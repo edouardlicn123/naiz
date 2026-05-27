@@ -1,0 +1,287 @@
+REM	START
+	CHKDTYP %3
+	IF 2 	HD
+REM	MOVE_AP
+:FD
+	ECHO
+	ECHO	アプリケーション登録のために新しいディスクを作成しますか <Y/N>?
+	INPKY
+	ECHO
+	IF 89	NEW_FD
+	IF 121	NEW_FD
+	IF 78	OLD_FD
+	IF 110	OLD_FD
+	GOTO	FD
+:OLD_FD
+	ECHO
+	ECHO	%3にアプリケーションを登録するディスクをセットしてください
+	ECHO	%1にアプリケーションのディスクをセットしてください
+	ECHO	準備ができたらどれかキーを押してください
+	INPKY
+	GOTO	COPY_FD
+:NEW_FD
+	ECHO
+	ECHO	新しくフロッピィディスクを作成します
+	ECHO	１ＭＢフロッピィディスクを初期化しますか <Y/N>?
+	INPKY
+	IF 89	1MB_FD
+	IF 121	1MB_FD
+	IF 78	640KB_FD
+	IF 110	640KB_FD
+	GOTO	NEW_FD
+:640KB_FD
+	ECHO
+	ECHO	%1にＭＳ－ＤＯＳのシステムディスクをセットしてください
+	ECHO	%3にアプリケーションを登録するフロッピィディスクをセットしてください
+	ECHO	準備ができたらどれかキーを押してください
+	INPKY
+	ECHO
+	%1\COMMAND.COM /C %1
+	%1\FORMAT.EXE %3 /9 /S /P
+	%1\COMMAND.COM /C %3
+	GOTO 	CHANGE
+:1MB_FD
+	ECHO
+	ECHO	%1にＭＳ－ＤＯＳのシステムディスクをセットしてください
+	ECHO	%3にアプリケーションを登録するフロッピィディスクをセットしてください
+	ECHO	準備ができたらどれかキーを押してください
+	INPKY
+	ECHO
+	%1\COMMAND.COM /C %1
+	%1\FORMAT.EXE %3 /M /S /P
+	%1\COMMAND.COM /C %3
+:CHANGE
+	ECHO
+	ECHO	%1に挿入されているＭＳ－ＤＯＳシステムディスクを抜いて、
+	ECHO	%1にアプリケーションのディスクをセットしてください
+	ECHO	準備ができたらどれかキーを押してください
+	INPKY
+:COPY_FD
+	ECHO
+	ECHO	ファイルをコピー中です
+	ECHO
+	FCOPY %1 %3
+	CHKDTYP %3
+	IF 6 	CP_RAMD
+	GOTO	CPY_MORE
+:CP_RAMD
+	ECHO
+	ECHO	%3に登録されたアプリケーションをフロッピィディスクにバックアップします
+	ECHO
+	ECHO	アプリケーションのバックアップのために新しいディスクを作成しますか <Y/N>?
+	INPKY
+	ECHO
+	IF 89	NEW_BKUP
+	IF 121	NEW_BKUP
+	IF 78	OLD_BKUP
+	IF 110	OLD_BKUP
+	GOTO	CP_RAMD
+:OLD_BKUP
+	ECHO
+	ECHO	%1にアプリケーションをバックアップするフロッピィディスクをセットしてください
+	ECHO	準備ができたらどれかキーを押してください
+	INPKY
+	GOTO	FD_BKUP
+:NEW_BKUP
+	ECHO
+	ECHO	%1にＭＳ－ＤＯＳシステムディスクをセットしてください
+	ECHO	準備ができたらどれかキーを押してください
+	INPKY
+	ECHO
+	ECHO	新しいフロッピィディスクを初期化します
+	ECHO	１ＭＢフロッピィディスクを初期化しますか <Y/N>?
+	INPKY
+	ECHO
+	IF 89	1MB_BKUP
+	IF 121	1MB_BKUP
+	IF 78	640_BKUP
+	IF 110	640_BKUP
+	GOTO	NEW_BKUP
+:640_BKUP
+	%1FORMAT.EXE %1 /9
+	GOTO	FD_BKUP
+:1MB_BKUP
+	%1FORMAT.EXE %1 /M
+:FD_BKUP
+	ECHO
+	ECHO	ファイルをコピー中です
+	ECHO
+	FCOPY %3 %1 /S
+	GOTO	CPY_MORE
+:HD
+	COMMAND.COM /C MD %3\SETUPDIR.$$$
+	COMMAND.COM /C CD %3\SETUPDIR.$$$
+	COMMAND.COM /C COPY %1\*.* %3
+	REPLACE.EXE %1\*.DIC %3\ /P
+	REPLACE.EXE %1\*.DIC %3\ /A
+	ECHO
+	SETUP2.EXE %3 %1
+	IF 0	CPY_MORE
+	IF 254	ESCAPE
+:ERROR
+	ECHO
+	ERECHO	アプリケーションの登録中にエラーがありました
+:ESCAPE
+	ECHO
+	ERECHO	アプリケーションの登録を中止します
+	ERECHO	”Ｙ”キーを押し、リターンキーを押してください
+	ECHO
+	COMMAND.COM /C DEL %3*.*
+	COMMAND.COM /C CD %3\
+	COMMAND.COM /C RD %3\SETUPDIR.$$$
+	ECHO
+	GOTO	END
+:CPY_MORE
+	ECHO
+	ECHO	もう一枚アプリケーションのディスクを登録しますか <Y/N>?
+	INPKY
+	ECHO
+	IF 89	YES_MORE
+	IF 121	YES_MORE
+	IF 78	NO_MORE
+	IF 110	NO_MORE
+	GOTO	CPY_MORE
+:NO_MORE
+	CHKDTYP %3
+	IF 2	CD_ROOT
+	GOTO	NO_SANK
+:YES_MORE
+	CHKDTYP %3
+	IF 2	HD_MORE
+	GOTO	FD_MORE
+:HD_MORE
+	ECHO
+	ECHO	%1に次のアプリケーションのディスクをセットしてください
+	ECHO	準備ができたらどれかキーを押してください
+	INPKY
+	ECHO
+	COMMAND.COM /C COPY %1\*.* %3
+	GOTO	CPY_MORE
+:FD_MORE
+	ECHO
+	ECHO	%1にＭＳ－ＤＯＳのシステムディスクをセットしてください
+	ECHO	%3にアプリケーションを登録する次のディスクをセットしてください
+	ECHO	準備ができたらどれかキーを押してください
+	INPKY
+	ECHO
+	ECHO	アプリケーション登録のために新しいディスクを作成しますか <Y/N>?
+	INPKY
+	ECHO
+	IF 89	NEW_MORE
+	IF 121	NEW_MORE
+	IF 78	OLD_MORE
+	IF 110	OLD_MORE
+	GOTO	FD_MORE
+:NEW_MORE
+	ECHO
+	ECHO	新しくフロッピィディスクを作成します
+	ECHO	１ＭＢフロッピィディスクを初期化しますか <Y/N>?
+	INPKY
+	ECHO
+	IF 89	1MB_MORE
+	IF 121	1MB_MORE
+	IF 78	640_MORE
+	IF 110	640_MORE
+	GOTO	NEW_MORE
+:640_MORE
+	%1\COMMAND.COM /C %1
+	%1\FORMAT.EXE %3 /9 /P
+	%1\COMMAND.COM /C %3
+	GOTO OLD_MORE
+:1MB_MORE
+	%1\COMMAND.COM /C %1
+	%1\FORMAT.EXE %3 /M /P
+	%1\COMMAND.COM /C %3
+:OLD_MORE
+	ECHO
+	ECHO	%1に挿入されているＭＳ－ＤＯＳシステムディスクを抜いて、
+	ECHO	%1に次のアプリケーションのディスクをセットしてください
+	ECHO	準備ができたらどれかキーを押してください
+	INPKY
+	ECHO
+	ECHO	ファイルをコピー中です
+	ECHO
+	FCOPY %1 %3
+	CHKDTYP %3
+	IF 6	RD_MORE
+	GOTO	SECOND
+:RD_MORE
+	ECHO
+	ECHO	%3に登録されたアプリケーションをフロッピィディスクにバックアップします
+	ECHO
+	ECHO	アプリケーションのバックアップのために新しいディスクを作成しますか <Y/N>?
+	INPKY
+	ECHO
+	IF 89	M_NBKUP
+	IF 121	M_NBKUP
+	IF 78	M_OBKUP
+	IF 110	M_OBKUP
+	GOTO	RD_MORE
+:M_OBKUP
+	ECHO
+	ECHO	%1にアプリケーションをバックアップするフロッピィディスクをセットしてください
+	ECHO	準備ができたらどれかキーを押してください
+	INPKY
+	GOTO	M_BKUP
+:M_NBKUP
+	ECHO
+	ECHO	%1にＭＳ－ＤＯＳシステムディスクをセットしてください
+	ECHO	準備ができたらどれかキーを押してください
+	INPKY
+	ECHO
+	ECHO	新しいフロッピィディスクを初期化します
+	ECHO	１ＭＢフロッピィディスクを初期化しますか <Y/N>?
+	INPKY
+	ECHO
+	IF 89	1_M_BKUP
+	IF 121	1_M_BKUP
+	IF 78	6_M_BKUP
+	IF 110	6_M_BKUP
+	GOTO	M_NBKUP
+:6_M_BKUP
+	%1FORMAT.EXE %1 /9
+	GOTO	M_BKUP
+:1_M_BKUP
+	%1FORMAT.EXE %1 /M
+:M_BKUP
+	ECHO
+	ECHO	ファイルをコピー中です
+	ECHO
+	FCOPY %3 %1
+	ECHO
+:SECOND
+	ECHO
+	ECHO	もう一枚アプリケーションのディスクを登録しますか <Y/N>?
+	INPKY
+	ECHO
+	IF 89	YES_MORE
+	IF 121	YES_MORE
+	IF 78	NO_SANK
+	IF 110	NO_SANK
+	GOTO	SECOND
+:NO_SANK
+	CHKDTYP %3
+	IF 6 SNK_RMD
+	ECHO
+	ECHO	%3にＭＳ－ＤＯＳのシステムディスクをセットしてください
+	ECHO	準備ができたらどれかキーを押してください
+	INPKY
+	ECHO
+	GOTO	END
+:SNK_RMD
+	ECHO
+	ECHO	%1にＭＳ－ＤＯＳのシステムディスクをセットしてください
+	ECHO	準備ができたらどれかキーを押してください
+	INPKY
+	ECHO
+	%1\COMMAND.COM /C %1
+	%1\FORMAT.EXE %3 /M /S /P
+	%1\COMMAND.COM /C %3
+	%3\COMMAND.COM /C COPY %1\*.* %3
+	GOTO	END
+:CD_ROOT
+	COMMAND.COM /C CD %3\
+REM	EXIT
+:END
+REM	END
+

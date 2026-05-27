@@ -1,0 +1,36 @@
+[submodule "ref_projects/gdc_test"]
+	path = ref_projects/gdc_test
+	url = https://github.com/tyama501/gdc_test.git
+[submodule "ref_projects/xsys35c"]
+	path = ref_projects/xsys35c
+	url = https://github.com/kichikuou/xsys35c.git
+[submodule "ref_projects/ps2busmouse98"]
+	path = ref_projects/ps2busmouse98
+	url = https://github.com/tyama501/ps2busmouse98.git
+[submodule "ref_projects/djlsr"]
+	path = ref_projects/djlsr
+	url = https://github.com/PC-98/djlsr.git
+[submodule "ref_projects/MHVNVisualNovelEngine"]
+	path = ref_projects/MHVNVisualNovelEngine
+	url = git@github.com:maxotaku11niku/MHVNVisualNovelEngine.git
+[submodule "ref_projects/pmdmini"]
+	path = ref_projects/pmdmini
+	url = https://github.com/mistydemeo/pmdmini.git
+[submodule "ref_projects/master_lib"]
+	path = ref_projects/master_lib
+	url = https://github.com/koizuka/master.lib.git
+[submodule "ref_projects/xsystem35-sdl2"]
+	path = ref_projects/xsystem35-sdl2
+	url = https://github.com/kichikuou/xsystem35-sdl2.git
+[submodule "ref_projects/ReC98"]
+	path = ref_projects/ReC98
+	url = https://github.com/nmlgc/ReC98.git
+[submodule "ref_projects/np21w"]
+	path = ref_projects/np21w
+	url = https://github.com/SimK98/np21w
+[submodule "ref_projects/98imgtools"]
+	path = ref_projects/98imgtools
+	url = https://github.com/tsdko/98imgtools
+[submodule "ref_projects/98fmplayer"]
+	path = ref_projects/98fmplayer
+	url = https://github.com/myon98/98fmplayer

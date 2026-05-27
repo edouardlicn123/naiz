@@ -1,0 +1,220 @@
+MHVNTEST - Basic test of the MHVN Visual Novel Engine
+Copyright (c) 2023-2024 Maxim Hoxha
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+
+Opening scene
+
+@s(SCENE_TEST)
+
+Narrator
+@[SCENE_TEST_0000
+Well, would you look at that, we've got ourselves a good bunch of text in front of us.@]
+
+Narrator
+@[SCENE_TEST_0001
+This is a test of the @f(sb)@cbMHVN Visual Novel Engine@r(fc) to show what it can do.@]
+
+Narrator
+@[SCENE_TEST_0002
+Perhaps you'd like a bit of@f(sb) bold text@r(f) in your life.@]
+
+Narrator
+@[SCENE_TEST_0003
+Maybe some@f(si) italics@r(f) too, if you're good.@]
+
+Narrator
+@[SCENE_TEST_0004
+I can even put an @f(su)underline@r(f) on this text as well!@]
+
+Narrator
+@[SCENE_TEST_0005
+@w3@m8Or perhaps you'd like some masked text?@]
+
+Narrator
+@[SCENE_TEST_0006
+@c0All @c1the @c2wonderful @c3colours @c4of @c5the @c6beautiful @c7rainbow @c8are @c9ready @cafor @cbus @ccto @cdmake @ceuse @cfof!@]
+
+Narrator
+@[SCENE_TEST_0007
+Well that's all for now, @p0.
+@f(sbi)@ca@d5Have a great day!@]
+
+(none)
+@[SCENE_TEST_0008
+Suddenly, someone new appears.@]
+
+Confused Person
+@[SCENE_TEST_0009
+Wait, wait, wait, this runs on a PC-98?@]
+
+Narrator
+@[SCENE_TEST_000A
+Well, it appears that, indeed, it does.@]
+
+Confused Person
+@[SCENE_TEST_000B
+Well, that's @f(si)completely unsurprising!@]
+
+Narrator
+@[SCENE_TEST_000C
+@f(sb)Of course you're not surprised!@]
+
+Narrator
+@[SCENE_TEST_000D
+What do you think, @p0? Is it surprising?@]
+
+Narrator
+@[SCENE_TEST_000E
+Anyway, I hope you've gotten over your confusion now.@]
+
+Confused Person
+@[SCENE_TEST_000F
+Hey you @p0! Who do you think's better?@]
+
+@[SCENE_TEST_CHOICE_0001_0
+You@]
+
+@[SCENE_TEST_CHOICE_0001_1
+The Narrator@]
+
+Narrator
+@[SCENE_TEST_0010
+Anyway we must press on. Questions with only two answers will get us nowhere. We need to give @p0 more. What's 9 + 10?@]
+
+@[SCENE_TEST_CHOICE_0002_0
+19, obviously@]
+
+@[SCENE_TEST_CHOICE_0002_1
+TWENNY WAN!@]
+
+@[SCENE_TEST_CHOICE_0002_2
+Uh, what?@]
+
+Confused Person
+@[SCENE_TEST_0011
+Alright let's take this even further! Which console is the best, in your objective opinion?@]
+
+@[SCENE_TEST_CHOICE_0003_0
+Nintendo Switch@]
+
+@[SCENE_TEST_CHOICE_0003_1
+Playstation@]
+
+@[SCENE_TEST_CHOICE_0003_2
+Xbox@]
+
+@[SCENE_TEST_CHOICE_0003_3
+None, PC beats them all@]
+
+Confused Person
+@[SCENE_TEST_0012
+Anyway, I'll come back when we have some actual sprites, instead of just this silly text box and cheesy background.@]
+
+Narrator
+@[SCENE_TEST_0013
+Yes, well we'll just have to wait for the developer to get to it, then.@]
+
+Narrator
+@[SCENE_TEST_0014
+So come on developer! Can't you program more for us? Jesus.@]
+
+
+
+I've put these ones out of order to test the linker
+
+
+
+Narrator
+@[SCENE_TEST_000D_YES_0
+Well what do you know, @p0 certainly seems to think it @f(si)is@r(f) surprising.@]
+
+Confused Person
+@[SCENE_TEST_000D_YES_1
+Well then they're @c5wrong!@]
+
+Narrator
+@[SCENE_TEST_000D_NO_0
+Well, well, well, looks like @p0 agrees with you.@]
+
+Confused Person
+@[SCENE_TEST_000D_NO_1
+Hah! 2 vs. 1, you're @c5outnumbered!@]
+
+
+
+Confused Person
+@[SCENE_TEST_000F_CONPER_0
+Aww hell yeah @f(si)in your face@r(f) stupid Narrator!@]
+
+Narrator
+@[SCENE_TEST_000F_CONPER_1
+Well I'm only a narrator, so what can I say.@]
+
+Confused Person
+@[SCENE_TEST_000F_NARR_0
+@f(sbi)What?!@r(f) How could you choose them?@]
+
+Narrator
+@[SCENE_TEST_000F_NARR_1
+Well, I'm flattered. @c3uwu.@]
+
+Confused Person
+@[SCENE_TEST_000F_NARR_2
+What do you mean '@c3uwu@r(c)'?@]
+
+
+
+Narrator
+@[SCENE_TEST_0010_CORRECT
+Correct. That should've been straightforward.@]
+
+Confused Person
+@[SCENE_TEST_0010_MEME
+That meme is @f(si)soooooooooo@r(f) dead.@]
+
+Narrator
+@[SCENE_TEST_0010_CONFUSED
+*sigh* @m8this should be simple@r(m)@d5 Anyway, let me repeat: what's 9 + 10?@]
+
+Narrator
+@[SCENE_TEST_0010_FYOU
+Fine, if you don't want to cooperate, I guess we should just end this test right here. F*** you. Seriously.@] Bowdlerised since this is a public test
+
+
+
+Confused Person
+@[SCENE_TEST_0011_NINTENDO
+@c5Ooh, fun.@r(c) You must like their exclusives.@]
+
+Confused Person
+@[SCENE_TEST_0011_PLAYSTATION
+@cdOoh, nice.@r(c) They really have a simple naming convention don't they?@]
+
+Confused Person
+@[SCENE_TEST_0011_XBOX
+@c9Ooh, cool.@r(c) I think the X in DirectX and Xbox are related, right?@]
+
+Confused Person
+@[SCENE_TEST_0011_PC_0
+@cb@f(sbiu)BASED!!!! PC MAST-@]
+
+Narrator
+@[SCENE_TEST_0011_PC_1
+Ahem, can you try not to say anything too offensive?@]

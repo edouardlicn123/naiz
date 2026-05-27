@@ -1,0 +1,6 @@
+logs/
+tools/env_setup/venv/
+pc98msdos5/
+disks/
+*.o
+__pycache__/
