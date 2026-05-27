@@ -49,11 +49,11 @@ def build_temp_dir(game, no_dos=False, no_config=False, no_autoexec=False):
         game_upper = game.upper()
         autoexec_content = (
             b'@ECHO OFF\r\n'
-            b'PATH A:\\DOS;A:\\' + game_upper.encode() + b'\r\n'
-            b'SET TEMP=A:\\DOS\r\n'
-            b'SET DOSDIR=A:\\DOS\r\n'
-            b'MOUSE\r\n'
-            b'CD A:\\' + game_upper.encode() + b'\r\n'
+            b'PATH C:\\DOS;C:\\' + game_upper.encode() + b'\r\n'
+            b'SET TEMP=C:\\DOS\r\n'
+            b'SET DOSDIR=C:\\DOS\r\n'
+            b'ECHO BOOT_OK > C:\\BOOTMARK.TXT\r\n'
+            b'CD C:\\' + game_upper.encode() + b'\r\n'
             b'ENGINE.EXE\r\n'
         )
         with open(dst_autoexec, 'wb') as f:

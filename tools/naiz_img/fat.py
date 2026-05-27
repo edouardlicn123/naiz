@@ -9,16 +9,20 @@ from .hdi import HDIImage
 from .partition import detect_partitions
 
 
-ATTR_DIRECTORY = 0x10
-ATTR_ARCHIVE   = 0x20
+ATTR_READ_ONLY = 0x01
+ATTR_HIDDEN    = 0x02
 ATTR_SYSTEM    = 0x04
 ATTR_VOLUME_ID = 0x08
+ATTR_DIRECTORY = 0x10
+ATTR_ARCHIVE   = 0x20
 ATTR_LFN       = 0x0F
+
+ATTR_SYSTEM_FILE = ATTR_READ_ONLY | ATTR_HIDDEN | ATTR_SYSTEM | ATTR_ARCHIVE
 
 FAT12_EOC = 0x0FF8
 FAT16_EOC = 0xFFF8
 
-SYSTEM_FILES = {'IO.SYS', 'MSDOS.SYS'}
+SYSTEM_FILES = {'IO.SYS', 'MSDOS.SYS', 'DBLSPACE.BIN'}
 
 
 class FileEntry:
@@ -374,7 +378,8 @@ class NAIZFatFS:
                         first_cluster = chain[0]
                     else:
                         first_cluster = 0
-                    entries.extend(_make_entry(name8, ext3, ATTR_ARCHIVE, first_cluster, file_size))
+                    attr = ATTR_SYSTEM_FILE if item_name.upper() in SYSTEM_FILES else ATTR_ARCHIVE
+                    entries.extend(_make_entry(name8, ext3, attr, first_cluster, file_size))
                     counters['files'] += 1
             return bytes(entries)
 
