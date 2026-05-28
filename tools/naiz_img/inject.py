@@ -25,7 +25,7 @@ REF_DISK = os.path.join(PROJECT_ROOT, 'tools', 'ref_disk')
 REF_CONFIG = os.path.join(PROJECT_ROOT, 'tools', 'ref_config')
 GAMES_DIR = os.path.join(PROJECT_ROOT, 'games')
 DISKS_DIR = os.path.join(PROJECT_ROOT, 'disks')
-DEFAULT_BASE = os.path.normpath(os.path.join(os.path.dirname(__file__), '..', 'msdos5.hdi'))
+DEFAULT_BASE = os.path.normpath(os.path.join(os.path.dirname(__file__), '..', 'base_msdos5_scsi_48m.hdi'))
 
 
 def build_temp_dir(game, no_dos=False, no_config=False, no_autoexec=False):
