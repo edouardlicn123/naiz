@@ -10,6 +10,7 @@ import shutil
 import subprocess
 import sys
 import time
+import tomllib
 from datetime import datetime
 
 LOG_DIR = "logs"
@@ -562,14 +563,35 @@ def cmd_test_hdi(hdi_path=None, emulator=None):
             shutil.copy2(src, dst)
             print(f"  [✓] 已复制: {rom}")
 
-    cfg_content = f"""[NP21kai]
-SCSIHDD0 = {selected}
-pc_model = PC9821
-keyboard = 106
-use_hdrv = true
-"""
-    with open(cfg_path, "w", encoding="utf-8") as f:
-        f.write(cfg_content)
+    try:
+        with open(cfg_path, 'rb') as f:
+            cfg = tomllib.load(f)
+    except (FileNotFoundError, tomllib.TOMLDecodeError):
+        cfg = {}
+
+    sec = cfg.setdefault('NP21kai', {})
+    sec['SCSIHDD0'] = selected
+
+    def _toml_val(v):
+        if isinstance(v, bool):
+            return 'true' if v else 'false'
+        if isinstance(v, int):
+            return str(v)
+        if isinstance(v, str):
+            return "'" + v.replace("'", "''") + "'"
+        if isinstance(v, list):
+            items = ', '.join(_toml_val(x) for x in v)
+            return f'[{items}]'
+        return str(v)
+
+    lines = []
+    for sk, sv in cfg.items():
+        lines.append(f'[{sk}]')
+        for k, v in sv.items():
+            lines.append(f'{k} = {_toml_val(v)}')
+        lines.append('')
+    with open(cfg_path, 'w', encoding='utf-8') as f:
+        f.write('\n'.join(lines))
 
     basename = os.path.basename(selected)
     size_str = os.path.getsize(selected)

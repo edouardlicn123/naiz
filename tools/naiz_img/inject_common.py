@@ -233,8 +233,9 @@ def inject_into_hdi(hdi_path, game_name, game_dir,
         entry = _make_entry(dir_name8, dir_ext3, ATTR_DIRECTORY, dir_cluster, 0)
         root_data[slot:slot + 32] = entry
         dir_chain = [dir_cluster]
+        _write_cluster(fs, dir_cluster, b'\x00' * fs.cluster_size)
         _write_root(fs, root_data)
-        print(f"\n{game_name_upper}/ created at cluster={dir_cluster}")
+        print(f"\n{game_name_upper}/ created at cluster={dir_cluster} (zeroed)")
 
     dir_data = bytearray()
     for c in dir_chain:
