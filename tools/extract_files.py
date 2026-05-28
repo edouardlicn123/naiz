@@ -1,6 +1,6 @@
 import struct
 
-HDI_PATH = "/home/edo/naiz/pc98msdos5/msdos5.hdi"
+HDI_PATH = os.path.join(os.path.dirname(__file__), "base_msdos5_scsi_48m.hdi")
 
 with open(HDI_PATH, "rb") as f:
     hdi = f.read(32)

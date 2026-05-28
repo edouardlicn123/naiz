@@ -6,10 +6,10 @@
 Naiz/
 ├── core/                    # Engine source (C, gcc-ia16)
 ├── tools/                   # Python toolchain
-│   ├── naiz_img/            #   HDI/FAT toolchain (inject.py, hdi.py, fat.py, ...)
-│   ├── ref_disk/            #   MS-DOS 5.0 system files (IO.SYS, MSDOS.SYS, COMMAND.COM, DOS/*)
-│   ├── ref_config/          #   CONFIG.SYS, AUTOEXEC.BAT
-│   └── msdos5.hdi           #   Base HDI image (read-only, MS-DOS 5.0 48MB)
+│   ├── naiz_img/            #   HDI/FAT toolchain (inject.py, inject_common.py, hdi.py, fat.py, ...)
+│   ├── inject_common.py          #   增量注入核心
+│   └── ref_config/          #   CONFIG.SYS
+│   └── base_msdos5_scsi_48m.hdi           #   Base HDI image (read-only, MS-DOS 5.0 48MB)
 ├── ref_projects/            # Read-only git submodules (references)
 ├── projects/                # Engineering projects (source code, build files)
 ├── games/                   # Deployable game files (injected into HDI, built from projects/)
@@ -20,22 +20,42 @@ Naiz/
 │   ├── 01-*.md
 │   ├── 02-*.md
 │   └── ...
+├── make_hdi.sh              # （已删除，由 makegame.sh 替代）
+├── makegame.sh              # Game build/test workflow (make/test/build)
+├── setup_env.sh             # 开发环境安装菜单
 └── start.sh                 # Launcher menu
 ```
 
 ## HDI 镜像制作 (HDI Image Creation)
 
-使用 `./make_hdi.sh` 制作启动盘，详细方案见 `docs/A04-HDI制作方案.md`。
+使用 `makegame.sh make <name>` 制作启动盘，详细方案见 `docs/A04-HDI制作方案.md`。
 
-**核心流程**：`make_hdi.sh` (Bash 交互) → `tools/naiz_img/inject.py` (Python 工具链)
+**核心流程**：`makegame.sh make` → `tools/naiz_img/inject.py` (Python 工具链)
 
 **要点**：
-- 基于已知可启动的 `tools/msdos5.hdi`（MS-DOS 5.0 48MB，只读），保留完整 IPL/VBR/boot chain
-- 注入三部分内容：`tools/ref_disk/`（系统文件）→ `tools/ref_config/`（CONFIG.SYS、AUTOEXEC.BAT）→ `games/<name>/`（游戏文件）
+- 基于已知可启动的 `tools/base_msdos5_scsi_48m.hdi`（MS-DOS 5.0 48MB，只读），保留完整 IPL/VBR/boot chain
+- **增量注入**：复制基座 → `inject_common.inject_into_hdi()` 在 FAT 层精准写入文件，不重建整个文件系统
+- 注入三部分内容：`tools/ref_config/CONFIG.SYS`（系统配置）+ `generate_autoexec()` 生成的 AUTOEXEC.BAT + `games/<name>/` 游戏文件；注入时自动移除 DBLSPACE.BIN
 - 输出到 `disks/<name>.hdi`
 - `tools/naiz_img/` 镜像工具链参考 98Bridge (MIT) 设计思路独立实现，涵盖 5 种容器格式（HDI/FDI/D88/Raw/NHD）和 FAT12/FAT16 文件系统
-- 使用 `NAIZFatFS.write_back_from_directory()` 全量重建 FAT 文件系统，自动将 IO.SYS/MSDOS.SYS 排根目录最前
-- CONFIG.SYS 必须使用根相对路径 `\`（MS-DOS 引导阶段盘符尚未分配）
+- IO.SYS/MSDOS.SYS 保持基座镜像原有簇链不变，无需重排
+- CONFIG.SYS 必须使用根相对路径 `\`（MS-DOS 引导阶段盘符尚未分配）；AUTOEXEC.BAT 虽在盘符分配后执行，但 `generate_autoexec()` 同样使用 `\` 保持统一
+- DBLSPACE.BIN 在注入时自动从根目录移除（Step 0），否则 IO.SYS 加载它后会扫描新簇数据并弹出交互式询问
+- 新分配的目录簇必须立即清零，否则簇内残留的 EXE 数据（`MZ%` 魔数）会被 FAT 解析层误判为垃圾目录项，导致 `CD` 失败
+
+## 基座镜像 (Base HDI)
+
+以只读形式存放于 `tools/base_msdos5_scsi_48m.hdi`，具体属性：
+
+| 属性 | 值 |
+|------|-----|
+| 系统 | MS-DOS 5.0（OEM: `NEC  5.0`） |
+| 接口 | SCSI（IPL 分区表 sys_id = `0x91`） |
+| 原始大小 | 约 48 MB（50,274,304 数据字节 + 4096 头部） |
+| HDI 头部 | 4096 字节 |
+| 几何 | 722 cyls × 8 heads × 17 spt × 512 bytes/sector |
+| 分区起始 | LBA 136 |
+| 文件系统 | FAT16，扇区 1024B，每簇 2 扇区 |
 
 ## 工具链 (Toolchain)
 
@@ -43,10 +63,9 @@ Naiz/
 |------|------|
 | 引擎编译 | gcc-ia16 (IA32, 16-bit real-mode) + ia16-elf-as, Make |
 | 素材处理 | Python 3.x |
-| 测试运行 | NP2kai（sdlnp21kai_sdl2，IA32 核心 + SDL2，系统安装于 /usr/local/bin/sdlnp21kai_sdl2，源码在 /tmp/NP2kai/） |
-| 移植目标 | SDL2（未来） |
+| 测试运行 | NP2kai（wxnp21kai，wxWidgets GTK3 前端 + IA32 核心，系统安装于 /usr/local/bin/wxnp21kai，源码在 /tmp/NP2kai/） |
 
-**注意**：使用 IA32 核心模拟器 (`sdlnp21kai_sdl2`)，i286 核心已废弃。所有测试通过 `./test_hdi.sh <name> ia32` 或 `make test` 运行。
+**注意**：使用 IA32 核心模拟器 (`wxnp21kai`)，i286 核心已废弃。SDL 前端 (`sdlnp21kai_sdl2`) 已弃用。所有测试通过 `makegame.sh test <name>` 或 `make test` 运行。
 
 ---
 

@@ -3,7 +3,7 @@
 ## 背景
 
 之前的方向变更（change.txt）提出：
-1. 基于已确认可启动的 `~/msdos5/msdos5.hdi` 制作游戏 HDI
+1. 基于已确认可启动的 `~/msdos5/base_msdos5_scsi_48m.hdi` 制作游戏 HDI
 2. 引入 98Bridge 替代自维护的 FAT16 注入代码
 
 98Bridge 已于 `docs/98bridge/api-分析.md` 做了完整源码分析。**不直接引用 98Bridge 代码**，而是借鉴其设计思路，在 `tools/naiz_img/` 下独立实现。
@@ -13,7 +13,7 @@
 在 `tools/naiz_img/` 中构建一套镜像工具链：
 - 支持 PC-98 常见镜像格式（HDI / FDI / D88 / Raw / NHD）
 - FAT12/FAT16 文件系统解析 + `write_back_from_directory` 全量重建注入
-- 基于 `~/msdos5/msdos5.hdi` 注入游戏文件，保留原版 boot chain
+- 基于 `~/msdos5/base_msdos5_scsi_48m.hdi` 注入游戏文件，保留原版 boot chain
 
 ## 目录结构
 
@@ -28,7 +28,7 @@ tools/naiz_img/
 ├── nhd.py             NHDImage   (T98-Next NHD, 512B 文本头)
 ├── partition.py       MBR / PC-98 IPL 分区表检测
 ├── fat.py             NAIZFatFS: FAT12/FAT16 解析 + write_back
-├── inject.py          CLI 入口: 注入游戏到 msdos5.hdi
+├── inject.py          CLI 入口: 注入游戏到 base_msdos5_scsi_48m.hdi
 └── README.md          用法 + 来源声明
 ```
 
@@ -157,7 +157,7 @@ CLI 参数：
 | 参数 | 默认值 | 说明 |
 |------|--------|------|
 | `-g, --game` | **必填** | 游戏名，对应 `games/<name>/` |
-| `-b, --base` | `~/msdos5/msdos5.hdi` | 基座 HDI |
+| `-b, --base` | `~/msdos5/base_msdos5_scsi_48m.hdi` | 基座 HDI |
 | `-o, --output` | `disks/<game>.hdi` | 输出路径 |
 | `--preview` | false | 只预览文件清单 |
 | `--list-files` | false | 列出全部文件 |
@@ -227,7 +227,7 @@ make test
 | 工具 | 职责 | 何时用 |
 |------|------|--------|
 | `make_hdi.py`（保留） | 从零创建 HDI（自建 IPL/VBR） | 备选/测试 |
-| `inject.py`（新增） | 基于 msdos5.hdi 注入游戏 | **主要开发流程** |
+| `inject.py`（新增） | 基于 base_msdos5_scsi_48m.hdi 注入游戏 | **主要开发流程** |
 | `naiz_img/` 各模块 | 镜像格式 + FAT12/FAT16 操作库 | 被 inject.py 调用 |
 
 ## 来源声明

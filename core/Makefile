@@ -51,5 +51,5 @@ clean:
 
 test: $(OUTPUT)
 	cp $(OUTPUT) ../games/demo-A1/
-	python3 -m tools.naiz_img.inject --game demo-A1 --yes
-	../test_hdi.sh demo-A1
+	../makegame.sh make demo-A1
+	../makegame.sh test demo-A1

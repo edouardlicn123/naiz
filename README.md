@@ -29,10 +29,9 @@ Naiz/
 │   └── build/               #   Build output
 ├── tools/                   # Python toolchain
 │   ├── naiz_img/            #   HDI/FAT toolchain (inject.py, hdi.py, fat.py, ...)
-│   ├── ref_disk/            #   MS-DOS 5.0 system files (IO.SYS, MSDOS.SYS, ...)
-│   ├── ref_config/          #   CONFIG.SYS, AUTOEXEC.BAT
+│   ├── ref_config/          #   CONFIG.SYS
 │   ├── env_setup/           #   NP2kai build / test scripts (install_env.py)
-│   └── msdos5.hdi           #   Base HDI image (read-only)
+│   └── base_msdos5_scsi_48m.hdi           #   Base HDI image (read-only)
 ├── projects/                # Game project containers
 │   └── demo-A1/             #   Demo project (main.c, Makefile)
 ├── games/                   # Deployable game files
@@ -41,7 +40,9 @@ Naiz/
 ├── docs/                    # Specifications (A01-A04)
 ├── devdocs/                 # Development notes (numbered 01-20, MHVN98/)
 ├── AGENTS.md                # AI agent rules & attribution policy
-├── make_hdi.sh              # Interactive HDI builder
+├── make_hdi.sh              # （已删除，由 makegame.sh 替代）
+├── makegame.sh              # Game build/test workflow (make/test/build)
+├── setup_env.sh             # 开发环境安装菜单
 └── start.sh                 # Launcher menu
 ```
 
@@ -75,8 +76,8 @@ See `AGENTS.md` for the attribution policy when using code from these projects.
 
 - **Engine (PC-98 real mode):** [gcc-ia16](https://github.com/tkchia/gcc-ia16) (IA-16, 16-bit real-mode), ia16-elf-as, Make
 - **Toolchain:** Python 3.x
-- **Emulator (testing):** [NP2kai](https://domisan.sakura.ne.jp/article/np2kai/np2kai.html) — IA32 core (`sdlnp21kai_sdl2`)
-- **Base HDI:** MS-DOS 5.0 (`tools/msdos5.hdi`, read-only)
+- **Emulator (testing):** [NP2kai](https://domisan.sakura.ne.jp/article/np2kai/np2kai.html) — IA32 core (`wxnp21kai`)
+- **Base HDI:** MS-DOS 5.0 (`tools/base_msdos5_scsi_48m.hdi`, read-only)
 
 ---
 
@@ -86,9 +87,9 @@ See `AGENTS.md` for the attribution policy when using code from these projects.
 Source → engine.exe → HDI → NP2kai boot → test
 ┌─────────────┐    ┌─────────────┐    ┌──────────┐
 │ core/       │    │ inject.py   │    │ NP2kai   │
-│ projects/   │───→│ ref_disk/   │───→│ IPL →    │
-│ gcc-ia16    │    │ ref_config/ │    │ MS-DOS → │
-│ crt0.s      │    │ msdos5.hdi  │    │ ENGINE   │
+│ projects/   │───→│ ref_config/ │───→│ IPL →    │
+│ gcc-ia16    │    │ (CONFIG.SYS)│    │ MS-DOS → │
+│ crt0.s      │    │ base_msdos5_scsi_48m.hdi  │    │ ENGINE   │
 │ msdos.ld    │    │             │    │          │
 └─────────────┘    └─────────────┘    └──────────┘
 ```
@@ -96,14 +97,10 @@ Source → engine.exe → HDI → NP2kai boot → test
 ## Quick Start | 快速开始
 
 ```bash
-# Build engine and inject into HDI
-cd projects/demo-A1 && make
-
-# Re-inject HDI (if engine unchanged, only rebuild HDI)
-python3 -m tools.naiz_img.inject --game demo-A1 --yes
-
-# Test in NP2kai
-make_hdi.sh  # interactive mode
+# Build engine, inject into HDI, test in NP2kai
+cd projects/demo-A1 && make        # compile engine
+./makegame.sh make demo-A1         # inject HDI
+./makegame.sh test demo-A1         # boot in NP2kai
 ```
 
 See `docs/A04-HDI制作方案.md` for HDI details and `docs/A03-引擎开发与调试全流程.md` for full dev cycle.

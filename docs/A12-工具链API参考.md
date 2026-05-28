@@ -18,7 +18,9 @@ tools/naiz_img/
 ├── nhd.py         # NHD (T98-Next) 格式
 ├── partition.py   # 分区表检测（MBR + PC-98 IPL）
 ├── fat.py         # FAT12/FAT16 文件系统
-└── inject.py      # CLI 入口：游戏注入工具
+├── inject_common.py # 增量注入核心（inject_into_hdi, generate_autoexec）
+├── inject.py      # CLI 入口：游戏注入工具
+└── inject_file.py  # CLI 入口：二次注入
 ```
 
 ---
@@ -123,7 +125,7 @@ PC-98 分区表位于 LBA 1（扇区 1），每项 32 字节，最多 16 项。
 
 LBA 计算公式：`cyl × heads × spt + head × spt + sector`
 
-msdos5.hdi 典型值：
+base_msdos5_scsi_48m.hdi 典型值：
 - 分区起始：LBA 136 (cyl=1, head=0, sector=0)
 - 类型 ID：`0x91`
 - 大小：47520 扇区
@@ -160,7 +162,7 @@ class NAIZFatFS:
     def list_dir(self, path='/') -> list[FileEntry] | None
     def walk(self, path='/') -> Generator[tuple[str, FileEntry]]
     def read_file(self, entry: FileEntry) -> bytes
-    def write_back_from_directory(self, dir_path: str, save_path: str = None) -> tuple[int, int]
+    # write_back_from_directory — 已由 inject_common.inject_into_hdi() 替代
 ```
 
 #### 构造函数
@@ -211,26 +213,29 @@ for path, entry in fs.walk():
 data = fs.read_file(fs.resolve_path("/DEMO-A1/ENGINE.LOG"))
 ```
 
-#### write_back_from_directory — FAT 全量重建
+#### inject_into_hdi — 增量 FAT 注入（替代 write_back_from_directory）
 
-核心算法 — 不修改 IPL/VBR，重建 FAT 表、根目录和数据区。
+`tools/naiz_img/inject_common.py` 提供当前核心注入逻辑。
+
+```python
+def inject_into_hdi(hdi_path, game_name, game_dir,
+                    no_config=False, no_autoexec=False) -> tuple[int, int]:
+```
 
 流程：
-1. 初始化 FAT 表（簇 0/1 设介质描述符/EOC）
-2. 清零 FAT 区（所有副本）、根目录区、数据区
-3. 递归遍历源目录：
-   - 根目录：IO.SYS 排第一，MSDOS.SYS 排第二
-   - 每个文件/目录分配连续簇，构建 FAT 链
-   - 数据写入 data 区，生成 32 字节目录项
-4. 写回根目录区
-5. `_build_fat_bytes()` 序列化 FAT（12-bit 交错或 16-bit 直写）
+0. 移除 DBLSPACE.BIN（根目录标记 0xE5），防 IO.SYS 弹出"how many files"询问
+1. 打开 HDI，解析 FAT16
+2. 替换 AUTOEXEC.BAT（原地覆写或重分配簇链）
+3. 替换 CONFIG.SYS（同上）
+4. 查找或创建游戏子目录 — 新分配目录簇立即清零
+5. 遍历游戏文件：已存在 → 覆写，新文件 → 分配簇链
 6. 写回所有 FAT 副本
 7. `img.save()`
 
-**约束**：
-- 必须基于有效 BPB（从镜像读取，非猜测值）
-- 文件名自动转为 8.3 格式，冲突使用 `~N` 后缀
-- 根目录条目数不能超过 `root_entries`
+```python
+def generate_autoexec(game_name) -> bytes:
+    """生成 AUTOEXEC.BAT 内容，使用 \ 根相对路径"""
+```
 
 ---
 
@@ -253,11 +258,12 @@ python -m tools.naiz_img.inject -g demo-A1 --extract DEMO-A1/ENGINE.LOG
 | 参数 | 默认值 | 说明 |
 |------|--------|------|
 | `-g, --game` | 必填 | 游戏名，对应 `games/<name>/` |
-| `-b, --base` | `tools/msdos5.hdi` | 基座 HDI |
+| `-b, --base` | `tools/base_msdos5_scsi_48m.hdi` | 基座 HDI |
 | `-o, --output` | `disks/<game>.hdi` | 输出路径 |
 | `--preview` | false | 预览文件清单 |
 | `--list-files` | false | 列出基座镜像文件 |
-| `--no-dos` | false | 跳过 DOS 工具 |
+| `--no-config` | false | 不覆写 CONFIG.SYS |
+| `--no-autoexec` | false | 不覆写 AUTOEXEC.BAT |
 | `--no-config` | false | 不覆盖 CONFIG.SYS |
 | `--no-autoexec` | false | 不覆盖 AUTOEXEC.BAT |
 | `-y, --yes` | false | 非交互模式 |
@@ -266,16 +272,9 @@ python -m tools.naiz_img.inject -g demo-A1 --extract DEMO-A1/ENGINE.LOG
 ### 工作流程
 
 ```python
-def build_temp_dir(game, ...):
-    tmp = mkdtemp()
-    # 1. 复制 ref_disk/（系统文件）
-    # 2. 复制 ref_config/（CONFIG.SYS + AUTOEXEC.BAT）
-    # 3. 复制 games/<game>/（游戏文件）
-    return tmp
-
-# 然后：
-fs = NAIZFatFS(open_image(base_hdi))
-fs.write_back_from_directory(tmp, save_path=output)
+shutil.copy2(base_hdi, output)                    # 复制基座
+inject_into_hdi(output, game, game_dir,
+                no_config=..., no_autoexec=...)    # 增量注入
 ```
 
 ---
@@ -284,10 +283,10 @@ fs.write_back_from_directory(tmp, save_path=output)
 
 | 工具 | 说明 |
 |------|------|
-| `make_hdi.sh` | 交互式外壳，调用 `inject.py`，自动选择 `games/` 下的子目录 |
-| `make_hdi.sh -g demo-A1 -y` | 静默模式，跳过菜单和确认 |
-| `make_hdi.sh --list-files` | 列出基座镜像内容 |
-| `make_hdi.sh --preview` | 预览游戏文件清单 |
+| `makegame.sh` | 统一工作流：`make`（注入 HDI）/ `test`（模拟器）/ `build`（编译） |
+| `makegame.sh make <game>` | 制作 HDI |
+| `makegame.sh test <game>` | 启动 wxnp21kai 测试 |
+| `makegame.sh build <proj>` | 编译项目数据 |
 
 ---
 
@@ -298,7 +297,7 @@ fs.write_back_from_directory(tmp, save_path=output)
 from naiz_img import open_image
 from naiz_img.fat import NAIZFatFS
 
-img = open_image("tools/msdos5.hdi")
+img = open_image("tools/base_msdos5_scsi_48m.hdi")
 fs = NAIZFatFS(img)
 
 for path, entry in fs.walk():
@@ -309,6 +308,7 @@ for path, entry in fs.walk():
 autoexec = fs.read_file(fs.resolve_path("/AUTOEXEC.BAT"))
 print(autoexec.decode('ascii'))
 
-# 注入游戏文件
-fs.write_back_from_directory("/tmp/my_build", save_path="disks/mygame.hdi")
+# 注入游戏文件（通过 inject_common）
+from tools.naiz_img.inject_common import inject_into_hdi
+inject_into_hdi("disks/mygame.hdi", "mygame", "games/mygame")
 ```

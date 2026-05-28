@@ -7,13 +7,13 @@ NP2kai 是 Neko Project II 的改进版（kai = 改良），PC-9800 系列模拟
 ### 核心架构
 
 ```
-游戏项目 (games/<name>/) + 系统文件 (tools/ref_disk/) + 配置 (tools/ref_config/)
+游戏项目 (games/<name>/) + 配置 (tools/ref_config/)
     │
     ▼
-tools/naiz_img/inject.py  ── 基于 msdos5.hdi 注入 ──▶  disks/<name>.hdi
+tools/naiz_img/inject.py  ── 基于 base_msdos5_scsi_48m.hdi 注入 ──▶  disks/<name>.hdi
     │
     ▼
-test_hdi.sh  ──▶  NP2kai (sdlnp2kai_sdl2)  ──▶  MS-DOS 5.0 boot → AUTOEXEC.BAT → ENGINE.EXE
+makegame.sh test ──▶  NP2kai (wxnp21kai)  ──▶  MS-DOS 5.0 boot → AUTOEXEC.BAT → ENGINE.EXE
 ```
 
 ### NP2kai 两大核心
@@ -21,7 +21,7 @@ test_hdi.sh  ──▶  NP2kai (sdlnp2kai_sdl2)  ──▶  MS-DOS 5.0 boot → 
 | 核心 | 二进制 | 模拟目标 | 用途 |
 |------|--------|----------|------|
 | **[DEPRECATED] i286** | `sdlnp2kai_sdl2` | PC-9801 (286) | 已弃用（BIOS 不匹配） |
-| **IA32** | `sdlnp21kai_sdl2` | PC-9821 (486+) | **当前开发目标**，与 PC-9821 BIOS 兼容 |
+| **IA32** | `wxnp21kai` | PC-9821 (486+) | **当前开发目标**，与 PC-9821 BIOS 兼容 |
 
 ### 开发环境路径速查
 
@@ -29,10 +29,11 @@ test_hdi.sh  ──▶  NP2kai (sdlnp2kai_sdl2)  ──▶  MS-DOS 5.0 boot → 
 |------|------|
 | NP2kai 源码 | `/tmp/NP2kai/` |
 | NP2kai 构建 | `/tmp/NP2kai/build/` |
-| BIOS ROM | `core/sdlnp2kai/bios.rom` |
-| Font ROM | `core/sdlnp2kai/font.rom` |
-| 模拟器配置 | `~/.config/sdlnp2kai/np2kai.cfg` |
-| 基座镜像 | `tools/msdos5.hdi` |
+| 模拟器安装 | `/usr/local/bin/wxnp21kai` |
+| 模拟器配置 | `~/.config/wxnp21kai/wxnp21kai.toml` |
+| BIOS ROM | `~/.config/wxnp21kai/bios.rom` |
+| Font ROM | `~/.config/wxnp21kai/font.rom` |
+| 基座镜像 | `tools/base_msdos5_scsi_48m.hdi` |
 | 输出镜像 | `disks/<game>.hdi` |
 | 测试日志 | `logs/test_<game>_<timestamp>.log` |
 
@@ -90,8 +91,7 @@ cmake --build /tmp/NP2kai/build --target sdlnp2kai_sdl2 -j$(nproc)
 ```bash
 python3 tools/env_setup/install_env.py check
 # 输出示例：
-#   sdlnp21kai_sdl2   /usr/local/bin/sdlnp21kai_sdl2
-#   sdlnp2kai_sdl2    /usr/local/bin/sdlnp2kai_sdl2
+#   ia32: /usr/local/bin/wxnp21kai
 ```
 
 ---
@@ -100,56 +100,23 @@ python3 tools/env_setup/install_env.py check
 
 ### 加载机制
 
-NP2kai **始终**从 `~/.config/sdlnp2kai/np2kai.cfg` 加载配置（`--config` 命令行参数无效），路径硬编码在源码中。
+wx 前端 (`wxnp21kai`) 使用 TOML 格式配置文件，默认路径 `~/.config/wxnp21kai/wxnp21kai.toml`。`cmd_test_hdi()` 自动在测试前生成该配置。
 
-测试时可通过设置 `XDG_CONFIG_HOME` 更改配置目录：
+### TOML 配置键名
 
-```python
-env["XDG_CONFIG_HOME"] = os.path.join(project_root, "core")
-# → 实际加载: core/sdlnp2kai/np2kai.cfg
-```
+wx 前端的 TOML 键名（按 `~/.config/wxnp21kai/wxnp21kai.toml` 格式）：
 
-### 配置键名
-
-| 节 | 键 | 说明 |
-|----|---|------|
-| `[NekoProjectIIkai]` | `fontfile` | 字体 ROM 路径 |
-| | `biospath` | BIOS ROM 路径 |
-| | `HDD1FILE` | SASI 硬盘镜像路径 |
-| | `HDD2FILE` | 第二硬盘（通常 NC） |
-| | `keyboard` | 键盘布局（106 = 日本键盘） |
-| | `use_hdrv` | 虚拟 HDD 驱动（false） |
-| `[NP2 Window Accelerator]` | `WindposX` / `WindposY` | 窗口位置 |
-| | `MULTIWND` | 多窗口模式 |
-| | `MULTHREAD` | 多线程加速 |
-| | `HALFTONE` | 半透明效果 |
-| `[Screen]` | `DispClock` | 显示帧率 |
-| | `RASTER` | 扫描线效果 |
-
-### 自动生成配置
-
-`cmd_test_hdi()` 生成如下配置：
-
-```ini
-[NekoProjectIIkai]
-fontfile = {core}/font.rom
-biospath = {core}/bios.rom
-HDD1FILE = {disks}/<game>.hdi
+```toml
+# 自动由 cmd_test_hdi() 生成
+title = "Naiz — <game>"
+SCSIHDD0 = "/path/to/disks/<game>.hdi"
 keyboard = 106
-use_hdrv = false
-
-[NP2 Window Accelerator]
-WindposX = 0
-WindposY = 0
-MULTIWND = false
-MULTHREAD = true
-HALFTONE = false
 ```
 
 ### 已知问题
 
-- NP2kai 缺乏官方的配置键名文档，部分键名可能未被正确解析
-- 配置路径发现流程曾发生过多次调试困难（见 §11）
+- wx 前端配置文件路径为 `~/.config/wxnp21kai/wxnp21kai.toml`，`cmd_test_hdi()` 自动生成
+- BIOS ROM 路径自动发现自配置目录，无需在配置文件中指定
 
 ---
 
@@ -159,16 +126,15 @@ HALFTONE = false
 
 | 文件 | 大小 | 说明 |
 |------|------|------|
-| `bios.rom` | 98304 B | PC-9801 系列 BIOS (N88-BASIC(86) v2.0) |
+| `bios.rom` | 98304 B | PC-9821 系列 BIOS |
 | `font.rom` | 288768 B | 字体 ROM（日文半角/全角字符） |
 
-存储位置：`core/sdlnp2kai/`
+存储位置：`~/.config/wxnp21kai/`
 
 ### 核心匹配规则
 
 ```
-PC-9801 BIOS (N88-BASIC v2.0)  →  [DEPRECATED] i286 核心 (sdlnp2kai_sdl2)
-PC-9821 BIOS (v3.0+)            →  IA32 核心 (sdlnp21kai_sdl2)
+PC-9821 BIOS (v3.0+)  →  IA32 核心 (wxnp21kai)
 ```
 
 **跨核心不匹配的症状**：BIOS POST 检查 IMA（Integrated Memory Architecture）失败 → 显示「IMA未启用」→ 键盘输入无效 → 引导卡死。
@@ -236,7 +202,7 @@ PC-98 分区表位于扇区 1，格式与 IBM-PC MBR 不同：
 
 LBA 计算公式：`cyl × heads × spt + head × spt + sector`
 
-**典型值**（msdos5.hdi）：
+**典型值**（base_msdos5_scsi_48m.hdi）：
 - 分区起始：cyl=1, head=0, sector=0 → LBA = 1×8×17 + 0×17 + 0 = 136
 - 类型 ID：`0x91`
 - 分区大小：47520 扇区（从 LBA 136 开始）
@@ -251,7 +217,7 @@ PC-98 VBR 与 IBM-PC 的关键区别：
 | 有效跳转 | `EB xx` @ 0x00 | `EB xx` @ 0x00 |
 | BPB 验证 | bytes_per_sector | bytes_per_sector ∈ {512, 1024, 2048} |
 
-**msdos5.hdi 的 BPB**：
+**base_msdos5_scsi_48m.hdi 的 BPB**：
 
 | 字段 | 值 |
 |------|-----|
@@ -399,29 +365,28 @@ value = struct.unpack('<H', fat_data[cluster * 2:cluster * 2 + 2])[0]
 
 EOC 值：FAT12 = `0x0FF8`，FAT16 = `0xFFF8`
 
-### write_back_from_directory() 核心算法
+### inject_into_hdi() — 增量 FAT 注入
 
-这是工具链最关键的入口——全量重建 FAT 文件系统。
+这是当前工具链的核心入口（替代旧 `write_back_from_directory()` 全量重建），见 `tools/naiz_img/inject_common.py`。
 
 **流程**：
 
 ```
-1. 初始化 FAT 表：全部填 0（未分配），簇 0/1 设介质描述符/EOC
-2. 清零 FAT 区（所有副本）、根目录区、数据区
-3. 递归遍历源目录：
-   a. 根目录特殊处理：IO.SYS 排第一，MSDOS.SYS 排第二
-   b. 每个文件/目录分配连续簇，构建 FAT 链
-   c. 数据写入 data 区
-   d. 生成 32 字节目录项并入 entries
-4. 写回根目录区
-5. 调用 _build_fat_bytes() 序列化 FAT 表（12/16 位编码）
+1. 打开复制后的 HDI，解析 FAT16
+2. 替换 AUTOEXEC.BAT（优先原地覆盖，空间不足时重分配簇链）
+3. 替换 CONFIG.SYS（同上）
+4. 查找或创建游戏子目录（如 DEMO-A1/）
+5. 遍历 games/<name>/ 下每个文件：
+   a. 已存在 → 原地覆盖或重分配
+   b. 新文件 → 分配簇链 + 创建目录项
 6. 写回所有 FAT 副本
-7. img.save()
+7. img.save() → 写出 HDI 文件
 ```
 
-**系统文件排序**：IO.SYS 必须是根目录第一个文件，MSDOS.SYS 第二个，否则 MS-DOS 无法启动。
-
-**FAT 编码**：`_build_fat_bytes()` 处理 FAT12 的 12-bit 交错打包和 FAT16 的 16-bit 直写。
+**优点 vs 全量重建**：
+- IO.SYS/MSDOS.SYS 的簇链地址不变，VBR 无需任何调整
+- 只修改变化的扇区，写入速度快
+- 基座镜像原有碎片分布完全保留
 
 ---
 
@@ -451,7 +416,7 @@ PC-98 专用：
 - PC-98 分区表项格式：`boot@0, sys_id@1, pad@2-3, head@4, sector@5(0-based), cyl@6-7(LE)`
 - LBA = `cyl × heads × spt + head × spt + sector`
 
-### msdos5.hdi 实际检测值
+### base_msdos5_scsi_48m.hdi 实际检测值
 
 | 检测项 | 值 |
 |--------|-----|
@@ -479,11 +444,10 @@ python -m tools.naiz_img.inject --game demo-A1 --list-files # 列出基座镜像
 | 参数 | 默认值 | 说明 |
 |------|--------|------|
 | `-g, --game` | 必填 | 游戏名，对应 `games/<name>/` |
-| `-b, --base` | `tools/msdos5.hdi` | 基座 HDI |
+| `-b, --base` | `tools/base_msdos5_scsi_48m.hdi` | 基座 HDI |
 | `-o, --output` | `disks/<game>.hdi` | 输出路径 |
 | `--preview` | false | 只预览文件清单 |
 | `--list-files` | false | 列出基座镜像全部文件 |
-| `--no-dos` | false | 跳过 DOS 工具文件 |
 | `--no-config` | false | 不覆写 CONFIG.SYS |
 | `--no-autoexec` | false | 不覆写 AUTOEXEC.BAT |
 | `-y, --yes` | false | 非交互模式 |
@@ -491,16 +455,9 @@ python -m tools.naiz_img.inject --game demo-A1 --list-files # 列出基座镜像
 ### 工作流程
 
 ```python
-def build_temp_dir(game, ...):
-    tmp = mkdtemp()
-    # 1. 复制 ref_disk/（IO.SYS, MSDOS.SYS, COMMAND.COM, DOS/）
-    # 2. 复制 ref_config/（CONFIG.SYS, AUTOEXEC.BAT）
-    # 3. 复制 games/<game>/（游戏文件）
-    return tmp
-
-# 然后：
-fs = NAIZFatFS(open_image(base_hdi))
-fs.write_back_from_directory(tmp, save_path=output)
+shutil.copy2(base_hdi, output)                # 复制基座（完整保留 IPL/VBR）
+inject_into_hdi(output, game, game_dir,       # 增量 FAT 编辑
+                no_config=..., no_autoexec=...)
 ```
 
 ### `ref_config/` 文件内容
@@ -510,35 +467,22 @@ CONFIG.SYS (tools/ref_config/CONFIG.SYS):
 FILES=30
 SHELL=\COMMAND.COM /P
 
-AUTOEXEC.BAT (tools/ref_config/AUTOEXEC.BAT):
-@ECHO OFF
-PATH A:\DOS;A:\
-SET TEMP=A:\DOS
-SET DOSDIR=A:\DOS
-MOUSE
-A:\DEMO-A1\ENGINE.EXE
+AUTOEXEC.BAT:
+  （由 generate_autoexec() 运行时生成，使用 \ 根相对路径）
 ```
 
 **CONFIG.SYS 路径格式**：必须使用根相对路径 `\`（盘符 `C:\` 在此阶段未分配），详见 §11.4。
 
-### Makefile 集成
+### makegame.sh 集成
 
-`core/Makefile` 的 `test` 目标：
+`makegame.sh` 统一管理制作、测试、构建流程：
 
-```makefile
-test: $(OUTPUT)
-	cp $(OUTPUT) ../games/demo-A1/
-	python3 -m tools.naiz_img.inject --game demo-A1 --yes
-	../test_hdi.sh demo-A1
+```bash
+./makegame.sh make demo-A1     # 制作 HDI
+./makegame.sh test demo-A1     # 模拟器启动测试
+./makegame.sh build demo-A1    # 编译 + 制作
+./makegame.sh                  # 交互模式
 ```
-
-### 与 make_hdi.sh 的关系
-
-| 工具 | 职责 | 何时用 |
-|------|------|--------|
-| `make_hdi.sh` | 交互式调用 inject.py 制作 HDI | 日常开发 |
-| `inject.py` | 基于 msdos5.hdi 注入游戏 | **主要开发流程** |
-| `naiz_img/` 各模块 | 镜像格式 + FAT12/FAT16 操作库 | 被 inject.py 调用 |
 
 ---
 
@@ -547,18 +491,17 @@ test: $(OUTPUT)
 ### 测试启动链
 
 ```
-test_hdi.sh <game>
+makegame.sh test <game>
     │ 激活 Python venv
-    │ 调用 install_env.py test-hdi [<hdi_path>]
+    │ 调用 install_env.py test-hdi --hdi <hdi_path>
     ▼
-cmd_test_hdi(hdi_path=None)
-    │ 列出 disks/*.hdi 供选择（或直接使用参数路径）
+cmd_test_hdi(hdi_path)
     │ 生成 logs/test_<game>_<timestamp>.log
-    │ 生成 ~/.config/sdlnp2kai/np2kai.cfg（HDD1FILE 指向所选 HDI）
-    │ 设置 SDL 环境变量
+    │ 生成 ~/.config/wxnp21kai/wxnp21kai.toml（SCSIHDD0 指向所选 HDI）
+    │ 复制 BIOS/Font ROM 到配置目录
     │ 等待 Enter 确认
     ▼
-NP2kai (sdlnp2kai_sdl2) 启动
+NP2kai (wxnp21kai) 启动
     │ 加载 BIOS → IPL → IO.SYS → CONFIG.SYS → AUTOEXEC.BAT
     ▼
 ENGINE.EXE 运行 → 画面输出
@@ -566,18 +509,7 @@ ENGINE.EXE 运行 → 画面输出
 
 ### SDL 环境设置
 
-`sdl_env.sh` 自动检测显示服务器：
-
-```bash
-if [ "$XDG_SESSION_TYPE" = "wayland" ]; then
-    export SDL_VIDEODRIVER=wayland
-else
-    export SDL_VIDEODRIVER=x11
-fi
-export SDL_AUDIODRIVER=pulse
-```
-
-`cmd_test_hdi()` 仅当环境变量未设置时才自动设置，优先使用 Wayland。
+（wx 前端不依赖 SDL 环境变量，SDL 前端已弃用。）
 
 ### 日志
 
@@ -594,9 +526,9 @@ export SDL_AUDIODRIVER=pulse
 
 **症状**：NP2kai 启动后显示「IMA未启用」并等待按键，键盘无效。
 
-**根因**：[DEPRECATED] 使用 IA32 核心 (`sdlnp21kai_sdl2`) 加载 PC-9801 BIOS ROM（N88-BASIC(86) v2.0）。PC-9821 硬件架构差异导致 IMA 检测失败 + 键盘中断不兼容。
+**根因**：使用 IA32 核心 (`wxnp21kai`) 加载 PC-9801 BIOS ROM（N88-BASIC(86) v2.0）。PC-9821 硬件架构差异导致 IMA 检测失败 + 键盘中断不兼容。
 
-**解决**：使用 IA32 核心 (`sdlnp21kai_sdl2`) + 匹配的 PC-9821 BIOS。[DEPRECATED] i286 核心 (`sdlnp2kai_sdl2`) 不再作为开发目标。
+**解决**：使用 IA32 核心 (`wxnp21kai`) + 匹配的 PC-9821 BIOS。i286 核心 (`sdlnp2kai_sdl2`) 不再作为开发目标。
 
 **涉及文件**：`17-bios-rom-issue.md`
 
@@ -683,7 +615,7 @@ BOOL sxsi_issasi(void) {
 - `DEVICE=C:\DOS\RSDRV.SYS` → `DEVICE=\DOS\RSDRV.SYS`
 - `SHELL=C:\COMMAND.COM /P` → `SHELL=\COMMAND.COM /P`
 
-AUTOEXEC.BAT 不受此限制（在盘符分配后执行），仍可使用 `C:\` 路径。
+AUTOEXEC.BAT 虽在盘符分配后执行（技术上可用 `C:\`），但为保持统一，`generate_autoexec()` 也使用 `\` 根相对路径。
 
 **涉及文件**：`tools/ref_config/CONFIG.SYS`
 
@@ -755,32 +687,55 @@ AUTOEXEC.BAT 不受此限制（在盘符分配后执行），仍可使用 `C:\` 
 
 ---
 
+### 11.11 DBLSPACE.BIN 导致启动时"how many files"提示
+
+**症状**：MS-DOS 启动过程中弹出提示询问文件数量，需人工输入后继续。
+
+**根因**：IO.SYS 自动加载 DBLSPACE.BIN 驱动，该驱动扫描所有新分配的簇，将游戏文件数据误判为 DriveSpace 压缩卷（CVF），触发交互式询问。
+
+**解决**：`inject_into_hdi()` 在 Step 0 自动将 DBLSPACE.BIN 的根目录项标记为 0xE5（已删除）。FAT 簇链（81-112）未释放但不再被引用，对游戏盘无影响。
+
+**涉及文件**：`tools/naiz_img/inject_common.py`
+
+---
+
+### 11.12 新分配目录簇残留数据导致 CD 失败
+
+**症状**：AUTOEXEC.BAT 执行 `CD \DEMO-A1` 失败，停留在命令提示符。
+
+**根因**：`inject_into_hdi()` Step 4 为新游戏目录分配一个簇后，未将簇数据清零。该簇之前分配给一个 EXE 文件，残留 `MZ%` 魔数和二进制数据。目录解析代码读取簇数据后，将残留 EXE 头部误识别为合法目录项（ATTR=0x07），导致 MS-DOS 认为目录损坏。
+
+**解决**：分配目录簇后立即写入 `b'\x00' * fs.cluster_size` 清零。当前版本尚未实现此修复。
+
+**涉及文件**：`tools/naiz_img/inject_common.py`
+
+---
+
 ## 12. 快速参考
 
 ### 常用命令速查
 
 | 操作 | 命令 |
 |------|------|
-| 编译引擎 | `make -C core clean && make -C core all` |
-| 注入游戏 | `python3 -m tools.naiz_img.inject --game <name> -y` |
+| 编译引擎 | `make -C core clean all` |
+| 注入游戏 | `./makegame.sh make <name>` |
 | 完整测试 | `make -C core test` |
-| 启动模拟器 | `../test_hdi.sh <game>` |
-| [DEPRECATED] 构建 i286 | `python3 tools/env_setup/install_env.py build-i286` |
+| 启动模拟器 | `./makegame.sh test <game>` |
 | 检查环境 | `python3 tools/env_setup/install_env.py check` |
-| 预览文件 | `python3 -m tools.naiz_img.inject --game <name> --preview` |
-| 列出基座文件 | `python3 -m tools.naiz_img.inject --game <name> --list-files` |
+| 预览文件 | `./makegame.sh make <name> --preview` |
+| 列出基座文件 | `./makegame.sh list-files` |
 
 ### 启动检查清单
 
 HDD 相关问题按序排查：
 
 - [ ] `bios.rom` 来源是否与核心匹配（PC-9821 BIOS → IA32 核心）
-- [ ] NP2kai 二进制是否正确（`sdlnp21kai_sdl2` IA32 核心）
+- [ ] NP2kai 二进制是否正确（`wxnp21kai` IA32 核心）
 - [ ] `sdl/unix/compiler.h` 是否包含 `#define SUPPORT_SASI`
 - [ ] `sxsi_issasi()` 逻辑是否允许 HDD2/3/4 槽位为 NC
 - [ ] CONFIG.SYS 路径是否使用 `\` 根相对格式（非 `C:\`）
-- [ ] `np2kai.cfg` 使用 `HDD1FILE`（SASI 方式）
-- [ ] HDI 是否已用最新 `inject.py` 重建
+- [ ] `wxnp21kai.toml` 使用 `SCSIHDD0`（SCSI 方式）
+- [ ] HDI 是否已用最新 `inject_into_hdi()` 重建
 - [ ] IO.SYS 是否为根目录第一个文件
 - [ ] `SHIFT+Enter` 是否已用以跳过 MS-DOS 启动菜单（如适用）
 
@@ -792,9 +747,9 @@ HDD 相关问题按序排查：
 | **工具链** | `tools/naiz_img/`（9 个 Python 模块） |
 | **游戏项目** | `games/<name>/` |
 | **输出镜像** | `disks/<name>.hdi` |
-| **基座镜像** | `tools/msdos5.hdi` |
-| **配置文件** | `~/.config/sdlnp2kai/np2kai.cfg` |
-| **BIOS/Font** | `core/sdlnp2kai/bios.rom`, `core/sdlnp2kai/font.rom` |
+| **基座镜像** | `tools/base_msdos5_scsi_48m.hdi` |
+| **配置文件** | `~/.config/wxnp21kai/wxnp21kai.toml` |
+| **BIOS/Font** | `~/.config/wxnp21kai/bios.rom`, `~/.config/wxnp21kai/font.rom` |
 | **测试日志** | `logs/test_<game>_<timestamp>.log` |
 | **文档** | `docs/A02-NP2kai与镜像工具链.md`, `devdocs/18-98Bridge方案.md`, `devdocs/19-实现方案.md` |
 

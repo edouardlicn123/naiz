@@ -13,11 +13,13 @@ from .raw import RawImage
 from .nhd import NHDImage
 from .partition import detect_partitions, PartitionEntry
 from .fat import NAIZFatFS, FileEntry
+from .inject_common import inject_into_hdi, generate_autoexec
 
 __all__ = [
     'DiskImage', 'HDIImage', 'FDIImage', 'D88Image', 'RawImage', 'NHDImage',
     'detect_partitions', 'PartitionEntry', 'NAIZFatFS', 'FileEntry',
     'open_image', 'create_blank_image',
+    'inject_into_hdi', 'generate_autoexec',
 ]
 
 _EXT_MAP = {

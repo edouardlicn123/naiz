@@ -9,13 +9,11 @@ show_menu() {
     echo "     Naiz Launcher"
     echo "===================================="
     echo "1. 查看状态"
-    echo "2. 安装开发环境"
     echo "3. 更新所有子项目"
     echo "4. 编译引擎 (make -C core)"
-    echo "5. 编译 demo-A1 数据 (make -C projects/demo-A1)"
     echo "0. 退出"
     echo "===================================="
-    echo -n "请选择 [0-5]: "
+    echo -n "请选择 [0-4]: "
 }
 
 MODULES=(
@@ -42,107 +40,6 @@ update_submodules() {
     echo "更新完成！"
     echo ""
     read -p "按 Enter 键继续..."
-}
-
-env_menu() {
-    local PYTHON="$VENV_DIR/bin/python3"
-    local SCRIPT="tools/env_setup/install_env.py"
-
-    while true; do
-        clear
-        echo "===== 开发环境 ====="
-        echo "1. Python 依赖安装"
-        echo "2. 系统依赖与交叉编译器 (deps + gcc-ia16)"
-        echo "3. NP2kai 模拟器 (SDL2) [主模拟器]"
-        echo "4. 备用模拟器 (RetroArch + libretro 核心) [备用]"
-        echo "5. 编译 i286 核心 [DEPRECATED]"
-        echo "6. 环境检测"
-        echo "7. 镜像源设置"
-        echo "0. 返回主菜单"
-        echo "===================="
-        echo -n "请选择 [0-7]: "
-        read sub_choice
-        case $sub_choice in
-            1)
-                $PYTHON "$SCRIPT" pip-install
-                echo ""
-                read -p "按 Enter 键继续..."
-                ;;
-            2)
-                echo "安装开发环境需要管理员权限："
-                sudo -v 2>/dev/null || { echo "密码验证失败"; read -p "按 Enter 键继续..."; continue; }
-                (while true; do sudo -n true; sleep 60; done) 2>/dev/null &
-                local sudo_keep_pid=$!
-                $PYTHON "$SCRIPT" system-tools
-                kill $sudo_keep_pid 2>/dev/null
-                echo ""
-                read -p "按 Enter 键继续..."
-                ;;
-            3)
-                echo "安装开发环境需要管理员权限："
-                sudo -v 2>/dev/null || { echo "密码验证失败"; read -p "按 Enter 键继续..."; continue; }
-                (while true; do sudo -n true; sleep 60; done) 2>/dev/null &
-                local sudo_keep_pid=$!
-                $PYTHON "$SCRIPT" np2kai
-                kill $sudo_keep_pid 2>/dev/null
-                echo ""
-                read -p "按 Enter 键继续..."
-                ;;
-            4)
-                echo "安装开发环境需要管理员权限："
-                sudo -v 2>/dev/null || { echo "密码验证失败"; read -p "按 Enter 键继续..."; continue; }
-                (while true; do sudo -n true; sleep 60; done) 2>/dev/null &
-                local sudo_keep_pid=$!
-                $PYTHON "$SCRIPT" backup-emu
-                kill $sudo_keep_pid 2>/dev/null
-                echo ""
-                read -p "按 Enter 键继续..."
-                ;;
-            5)
-                echo "安装开发环境需要管理员权限："
-                sudo -v 2>/dev/null || { echo "密码验证失败"; read -p "按 Enter 键继续..."; continue; }
-                (while true; do sudo -n true; sleep 60; done) 2>/dev/null &
-                local sudo_keep_pid=$!
-                $PYTHON "$SCRIPT" build-i286
-                kill $sudo_keep_pid 2>/dev/null
-                echo ""
-                read -p "按 Enter 键继续..."
-                ;;
-            6)
-                $PYTHON "$SCRIPT" check
-                echo ""
-                read -p "按 Enter 键继续..."
-                ;;
-            7)
-                echo ""
-                echo "───── Git 仓库来源 ─────"
-                echo "  1) GitHub（海外直连）"
-                echo "  2) 国内镜像（Gitee/GitCode，中国大陆加速）"
-                echo -n "  请选择 [1/2]: "
-                read mirror_choice
-                case $mirror_choice in
-                    1)
-                        $PYTHON "$SCRIPT" --mirror github check
-                        ;;
-                    2)
-                        $PYTHON "$SCRIPT" --mirror china check
-                        ;;
-                    *)
-                        echo "  无效选项"
-                        ;;
-                esac
-                echo ""
-                read -p "按 Enter 键继续..."
-                ;;
-            0)
-                return
-                ;;
-            *)
-                echo "无效选项，请重新选择。"
-                sleep 1
-                ;;
-        esac
-    done
 }
 
 # 主循环前：自动检查 Python venv
@@ -187,21 +84,12 @@ while true; do
             echo ""
             read -p "按 Enter 键继续..."
             ;;
-        2)
-            env_menu
-            ;;
         3)
             update_submodules
             ;;
         4)
             echo "编译引擎..."
             make -C core all
-            echo ""
-            read -p "按 Enter 键继续..."
-            ;;
-        5)
-            echo "编译 demo-A1 数据..."
-            make -C projects/demo-A1
             echo ""
             read -p "按 Enter 键继续..."
             ;;

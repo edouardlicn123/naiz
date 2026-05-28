@@ -99,9 +99,9 @@ class HDIImage(DiskImage):
         pass
 ```
 
-**HDI 头部格式验证**（当前 msdos5.hdi 的 HDI header）：
+**HDI 头部格式验证**（当前 base_msdos5_scsi_48m.hdi 的 HDI header）：
 
-| 偏移 | 字段 | 值（msdos5.hdi） | 说明 |
+| 偏移 | 字段 | 值（base_msdos5_scsi_48m.hdi） | 说明 |
 |------|------|-------------------|------|
 | 0x00 | reserved | 0 | |
 | 0x04 | hdd_type | 48 | 容量 MB 提示 |
@@ -163,7 +163,7 @@ def detect_partitions(disk_image) -> list[PartitionEntry]:
 2. 再尝试 `PC-98 IPL`（扇区 0 包含 `IPL1` 魔数，或扇区末尾 55AA，在扇区 1 读取 16 个分区表项）
 3. 都失败则返回空列表
 
-**在 msdos5.hdi 上的行为**：
+**在 base_msdos5_scsi_48m.hdi 上的行为**：
 - 扇区 0 是 HDI 文件头，不是磁盘数据
 - 真正的扇区 0 = 偏移 4096 处
 - 所以 `HDIImage` 通过 `_raw_offset` 已经做了透明映射，`disk_image.read_sector(0)` 返回的是数据扇区 0
@@ -291,7 +291,7 @@ def write_back_from_directory(self, dir_path, save_path=None) -> tuple:
 from disk_image import open_image
 from fat_fs import FATFilesystem
 
-disk = open_image("msdos5.hdi")       # → HDIImage 实例
+disk = open_image("base_msdos5_scsi_48m.hdi")       # → HDIImage 实例
 fs = FATFilesystem(disk)              # 自动检测分区，解析 BPB，构建目录树
 
 # 遍历文件
@@ -309,7 +309,7 @@ import tempfile, shutil
 from pathlib import Path
 
 # 1. 打开基座 HDI
-disk = open_image("~/msdos5/msdos5.hdi")
+disk = open_image("~/msdos5/base_msdos5_scsi_48m.hdi")
 fs = FATFilesystem(disk)
 
 # 2. 提取所有文件到临时目录
@@ -356,7 +356,7 @@ shutil.copy2("games/demo-A1/ENGINE.EXE",
              os.path.join(tmpdir, "demo-A1", "ENGINE.EXE"))
 
 # 4. 打开基座 + write_back
-disk = open_image("~/msdos5/msdos5.hdi")
+disk = open_image("~/msdos5/base_msdos5_scsi_48m.hdi")
 fs = FATFilesystem(disk)
 fs.write_back_from_directory(tmpdir, save_path="disks/demo-A1.hdi")
 ```
@@ -407,7 +407,7 @@ from fat_fs import FATFilesystem
 ```python
 # 直接实例化，不依赖 registry
 from disk_image import HDIImage
-disk = HDIImage("msdos5.hdi")     # 直接调用，无需 registry
+disk = HDIImage("base_msdos5_scsi_48m.hdi")     # 直接调用，无需 registry
 ```
 
 同样，`FATFilesystem(disk)` 也不需要 registry——它直接调用 `partition.detect_partitions()`。
@@ -447,7 +447,7 @@ import plugins.core.pc98_formats   # noqa: F401, 注册 .hdi → HDIImage
 from disk_image import open_image   # 现在可以使用 open_image()
 from fat_fs import FATFilesystem
 
-disk = open_image("msdos5.hdi")
+disk = open_image("base_msdos5_scsi_48m.hdi")
 fs = FATFilesystem(disk)
 ```
 
@@ -457,7 +457,7 @@ fs = FATFilesystem(disk)
 from disk_image import HDIImage
 from fat_fs import FATFilesystem
 
-disk = HDIImage("msdos5.hdi")        # 直接构造
+disk = HDIImage("base_msdos5_scsi_48m.hdi")        # 直接构造
 fs = FATFilesystem(disk)              # FATFilesystem 内部会自动调用 partition.detect_partitions()
 ```
 

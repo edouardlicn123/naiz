@@ -37,6 +37,13 @@ REPO_MAP = {
     "binutils": {"github": BINUTILS_IA16_REPO,    "china": BINUTILS_IA16_REPO_MIRROR},
 }
 
+RETROARCH_LATEST = "1.22.2"
+RETROARCH_APPIMAGE_URL = (
+    f"https://buildbot.libretro.com/stable/{RETROARCH_LATEST}/linux/x86_64/RetroArch.7z"
+)
+RETROARCH_APPIMAGE_DIR = os.path.expanduser("~/Applications")
+RETROARCH_BIN_SYMLINK = "/usr/local/bin/retroarch"
+
 # 由 main() 初始化，决定 git 仓库来源
 MIRROR = None
 
@@ -143,6 +150,15 @@ def _resolve_repo(name, mirror=None, interactive=True):
         return REPO_MAP[name][cfg["mirror"]]
 
     return REPO_MAP[name]["github"]
+
+
+def _set_mirror(mirror_name):
+    global MIRROR
+    MIRROR = mirror_name
+    cfg = _read_conf()
+    cfg["mirror"] = MIRROR
+    _write_conf(cfg)
+    print(f"  已设置镜像源: {mirror_name}")
 
 
 def _mirror_init():
@@ -269,7 +285,7 @@ def cmd_pip_install():
 
 def cmd_build_i286():
     print("")
-    print("[DEPRECATED] i286 核心已废弃，请使用 IA32 核心 (sdlnp21kai_sdl2)")
+    print("[DEPRECATED] i286 核心已废弃，请使用 IA32 核心 (wxnp21kai, wxWidgets/GTK3)")
     print("===== 编译 i286 核心 =====")
 
     np2kai_dir = _get_np2kai_source()
@@ -415,8 +431,7 @@ def cmd_build_i286():
 
 
 EMULATORS = {
-    "ia32": "/usr/local/bin/sdlnp21kai_sdl2",
-    "i286": "/usr/local/bin/sdlnp2kai_sdl2",
+    "ia32": "/usr/local/bin/wxnp21kai",
 }
 
 def _pick_emulator(emulator_arg):
@@ -447,8 +462,7 @@ def _pick_emulator(emulator_arg):
 
     print("\n选择模拟器版本:")
     keys = list(available.keys())
-    defaults = {"ia32": "PC-9821, IDE/HDD 完整支持 (推荐)",
-                "i286": "旧版核心, 仅 SASI [DEPRECATED]"}
+    defaults = {"ia32": "wxWidgets/GTK3, SCSI/IDE HDD 完整支持 (推荐)"}
     for i, k in enumerate(keys, 1):
         desc = defaults.get(k, "")
         print(f"  {i}) {k} — {desc}")
@@ -473,7 +487,6 @@ def cmd_test_hdi(hdi_path=None, emulator=None):
     project_root = os.path.normpath(
         os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", ".."))
     disks_dir = os.path.join(project_root, "disks")
-    np2cfg_dir = os.path.join(project_root, "core", "sdlnp2kai")
 
     # ── 1. 选择模拟器版本 ──
     emu_name = _pick_emulator(emulator)
@@ -532,46 +545,28 @@ def cmd_test_hdi(hdi_path=None, emulator=None):
         f.write(f"HDI:  {selected}\n")
         f.write(f"Time: {datetime.now().isoformat()}\n")
 
-    # ── 4. 生成 config 文件 ──
-    cfg_subdir = "sdlnp21kai" if emu_name == "ia32" else "sdlnp2kai"
-    cfg_name = "np21kai.cfg" if emu_name == "ia32" else "np2kai.cfg"
+    # ── 4. 生成 wx 前端 config 文件 (TOML) ──
     cfg_dir = os.path.join(os.environ.get("XDG_CONFIG_HOME",
                                         os.path.join(os.environ["HOME"], ".config")),
-                          cfg_subdir)
+                          "wxnp21kai")
     os.makedirs(cfg_dir, exist_ok=True)
-    cfg_path = os.path.join(cfg_dir, cfg_name)
+    cfg_path = os.path.join(cfg_dir, "wxnp21kai.toml")
 
-    if emu_name == "ia32":
-        cfg_content = f"""[NekoProjectIIkai]
-fontfile = {np2cfg_dir}/font.rom
-biospath = {np2cfg_dir}/bios.rom
+    # Copy BIOS/font ROMs to config dir (wx frontend auto-discovers when biospath is empty)
+    bios_src = os.path.join(project_root, "core", "sdlnp2kai")
+    for rom in ["bios.rom", "font.rom"]:
+        src = os.path.join(bios_src, rom)
+        dst = os.path.join(cfg_dir, rom)
+        if os.path.exists(src) and (not os.path.exists(dst) or
+                                    os.path.getsize(dst) != os.path.getsize(src)):
+            shutil.copy2(src, dst)
+            print(f"  [✓] 已复制: {rom}")
+
+    cfg_content = f"""[NP21kai]
+SCSIHDD0 = {selected}
 pc_model = PC9821
-HDD1FILE = {selected}
 keyboard = 106
 use_hdrv = true
-MEMswtch = 0, 0, 0, 0, 0, 0xA0
-
-[NP2 Window Accelerator]
-WindposX = 0
-WindposY = 0
-MULTIWND = false
-MULTHREAD = true
-HALFTONE = false
-"""
-    else:
-        cfg_content = f"""[NekoProjectIIkai]
-fontfile = {np2cfg_dir}/font.rom
-biospath = {np2cfg_dir}/bios.rom
-HDD1FILE = {selected}
-keyboard = 106
-use_hdrv = true
-
-[NP2 Window Accelerator]
-WindposX = 0
-WindposY = 0
-MULTIWND = false
-MULTHREAD = true
-HALFTONE = false
 """
     with open(cfg_path, "w", encoding="utf-8") as f:
         f.write(cfg_content)
@@ -581,7 +576,7 @@ HALFTONE = false
     print("")
     print("═══════════════════════════════════")
     print(f"  模拟器: {emu_name}")
-    print(f"  配置:   {cfg_name}")
+    print(f"  配置:   {cfg_path}")
     print(f"  HDI:    {basename}")
     print(f"  大小:   {size_str} 字节")
     print(f"  路径:   {selected}")
@@ -592,27 +587,14 @@ HALFTONE = false
     print("        Alt+F4 强制退出模拟器")
     print("")
 
-    # ── 5. 设置 SDL 环境 ──
-    if "SDL_VIDEODRIVER" not in os.environ:
-        session_type = os.environ.get("XDG_SESSION_TYPE", "")
-        wayland_display = os.environ.get("WAYLAND_DISPLAY", "")
-        if session_type == "wayland" or wayland_display:
-            os.environ["SDL_VIDEODRIVER"] = "wayland"
-    if "SDL_AUDIODRIVER" not in os.environ:
-        os.environ["SDL_AUDIODRIVER"] = "pulse"
-
-    # ── 6. 确认 ──
+    # ── 5. 确认 ──
     try:
         confirm = input("  按 Enter 启动 NP2kai，或 Ctrl+C 取消...")
     except (EOFError, KeyboardInterrupt):
         print("\n已取消")
         sys.exit(0)
 
-    # ── 7. 启动 ──
-    env = os.environ.copy()
-    env.setdefault("LIBGL_ALWAYS_SOFTWARE", "1")
-    env.setdefault("GALLIUM_DRIVER", "softpipe")
-
+    # ── 6. 启动 ──
     with open(log_path, "a", encoding="utf-8") as f:
         f.write(f"\n--- Launch ---\n")
         f.write(f"emulator: {emu_name}\n")
@@ -623,8 +605,7 @@ HALFTONE = false
     print(f"启动: {binary}")
     with open(log_path, "a", encoding="utf-8") as f:
         result = subprocess.run(
-            [binary, selected],
-            env=env,
+            [binary],
             stdout=f,
             stderr=subprocess.STDOUT,
         )
@@ -636,13 +617,15 @@ HALFTONE = false
 def cmd_check():
     print("")
     print("───── 模拟器 ─────")
-    _run_check("sdlnp21kai_sdl2 (ia32)",
-        "test -f /usr/local/bin/sdlnp21kai_sdl2 && echo '/usr/local/bin/sdlnp21kai_sdl2' || echo '未安装'")
+    _run_check("wxnp21kai (ia32, wxWidgets/GTK3)",
+        "test -f /usr/local/bin/wxnp21kai && echo '/usr/local/bin/wxnp21kai' || echo '未安装'")
     _run_check("np2kai_libretro",
         "ls /usr/lib/libretro/np2kai_libretro.so 2>/dev/null || echo '未安装'")
     _run_check("retroarch",
         "which retroarch 2>/dev/null || echo '未安装'")
-    _run_check("np2kai i286 core",
+    _run_check("sdlnp21kai_sdl2 (ia32, SDL2, deprecated)",
+        "test -f /usr/local/bin/sdlnp21kai_sdl2 && echo '/usr/local/bin/sdlnp21kai_sdl2' || echo '未安装'")
+    _run_check("i286 core (SDL2, deprecated)",
         "test -f /tmp/NP2kai/build/sdlnp2kai_sdl2 && echo '/tmp/NP2kai/build/sdlnp2kai_sdl2' || test -f /usr/local/bin/sdlnp2kai_sdl2 && echo '/usr/local/bin/sdlnp2kai_sdl2' || echo '未安装'")
     print("")
     print("───── 开发工具 ─────")
@@ -846,13 +829,13 @@ def _np2kai_deps(pkg_manager="apt"):
     deps = {
         "apt": [
             "git", "cmake", "ninja-build", "build-essential",
-            "libsdl2-dev", "libsdl2-ttf-dev",
+            "libwxgtk3.2-dev", "libsdl3-dev", "libsdl3-ttf-dev",
             "libgl1-mesa-dev", "libssl-dev",
             "libusb-1.0-0-dev", "libcdio-dev",
         ],
         "pacman": [
             "git", "cmake", "ninja", "base-devel",
-            "sdl2", "sdl2_ttf",
+            "wxgtk3", "sdl3", "sdl3_ttf",
             "libusb", "libcdio",
         ],
     }
@@ -917,8 +900,6 @@ def cmd_np2kai():
 
     np2kai_dir = _get_np2kai_source()
     build_dir = os.path.join(np2kai_dir, "build")
-    _patch_sdl2ttf_cmake(np2kai_dir)
-    _patch_fontmng_sdlttf(np2kai_dir)
 
     print("--- 应用上游补丁 ---")
     cmake_file = os.path.join(np2kai_dir, "CMakeLists.txt")
@@ -927,25 +908,18 @@ def cmd_np2kai():
          's/"VERMOUTH_LIB")/"VERMOUTH_LIB" "SUPPORT_DEBUGSS")/',
          cmake_file],
         check=False)
-    subprocess.run(
-        ["sed", "-i",
-         '/target_link_libraries(NP2kai_SDL2_base.*lib_dl_libraries})/ s|})|} crypto)|',
-         cmake_file],
-        check=False)
-
-    _patch_np2_idetype(np2kai_dir)
 
     if os.path.exists(build_dir):
         shutil.rmtree(build_dir)
 
-    ok = run_step("生成构建系统 (i286 + SDL2, 禁用 X/wxWidgets)",
+    ok = run_step("生成构建系统 (wxWidgets + SDL3, GPU)",
                   ["cmake", "-S", np2kai_dir, "-B", build_dir,
-                   "-DBUILD_I286=ON", "-DBUILD_SDL=ON",
-                   "-DUSE_SDL=2", "-DBUILD_WX=OFF", "-DBUILD_X=OFF"])
+                   "-DBUILD_WX=ON", "-DBUILD_SDL=OFF",
+                   "-DUSE_SDL=3", "-DBUILD_X=OFF"])
     if not ok:
         sys.exit(1)
 
-    ok = run_step("编译 NP2kai (SDL2 port)",
+    ok = run_step("编译 NP2kai (wxWidgets port)",
                   ["cmake", "--build", build_dir, "-j", str(os.cpu_count() or 4)])
     if not ok:
         sys.exit(1)
@@ -954,10 +928,9 @@ def cmd_np2kai():
     run_step("安装到 /usr/local/bin",
              ["cmake", "--install", build_dir], sudo=True)
 
-    built = [n for n in ["sdlnp2kai_sdl2", "sdlnp21kai_sdl2"]
+    built = [n for n in ["wxnp21kai"]
              if os.path.exists(os.path.join(build_dir, n))]
-    installed = [n for n in ["/usr/local/bin/sdlnp2kai_sdl2",
-                             "/usr/local/bin/sdlnp21kai_sdl2"]
+    installed = [n for n in ["/usr/local/bin/wxnp21kai"]
                  if os.path.exists(n)]
     if built:
         print(f"[✓] 编译完成: {', '.join(built)}")
@@ -1000,11 +973,64 @@ def cmd_np2kai_libretro():
     print(f"[✓] libretro 核心已安装: {cores_dir}/np2kai_libretro.so")
 
 
+def _install_retroarch_appimage():
+    """Fallback: download RetroArch AppImage for distros without retroarch package."""
+    if os.uname().machine != "x86_64":
+        print("[!] AppImage 仅支持 x86_64 架构，请手动安装 RetroArch")
+        return False
+
+    _apt_install(["wget", "p7zip"], "安装下载工具和 p7zip")
+
+    os.makedirs(RETROARCH_APPIMAGE_DIR, exist_ok=True)
+
+    download_path = "/tmp/RetroArch.7z"
+    ok = run_step("下载 RetroArch AppImage",
+                  ["sh", "-c", f"wget -O '{download_path}' '{RETROARCH_APPIMAGE_URL}' "
+                              f"|| curl -fsSL '{RETROARCH_APPIMAGE_URL}' -o '{download_path}'"])
+    if not ok or not os.path.exists(download_path):
+        print("[!] 下载失败，请手动下载并解压:")
+        print(f"    {RETROARCH_APPIMAGE_URL}")
+        print(f"    解压到: {RETROARCH_APPIMAGE_DIR}/")
+        return False
+
+    ok = run_step("解压 RetroArch AppImage",
+                  ["7z", "x", download_path, f"-o{RETROARCH_APPIMAGE_DIR}/", "-y"])
+    os.unlink(download_path)
+    if not ok:
+        return False
+
+    appimage = None
+    for f in os.listdir(RETROARCH_APPIMAGE_DIR):
+        if f.endswith(".AppImage") and "RetroArch" in f:
+            appimage = os.path.join(RETROARCH_APPIMAGE_DIR, f)
+            break
+
+    if not appimage:
+        print("[!] 未在解压目录中找到 RetroArch AppImage 文件")
+        return False
+
+    os.chmod(appimage, 0o755)
+
+    ok = run_step("创建 retroarch 命令",
+                  ["ln", "-sf", appimage, RETROARCH_BIN_SYMLINK],
+                  sudo=True)
+    if not ok:
+        return False
+
+    print(f"[✓] RetroArch AppImage: {appimage}")
+    print("[*] RetroArch 启动命令: retroarch")
+    return True
+
+
 def cmd_retroarch():
-    _pkg_install({
+    pkg_ok = _pkg_install({
         "apt": ["retroarch", "retroarch-assets"],
         "pacman": ["retroarch"],
     }[_detect_pkg_manager() or "apt"], "安装 RetroArch")
+
+    if not pkg_ok and _detect_pkg_manager() == "apt":
+        print("[*] apt 中未找到 RetroArch 包，尝试下载 AppImage...")
+        _install_retroarch_appimage()
 
     retroarch_cfg = os.path.expanduser("~/.config/retroarch/retroarch.cfg")
     cores_dir = "/usr/lib/libretro"
@@ -1034,12 +1060,66 @@ def cmd_backup_emu():
     cmd_retroarch()
 
 
+def cmd_interactive():
+    """交互式安装菜单（原 start.sh env_menu 内容）"""
+    _sudo_init()
+    while True:
+        print("\n===== 开发环境 =====")
+        print("1. Python 依赖安装")
+        print("2. 系统依赖与交叉编译器 (deps + gcc-ia16)")
+        print("3. NP2kai 模拟器 (wxWidgets/GTK3) [主模拟器]")
+        print("4. 备用模拟器 (RetroArch + libretro 核心) [备用]")
+        print("5. 编译 i286 核心 [DEPRECATED]")
+        print("6. 环境检测")
+        print("7. 镜像源设置")
+        print("0. 退出")
+        print("====================")
+        choice = input("请选择 [0-7]: ").strip()
+
+        if choice == "1":
+            cmd_pip_install()
+            input("按 Enter 键继续...")
+        elif choice == "2":
+            cmd_system_tools()
+            input("按 Enter 键继续...")
+        elif choice == "3":
+            cmd_np2kai()
+            input("按 Enter 键继续...")
+        elif choice == "4":
+            cmd_backup_emu()
+            input("按 Enter 键继续...")
+        elif choice == "5":
+            cmd_build_i286()
+            input("按 Enter 键继续...")
+        elif choice == "6":
+            cmd_check()
+            input("按 Enter 键继续...")
+        elif choice == "7":
+            print("\n───── Git 仓库来源 ─────")
+            print("  1) GitHub（海外直连）")
+            print("  2) 国内镜像（Gitee/GitCode，中国大陆加速）")
+            m = input("请选择 [1/2]: ").strip()
+            if m == "1":
+                _set_mirror("github")
+            elif m == "2":
+                _set_mirror("china")
+            input("按 Enter 键继续...")
+        elif choice == "0":
+            break
+        else:
+            print("无效选项")
+
+
 def main():
+    VALID_COMMANDS = {"check", "deps", "gcc-ia16", "np2kai", "np2kai-libretro",
+                      "retroarch", "system-tools", "backup-emu", "pip-install",
+                      "build-i286", "test-hdi"}
     parser = argparse.ArgumentParser(description="Naiz 开发环境安装工具")
     parser.add_argument(
         "command",
-        choices=["check", "deps", "gcc-ia16", "np2kai", "np2kai-libretro", "retroarch", "system-tools", "backup-emu", "pip-install", "build-i286", "test-hdi"],
-        help="要执行的子命令",
+        nargs="?",
+        default=None,
+        help="要执行的子命令 (无参时进入交互模式)",
     )
     parser.add_argument(
         "--hdi",
@@ -1050,7 +1130,7 @@ def main():
         "--emulator", "-e",
         default=None,
         choices=list(EMULATORS.keys()),
-        help="指定模拟器版本: ia32 (默认) 或 i286 [DEPRECATED] (仅 test-hdi)",
+        help="指定模拟器版本: ia32 (默认, wxnp21kai) (仅 test-hdi)",
     )
     parser.add_argument(
         "--mirror",
@@ -1063,12 +1143,20 @@ def main():
     # 初始化镜像源
     global MIRROR
     if args.mirror:
-        MIRROR = args.mirror
-        cfg = _read_conf()
-        cfg["mirror"] = MIRROR
-        _write_conf(cfg)
+        _set_mirror(args.mirror)
     else:
         MIRROR = _mirror_init()
+
+    # 无参 → 交互模式
+    if args.command is None:
+        cmd_interactive()
+        return
+
+    # 验证子命令
+    if args.command not in VALID_COMMANDS:
+        print(f"[✗] 未知子命令: {args.command}")
+        print(f"    可选: {', '.join(sorted(VALID_COMMANDS))}")
+        sys.exit(1)
 
     if args.command != "check":
         os.makedirs(LOG_DIR, exist_ok=True)

@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
-"""Read FAT16 partition from msdos5.hdi and list all files."""
+"""Read FAT16 partition from base_msdos5_scsi_48m.hdi and list all files."""
 
 import struct
 import os
 
-HDI_PATH = os.path.join(os.path.dirname(__file__), "msdos5.hdi")
+HDI_PATH = os.path.join(os.path.dirname(__file__), "base_msdos5_scsi_48m.hdi")
 
 with open(HDI_PATH, "rb") as f:
     hdi_data = f.read()

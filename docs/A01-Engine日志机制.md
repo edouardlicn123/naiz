@@ -2,7 +2,7 @@
 
 ## 概述
 
-Engine 在 MS-DOS 下运行时通过 HAL 层的 DOS INT 21h 文件操作，在游戏目录 `A:\DEMO-A1\` 下生成日志文件 `ENGINE.LOG`。测试结束后通过 Python 工具链将该文件从 HDI 镜像中提取到宿主机的 `logs/` 目录，并加上时间戳重命名。
+Engine 在 MS-DOS 下运行时通过 HAL 层的 DOS INT 21h 文件操作，在游戏目录 `C:\DEMO-A1\` 下生成日志文件 `ENGINE.LOG`。测试结束后通过 Python 工具链将该文件从 HDI 镜像中提取到宿主机的 `logs/` 目录，并加上时间戳重命名。
 
 ## 数据流
 
@@ -146,7 +146,7 @@ make -C core clean all                     # 编译新 engine
 cp core/engine.exe games/demo-A1/
 source tools/env_setup/venv/bin/activate
 python3 -m tools.naiz_img.inject --game demo-A1 --yes   # 注入 HDI
-bash test_hdi.sh demo-A1 ia32              # 运行 NP2kai IA32 核心（engine 生成 ENGINE.LOG）
+./makegame.sh test demo-A1                  # 运行 NP2kai（engine 生成 ENGINE.LOG）
 python3 -m tools.naiz_img.inject --game demo-A1 --extract ENGINE.LOG  # 提取
 cat logs/ENGINE.RUN.*.log                  # 查看日志
 ```

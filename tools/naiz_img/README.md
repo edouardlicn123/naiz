@@ -18,7 +18,7 @@ Inspired by [98Bridge](https://github.com/NullMagic2/98Bridge) (MIT).
 ```python
 from naiz_img import open_image, NAIZFatFS
 
-img = open_image("~/msdos5/msdos5.hdi")
+img = open_image("tools/base_msdos5_scsi_48m.hdi")
 fs = NAIZFatFS(img)
 for path, entry in fs.walk():
     print(path)
