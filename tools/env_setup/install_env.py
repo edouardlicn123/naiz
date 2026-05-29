@@ -496,7 +496,7 @@ def _pick_emulator(emulator_arg):
         print("  无效选择，请重新输入")
 
 
-def cmd_test_hdi(hdi_path=None, emulator=None):
+def cmd_test_hdi(hdi_path=None, emulator=None, serial=False):
     print("")
     print("===== NP2kai 测试启动 =====")
 
@@ -587,6 +587,18 @@ def cmd_test_hdi(hdi_path=None, emulator=None):
     sec = cfg.setdefault('NP21kai', {})
     sec['SCSIHDD0'] = selected
 
+    serial_pty = None
+    if serial:
+        import pty as pty_mod
+        master_fd, slave_fd = pty_mod.openpty()
+        slave_name = os.ttyname(slave_fd)
+        sec['com1_m_o'] = slave_name
+        sec['com1_m_i'] = slave_name
+        sec['com1port'] = 0
+        sec['com1para'] = 0xE3  # 9600 8N1
+        sec['com1_bps'] = 9600
+        serial_pty = (master_fd, slave_fd, slave_name)
+
     def _toml_val(v):
         if isinstance(v, bool):
             return 'true' if v else 'false'
@@ -640,12 +652,49 @@ def cmd_test_hdi(hdi_path=None, emulator=None):
         f.write(f"cfg:      {cfg_path}\n")
 
     print(f"启动: {binary}")
-    with open(log_path, "a", encoding="utf-8") as f:
-        result = subprocess.run(
-            [binary],
-            stdout=f,
-            stderr=subprocess.STDOUT,
-        )
+
+    if serial_pty:
+        master_fd, slave_fd, slave_name = serial_pty
+        serial_log = os.path.join(project_root, "logs",
+            f"serial_{os.path.splitext(os.path.basename(selected))[0]}.log")
+        # Close slave fd in parent; only master needed
+        os.close(slave_fd)
+        proc = subprocess.Popen([binary], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        import select
+        import threading
+        serial_stop = threading.Event()
+        def read_serial():
+            with open(serial_log, "w", encoding="utf-8") as sf:
+                sf.write(f"Serial debug log - {datetime.now().isoformat()}\n")
+                sf.write(f"PTY: {slave_name}\n\n")
+                while not serial_stop.is_set():
+                    r, _, _ = select.select([master_fd], [], [], 0.5)
+                    if r:
+                        try:
+                            data = os.read(master_fd, 4096)
+                            if not data:
+                                break
+                            text = data.decode("utf-8", errors="replace")
+                            print(text, end="", flush=True)
+                            sf.write(text)
+                            sf.flush()
+                        except OSError:
+                            break
+        st = threading.Thread(target=read_serial, daemon=True)
+        st.start()
+        proc.wait()
+        serial_stop.set()
+        st.join(timeout=2)
+        os.close(master_fd)
+        result = proc
+        print(f"\n[✓] 串口日志: {serial_log}")
+    else:
+        with open(log_path, "a", encoding="utf-8") as f:
+            result = subprocess.run(
+                [binary],
+                stdout=f,
+                stderr=subprocess.STDOUT,
+            )
 
     print(f"[✓] 模拟器已退出 (exit={result.returncode})")
     print(f"    日志: {log_path}")
@@ -1306,6 +1355,12 @@ def main():
         help="指定模拟器版本: ia32 (默认, wxnp21kai) (仅 test-hdi)",
     )
     parser.add_argument(
+        "--serial",
+        action="store_true",
+        default=False,
+        help="启用串口调试 (PTY 管道，日志写入 logs/serial_<game>.log) (仅 test-hdi)",
+    )
+    parser.add_argument(
         "--mirror",
         default=None,
         choices=["github", "china"],
@@ -1359,7 +1414,7 @@ def main():
         "test-hdi": cmd_test_hdi,
     }
     if args.command == "test-hdi":
-        cmd_test_hdi(hdi_path=args.hdi, emulator=args.emulator)
+        cmd_test_hdi(hdi_path=args.hdi, emulator=args.emulator, serial=args.serial)
     else:
         commands[args.command]()
 

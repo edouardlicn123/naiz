@@ -113,6 +113,46 @@ void hal_video_clear_screen(void)
     hal_video_fill_rect(0, 0, 640, 400, 1);
 }
 
+#define TEXT_VRAM_SEG 0xA000
+#define TEXT_COLS 80
+#define TEXT_ROWS 25
+#define TEXT_ATTR_DEFAULT 0x07
+
+void hal_video_write_text_char(int row, int col, unsigned char ch, unsigned char attr)
+{
+    unsigned short __far *vram = (unsigned short __far *)0xA0000000L;
+    vram[row * TEXT_COLS + col] = (unsigned short)(((unsigned short)attr << 8) | ch);
+}
+
+void hal_video_scroll_text(void)
+{
+    unsigned short __far *vram = (unsigned short __far *)0xA0000000L;
+    unsigned short space = (unsigned short)(((unsigned short)TEXT_ATTR_DEFAULT << 8) | ' ');
+    int r, c;
+    for (r = 1; r < TEXT_ROWS; r++)
+    {
+        for (c = 0; c < TEXT_COLS; c++)
+        {
+            vram[(r - 1) * TEXT_COLS + c] = vram[r * TEXT_COLS + c];
+        }
+    }
+    for (c = 0; c < TEXT_COLS; c++)
+    {
+        vram[(TEXT_ROWS - 1) * TEXT_COLS + c] = space;
+    }
+}
+
+void hal_video_clear_text(void)
+{
+    unsigned short __far *vram = (unsigned short __far *)0xA0000000L;
+    unsigned short space = (unsigned short)(((unsigned short)TEXT_ATTR_DEFAULT << 8) | ' ');
+    int i;
+    for (i = 0; i < TEXT_COLS * TEXT_ROWS; i++)
+    {
+        vram[i] = space;
+    }
+}
+
 void hal_video_deinit(void)
 {
     gdc_interrupt_reset();
@@ -382,4 +422,51 @@ int hal_vsync_count(void)
     unsigned short c = vsync_counter;
     vsync_counter = 0;
     return (int)c;
+}
+
+int hal_serial_init(int port, unsigned long baud)
+{
+    unsigned char param;
+    if (baud <= 150) param = 0x00;
+    else if (baud <= 300) param = 0x20;
+    else if (baud <= 600) param = 0x40;
+    else if (baud <= 1200) param = 0x60;
+    else if (baud <= 2400) param = 0x80;
+    else if (baud <= 4800) param = 0xA0;
+    else param = 0xE0;
+
+    param |= 0x03;
+
+    __asm volatile (
+        "movb $0x00, %%ah\n\t"
+        "int $0x14\n\t"
+        : : "a" (param), "d" ((unsigned short)port)
+        : "cc");
+    return 0;
+}
+
+void hal_serial_write_char(unsigned char c)
+{
+    unsigned short tries = 0;
+    unsigned short result;
+    for (;;)
+    {
+        __asm volatile (
+            "movb $0x01, %%ah\n\t"
+            "int $0x14\n\t"
+            : "=a" (result)
+            : "d" ((unsigned short)0), "a" ((unsigned short)c)
+            : "cc");
+        if (result & 0x8000) break;
+        if (++tries > 10000) break;
+    }
+}
+
+void hal_serial_write(const char *s)
+{
+    while (*s)
+    {
+        hal_serial_write_char((unsigned char)*s);
+        s++;
+    }
 }

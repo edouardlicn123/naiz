@@ -27,25 +27,11 @@ static int key_pressed(unsigned char scancode)
     return (key_change_status[byte] >> bit) & 1;
 }
 
-static void init_display(void)
-{
-    /* Fill text plane with 'A' characters (white on black) */
-    __asm volatile (
-        "movw $0xA000, %%ax\n\t"
-        "movw %%ax, %%es\n\t"
-        "movw $0x0741, %%ax\n\t"
-        "movw $2000, %%cx\n\t"
-        "xorw %%di, %%di\n\t"
-        "rep stosw\n\t"
-        : : : "%ax", "%cx", "%di", "%es"
-    );
-    for (;;) __asm volatile ("hlt");
-}
-
 int main(void)
 {
     log_open("ENGINE.LOG");
     log_write("Naiz engine starting\r\n");
+    log_flush();
 
     if (!hal_check_compatibility())
     {
@@ -53,8 +39,10 @@ int main(void)
         return 0xFF;
     }
 
-    //hal_video_init();
-    init_display();
+    hal_video_init();
+    gdc_start_text();
+    log_write("Video init done\r\n");
+    log_flush();
 
     if (read_root_info() != 0)
     {
@@ -173,6 +161,7 @@ int main(void)
     free_scene_engine();
     free_graphics_system();
     log_write("Shutdown\r\n");
+    log_flush();
     log_close();
     return 0;
 }

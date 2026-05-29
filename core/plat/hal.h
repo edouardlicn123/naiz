@@ -6,6 +6,9 @@ void hal_video_set_palette(int idx, unsigned char r, unsigned char g, unsigned c
 void hal_video_fill_rect(int x, int y, int w, int h, int color);
 void hal_video_vsync_wait(void);
 void hal_video_clear_screen(void);
+void hal_video_write_text_char(int row, int col, unsigned char ch, unsigned char attr);
+void hal_video_scroll_text(void);
+void hal_video_clear_text(void);
 void hal_video_deinit(void);
 
 void hal_input_init(void);
@@ -31,5 +34,9 @@ void hal_vsync_disable(void);
 int  hal_vsync_count(void);
 
 int hal_check_compatibility(void);
+
+int  hal_serial_init(int port, unsigned long baud);
+void hal_serial_write_char(unsigned char c);
+void hal_serial_write(const char *s);
 
 #endif

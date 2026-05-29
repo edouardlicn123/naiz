@@ -35,11 +35,15 @@ case "$SUBCOMMAND" in
 
     test)
         GAME="${1:-}"
+        SERIAL=""
+        if [ "$2" = "--serial" ]; then
+            SERIAL="--serial"
+        fi
         if [ -z "$GAME" ]; then
-            echo "用法: makegame.sh test <game>"
+            echo "用法: makegame.sh test <game> [--serial]"
             exit 1
         fi
-        exec "$PYTHON" "$ROOT/tools/env_setup/install_env.py" test-hdi --hdi "$ROOT/disks/$GAME.hdi"
+        exec "$PYTHON" "$ROOT/tools/env_setup/install_env.py" test-hdi --hdi "$ROOT/disks/$GAME.hdi" $SERIAL
         ;;
 
     build)

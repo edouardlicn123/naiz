@@ -2,6 +2,7 @@
 #define LOG_H
 
 void log_open(const char *path);
+void log_enable_serial(int port, unsigned long baud);
 void log_write(const char *s);
 void log_write_dec(unsigned short val);
 void log_write_datetime(void);

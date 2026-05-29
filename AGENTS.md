@@ -7,6 +7,7 @@ Naiz/
 ├── core/                    # Engine source (C, gcc-ia16)
 ├── tools/                   # Python toolchain
 │   ├── naiz_img/            #   HDI/FAT toolchain (inject.py, inject_common.py, hdi.py, fat.py, ...)
+│   ├── diag/                #   诊断工具 (gen_com, hdi_patch_autoexec, hdi_find_file, hdi_integrity, np2kai_screenshot, np2kai_serial)
 │   ├── inject_common.py          #   增量注入核心
 │   └── ref_config/          #   CONFIG.SYS
 │   └── base_msdos5_scsi_48m.hdi           #   Base HDI image (read-only, MS-DOS 5.0 48MB)
@@ -15,7 +16,7 @@ Naiz/
 ├── games/                   # Deployable game files (injected into HDI, built from projects/)
 ├── disks/                   # Generated HDI disk images
 ├── docs/                    # Specifications (A-prefix: engine, toolchain, HDI, dev guides)
-├── devdocs/                 # Development notes (numbered 01-20)
+├── devdocs/                 # Development notes (numbered 01-30)
 │   ├── MHVN98/              #   MHVNVisualNovelEngine 逆向笔记
 │   ├── 01-*.md
 │   ├── 02-*.md
@@ -66,6 +67,27 @@ Naiz/
 | 测试运行 | NP2kai（wxnp21kai，wxWidgets GTK3 前端 + IA32 核心，系统安装于 /usr/local/bin/wxnp21kai，源码在 /tmp/NP2kai/） |
 
 **注意**：使用 IA32 核心模拟器 (`wxnp21kai`)，i286 核心已废弃。SDL 前端 (`sdlnp21kai_sdl2`) 已弃用。所有测试通过 `makegame.sh test <name>` 或 `make test` 运行。
+
+## 诊断工具 (Diagnostic Tools)
+
+详情见 `docs/DiagnosticTools.md`。所有工具在 `tools/diag/` 下，通过 `python -m tools.diag.<tool>` 调用。
+
+### 工具优先级
+
+| 优先级 | 工具 | 适用场景 |
+|--------|------|----------|
+| **P0** | `np2kai_screenshot` | 最直接的验证手段。截图看模拟器画面，确认 DOS 启动链、文本 VRAM、engine 输出 |
+| **P1** | `np2kai_serial` | 绕过 HDI 写回问题，通过 INT 14h + PTY 实时捕获串口输出 |
+| **P2** | `gen_com` | 生成特定 COM 测试文件，配合 screenshot/serial 使用 |
+| **P3** | `hdi_patch_autoexec` | 直接修改 AUTOEXEC.BAT（不经过 inject.py 重建 HDI） |
+| **P4** | `hdi_find_file` | 离线检查 HDI 中文件的存在性、内容、FAT 链 |
+| **P4** | `hdi_integrity` | SHA256 检查点，确认 NP2kai 是否实际写回 HDI |
+
+### 已知限制
+
+- NP2kai 的 SCSI HDI **写不回**（`hdi_integrity` 已确认），依赖文件输出的验证走不通
+- 串口首次测试无输出，疑似 DOS 未完成启动
+- 截图工具已在桌面环境验证可用
 
 ---
 

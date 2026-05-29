@@ -8,9 +8,66 @@ static int log_fd = -1;
 static char log_buf[LOG_BUF_SIZE];
 static unsigned char log_buf_pos = 0;
 
+static unsigned char screen_row = 0;
+static unsigned char screen_col = 0;
+static unsigned char screen_inited = 0;
+static unsigned char serial_enabled = 0;
+
+#define SCREEN_ATTR 0x07
+
+static void log_write_screen_len(const char *s, unsigned short len)
+{
+    unsigned short i;
+    for (i = 0; i < len; i++)
+    {
+        unsigned char c = (unsigned char)s[i];
+        if (c == '\r')
+        {
+            screen_col = 0;
+        }
+        else if (c == '\n')
+        {
+            screen_row++;
+            screen_col = 0;
+        }
+        else if (c == '\t')
+        {
+            do {
+                hal_video_write_text_char(screen_row, screen_col, ' ', SCREEN_ATTR);
+                screen_col++;
+            } while (screen_col % 8 != 0 && screen_col < 80);
+        }
+        else
+        {
+            hal_video_write_text_char(screen_row, screen_col, c, SCREEN_ATTR);
+            screen_col++;
+        }
+        if (screen_col >= 80)
+        {
+            screen_col = 0;
+            screen_row++;
+        }
+        while (screen_row >= 25)
+        {
+            hal_video_scroll_text();
+            screen_row = 24;
+        }
+    }
+}
+
 void log_open(const char *path)
 {
     log_fd = hal_file_open(path, 1);
+    screen_row = 0;
+    screen_col = 0;
+    screen_inited = 1;
+    hal_video_clear_text();
+}
+
+void log_enable_serial(int port, unsigned long baud)
+{
+    hal_serial_init(port, baud);
+    serial_enabled = 1;
 }
 
 static void flush(void)
@@ -24,12 +81,17 @@ static void flush(void)
 static void buf_write(const char *buf, unsigned short len)
 {
     if (log_fd < 0) return;
-    for (unsigned short i = 0; i < len; i++)
+    unsigned short i;
+    for (i = 0; i < len; i++)
     {
         log_buf[log_buf_pos++] = buf[i];
         if (log_buf_pos >= LOG_BUF_SIZE)
             flush();
     }
+    if (screen_inited)
+        log_write_screen_len(buf, len);
+    if (serial_enabled)
+        hal_serial_write(buf);
 }
 
 void log_flush(void)
