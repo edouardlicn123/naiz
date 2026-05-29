@@ -24,10 +24,10 @@ def generate_autoexec(game_name):
     content = (
         b'@ECHO OFF\r\n'
         b'PATH \\DOS\r\n'
-        b'SET TEMP=\\DOS\r\n'
+        b'SET TEMP=\ DOS\r\n'
         b'SET DOSDIR=\\DOS\r\n'
         b'CD \\' + name.encode() + b'\r\n'
-        b'ENGINE.EXE\r\n'
+        b'TESTVRAM.COM\r\n'
     )
     return content
 

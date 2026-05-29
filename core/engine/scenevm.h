@@ -19,6 +19,7 @@ typedef struct
 
 extern SceneInfo scene_info;
 extern int return_status;
+extern unsigned char cur_async_actions;
 
 int setup_scene_engine(void);
 int free_scene_engine(void);

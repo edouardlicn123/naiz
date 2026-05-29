@@ -19,12 +19,12 @@
 #define GDC_PLANE3 ((unsigned __far char*)0xE0000000)
 #define GDC_PLANES  ((unsigned __far char*)0xA8000000)
 
-#define GDC_MODE1_COLOUR            0x02
-#define GDC_MODE1_MONOCHROME        0x03
-#define GDC_MODE1_LINEDOUBLE_ON     0x08
-#define GDC_MODE1_LINEDOUBLE_OFF    0x09
-#define GDC_MODE1_DISPLAY_ON        0x0E
-#define GDC_MODE1_DISPLAY_OFF       0x0F
+#define GDC_MODE1_COLOUR            0x03
+#define GDC_MODE1_MONOCHROME        0x02
+#define GDC_MODE1_LINEDOUBLE_ON     0x09
+#define GDC_MODE1_LINEDOUBLE_OFF    0x08
+#define GDC_MODE1_DISPLAY_ON        0x0F
+#define GDC_MODE1_DISPLAY_OFF       0x0E
 
 #define GDC_MODE2_8COLOURS      0x00
 #define GDC_MODE2_16COLOURS     0x01

@@ -81,21 +81,25 @@ def _is_pikaos():
 
 def _sudo_init():
     """Ensure sudo credential is cached before calling sudo-based run_step.
-    Tries sudo -n (non-interactive); if that fails, prompts with getpass
-    into sudo -S so subsequent sudo -n calls work without a TTY."""
+    Supports NAIZ_SUDO_PASS env var for non-interactive use.
+    Falls back to getpass prompt when no TTY + no env var."""
     if os.geteuid() == 0:
         return
     # Check if credential is already cached
     r = subprocess.run(["sudo", "-n", "true"], capture_output=True)
     if r.returncode == 0:
         return
-    # Prompt and cache via -S
-    import getpass
-    try:
-        pw = getpass.getpass("[sudo] 密码: ")
-    except (EOFError, KeyboardInterrupt):
-        print("\n[✗] 需要 sudo 权限")
-        sys.exit(1)
+    # Get password: env var or interactive prompt
+    pw = os.environ.get("NAIZ_SUDO_PASS")
+    if pw is not None:
+        print("[*] 使用 NAIZ_SUDO_PASS 环境变量")
+    else:
+        import getpass
+        try:
+            pw = getpass.getpass("[sudo] 密码: ")
+        except (EOFError, KeyboardInterrupt):
+            print("\n[✗] 需要 sudo 权限")
+            sys.exit(1)
     r = subprocess.run(["sudo", "-S", "-v"], input=pw + "\n", text=True,
                        capture_output=True)
     if r.returncode != 0:
@@ -279,8 +283,19 @@ def cmd_pip_install():
     if not os.path.exists(requirements):
         print(f"[✗] 未找到 requirements.txt: {requirements}")
         sys.exit(1)
-    venv_python = os.path.dirname(sys.executable)
-    pip_cmd = [os.path.join(venv_python, "pip"), "install", "-r", requirements]
+
+    # 自动创建 venv（系统 Python 3.12+ 默认启用 PEP 668）
+    venv_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "venv")
+    venv_python = os.path.join(venv_dir, "bin", "python3")
+    venv_pip = os.path.join(venv_dir, "bin", "pip")
+    if not os.path.exists(venv_python):
+        print("  [*] 创建虚拟环境...")
+        ok = run_step("创建 Python venv",
+                      [sys.executable, "-m", "venv", venv_dir])
+        if not ok:
+            sys.exit(1)
+
+    pip_cmd = [venv_pip, "install", "-r", requirements]
     run_step("安装 Python 依赖", pip_cmd)
 
 
@@ -851,17 +866,24 @@ def _np2kai_deps(pkg_manager="apt"):
     deps = {
         "apt": [
             "git", "cmake", "ninja-build", "build-essential",
-            "libwxgtk3.2-dev", "libsdl3-dev", "libsdl3-ttf-dev",
+            "libwxgtk3.2-dev",
             "libgl1-mesa-dev", "libssl-dev",
             "libusb-1.0-0-dev", "libcdio-dev",
         ],
         "pacman": [
             "git", "cmake", "ninja", "base-devel",
-            "wxgtk3", "sdl3", "sdl3_ttf",
+            "wxgtk3",
             "libusb", "libcdio",
         ],
     }
     return deps.get(pkg_manager, deps["apt"])
+
+
+# SDL3 apt 包名映射（无包时自动源码构建）
+_SDL_PKGS = {
+    "apt": ["libsdl3-dev", "libsdl3-ttf-dev"],
+    "pacman": ["sdl3", "sdl3_ttf"],
+}
 
 
 def _np2kai_x_deps(pkg_manager="apt"):
@@ -912,6 +934,70 @@ def _pkg_install(packages, title=None):
         return False
 
 
+SDL3_SRC_DIR = "/tmp/SDL3"
+SDL3_TTF_SRC_DIR = "/tmp/SDL3_ttf"
+
+
+def _build_sdl3():
+    """从源码构建 SDL3（apt 无包时的回退）。"""
+    # 编译依赖
+    _pkg_install([
+        "libfreetype-dev", "libpulse-dev", "libasound2-dev",
+    ], "安装 SDL3 编译依赖")
+
+    # SDL3（只编译 audio/joystick 子系统，禁用视频后端以减小编译时间）
+    if not os.path.exists(f"{SDL3_SRC_DIR}/CMakeLists.txt"):
+        _git_clone_with_retry(
+            "https://github.com/libsdl-org/SDL.git", SDL3_SRC_DIR,
+            desc="SDL3 源码", max_retries=2)
+    if not os.path.exists(f"{SDL3_SRC_DIR}/build"):
+        os.makedirs(f"{SDL3_SRC_DIR}/build")
+    ok = run_step("配置 SDL3", ["cmake", "-S", SDL3_SRC_DIR, "-B",
+                                f"{SDL3_SRC_DIR}/build",
+                                "-DCMAKE_BUILD_TYPE=Release",
+                                "-DSDL_X11=OFF", "-DSDL_WAYLAND=OFF",
+                                "-DSDL_OPENGL=OFF", "-DSDL_VULKAN=OFF",
+                                "-DSDL_HIDAPI=OFF",
+                                "-DSDL_UNIX_CONSOLE_BUILD=ON"])
+    if not ok:
+        sys.exit(1)
+    ok = run_step("编译 SDL3", ["cmake", "--build", f"{SDL3_SRC_DIR}/build",
+                                "-j", str(os.cpu_count() or 4)])
+    if not ok:
+        sys.exit(1)
+    ok = run_step("安装 SDL3", ["cmake", "--install", f"{SDL3_SRC_DIR}/build"],
+                  sudo=True)
+    if not ok:
+        sys.exit(1)
+
+    # SDL3_ttf
+    if not os.path.exists(f"{SDL3_TTF_SRC_DIR}/CMakeLists.txt"):
+        _git_clone_with_retry(
+            "https://github.com/libsdl-org/SDL_ttf.git", SDL3_TTF_SRC_DIR,
+            desc="SDL3_ttf 源码", max_retries=2)
+    if not os.path.exists(f"{SDL3_TTF_SRC_DIR}/build"):
+        os.makedirs(f"{SDL3_TTF_SRC_DIR}/build")
+    ok = run_step("配置 SDL3_ttf",
+                  ["cmake", "-S", SDL3_TTF_SRC_DIR, "-B",
+                   f"{SDL3_TTF_SRC_DIR}/build",
+                   "-DCMAKE_BUILD_TYPE=Release"])
+    if not ok:
+        sys.exit(1)
+    ok = run_step("编译 SDL3_ttf",
+                  ["cmake", "--build", f"{SDL3_TTF_SRC_DIR}/build",
+                   "-j", str(os.cpu_count() or 4)])
+    if not ok:
+        sys.exit(1)
+    ok = run_step("安装 SDL3_ttf",
+                  ["cmake", "--install", f"{SDL3_TTF_SRC_DIR}/build"],
+                  sudo=True)
+    if not ok:
+        sys.exit(1)
+
+    # 刷新链接器缓存
+    run_step("刷新 ldconfig", ["sudo", "ldconfig"], sudo=True)
+
+
 def cmd_np2kai():
     pm = _detect_pkg_manager()
     if not pm:
@@ -920,24 +1006,90 @@ def cmd_np2kai():
 
     _pkg_install(_np2kai_deps(pm), "安装 NP2kai 编译依赖")
 
+    # SDL3 — apt 优先，不可用时从源码构建
+    sdl_apt_ok = _pkg_install(_SDL_PKGS.get(pm, _SDL_PKGS["apt"]),
+                              "安装 SDL3 开发库")
+    if sdl_apt_ok:
+        use_sdl = 3
+    else:
+        print("  [*] apt 中无 SDL3 包，从源码构建...")
+        _build_sdl3()
+        use_sdl = 3
+
     np2kai_dir = _get_np2kai_source()
     build_dir = os.path.join(np2kai_dir, "build")
 
     print("--- 应用上游补丁 ---")
     cmake_file = os.path.join(np2kai_dir, "CMakeLists.txt")
+    compiler_h_wx = os.path.join(np2kai_dir, "wx", "compiler.h")
+
+    # SUPPORT_DEBUGSS
     subprocess.run(
         ["sed", "-i",
          's/"VERMOUTH_LIB")/"VERMOUTH_LIB" "SUPPORT_DEBUGSS")/',
          cmake_file],
         check=False)
 
+    # wx/compiler.h: 强制 USE_SDL 3（原为 2，但 wx port 源码已用 SDL3 API）
+    subprocess.run(
+        ["sed", "-i",
+         's/#define USE_SDL 2/#define USE_SDL 3/',
+         compiler_h_wx],
+        check=False)
+
+    # CMakeLists.txt — NP2kai_WX_base: SDL2::SDL2 → 条件 USE_SDL
+    old_link = 'target_link_libraries(NP2kai_WX_base INTERFACE ${lib_math_libraries} ${wxWidgets_LIBRARIES} ${lib_tomlplusplus_libraries} SDL2::SDL2 SDL2_ttf::SDL2_ttf ${LIBCDIO_LINK_LIBRARIES} ${lib_dl_libraries})'
+    new_link = '''\t\tif(USE_SDL EQUAL 3)
+\t\t\ttarget_link_libraries(NP2kai_WX_base INTERFACE ${lib_math_libraries} ${wxWidgets_LIBRARIES} ${lib_tomlplusplus_libraries} SDL3::SDL3 SDL3_ttf::SDL3_ttf ${LIBCDIO_LINK_LIBRARIES} ${lib_dl_libraries})
+\t\telseif(USE_SDL EQUAL 2)
+\t\t\ttarget_link_libraries(NP2kai_WX_base INTERFACE ${lib_math_libraries} ${wxWidgets_LIBRARIES} ${lib_tomlplusplus_libraries} SDL2::SDL2 SDL2_ttf::SDL2_ttf ${LIBCDIO_LINK_LIBRARIES} ${lib_dl_libraries})
+\t\telse()
+\t\t\ttarget_link_libraries(NP2kai_WX_base INTERFACE ${lib_math_libraries} ${wxWidgets_LIBRARIES} ${lib_tomlplusplus_libraries} SDL::SDL SDL_ttf::SDL_ttf ${LIBCDIO_LINK_LIBRARIES} ${lib_dl_libraries})
+\t\tendif()'''
+    with open(cmake_file, 'r') as f:
+        cmake_content = f.read()
+    if old_link in cmake_content:
+        cmake_content = cmake_content.replace(old_link, new_link)
+        with open(cmake_file, 'w') as f:
+            f.write(cmake_content)
+        print("  已修复 NP2kai_WX_base SDL 链接目标（USE_SDL 条件分支）")
+    else:
+        print("  NP2kai_WX_base SDL 链接已修复，跳过")
+
+    # CMakeLists.txt — NP2kai_SDL3_base: SDL2::SDL2 → SDL3::SDL3
+    subprocess.run(
+        ["sed", "-i",
+         's/target_link_libraries(NP2kai_SDL3_base INTERFACE ${lib_math_libraries} ${lib_vst3sdk_libraries} SDL2::SDL2 SDL2_ttf::SDL2_ttf/target_link_libraries(NP2kai_SDL3_base INTERFACE ${lib_math_libraries} ${lib_vst3sdk_libraries} SDL3::SDL3 SDL3_ttf::SDL3_ttf/',
+         cmake_file],
+        check=False)
+
+    # CMakeLists.txt — NP2kai_X_SDL3_base: SDL2::SDL2 → SDL3::SDL3
+    subprocess.run(
+        ["sed", "-i",
+         's/target_link_libraries(NP2kai_X_SDL3_base INTERFACE ${lib_math_libraries} ${lib_glib_libraries} ${GTK2_LIBRARIES} ${X11_LIBRARIES} ${Fontconfig_LIBRARIES} ${Freetype_LIBRARIES} ${lib_vst3sdk_libraries} ${lib_Threads_libraries} SDL2::SDL2 SDL2_ttf::SDL2_ttf/target_link_libraries(NP2kai_X_SDL3_base INTERFACE ${lib_math_libraries} ${lib_glib_libraries} ${GTK2_LIBRARIES} ${X11_LIBRARIES} ${Fontconfig_LIBRARIES} ${Freetype_LIBRARIES} ${lib_vst3sdk_libraries} ${lib_Threads_libraries} SDL3::SDL3 SDL3_ttf::SDL3_ttf/',
+         cmake_file],
+        check=False)
+
+    # CMakeLists.txt — wxnp21kai: add crypto (SHA1 for debugsnapshot)
+    old_crypto = 'target_link_libraries(wxnp21kai NP21kai_base NP2kai_WX_base)'
+    new_crypto = 'target_link_libraries(wxnp21kai NP21kai_base NP2kai_WX_base crypto)'
+    with open(cmake_file, 'r') as f:
+        cmake_content = f.read()
+    if old_crypto in cmake_content:
+        cmake_content = cmake_content.replace(old_crypto, new_crypto)
+        with open(cmake_file, 'w') as f:
+            f.write(cmake_content)
+        print("  已添加 crypto 链接到 wxnp21kai")
+    elif new_crypto in cmake_content:
+        print("  wxnp21kai crypto 已存在，跳过")
+
     if os.path.exists(build_dir):
         shutil.rmtree(build_dir)
 
-    ok = run_step("生成构建系统 (wxWidgets + SDL3, GPU)",
+    ok = run_step(f"生成构建系统 (wxWidgets + SDL{use_sdl}, GPU)",
                   ["cmake", "-S", np2kai_dir, "-B", build_dir,
                    "-DBUILD_WX=ON", "-DBUILD_SDL=OFF",
-                   "-DUSE_SDL=3", "-DBUILD_X=OFF"])
+                   f"-DUSE_SDL={use_sdl}", "-DBUILD_X=OFF"])
     if not ok:
         sys.exit(1)
 
@@ -946,23 +1098,22 @@ def cmd_np2kai():
     if not ok:
         sys.exit(1)
 
-    # cmake --install requires sudo (no TTY in subprocess), so this is best-effort
-    run_step("安装到 /usr/local/bin",
-             ["cmake", "--install", build_dir], sudo=True)
+    # 安装到系统（sudo 凭据已由 _sudo_init() 缓存）
+    binary = os.path.join(build_dir, "wxnp21kai")
+    if os.path.exists(binary):
+        run_step("安装到 /usr/local/bin",
+                 ["cp", binary, "/usr/local/bin/wxnp21kai"], sudo=True)
 
-    built = [n for n in ["wxnp21kai"]
-             if os.path.exists(os.path.join(build_dir, n))]
-    installed = [n for n in ["/usr/local/bin/wxnp21kai"]
-                 if os.path.exists(n)]
+    built = os.path.exists(binary)
+    installed = os.path.exists("/usr/local/bin/wxnp21kai")
     if built:
-        print(f"[✓] 编译完成: {', '.join(built)}")
+        print(f"[✓] 编译完成: wxnp21kai")
     if installed:
-        print(f"[✓] 已安装: {', '.join(installed)}")
+        print(f"[✓] 已安装: /usr/local/bin/wxnp21kai")
     elif built:
         print("[!] 编译完成但未安装到系统 (缺少 sudo 交互权限)")
         print("    如需安装，请手动执行:")
-        for b in built:
-            print(f"    sudo cp {os.path.join(build_dir, b)} /usr/local/bin/")
+        print(f"    sudo cp {binary} /usr/local/bin/")
 
 
 def cmd_np2kai_libretro():

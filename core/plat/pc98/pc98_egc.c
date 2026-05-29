@@ -54,6 +54,10 @@ void egc_enable(void)
     grcg_enable();
     gdc_set_mode2(GDC_MODE2_MODIFY);
     gdc_set_mode2(GDC_MODE2_EGC);
+}
+
+void egc_operation_done(void)
+{
     gdc_set_mode2(GDC_MODE2_NOMODIFY);
 }
 

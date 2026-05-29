@@ -41,9 +41,7 @@ void hal_video_init(void)
 {
     hal_cli();
 
-    gdc_set_display_mode(640, 400, 440);
-
-    gdc_stop_text();
+    //gdc_set_display_mode(640, 400, 440);
     gdc_start_graphics();
     gdc_set_graphics_line_scale(1);
 
@@ -54,6 +52,8 @@ void hal_video_init(void)
     gdc_set_mode2(GDC_MODE2_16COLOURS);
     gdc_set_display_region(0, 400);
     gdc_scroll_simple_graphics(0);
+    gdc_write_text_cmd(GDC_COMMAND_SYNC_ON);
+    gdc_write_gfx_cmd(GDC_COMMAND_SYNC_ON);
 
     gdc_set_palette_colour(0, 0x00, 0x00, 0x00);
     gdc_set_palette_colour(1, 0x33, 0x33, 0xBB);

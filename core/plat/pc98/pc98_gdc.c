@@ -69,7 +69,7 @@ int gdc_set_display_mode(unsigned int width, unsigned int height, unsigned int s
     }
 
     gdc_write_text_cmd(GDC_COMMAND_SYNC_OFF);
-    gdc_write_text_param(0);
+    gdc_write_text_param(0x10);
     gdc_write_text_param((unsigned char)spitch5);
     gdc_write_text_param(((unsigned char)hs5) | (((unsigned char)vs) << 5));
     gdc_write_text_param((((unsigned char)vs) >> 3) | (((unsigned char)hfp5) << 2));

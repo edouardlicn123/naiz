@@ -83,6 +83,7 @@ void egc_set_to_bg_clear_mode(void);
 void egc_set_to_mono_draw_mode(void);
 void egc_set_to_vram_blit(void);
 void egc_enable(void);
+void egc_operation_done(void);
 void egc_disable(void);
 
 #endif

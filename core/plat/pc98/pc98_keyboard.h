@@ -19,6 +19,8 @@
 #define KC_ESC  0x00
 #define KC_ENTER 0x1C
 #define KC_SPACE 0x34
+#define KC_UP   0x78
+#define KC_DOWN 0x79
 
 void update_prev_key_status(void);
 void wait_vsync(void);

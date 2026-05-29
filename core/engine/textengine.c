@@ -75,7 +75,6 @@ void set_shadow_colours(const unsigned char* cols)
 
 int setup_text_info(void)
 {
-    write_string(root_info.cur_text_path, 0, 0, FORMAT_COLOUR_SET(0xA), 0);
     int fh = hal_file_open(root_info.cur_text_path, 0);
     if (fh < 0)
     {

@@ -185,7 +185,12 @@ Naiz/
 - **要求**：所有错误路径必须明确处理。函数返回错误码或满足断言失败条件时必须让对方明确感知。
 - **禁忌**：严禁吞掉错误、不返回状态、或不打印提示就假装操作成功。
 
-### 13. 安装失败自动查日志 (Check log on env install failure)
+### 13. 每次 compact 后用中文沟通 (Chinese after compact)
+
+- **要求**：每次我 compact（整理对话）后，AI 必须改用中文沟通，包括回复、提问、注释和 commit message。
+- **原因**：compact 后对话历史被截断，AI 可能丢失语言偏好设定，必须在此文件中显式声明。
+
+### 14. 安装失败自动查日志 (Check log on env install failure)
 
 - **要求**：当 `tools/env_setup/install_env.py` 相关操作失败或用户报告失败时，**必须先读取 `logs/env_install.log` 最后 200 行**定位原因，再给出修复方案。
 - **原因**：`install_env.py` 的错误输出通过 `run_step()` 写入日志但不会自动打印到终端。
