@@ -149,6 +149,40 @@ __asm volatile (
 
 优先级较低，因为需要重新制作基座镜像。
 
+## 已修复的 Bug
+
+### Bug 1: serialwrite COM 端口号错误 (gen_com.py)
+- 文件: `tools/diag/gen_com.py:86`
+- 症状: `serialwrite.com` 发送 `INT 14h` 初始化时 `mov dx, 0x83`，被当作 COM 端口号 #83（不存在）
+- 修复: 改为 `mov dx, 0`（COM1）
+- 背景: 注释错误地把 0x83 标注为"9600 8N1 param"，实际 0xE3 才在 AL 中
+
+### Bug 2: hdi_patch_autoexec 缺少 CD 命令 (np2kai_serial.py)
+- 症状: 注入到 `\DEMO-A1\` 下的 COM 文件在 AUTOEXEC 中直接执行，但当前目录是根目录，找不到文件
+- 修复: `np2kai_serial.py` patch AUTOEXEC 时先加 `CD \GAME` 再运行 COM
+- 影响: 手动使用 `hdi_patch_autoexec` 也需加 CD 命令
+
+### Bug 3: np2kai_serial PTY slave_fd 过早关闭
+- 症状: `os.close(slave_fd)` 在模拟器启动前执行，导致 `/dev/pts/N` 设备节点在模拟器打开前被销毁
+- 修复: 不再关闭 slave_fd，保持打开直到模拟器退出后再关
+
+### Bug 4: com1port = 0 (COMPORT_NONE) 导致 COM 禁用
+- 症状: NP2kai 配置 `com1port = 0` 对应 `COMPORT_NONE`，串口完全禁用
+- 修复: 改为 `com1port = 1`（`COMPORT_COM1`）
+- NP2kai 源码: `commng.h` 中 `COMPORT_NONE = 0, COMPORT_COM1 = 1, ...`
+
+### Bug 5: CONFIG.SYS 缺少 RSDRV.SYS
+- 症状: 极简 `CONFIG.SYS` 去掉了 `\DOS\RSDRV.SYS`（RS-232C 驱动），导致 INT 14h 调用可能失败
+- 修复: 恢复 RSDRV.SYS 加载，同时保留 HIMEM.SYS + EMM386.EXE
+- 注意: `DEVICEHIGH` 要求 EMM386 提供 UMB，否则驱动不会加载
+
+### 串口问题（仍未解决）
+即使以上 Bug 全部修复，`np2kai_serial` 仍收不到串口输出。可能原因：
+1. NP2kai 的 INT 14h BIOS 实现可能不完整或不调用 `cmserial_create`
+2. PIT 通道 2 计时器（`rs232c_callback`）未启动，导致 `rs232c_open()` 不会被调用
+3. PC-98 型号 VX 的 RS-232C 端口映射位置不同
+4. 需要深入 NP2kai 源码 `io/serial.c` 和 `io/pit.c` 排查
+
 ## 工具链使用流程总图
 
 ```
@@ -168,13 +202,13 @@ gen_com ──→ .com ──→ cp games/<name>/
     hdi_find_file *.LOG            (实时捕获)
           │
           ▼
-    结果: HDI 是否写回？
-    文件内容是否正确？
+     结果: HDI 是否写回？
+     文件内容是否正确？
 ```
 
-虚线路径（HDI 写回）目前不通。实线路径（串口、截图）可用。
+虚线路径（HDI 写回）目前不通（P0）。
 
-截图路径（新增）：
+截图路径（推荐，已验证可用）：
 
 ```
 gen_com vramwrite ──→ .com ──→ inject.py ──→ hdi_patch_autoexec

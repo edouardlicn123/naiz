@@ -83,8 +83,8 @@ def make_serialwrite():
     msg_off = 0x120
     entry_off = 0x100
 
-    code += b'\xba\x83\x00'             # mov dx, 0x83  (9600 8N1 param)
-    code += b'\xb8\x00\xe3'             # mov ax, 0xE300 (AH=0 init, AL=0xE3)
+    code += b'\xba\x00\x00'             # mov dx, 0  (COM1)
+    code += b'\xb8\x00\xe3'             # mov ax, 0x00E3 (AH=0 init, AL=0xE3)
     code += b'\xcd\x14'                 # int 14h
     code += b'\xbe' + struct.pack('<H', msg_off)  # mov si, offset msg
     code += b'\xb9' + struct.pack('<H', len(msg))  # mov cx, len(msg)

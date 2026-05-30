@@ -36,7 +36,7 @@ case "$SUBCOMMAND" in
     test)
         GAME="${1:-}"
         SERIAL=""
-        if [ "$2" = "--serial" ]; then
+        if [ "${2:-}" = "--serial" ]; then
             SERIAL="--serial"
         fi
         if [ -z "$GAME" ]; then

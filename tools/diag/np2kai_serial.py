@@ -95,7 +95,7 @@ def save_toml(hdi_abs_path, slave_name):
     sec['SCSIHDD0'] = hdi_abs_path
     sec['com1_m_o'] = slave_name
     sec['com1_m_i'] = slave_name
-    sec['com1port'] = 0
+    sec['com1port'] = 1  # COMPORT_COM1 (0 = COMPORT_NONE = disabled)
     sec['com1para'] = 0xE3
     sec['com1_bps'] = 9600
 
@@ -137,7 +137,6 @@ def run_emulator(hdi_path, serial_out, timeout_sec):
     print(f"[serial] Starting emulator (timeout={timeout_sec}s)...")
     print()
 
-    os.close(slave_fd)
     proc = subprocess.Popen(
         [EMULATOR],
         stdout=subprocess.DEVNULL,
@@ -181,6 +180,7 @@ def run_emulator(hdi_path, serial_out, timeout_sec):
     serial_stop.set()
     st.join(timeout=2)
     os.close(master_fd)
+    os.close(slave_fd)
 
     output = "".join(captured_data)
     if serial_out:
@@ -237,8 +237,10 @@ def main():
         if autoexec_backup:
             print(f"[serial] Backed up {len(autoexec_backup)} bytes")
 
-        print(f"[serial] Patching AUTOEXEC.BAT to run SERIALWRITE.COM")
-        patch_autoexec_in_hdi(hdi_path, b"SERIALWRITE.COM")
+        game_upper = args.game.upper()
+        autoexec_content = f"@ECHO OFF\r\nCD \\{game_upper}\r\nSERIALWRITE.COM"
+        print(f"[serial] Patching AUTOEXEC.BAT (CD \\{game_upper} + SERIALWRITE.COM)")
+        patch_autoexec_in_hdi(hdi_path, autoexec_content.encode())
 
     if not os.path.isdir(CONFIG_DIR):
         print(f"[serial] ERROR: config dir not found: {CONFIG_DIR}")
