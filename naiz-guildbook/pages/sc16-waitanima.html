@@ -1,0 +1,34 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>waitanima — Naiz Guildbook</title>
+<link rel="stylesheet" href="../style.css">
+</head>
+<body>
+<nav class="sidebar" id="sidebar-nav"></nav>
+<script src="../sidebar-scripts.js"></script>
+<main class="main">
+
+<h1>waitanima 等待动画</h1>
+<hr>
+<blockquote><strong>创建</strong>：2026-08-29</blockquote>
+<p><code>waitanima{}</code> 暂停剧本推进，直到当前动画播放完毕。</p>
+
+<h2>1. 语法</h2>
+<pre><code>waitanima{}</code></pre>
+<table>
+<tr><th>参数</th><th>类型</th><th>说明</th></tr>
+<tr><td>—</td><td>—</td><td>无参数</td></tr>
+</table>
+
+<h2>2. 示例</h2>
+<pre><code>playanima(opening)
+waitanima{}</code></pre>
+
+<div class="note-box"><p>等待期间输入被吞（不跳行、不终止动画）；<code>once</code> 动画播完自动续行，无需按键。配合 <code>playanima</code> 使用，见 <code>sc15-playanima.html</code>。</p></div>
+
+</main>
+</body>
+</html>

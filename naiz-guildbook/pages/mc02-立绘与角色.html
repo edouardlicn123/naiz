@@ -1,0 +1,263 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>立绘与角色 — Naiz Guildbook</title>
+<link rel="stylesheet" href="../style.css">
+</head>
+<body>
+<nav class="sidebar" id="sidebar-nav"></nav>
+<script src="../sidebar-reference.js"></script>
+<main class="main">
+<h1>立绘与角色</h1>
+<blockquote><strong>创建</strong>：2026-06-10<br><strong>最后更新</strong>：2026-07-27</blockquote>
+<p>本文说明立绘与背景素材的制作规范。</p>
+<hr>
+
+<h2>1. 硬性约束</h2>
+
+<h3>1.1 透明色约定</h3>
+<p>PC-98 没有 alpha 通道。立绘透明通过<strong>色键透明（Color Key）</strong>实现。</p>
+<table>
+<thead>
+<tr><th>约定</th><th>说明</th></tr>
+</thead>
+<tbody>
+<tr><td><strong>透明索引</strong></td><td>调色板<strong>索引 15</strong>（引擎约定，<code>vram_blit_sprite</code> 跳过此索引）</td></tr>
+<tr><td><strong>不透明索引</strong></td><td>索引 0–14，共 15 个实际颜色</td></tr>
+<tr><td><strong>素材格式</strong></td><td>RGBA PNG（透明背景），alpha&lt;128 → 索引 15</td></tr>
+</tbody>
+</table>
+<p><strong>禁止使用白底图</strong>：如果角色内有白色（眼睛高光、皮肤高光），会被 <code>--sprite-key</code> 误判为透明，导致角色出现像素漏洞。</p>
+
+<h3>1.2 立绘朝向约定</h3>
+<p>所有立绘素材统一为<strong>右站位</strong>——角色站立在画面右侧，身体朝向左侧（面朝中）。引擎通过水平翻转实现左站位：</p>
+<table>
+<thead>
+<tr><th>站位</th><th>水平翻转</th><th>效果</th></tr>
+</thead>
+<tbody>
+<tr><td>右位</td><td>不需</td><td>原图，角色面朝左侧（面朝中）</td></tr>
+<tr><td>中位</td><td>不需</td><td>原图，角色面朝左侧</td></tr>
+<tr><td>左位</td><td><strong>需要</strong></td><td>翻转后角色面朝右侧（面朝中，与右侧对称）</td></tr>
+</tbody>
+</table>
+<p>翻转由 <code>char</code> 位置参数隐式控制（左位 <code>l</code> 自动水平翻转），素材本身不做左右两份。</p>
+
+<hr>
+
+<h2>2. 立绘素材规范</h2>
+
+<h3>2.1 标准尺寸</h3>
+<table>
+<thead>
+<tr><th>宽×高</th><th>画布</th><th>说明</th></tr>
+</thead>
+<tbody>
+<tr><td><strong>200×400</strong></td><td>200×400</td><td>全高立绘，底部接触屏幕底，顶部对齐 y=0</td></tr>
+</tbody>
+</table>
+
+<h3>2.2 素材要求</h3>
+<ul>
+<li><strong>格式</strong>：RGBA PNG，带 alpha 透明通道</li>
+<li><strong>画布</strong>：角色在画布中适当位置——画布就是精灵的边界</li>
+<li><strong>透明区</strong>：角色轮廓外的所有像素 alpha=0</li>
+<li><strong>索引约束</strong>：精灵最多用 15 色（索引 0–14），第 16 色（索引 15）为透明</li>
+<li><strong>制图约束</strong>：同角色不同表情的立绘，对话框以下区域 [y=280, 400) 必须像素级完全一致</li>
+</ul>
+<p><img src="../imgs/canvas-diagram.png" alt=""></p>
+
+<h3>2.3 文件命名约定</h3>
+<table>
+<thead>
+<tr><th>文件</th><th>含义</th></tr>
+</thead>
+<tbody>
+<tr><td><code>fei-normal.MAG</code></td><td>fei 默认表情</td></tr>
+<tr><td><code>fei-happy.MAG</code></td><td>fei 开心表情</td></tr>
+<tr><td><code>fei-sad.MAG</code></td><td>fei 难过表情</td></tr>
+</tbody>
+</table>
+<p>PNG 源文件与 MAG 同名不同后缀：<code>fei-normal.png</code> → <code>fei-normal.MAG</code>。</p>
+<p>表情名在 <code>char_expressions.expr_name</code> 列中记录，引擎不依赖文件名解析表情——只通过 <code>asset_map.id</code> 索引。</p>
+
+<h3>2.4 同角色跨表情制图约束</h3>
+<p>引擎的"换表情不重绘对话框"优化依赖以下制图规则：</p>
+<p><img src="../imgs/region-diagram.png" alt=""></p>
+<table>
+<thead>
+<tr><th>区域</th><th>Y 范围</th><th>高度</th><th>要求</th></tr>
+</thead>
+<tbody>
+<tr><td>表情可变区</td><td>0–279</td><td>280 px</td><td>每个表情可不同</td></tr>
+<tr><td>固定区（对话框掩盖）</td><td>280–395</td><td>116 px</td><td>像素级一致</td></tr>
+<tr><td>固定区（可见底部）</td><td>396–399</td><td>4 px</td><td>像素级一致</td></tr>
+<tr><td><strong>固定区合计</strong></td><td><strong>280–400</strong></td><td><strong>120 px</strong></td><td><strong>同角色必一致</strong></td></tr>
+</tbody>
+</table>
+<blockquote><strong>为什么？</strong> 换表情时引擎只重绘 <code>y&lt;280</code> 的区域，<code>y&gt;=280</code> 的 VRAM 像素保持原样。如果同角色不同表情的下半身有差异，将出现"换脸后身体残留错位"的视觉故障。</blockquote>
+<p><strong>制图建议</strong>：从同一全身底稿裁剪不同表情版本，仅重绘 y&lt;280 的部分。</p>
+
+<h3>2.5 转换命令</h3>
+<pre><code class="language-bash">python3 -m tools.naiz_conv.img2mag char_hime.png -o CHR_HIME.MAG --sprite --256</code></pre>
+<ul>
+<li>自动检测 alpha 通道 → 透明区映射为索引 15</li>
+<li><strong>不 resize</strong>（保持原始尺寸 200×400）</li>
+<li>写入 <code>"sprt\x1a"</code> 用户字符串</li>
+</ul>
+
+<hr>
+
+<h2>3. 背景素材规范</h2>
+
+<h3>3.1 规格</h3>
+<table>
+<thead>
+<tr><th>参数</th><th>值</th></tr>
+</thead>
+<tbody>
+<tr><td>分辨率</td><td><strong>640×400</strong></td></tr>
+<tr><td>色数</td><td>256 色（PEGC 模式）</td></tr>
+<tr><td>格式</td><td>MAG (MAKI02, screen_mode 0x80)</td></tr>
+<tr><td>输入格式</td><td>PNG 或 JPG（PIL 支持的任何格式）</td></tr>
+</tbody>
+</table>
+
+<h3>3.2 调色板保护</h3>
+<p>背景 MAG 加载时，引擎自动跳过以下索引：</p>
+<table>
+<thead>
+<tr><th>索引</th><th>保留色</th><th>用途</th></tr>
+</thead>
+<tbody>
+<tr><td><strong>7</strong></td><td><code>#FFFFFF</code> 白</td><td>对白文字、对话框边框、提示</td></tr>
+<tr><td><strong>8</strong></td><td><code>#555555</code> 灰</td><td>Ctrl 快进提示</td></tr>
+</tbody>
+</table>
+<p>引擎自动处理保护，制作者无需担心。如果背景中有需要精确色的白色/灰色，用索引 6、14 等替代即可。</p>
+
+<h3>3.3 转换命令</h3>
+<pre><code class="language-bash">python3 -m tools.naiz_conv.img2mag bg_photo.png -o BG001.MAG --dither --256
+python3 -m tools.naiz_conv.img2mag bg_flat_colors.png -o BG002.MAG --256</code></pre>
+<table>
+<thead>
+<tr><th>标志</th><th>效果</th></tr>
+</thead>
+<tbody>
+<tr><td><code>--dither</code></td><td>Floyd-Steinberg 抖动（照片/渐变推荐）</td></tr>
+<tr><td>无标志</td><td>直接量化（像素风/平面色推荐）</td></tr>
+</tbody>
+</table>
+
+<h3>3.4 工作流程</h3>
+<pre><code>1. 绘制 640×400 背景
+2. 导出 PNG → img2mag bg.png -o BG001.MAG --dither
+3. BG001.MAG → IMAGE.DAT（pack_images.py 打包）
+4. 引擎加载 → image_set_palette + vram_blit</code></pre>
+
+<hr>
+
+<h2>4. 站位布局</h2>
+
+<h3>4.1 站位映射表</h3>
+<p>NB 脚本 <code>char()</code> 中的 <code>l</code>/<code>c</code>/<code>r</code> 经引擎 <code>pos_to_x()</code> 映射为像素坐标：</p>
+<table>
+<thead>
+<tr><th>pos</th><th>含义</th><th>x 坐标</th></tr>
+</thead>
+<tbody>
+<tr><td><code>l</code></td><td>左位</td><td><strong>27</strong></td></tr>
+<tr><td><code>c</code></td><td>中位</td><td><strong>220</strong></td></tr>
+<tr><td><code>r</code></td><td>右位</td><td><strong>413</strong></td></tr>
+</tbody>
+</table>
+<blockquote>立绘 y 固定为 0，顶部对齐屏幕顶，底部 400px 接触屏幕底。对话框 [y=280,395] 覆盖立绘底部 116px。</blockquote>
+<p>三人布局（全景）：</p>
+<p><img src="../imgs/screen-panorama.png" alt="三人站位屏幕全景"></p>
+
+<h3>4.2 两人布局</h3>
+<table>
+<thead>
+<tr><th>位</th><th>200×400 时 x</th></tr>
+</thead>
+<tbody>
+<tr><td>左</td><td>90</td></tr>
+<tr><td>右</td><td>350</td></tr>
+</tbody>
+</table>
+
+<h3>4.3 单人布局</h3>
+<table>
+<thead>
+<tr><th>位</th><th>200×400 时 x</th></tr>
+</thead>
+<tbody>
+<tr><td>中</td><td>220</td></tr>
+</tbody>
+</table>
+
+<hr>
+
+<h2>5. 精灵操作与渲染</h2>
+
+<h3>5.1 精灵操作</h3>
+<table>
+<thead>
+<tr><th>操作</th><th>方法</th><th>对话框影响</th></tr>
+</thead>
+<tbody>
+<tr><td>显示精灵（首次）</td><td><code>char(key, pos, expr, body)</code></td><td>无影响</td></tr>
+<tr><td>换表情</td><td><code>char(key, pos, expr, face)</code></td><td><strong>不重绘对话框</strong> ✅</td></tr>
+<tr><td>换装/换位</td><td><code>char(key, pos, expr, body)</code>（已显示时）</td><td><strong>自动重绘对话框</strong> ✅</td></tr>
+<tr><td>隐藏所有</td><td><code>char(hideall)</code></td><td>清除精灵，对话框区域恢复纯背景</td></tr>
+</tbody>
+</table>
+
+<h3>5.2 渲染顺序</h3>
+<pre><code>1. 背景全屏    → bg()
+2. 立绘        → char()
+3. 对话框      → 首次对话命令
+4. 文字        → key(){}</code></pre>
+<ul>
+<li><strong>立绘在对话框之下</strong>：对话框在第二趟精灵之后绘制，立绘延伸入对话框区域的部分被对话框覆盖。</li>
+<li><strong>文字始终在最顶层</strong>：写在对话框底色之上。</li>
+<li><strong>半透明对话框</strong>：立绘底部通过点阵隐约透出——见 <a href="cf03-对话框样式方案.html">cf03-对话框样式方案</a>。</li>
+</ul>
+<blockquote><strong>注</strong>：以上所有图层均写入同一图像 VRAM（Graphics Plane A+B 组合后的 256 色 packed-pixel 区域）。Text Plane 不使用，文字作为位图绘制到图像 VRAM。详见 <a href="fd01-引擎基本概念.html#1.4">fd01 §1.4</a>。</blockquote>
+<p>换表情时（<code>face</code> 类型）：仅重绘 y&lt;280 区域，对话框不动。这要求同角色不同表情在 y≥280 区域像素级一致（见 §2.4）。</p>
+
+<hr>
+
+<h2>6. 调色板管理</h2>
+<p>背景与立绘<strong>共享同一套 256 色调色板</strong>——引擎在加载背景时设置全场景调色板，精灵加载时不改调色板。</p>
+<p><strong>工作流程</strong>：</p>
+<pre><code>1. 制作背景 → img2mag bg.png -o BG001.MAG --dither
+2. 在 Aseprite/Krita 中置入同一调色板
+3. 导出角色 RGBA PNG，按 `角色-表情.png` 命名
+4. 在 ASSETS.DB 中注册：
+   asset_map        — 每个 MAG 文件一个 entry
+   characters       — 角色定义（charname → 显示名）
+   char_expressions — 角色 → 表情 → asset_id 映射
+5. pack_images.py 打包（自动做跨表情 y≥280 一致性校验）
+6. IMAGE.DAT → 引擎渲染</code></pre>
+
+<hr>
+
+<h2>7. 与其他文档的关系</h2>
+<table>
+<thead>
+<tr><th>文档</th><th>内容</th></tr>
+</thead>
+<tbody>
+<tr><td><a href="fd01-引擎基本概念.html">fd01-引擎基本概念</a></td><td>引擎基本概念（背景/对白）</td></tr>
+<tr><td><a href="cf03-对话框样式方案.html">cf03-对话框样式方案</a></td><td>对话框预设样式</td></tr>
+<tr><td><a href="mc03-图层渲染与换装机制.html">mc03-图层渲染与换装机制</a></td><td>渲染管线、精灵操作、换装机制</td></tr>
+<tr><td><a href="sc01-NB剧本概述.html">sc01-NB剧本概述</a></td><td>bg/host/key/scene 等基础命令</td></tr>
+</tbody>
+</table>
+
+</main>
+</body>
+</html>

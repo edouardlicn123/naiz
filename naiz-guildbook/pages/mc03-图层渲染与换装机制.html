@@ -1,0 +1,134 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>图层渲染与换装机制 — Naiz Guildbook</title>
+<link rel="stylesheet" href="../style.css">
+</head>
+<body>
+<nav class="sidebar" id="sidebar-nav"></nav>
+<script src="../sidebar-reference.js"></script>
+<main class="main">
+<h1>图层渲染与换装机制</h1>
+<blockquote><strong>创建</strong>：2026-06-27<br><strong>最后更新</strong>：2026-08-13</blockquote>
+<p>本文从<strong>制作者</strong>视角说明 Naiz 引擎的图层渲染架构——立绘、对话框、背景之间的堆叠关系，以及换表情、换装时的渲染策略。</p>
+<hr>
+
+<h2>1. 图层堆叠（从下到上）</h2>
+<p>PC-98 PEGC 提供 2 个图像平面（Graphic Plane A + B）组合为单层 8-bit 256色 VRAM（640×400），另有一独立硬件文字平面（Text Plane）。引擎只使用图像 VRAM，文字平面不可用——DOS/4GW 保护模式下不可见，见 <a href="fd01-引擎基本概念.html#1.4">fd01 §1.4</a>。引擎通过<strong>四趟渲染</strong>顺序在单层 VRAM 上实现多层堆叠效果：</p>
+<pre><code>Layer 0: 背景（bg MAG）
+Layer 1: 对话框背景区还原
+Layer 2: 精灵（立绘/角色，最多 16 个）
+Layer 3: 对话框（透明/半透明/实心底色）
+Layer 4: 文字（对白文本，覆盖在对话框之上）</code></pre>
+<p>每趟渲染只写入该层对应的区域，不会覆盖下方已绘内容。</p>
+
+<h2>2. 精灵（立绘）机制</h2>
+<p>引擎通过 <code>char</code> 命令控制立绘。详见 <a href="mc02-立绘与角色.html">mc02-立绘与角色</a>。</p>
+<h3>2.1 显示与定位</h3>
+<pre><code>char charlie l            # 左侧显示 charlie（默认 body，左位自动水平翻转）
+char charlie r expr_happy # 右侧显示 charlie，表情 happy（face）
+char charlie c body       # 中央显示 charlie（body 全身）</code></pre>
+<h3>2.2 换表情 / 换装</h3>
+<pre><code>char charlie l expr_angry # 只刷新面部区域（face 模式，不重绘对话框）
+char charlie c body       # 从 body 切换，不受 clip_h 限制</code></pre>
+<p><strong>face 约束</strong>：face 模式只能写入 <code>y &lt; 280</code> 的 VRAM 区域，不触及对话框范围。</p>
+<p><strong>clip_h</strong>：引擎通过 <code>calc_sprite_clip_h()</code> 计算每个立绘允许绘制的行数。如果立绘位置（左/中/右）在对话框之上，则不受限；如果部分区域落在对话框范围内，自动裁剪。</p>
+
+<h2>3. 对话框渲染</h2>
+<p>对话框的<strong>外观样式</strong>见 <a href="cf03-对话框样式方案.html">cf03-对话框样式方案</a>。本节说明对话框在渲染管线中的出现、更新与清理机制。</p>
+<h3>3.1 出现时机</h3>
+<p>对话框由<strong>文本指令</strong>触发：剧本中第一条台词（<code>host{...}</code>、对白命令等）出现时，引擎自动弹出对话框。具体流程：</p>
+<ol>
+<li>文本指令调用 <code>dialog_show()</code>（nb_dialog.c）</li>
+<li>若对话框尚未显示 → <code>layer_dialog_open()</code>：画出对话框并拍摄快照</li>
+<li>若对话框已显示（翻页/后续台词）→ 跳过重画，直接更新文字</li>
+</ol>
+<p>也就是说：<strong>同一个场景内对话框只弹出一次</strong>，后续台词复用同一框，只替换文字内容。</p>
+<h3>3.2 首次弹出（layer_dialog_open）</h3>
+<p>首次出现时按以下顺序构建：</p>
+<ol>
+<li>绘制对话框底色（半透明图案或实心，按样式设定）+ 2px 白色边框</li>
+<li>把对话框区域（x=80, y=280, 宽480, 高115）的画面<strong>拍摄成快照</strong>（dialog_snapshot）</li>
+<li>标记「对话框已显示」</li>
+</ol>
+<p>之后每次文字刷新，只需在快照之上写新文字，<strong>无需重绘底色和边框</strong>。</p>
+<h3>3.3 两份快照的分工</h3>
+<p>引擎维护两份不同的快照，用途相反：</p>
+<table>
+<thead>
+<tr><th>快照</th><th>内容</th><th>用途</th></tr>
+</thead>
+<tbody>
+<tr><td><code>dialog_snapshot</code></td><td><strong>带对话框</strong>的画面（含底色/边框/文字）</td><td>角色身体压住对话框后，用它把对话框区域<strong>恢复原样</strong></td></tr>
+<tr><td><code>bg_dialog_snapshot</code></td><td><strong>纯背景</strong>（不含对话框）</td><td>对话框<strong>消失时</strong>，把它还原回画面，露出背后背景</td></tr>
+</tbody>
+</table>
+<p>要点：<code>bg_dialog_snapshot</code> 必须始终是「纯背景」。因此每次换背景、角色增减之后都要重新拍摄，否则对话框消失时会还原成错误的画面。</p>
+<h3>3.4 对话框的消失 / 清理</h3>
+<p>按触发原因分为三种，清理程度不同：</p>
+<table>
+<thead>
+<tr><th>场景</th><th>触发</th><th>做了什么</th></tr>
+</thead>
+<tbody>
+<tr><td>正常隐藏</td><td><code>bg(hidedialog)</code> 或 <code>char(hideall)</code></td><td>把「纯背景」快照还原到画面 → 对话框消失；快照内存保留，方便再次弹出</td></tr>
+<tr><td>更换背景</td><td><code>bg(...)</code></td><td>背景已整体重画，只清标记，不做画面还原</td></tr>
+<tr><td>切换场景</td><td><code>scene(...)</code></td><td>清空全部状态，<strong>释放快照内存</strong>；下个场景首次台词再重新弹框</td></tr>
+</tbody>
+</table>
+<h3>3.5 与角色的联动清理</h3>
+<p>角色身体与对话框区域重叠时，清理需要按顺序处理：</p>
+<ul>
+<li><strong>隐藏单个角色</strong>：若该角色身体压住对话框 → 隐藏后把对话框那部分<strong>重画</strong>并刷新快照</li>
+<li><strong>最后一个角色消失</strong>：先把角色区域（对话框上方）的背景还原，再<strong>重新拍摄一份「纯背景」快照</strong>（因为对话框上方的画面已变化）</li>
+<li><strong><code>char(hideall)</code>（隐藏所有角色）</strong>—— 完整链路：
+  <ol>
+  <li>逐个隐藏所有角色（压住对话框的依次重画对话框）</li>
+  <li>隐藏对话框：把「纯背景」还原回画面</li>
+  <li>清空台词状态（角色名、台词缓冲归零）</li>
+  </ol>
+</li>
+</ul>
+
+<h2>4. 背景与场景切换</h2>
+<ul>
+<li><code>bg(...)</code>：加载新背景 MAG，捕获全屏快照和对话框区域纯背景快照，关闭对话框</li>
+<li><code>bg(hidedialog)</code>：只关闭对话框并还原对话框区域背景，不加载新背景</li>
+<li>每次 <code>scene(...)</code> 切换：自动清屏为黑屏，然后执行新场景的 <code>bg(...)</code> 指令</li>
+</ul>
+
+<h2>5. 精灵操作速查</h2>
+<table>
+<thead>
+<tr><th>NB 命令</th><th>效果</th><th>渲染策略</th></tr>
+</thead>
+<tbody>
+<tr><td><code>char name pos</code></td><td>显示立绘（默认 body）</td><td>覆盖式 blit，capture bg dialog</td></tr>
+<tr><td><code>char name pos expr</code></td><td>换表情</td><td>clip_h 限定区域，不触发 dialog rebuild</td></tr>
+<tr><td><code>char name pos body</code></td><td>换全身</td><td>完整重绘，触发 dialog rebuild</td></tr>
+<tr><td><code>char(hideall)</code></td><td>隐藏所有立绘 + 对话框 + 清空台词</td><td>逐精灵隐藏 → 还原对话框背景 → 清空台词状态（见 §3.5）</td></tr>
+</tbody>
+</table>
+
+<h2>6. 跨文档参考</h2>
+<table>
+<thead>
+<tr><th>文档</th><th>内容</th></tr>
+</thead>
+<tbody>
+<tr><td><a href="mc02-立绘与角色.html">mc02-立绘与角色</a></td><td>立绘素材制作规范、透明约定、200×400 画布标准</td></tr>
+<tr><td><a href="cf03-对话框样式方案.html">cf03-对话框样式方案</a></td><td>10 种对话框预设样式与选择指南</td></tr>
+<tr><td>B15-图层渲染与换装机制.md</td><td>完整实现规范：API 签名、数据结构和决策表</td></tr>
+<tr><td>B02-显示管线规范.md</td><td>VRAM 布局、图元函数、bank 切换</td></tr>
+<tr><td>源码：layer_dialog.c / layer_sprite.c</td><td>对话框快照、清理与角色联动逻辑实现</td></tr>
+<tr><td>源码：nb_dialog.c</td><td>文本指令 → 对话框的触发链路（dialog_show）</td></tr>
+</tbody>
+</table>
+
+<hr>
+<p><strong>引擎底层规范</strong>见 <code>docs/</code> 目录下的 A/B 类 Markdown 文档（<code>B02</code>、<code>B15</code> 等）。</p>
+</main>
+</body>
+</html>

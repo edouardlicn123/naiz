@@ -1,0 +1,96 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>anima.sh 使用说明 — Naiz Guildbook</title>
+<link rel="stylesheet" href="../style.css">
+</head>
+<body>
+<nav class="sidebar" id="sidebar-nav"></nav>
+<script src="../sidebar-tools.js"></script>
+<main class="main">
+
+<h1>anima.sh 使用说明</h1>
+<blockquote><strong>创建</strong>：2026-08-29<br><strong>最后更新</strong>：2026-08-29</blockquote>
+<p><code>anima.sh</code> 是<strong>动画制作工具</strong>：把 <code>.na</code> 动画脚本编译成游戏可用的 <code>.ANI</code> 文件。脚本写法见动画设计分类的「制作工作流」页（本页为制作工具分类下的独立文档，不复用那边的内容）。<strong>日常最推荐直接运行、用数字菜单逐级操作</strong>；命令行子命令适合写进脚本或熟练后使用。</p>
+<hr>
+
+<h2>1. 交互式菜单（主要用法）</h2>
+<p>不带任何参数运行：</p>
+<pre><code>./anima.sh</code></pre>
+<p>会进入<strong>三级数字菜单</strong>，每一步输入数字并按回车：</p>
+
+<h3>① 项目列表（第一级）</h3>
+<p>列出所有动画项目（如 <code>1) myanim …</code>），此外还有：</p>
+<ul>
+<li><code>i</code> 新建一个动画项目（init 骨架）</li>
+<li><code>0</code> 退出</li>
+</ul>
+<p>选一个数字进入某个项目。</p>
+
+<h3>② 操作菜单（第二级，已选项目）</h3>
+<table>
+<tr><th>菜单数字</th><th>功能</th></tr>
+<tr><td><code>1</code></td><td>检查素材登记（check）：看看脚本里用到的素材昵称是否都已登记、有无失效</td></tr>
+<tr><td><code>2</code></td><td>register 同步：把素材扫描登记进索引库</td></tr>
+<tr><td><code>3</code></td><td>生成动画：进入脚本子菜单去构建某段动画</td></tr>
+<tr><td><code>0</code></td><td>返回上一级（项目列表）</td></tr>
+</table>
+
+<h3>③ 脚本子菜单（第三级，选「3 生成动画」后）</h3>
+<p>列出该项目下所有 <code>.na</code> 脚本，选一个数字进入某段脚本，再选：</p>
+<table>
+<tr><th>菜单数字</th><th>功能</th></tr>
+<tr><td><code>1</code></td><td>build：构建这段动画（生成 <code>.ANI</code>）</td></tr>
+<tr><td><code>2</code></td><td>build --sync：构建前先自动同步登记库，再生成</td></tr>
+<tr><td><code>0</code></td><td>返回上一级（操作菜单）</td></tr>
+</table>
+<p><em>新手提示：第一次做动画的顺序一般是 ②里先按 <code>2</code> 登记素材，再用 <code>3 → 1/2</code> 生成。</em></p>
+
+<h2>2. 命令行用法（进阶 / 脚本化）</h2>
+<p>熟练或要写进自动化脚本时，可直接跟子命令，跳过菜单：</p>
+<pre><code>./anima.sh &lt;子命令&gt; &lt;参数&gt;</code></pre>
+<table>
+<tr><th>子命令</th><th>作用</th></tr>
+<tr><td><code>init &lt;项目&gt;</code></td><td>创建动画项目骨架：<code>animation/projects/&lt;项目&gt;/{config.toml,scripts/,db/}</code></td></tr>
+<tr><td><code>register &lt;项目&gt;</code></td><td>扫描 <code>assets/&lt;项目&gt;/anim/</code> 素材，登记进名字索引库</td></tr>
+<tr><td><code>check &lt;项目&gt;</code></td><td>只读双向对账：未登记 / 失效行 / 待更新；有差异时退出码非零</td></tr>
+<tr><td><code>build &lt;项目&gt;/&lt;脚本&gt;</code></td><td>生成 <code>animation/output/&lt;STEM大写&gt;.ANI</code>；可加 <code>--sync</code> 先同步登记库</td></tr>
+<tr><td><code>buildall [--flags]</code></td><td>全项目全脚本构建</td></tr>
+<tr><td><code>list</code></td><td>列出 <code>&lt;项目&gt;/&lt;脚本&gt;</code></td></tr>
+</table>
+
+<h2>3. 常见用法示例</h2>
+<pre><code># 交互菜单里 i 建项目 → 选项目 → 按 2 登记 → 按 3→1 生成（推荐）
+./anima.sh
+# 等效的命令行写法：
+./anima.sh init myanim
+./anima.sh register myanim
+./anima.sh build myanim/blink
+
+# 构建前自动先登记
+./anima.sh build myanim/blink --sync
+
+# 检查素材登记是否齐全
+./anima.sh check myanim
+
+# 一次性构建所有动画
+./anima.sh buildall</code></pre>
+
+<h2>4. 注意事项</h2>
+<ul>
+<li>脚本文件须以 <code>.na</code> 结尾，且放在 <code>animation/projects/&lt;项目&gt;/scripts/</code> 下。</li>
+<li>构建前必须先 <code>register</code>（或 build 加 <code>--sync</code>），否则脚本里写的素材昵称无法对应到真实文件。</li>
+<li><code>check</code> 用于 CI/提交前自检：有未登记或失效素材时返回非零退出码。</li>
+<li>成品 <code>.ANI</code> 输出到 <code>animation/output/</code>，由游戏数据构建（<code>makegame.sh build</code>）一并打包进 HDI。</li>
+</ul>
+
+<h2>5. 关联</h2>
+<ul>
+<li><a href="tool-start.html">start.sh</a> / <a href="tool-makegame.html">makegame.sh</a> — 环境安装与游戏构建。</li>
+</ul>
+
+</main>
+</body>
+</html>

@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>animaconf：开场设定 — Naiz Guildbook</title>
+<link rel="stylesheet" href="../style.css">
+</head>
+<body>
+<nav class="sidebar" id="sidebar-nav"></nav>
+<script src="../sidebar-animation.js"></script>
+<main class="main">
+
+<h1>animaconf：开场设定</h1>
+<blockquote><strong>创建</strong>：2026-08-29<br><strong>最后更新</strong>：2026-08-29</blockquote>
+<p><code>animaconf</code> 写在小本子（<code>.na</code> 脚本）的<strong>第一行</strong>，用来交代这段动画的「基本设定」。就像拍视频前先说清楚：拍全屏还是拍一条横幅、是换图还是变色、素材归哪个项目。返回总览见 <a href="anim-语法.html">语法总览</a>。</p>
+<hr>
+
+<h2>1. 怎么写</h2>
+<pre><code>animaconf(全屏还是横条, 整图还是变色, 项目名)</code></pre>
+<p>三个选项用逗号分开，写在括号里，<strong>不要加大括号</strong>。例如：</p>
+<pre><code>animaconf(fullscreen,pixel,眨眼项目)
+animaconf(cine,palette,标题流光)</code></pre>
+
+<h2>2. 三个选项分别填什么</h2>
+<table>
+<tr><th>位置</th><th>能填什么</th><th>意思</th></tr>
+<tr><td>第一个</td><td><code>fullscreen</code> / <code>cine</code></td><td><code>fullscreen</code>=铺满整个画面的动画；<code>cine</code>=只占对话框上方的横条</td></tr>
+<tr><td>第二个</td><td><code>pixel</code> / <code>palette</code></td><td><code>pixel</code>=整图动画（一张张图轮流播）；<code>palette</code>=变色动画（画面不动，只让颜色变）</td></tr>
+<tr><td>第三个</td><td>你的项目名</td><td>告诉工具去哪个项目的素材文件夹找图片；这个项目要先建好</td></tr>
+</table>
+
+<h2>3. 写的时候注意</h2>
+<ul>
+<li>必须写、且<strong>只能写一次</strong>，并放在小本子最前面（前面可空行或写 <code>#</code> 备注）。</li>
+<li><strong>「循环播放」不要写在这里</strong>——动画播一次还是循环播，是在游戏里调用时决定的，小本子不管这件事。</li>
+<li>选项拼错、或项目文件夹不存在，工具会报错提醒你。</li>
+</ul>
+
+<h2>4. 举个例子</h2>
+<pre><code># 一段全屏的整图动画（比如爆炸、花瓣飘落）
+animaconf(fullscreen,pixel,特效合集)
+
+# 一段对话框上方横条的变色动画（比如灯光忽明忽暗）
+animaconf(cine,palette,标题流光)</code></pre>
+
+<h2>5. 常见错误</h2>
+<ul>
+<li>写成 <code>animaconf(){...}</code> 带了大括号 → 这里只用括号，不要大括号。</li>
+<li>忘了写、写了两次、或不在第一行 → 工具会提示 animaconf 有问题。</li>
+<li>项目名写错或项目还没建 → 工具会提示找不到项目。</li>
+</ul>
+<p>→ <a href="anim-语法.html">返回语法总览</a></p>
+
+</main>
+</body>
+</html>

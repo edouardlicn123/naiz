@@ -1,0 +1,8 @@
+sceneconf(){Come with cat, normal}
+bg(seasidebg,normal)
+char(fei,l,swimming,body)
+char(neon,r,normal,body)
+fei(){What a good day!}
+fei(){Isn't it,Neon?}
+neon(){Yes but I don't want to swim,I just want to stay at the beach.}
+scene(end)

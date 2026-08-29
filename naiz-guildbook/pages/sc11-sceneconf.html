@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>sceneconf — Naiz Guildbook</title>
+<link rel="stylesheet" href="../style.css">
+</head>
+<body>
+<nav class="sidebar" id="sidebar-nav"></nav>
+<script src="../sidebar-scripts.js"></script>
+<main class="main">
+
+<h1>sceneconf 场景配置</h1>
+<hr>
+<blockquote><strong>创建</strong>：2026-08-29</blockquote>
+<p><code>sceneconf()</code> 命令用于设置当前场景的章节标题与类型。标题随存档记录，类型控制存档热键等行为。</p>
+
+<h2>1. 语法</h2>
+<pre><code>sceneconf &lt;title&gt;[,type]</code></pre>
+<table>
+<tr><th>参数</th><th>类型</th><th>说明</th></tr>
+<tr><td><code>title</code></td><td>string</td><td>章节标题文本，随存档记录并显示</td></tr>
+<tr><td><code>type</code></td><td>string</td><td>场景类型 <code>normal</code> / <code>cg</code> / <code>menu</code>，默认 <code>normal</code></td></tr>
+</table>
+
+<h3>1.1 类型说明</h3>
+<table>
+<tr><th>类型</th><th>说明</th></tr>
+<tr><td><code>normal</code></td><td>普通场景（默认）</td></tr>
+<tr><td><code>cg</code></td><td>CG 鉴赏场景</td></tr>
+<tr><td><code>menu</code></td><td>菜单场景，禁用存档热键</td></tr>
+</table>
+
+<h2>2. 示例</h2>
+<pre><code>sceneconf 序章,normal
+sceneconf 画廊,cg
+sceneconf 主菜单,menu</code></pre>
+
+<div class="note-box"><p><strong>注意</strong>：<code>type=menu</code> 时会禁用存档热键，避免在主菜单/设置场景内误触发存档。</p></div>
+
+</main>
+</body>
+</html>

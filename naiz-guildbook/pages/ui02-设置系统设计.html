@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>设置系统设计 — Naiz Guildbook</title>
+<link rel="stylesheet" href="../style.css">
+</head>
+<body>
+<nav class="sidebar" id="sidebar-nav"></nav>
+<script src="../sidebar-reference.js"></script>
+<main class="main">
+<h1>设置系统设计</h1>
+<blockquote><strong>创建</strong>：2026-06-27<br><strong>最后更新</strong>：2026-07-01</blockquote>
+<p>本文说明游戏设置系统的脚本层面设计，包括 <code>settings.txt</code> 配置文件和 <code>settingmenu</code> 命令。</p>
+<hr>
+
+<h2>1. settings.txt</h2>
+<p>纯文本键值对文件，每行 <code>key=value</code>。由 NB 解释器在初始化阶段读取，设置引擎全局状态。</p>
+<pre><code>dlgstyle=3
+btnstyle=0
+lang=eng</code></pre>
+
+<hr>
+
+<h2>2. dlgstyle — 对话框样式</h2>
+<pre><code>dlgstyle=N</code></pre>
+<p>指定对话框背景样式。<code>N</code> 为 0–9 整数，对应 10 种预设方案。每种方案定义底色、边框颜色和半透明处理方式。</p>
+<p>完整方案参考 <a href="cf03-对话框样式方案.html">cf03-对话框样式方案</a>。</p>
+
+<hr>
+
+<h2>3. btnstyle — 按钮配色</h2>
+<pre><code>btnstyle=N</code></pre>
+<p>指定菜单按钮配色。<code>N</code> 为 0–4 整数：</p>
+<table>
+<thead>
+<tr><th>值</th><th>配色</th></tr>
+</thead>
+<tbody>
+<tr><td><code>0</code></td><td>黑</td></tr>
+<tr><td><code>1</code></td><td>蓝</td></tr>
+<tr><td><code>2</code></td><td>暗红</td></tr>
+<tr><td><code>3</code></td><td>绿</td></tr>
+<tr><td><code>4</code></td><td>紫</td></tr>
+</tbody>
+</table>
+<p>完整配色和视觉规格见 <a href="cf04-按钮样式方案.html">cf04-按钮样式方案</a>。</p>
+
+<hr>
+
+<h2>4. lang — 多语言切换</h2>
+<pre><code>lang=eng</code></pre>
+<p><code>lang</code> 指定游戏显示语言，支持：</p>
+<table>
+<thead>
+<tr><th>值</th><th>语言</th></tr>
+</thead>
+<tbody>
+<tr><td><code>eng</code></td><td>English</td></tr>
+<tr><td><code>chi</code></td><td>简体中文</td></tr>
+<tr><td><code>jpn</code></td><td>日本語</td></tr>
+<tr><td><code>kor</code></td><td>한국어</td></tr>
+</tbody>
+</table>
+<p>引擎在显示命令文本时通过 <code>tr()</code> 查找对应语言的翻译文件 <code>i18n/*_&lt;lang&gt;.txt</code>。</p>
+
+<hr>
+
+<h2>5. settingmenu 命令</h2>
+<pre><code>settingmenu()</code></pre>
+<p>设置菜单命令，当前为预留 stub，尚无实际效果。未来将提供运行时设置界面，允许玩家在游戏中修改 <code>dlgstyle</code>、<code>btnstyle</code>、<code>lang</code> 等选项。</p>
+
+</main>
+</body>
+</html>

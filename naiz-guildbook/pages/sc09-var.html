@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>var — Naiz Guildbook</title>
+<link rel="stylesheet" href="../style.css">
+</head>
+<body>
+<nav class="sidebar" id="sidebar-nav"></nav>
+<script src="../sidebar-scripts.js"></script>
+<main class="main">
+
+<h1>var 变量操作</h1>
+<hr>
+<blockquote><strong>创建</strong>：2026-07-27</blockquote>
+<p><code>var()</code> 命令用于独立读写变量。变量定义见 <a href="cf01-变量系统.html">cf01 变量系统</a>。</p>
+
+<h2>1. 语法</h2>
+<pre><code>var(id, op, value)</code></pre>
+<table>
+<tr><th>参数</th><th>类型</th><th>说明</th></tr>
+<tr><td><code>id</code></td><td>string</td><td>变量标识符（须在 variables.json 中定义）</td></tr>
+<tr><td><code>op</code></td><td>string</td><td>操作符：<code>=</code>（赋值）、<code>+</code>（加）、<code>-</code>（减）</td></tr>
+<tr><td><code>value</code></td><td>int</td><td>数值</td></tr>
+</table>
+
+<h2>2. 行为</h2>
+<ul>
+<li><code>=</code> 将变量设为 value</li>
+<li><code>+</code> 将变量加上 value</li>
+<li><code>-</code> 将变量减去 value</li>
+<li>所有操作受 variables.json 中 <code>min</code> / <code>max</code> 限制，超出自动截断</li>
+</ul>
+
+<h2>3. 示例</h2>
+<pre><code>var(bond_fei, +, 3)    # bond_fei += 3
+var(bond_ira, =, 50)   # bond_ira = 50
+var(bond_neon, -, 10)  # bond_neon -= 10</code></pre>
+
+</main>
+</body>
+</html>

@@ -1,0 +1,139 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>过渡效果设置 — Naiz Guildbook</title>
+<link rel="stylesheet" href="../style.css">
+</head>
+<body>
+<nav class="sidebar" id="sidebar-nav"></nav>
+<script src="../sidebar-reference.js"></script>
+<main class="main">
+
+<h1>过渡效果设置</h1>
+<hr>
+<blockquote><strong>创建</strong>：2026-07-27</blockquote>
+
+<p>Naiz 引擎支持在场景切换时播放全屏视觉过渡效果，通过项目 <code>config.toml</code> 配置，构建时编译到引擎中。</p>
+
+<h2>1. 场景过渡</h2>
+<p>场景跳转（<code>scene()</code> 命令）时播放全屏过渡。共有 7 种可选：</p>
+
+<table>
+<tr><th>类型</th><th>键名</th><th>说明</th></tr>
+<tr>
+  <td>正常</td>
+  <td><code>cut</code></td>
+  <td>立即切换，无过渡效果。速度最快。</td>
+</tr>
+<tr>
+  <td>渐暗</td>
+  <td><code>pfade</code></td>
+  <td>调色板淡出：256 色全表逐帧向黑插值，背景像素完整保留。</td>
+</tr>
+<tr>
+  <td>垂直百叶窗</td>
+  <td><code>vblinds</code></td>
+  <td>20 条竖向细条。黑色边界自左向右逐帧推进，细条由窄变宽直至全黑，未覆盖处保留原画面。</td>
+</tr>
+<tr>
+  <td>水平百叶窗</td>
+  <td><code>hblinds</code></td>
+  <td>20 条横向细条。黑色边界自顶向下逐帧推进，细条由窄变宽直至全黑。</td>
+</tr>
+<tr>
+  <td>正斜百叶窗</td>
+  <td><code>dblinds</code></td>
+  <td>20 条对角细条，方向 ↖↘。黑色边界沿对角逐帧推进。</td>
+</tr>
+<tr>
+  <td>反斜百叶窗</td>
+  <td><code>rdblinds</code></td>
+  <td>20 条对角细条，方向 ↗↙。黑色边界沿对角逐帧推进。</td>
+</tr>
+<tr>
+  <td>棋盘</td>
+  <td><code>checker</code></td>
+  <td>16×10 个 40px 方格。奇/偶秩格分两波沿对角方向依次抹黑，波前全程保持棋盘纹理，末帧全黑。</td>
+</tr>
+</table>
+
+<h2>2. config.toml 配置</h2>
+<p>在项目 <code>config.toml</code> 中通过以下字段配置，构建时自动编译到引擎中（无需 <code>settings.txt</code>）：</p>
+
+<table>
+<tr><th>段</th><th>字段</th><th>默认值</th><th>说明</th></tr>
+<tr>
+  <td><code>[transition]</code></td>
+  <td><code>type</code></td>
+  <td><code>pfade</code></td>
+  <td>场景过渡类型。可选 <code>cut</code> <code>pfade</code> <code>vblinds</code> <code>hblinds</code> <code>dblinds</code> <code>rdblinds</code> <code>checker</code></td>
+</tr>
+<tr>
+  <td><code>[transition]</code></td>
+  <td><code>frames</code></td>
+  <td><code>16</code></td>
+  <td>场景过渡帧数（1–64）。16 帧 ≈ 0.3 秒（60fps）</td>
+</tr>
+</table>
+
+<p>完整示例：</p>
+<pre><code>[transition]
+type = "checker"
+frames = 32</code></pre>
+
+<h2>3. 百叶窗方向图解</h2>
+
+<p>百叶窗系列把屏幕切成 20 条细条，所有细条同步由窄变宽直至全黑（黑色边界沿单一方向推进，边界之前已刷黑、之后保留原画面）。示例以 <code>vblinds</code>（自左向右）与 <code>hblinds</code>（自顶向下）为例。</p>
+
+<h3>垂直百叶窗（vblinds）</h3>
+<p>条带方向为垂直，黑色边界自左向右推进。20 条 × 32px。</p>
+<pre>Step 0:  │░░░░░░░░│░░░░░░░░│░░░░░░░░│
+Step 1:  │████░░░░│████░░░░│████░░░░│    ← 每条带左侧先变黑，边界向右推进
+Step N:  │████████│████████│████████│    ← 全部刷黑</pre>
+<p><code>░</code> = 原画面可见, <code>▌</code> = 目标黑色</p>
+
+<h3>水平百叶窗（hblinds）</h3>
+<p>条带方向为水平，黑色边界自顶向下推进。20 条 × 20px。</p>
+<pre>Step 0:  ──░░░░░░──  ──░░░░░░──
+         ──░░░░░░──  ──░░░░░░──
+Step 1:  ──████░░──  ──████░░──  ← 每条带上侧先变黑，边界向下推进
+         ──░░░░░░──  ──░░░░░░──
+Step N:  ──████████──  ──████████──  ← 全部刷黑</pre>
+
+<h3>正斜百叶窗（dblinds）</h3>
+<p>斜条带方向 ↖↘（反斜线方向）。20 条 × 32px，黑色边界沿对角推进。</p>
+<pre>方向:    ╲╱╲╱╲╱
+         ╱╲╱╲╱╲
+         ╲╱╲╱╲╱</pre>
+<p>位置坐标 <code>(x + y) % 32</code> 决定每个像素所属的条带，边界按该坐标顺序扫过。</p>
+
+<h3>反斜百叶窗（rdblinds）</h3>
+<p>斜条带方向 ↗↙（正斜线方向）。20 条 × 32px，黑色边界沿对角推进。</p>
+<pre>方向:    ╱╲╱╲╱╲
+         ╲╱╲╱╲╱
+         ╱╲╱╲╱╲</pre>
+<p>位置坐标 <code>(x + h-1-y) % 32</code> 决定每个像素所属的条带。</p>
+
+<h2>3.5 棋盘（checker）</h2>
+<p>屏幕切成 16×10 个 40px 方格，格子 <code>(i,j)</code> 的秩 <code>r = i+j</code>（0..24）。
+偶数秩格在前半段转场沿对角方向依次抹黑，奇数秩格在后半段补齐。
+相邻格秩总相差 1（奇偶互异），故同一帧不会有两个相邻格同时变黑，波前全程保持棋盘纹理。</p>
+<p>激活时机（32 帧）：</p>
+<pre>  秩 r       激活帧                    示例格
+  偶 r=0,2,…,24  →  (31·r)/48          (0,0)→0、(0,2)→1、(0,4)→2 …
+  奇 r=1,3,…,23  →  (31·(24+r))/48     (0,1)→16、(0,3)→17、(0,23)→30 …</pre>
+<p>全部 160 格在 32 帧内各激活一次，最末奇秩（r=23）第 30 帧变黑，第 30–31 帧全屏纯黑（R=24 为偶数，黑屏比最后一帧提前 1 帧完成）。</p>
+
+<h2>4. 注意事项</h2>
+<ul>
+  <li><strong>斜百叶窗性能</strong>：<code>dblinds</code> 和 <code>rdblinds</code> 每帧按行推进对角条带，比垂直/水平百叶窗多几行小矩形填充，但仍是逐帧增量绘制（只画新覆盖的窄条），性能开销可控。</li>
+  <li><strong>原画面保留</strong>：百叶窗系列在边界扫到之前保留原画面像素；<code>pfade</code> 保留整幅背景像素。<code>cut</code> 无中间态。</li>
+  <li><strong>帧数范围</strong>：<code>transition.frames</code> 取值范围 1–64。建议场景 8–32 帧。</li>
+  <li><strong>帧数 = 1</strong>：相当于 <code>cut</code> 模式的视觉效果（一帧完成）。</li>
+</ul>
+
+</main>
+</body>
+</html>

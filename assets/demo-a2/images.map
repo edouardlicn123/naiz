@@ -1,0 +1,18 @@
+# PNG→MAG 映射表
+# 格式: <png_rel_path>  <mag_rel_path>  [选项]
+# 路径相对于 assets/<game>/ 和 projects/<game>/
+# png2mag.py 自动检测 PNG 比 MAG 新时转换
+
+png/bg/comlogo.png       images/comlogo.MAG   --256color
+png/bg/mainmenu.png       images/mainmenu.MAG   --256color
+png/bg/powed.png       images/powed.MAG   --256color
+png/bg/seasidebg.png       images/seasidebg.MAG   --256color
+png/bg/splbg.png       images/splbg.MAG   --256color
+png/char/fei-normal.png       images/fei-normal.MAG   --256color --sprite
+png/char/fei-sad.png       images/fei-sad.MAG   --256color --sprite
+png/char/fei-smile.png       images/fei-smile.MAG   --256color --sprite
+png/char/fei-surprised.png       images/fei-surprised.MAG   --256color --sprite
+png/char/fei-swimming.png       images/fei-swimming.MAG   --256color --sprite
+png/char/ira-normal.png       images/ira-normal.MAG   --256color --sprite
+png/char/ira-sad.png       images/ira-sad.MAG   --256color --sprite
+png/char/neon-normal.png       images/neon-normal.MAG   --256color --sprite

@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>char — Naiz Guildbook</title>
+<link rel="stylesheet" href="../style.css">
+</head>
+<body>
+<nav class="sidebar" id="sidebar-nav"></nav>
+<script src="../sidebar-scripts.js"></script>
+<main class="main">
+
+<h1>char 立绘操作与对话</h1>
+<hr>
+<blockquote><strong>创建</strong>：2026-07-27</blockquote>
+<p><code>char()</code> 命令用于控制立绘的显示、隐藏和表情切换。角色对话和旁白也归入本文。</p>
+
+<h2>1. 语法</h2>
+<pre><code>char(charname, pos, expr, type)
+char(hideall)</code></pre>
+<table>
+<tr><th>参数</th><th>类型</th><th>说明</th></tr>
+<tr><td><code>charname</code></td><td>string</td><td>角色 key，如 <code>fei</code>、<code>ira</code></td></tr>
+<tr><td><code>pos</code></td><td>string</td><td>位置：<code>l</code>（左）、<code>c</code>（中）、<code>r</code>（右）</td></tr>
+<tr><td><code>expr</code></td><td>string</td><td><strong>可选</strong>，默认 <code>normal</code>。表情名</td></tr>
+<tr><td><code>type</code></td><td>string</td><td><strong>可选</strong>，默认自动推断。<code>body</code>（全身/换装）或 <code>face</code>（仅换表情）</td></tr>
+</table>
+
+<h2>2. 类型推断</h2>
+<p>若省略 <code>type</code>，引擎自动选择：</p>
+<ul>
+<li>角色尚未显示 → <code>body</code>（首次全身显示）</li>
+<li>角色已显示 → <code>face</code>（仅换表情，不重绘对话框）</li>
+</ul>
+
+<h2>3. 子命令</h2>
+<table>
+<tr><th>命令</th><th>说明</th></tr>
+<tr><td><code>char(hideall)</code></td><td>隐藏所有立绘并 clean reset</td></tr>
+</table>
+
+<h2>4. 示例</h2>
+<pre><code>char(fei, l, normal, body)    ← 首次显示 fei 在左位
+char(ira, r, normal, body)    ← 首次显示 ira 在右位
+char(fei, r, smile)           ← fei 换微笑表情
+char(ira, r, sad, face)       ← ira 换难过表情
+char(hideall)                 ← 隐藏所有立绘</code></pre>
+
+<hr>
+
+<h2>5. 角色对话</h2>
+<p><code>角色key(){text}</code> 命令用于显示角色台词。角色 key 对应 <code>characters.key</code> 字段，自动使用 <code>characters.name</code> 作为角色名显示。</p>
+
+<h3>语法</h3>
+<pre><code>角色key(){text}</code></pre>
+
+<h3>分页</h3>
+<p>引擎自动处理文本溢出。当文本超出对话框高度时，自动暂停等待按键，按任意键继续下一页。</p>
+
+<h3>示例</h3>
+<pre><code>fei(){Hello.}
+ira(){Hi.}
+neon(){Let's begin!}</code></pre>
+
+<hr>
+
+<h2>6. 旁白</h2>
+<p><code>host(){text}</code> 命令用于显示无角色名的旁白文本，不带姓名标签。</p>
+
+<h3>语法</h3>
+<pre><code>host(){text}</code></pre>
+
+<h3>示例</h3>
+<pre><code>host(){This is Naiz demo.}</code></pre>
+
+</main>
+</body>
+</html>

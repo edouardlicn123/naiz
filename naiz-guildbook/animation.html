@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>动画设计 — Naiz Guildbook</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<nav class="sidebar" id="sidebar-nav"></nav>
+<script src="sidebar-animation.js"></script>
+<main class="main">
+
+<h1>动画设计</h1>
+<hr>
+<p class="page-intro">
+  Naiz 引擎的序列帧动画制作与播放指南。本分类分为两部分：<strong>制作</strong>（anima.sh 工作流与素材登记）与 <strong>语法</strong>（.na 脚本逐命令参考）。
+</p>
+
+<div class="index-section">
+  <div class="index-section-title sec-anim">动画制作</div>
+  <div class="index-grid-1">
+    <div class="index-card">
+      <a href="pages/anim-制作.html">
+        <span class="card-badge b-anim">an</span>
+        <h3>动画制作工作流</h3>
+        <p>anima.sh init / register / check / build；名字索引库与 .ANI 产物</p>
+      </a>
+    </div>
+  </div>
+</div>
+
+<div class="index-section">
+  <div class="index-section-title sec-anim">脚本语法（.na）</div>
+  <div class="index-grid-2">
+    <div class="index-card">
+      <a href="pages/anim-语法.html">
+        <span class="card-badge b-anim">an</span>
+        <h3>语法总览</h3>
+        <p>F1 门禁、命令集、通用规则、V1–V8 校验表</p>
+      </a>
+    </div>
+    <div class="index-card">
+      <a href="pages/anim-animaconf.html">
+        <span class="card-badge b-anim">an</span>
+        <h3>animaconf</h3>
+        <p>头部声明：区域 / 轨道 / 项目名</p>
+      </a>
+    </div>
+    <div class="index-card">
+      <a href="pages/anim-frame.html">
+        <span class="card-badge b-anim">an</span>
+        <h3>frame</h3>
+        <p>pixel 轨帧：秒数 + 裸名字序列</p>
+      </a>
+    </div>
+    <div class="index-card">
+      <a href="pages/anim-base.html">
+        <span class="card-badge b-anim">an</span>
+        <h3>base</h3>
+        <p>palette 轨底图：恰好一次</p>
+      </a>
+    </div>
+    <div class="index-card">
+      <a href="pages/anim-pal.html">
+        <span class="card-badge b-anim">an</span>
+        <h3>pal</h3>
+        <p>调色板差异表：须在 base 之后</p>
+      </a>
+    </div>
+  </div>
+</div>
+
+<hr>
+<p class="muted-note">
+  引擎侧播放机制见 <a href="pages/mc05-动画机制.html">mc05 动画机制</a>；帧编解码见 <a href="pages/mc04-MAG图片机制.html">mc04 MAG 图片机制</a>。
+</p>
+
+</main>
+<script src="topnav.js"></script>
+</body>
+</html>

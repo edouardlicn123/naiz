@@ -1,0 +1,119 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>对话框样式方案 — Naiz Guildbook</title>
+<link rel="stylesheet" href="../style.css">
+</head>
+<body>
+<nav class="sidebar" id="sidebar-nav"></nav>
+<script src="../sidebar-reference.js"></script>
+<main class="main">
+<h1>对话框样式方案</h1>
+<blockquote><strong>创建</strong>：2026-06-10<br><strong>最后更新</strong>：2026-06-10</blockquote>
+<p>在 Naiz 引擎中，<strong>对话框不只是承载文字的容器——它本身就是作品的视觉语言之一</strong>。本文为制作者提供 10 种预设样式，5 色 × 2 密度（实心 / 75% 半透明）。</p>
+<hr>
+<h2>1. 样式一览</h2>
+<h3>编码规则</h3>
+<pre><code>style = (color_index << 1) | dither_bit
+  color_index: 0=黑, 1=蓝, 2=暗红, 3=绿, 4=紫
+  dither_bit:  0=实心, 1=75% 抖动
+
+取值范围 0-9，连续无间隙</code></pre>
+<h3>完整表</h3>
+<table>
+<thead>
+<tr><th>#</th><th>名称</th><th>密度</th><th>底色 RGB</th><th>视觉效果</th></tr>
+</thead>
+<tbody>
+<tr><td>0</td><td><code>SOLID_BLACK</code></td><td>实心</td><td>0,0,0</td><td>经典黑底，最高可读</td></tr>
+<tr><td>1</td><td><code>DITHER75_BLACK</code></td><td>75%</td><td>0,0,0</td><td>半透近黑</td></tr>
+<tr><td>2</td><td><code>SOLID_BLUE</code></td><td>实心</td><td>0,0,255</td><td>纯蓝底，PC-98 传统</td></tr>
+<tr><td>3</td><td><code>DITHER75_BLUE</code></td><td>75%</td><td>0,0,255</td><td>蓝半透</td></tr>
+<tr><td>4</td><td><code>SOLID_RED</code></td><td>实心</td><td>128,0,0</td><td>暗红底，戏剧/伤感</td></tr>
+<tr><td>5</td><td><code>DITHER75_RED</code></td><td>75%</td><td>128,0,0</td><td>红半透</td></tr>
+<tr><td>6</td><td><code>SOLID_GREEN</code></td><td>实心</td><td>0,128,0</td><td>深绿底，森林/自然</td></tr>
+<tr><td>7</td><td><code>DITHER75_GREEN</code></td><td>75%</td><td>0,128,0</td><td>绿半透</td></tr>
+<tr><td>8</td><td><code>SOLID_PURPLE</code></td><td>实心</td><td>128,0,128</td><td>紫底，神秘/浪漫</td></tr>
+<tr><td>9</td><td><code>DITHER75_PURPLE</code></td><td>75%</td><td>128,0,128</td><td>紫半透</td></tr>
+</tbody>
+</table>
+<h3>1.1 实心（5 种）</h3>
+<table>
+<thead>
+<tr><th>样式</th><th>色值</th><th>适用</th></tr>
+</thead>
+<tbody>
+<tr><td><code>SOLID_BLACK</code> (0)</td><td>#000000 黑</td><td>所有场景，起步标准，可读性最高</td></tr>
+<tr><td><code>SOLID_BLUE</code> (2)</td><td>#0000FF 蓝</td><td>海洋、夜空等蓝色主导场景</td></tr>
+<tr><td><code>SOLID_RED</code> (4)</td><td>#800000 暗红</td><td>戏剧、悲伤、紧张场景</td></tr>
+<tr><td><code>SOLID_GREEN</code> (6)</td><td>#008000 深绿</td><td>森林、自然、宁静场景</td></tr>
+<tr><td><code>SOLID_PURPLE</code> (8)</td><td>#800080 紫</td><td>神秘、浪漫、幻想场景</td></tr>
+</tbody>
+</table>
+<h3>1.2 75% 半透明（5 种）</h3>
+<p><strong>原理</strong>：引擎在对话框区域内按 <strong>Bayer 4×4 有序抖动</strong> 图案写入覆盖色（黑/蓝/红/绿/紫），25% 像素保留背景。点阵图案：</p>
+<pre><code>Row 0: ▓▓▓░▓▓▓░  (0xEE)
+Row 1: ░▓▓▓░▓▓▓  (0x77)
+Row 2: ▓░▓▓▓░▓▓  (0xBB)
+Row 3: ▓▓░▓▓▓░▓  (0xDD)</code></pre>
+<p><strong>统一行为</strong>：</p>
+<ul><li><strong>边框</strong>：始终保持 2px 白色实线</li><li><strong>文字</strong>：白色，无实心底衬——直接写在半透明背景上</li><li><strong>翻行</strong>：旧文字区域以与对话框相同的图案覆盖，再写新字</li></ul>
+<table>
+<thead>
+<tr><th>样式</th><th>色值</th><th>视觉效果</th></tr>
+</thead>
+<tbody>
+<tr><td><code>DITHER75_BLACK</code> (1)</td><td>#000000 黑</td><td>近实心，微弱背景透过</td></tr>
+<tr><td><code>DITHER75_BLUE</code> (3)</td><td>#0000FF 蓝</td><td>蓝半透，融入蓝色场景</td></tr>
+<tr><td><code>DITHER75_RED</code> (5)</td><td>#800000 暗红</td><td>红半透，保留氛围</td></tr>
+<tr><td><code>DITHER75_GREEN</code> (7)</td><td>#008000 深绿</td><td>绿半透，自然融入</td></tr>
+<tr><td><code>DITHER75_PURPLE</code> (9)</td><td>#800080 紫</td><td>紫半透，梦幻感</td></tr>
+</tbody>
+</table>
+<p><strong>可读性提示</strong>：白字写在半透明背景上，在复杂背景上可读性会下降。建议简约背景用透明样式，复杂背景回退到实心。</p>
+<hr>
+<h2>2. 选择指南</h2>
+<table>
+<thead>
+<tr><th>场景类型</th><th>推荐样式</th></tr>
+</thead>
+<tbody>
+<tr><td>日常对白——任何场景</td><td><code>SOLID_BLACK</code> (0)</td></tr>
+<tr><td>海洋、夜空、蓝色室内</td><td><code>SOLID_BLUE</code> (2) 或 <code>DITHER75_BLUE</code> (3)</td></tr>
+<tr><td>戏剧、回忆、紧张</td><td><code>SOLID_RED</code> (4) 或 <code>DITHER75_RED</code> (5)</td></tr>
+<tr><td>森林、自然、宁静</td><td><code>SOLID_GREEN</code> (6) 或 <code>DITHER75_GREEN</code> (7)</td></tr>
+<tr><td>神秘、浪漫、幻想</td><td><code>SOLID_PURPLE</code> (8) 或 <code>DITHER75_PURPLE</code> (9)</td></tr>
+<tr><td>高可读性 + 微透明</td><td><code>DITHER75_BLACK</code> (1)</td></tr>
+</tbody>
+</table>
+<p><strong>黄金规则</strong>：当背景复杂多变，以 <code>SOLID_BLACK</code> 为主，局部用透明/彩色样式营造特殊氛围。</p>
+<hr>
+<h2>3. 配置与使用</h2>
+<h3>3.1 settings.txt</h3>
+<pre><code>dlgstyle=3      # 0-9，对应上表</code></pre>
+<h3>3.2 与背景加载的交互</h3>
+<pre><code>顺序（固定）：
+1. 切换背景 — 全屏新背景显示并保存快照
+2. 之后首次对话 — 按当前对话框样式绘制对话框</code></pre>
+<p>详细实现见 <code>B15-图层渲染与换装机制.md</code> §2.3。</p>
+<hr>
+<h2>4. 与其他文档的关系</h2>
+<table>
+<thead>
+<tr><th>文档</th><th>内容</th></tr>
+</thead>
+<tbody>
+<tr><td><code>C01-引擎基本概念.md</code> §3</td><td>"对白"的基本概念</td></tr>
+<tr><td><code>B12-VRAM渲染策略.md</code> §4</td><td>四趟渲染顺序与局部刷新</td></tr>
+<tr><td><code>B02-显示管线规范.md</code> §9</td><td>对话框布局参数、边框结构</td></tr>
+<tr><td><code>B15-图层渲染与换装机制.md</code> §2</td><td>对话框样式底层实现（DIALOG_COLORS、位编码）</td></tr>
+<tr><td><code>B15-图层渲染与换装机制.md</code> §3</td><td>对话框生命周期 API</td></tr>
+<tr><td><code>B11-MAG图片加载与显示规范.md</code> §12</td><td>调色板预留三段保护机制</td></tr>
+</tbody>
+</table>
+
+</main>
+</body>
+</html>

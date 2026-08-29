@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>bg — Naiz Guildbook</title>
+<link rel="stylesheet" href="../style.css">
+</head>
+<body>
+<nav class="sidebar" id="sidebar-nav"></nav>
+<script src="../sidebar-scripts.js"></script>
+<main class="main">
+
+<h1>bg 背景切换</h1>
+<hr>
+<blockquote><strong>创建</strong>：2026-07-27</blockquote>
+<p><code>bg()</code> 命令用于切换场景背景，或关闭对话框还原背景区域。</p>
+
+<h2>1. 语法</h2>
+<pre><code>bg(key, type)
+bg(key, type, extra)
+bg(hidedialog)</code></pre>
+<table>
+<tr><th>参数</th><th>类型</th><th>说明</th></tr>
+<tr><td><code>key</code></td><td>string</td><td>资源名称，对应 <code>asset_map.name</code>（非 filename）</td></tr>
+<tr><td><code>type</code></td><td>string</td><td>显示方式（<code>normal</code> 等）</td></tr>
+<tr><td><code>extra</code></td><td>string</td><td>可选附加参数</td></tr>
+</table>
+
+<h3>1.1 子命令</h3>
+<table>
+<tr><th>命令</th><th>说明</th></tr>
+<tr><td><code>bg(hidedialog)</code></td><td>关闭对话框并还原背景区域</td></tr>
+</table>
+
+<h2>2. 示例</h2>
+<pre><code>bg(splbg,normal)
+bg(logo,normal,normal)
+bg(hidedialog)</code></pre>
+
+</main>
+</body>
+</html>

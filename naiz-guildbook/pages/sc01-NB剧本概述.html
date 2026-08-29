@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>NB 剧本概述 — Naiz Guildbook</title>
+<link rel="stylesheet" href="../style.css">
+</head>
+<body>
+<nav class="sidebar" id="sidebar-nav"></nav>
+<script src="../sidebar-scripts.js"></script>
+<main class="main">
+
+<h1>NB 剧本概述</h1>
+<hr>
+
+<blockquote><strong>创建</strong>：2026-07-27<br><strong>最后更新</strong>：2026-07-27</blockquote>
+
+<h2>1. 概述</h2>
+<p>NB（Naiz Book）是 Naiz 引擎的高层剧本格式，采用 UTF-8 纯文本，每行一条命令。NB 文件由引擎直接加载执行，无需编译为字节码。</p>
+
+<hr>
+
+<h2>2. 文件组织</h2>
+
+<h3>2.1 命名规则</h3>
+<table>
+<tr><th>文件</th><th>对应场景</th></tr>
+<tr><td><code>logo.nb</code></td><td>启动 Logo</td></tr>
+<tr><td><code>op.nb</code></td><td>开场</td></tr>
+<tr><td><code>mainmenu.nb</code></td><td>主菜单</td></tr>
+<tr><td><code>savescene.nb</code></td><td>存档选单</td></tr>
+<tr><td><code>loadscene.nb</code></td><td>读档选单</td></tr>
+<tr><td><code>nbook001.nb</code> ~ <code>nbook020.nb</code></td><td>故事场景 001–020</td></tr>
+</table>
+
+<h3>2.2 格式约定</h3>
+<ul>
+<li>UTF-8 编码，LF 换行</li>
+<li>每行一条命令</li>
+<li>以 <code>#</code> 开头的行为注释</li>
+<li>空行忽略</li>
+<li>参数间逗号分隔（<code>question</code> 和 <code>scene</code> 命令使用分号 <code>;</code> 作为顶层分隔符，子段内用逗号）</li>
+<li><code>()</code> 内为参数，<code>{}</code> 内为文本内容</li>
+</ul>
+
+<hr>
+
+<h2>3. 场景链示例</h2>
+<pre><code>logo.nb  ──scene(op)────→  op.nb  ──scene(mainmenu)──→  mainmenu.nb
+                                                               │
+                  ┌─────────┬─────────┬─────────┬──────┬──────┬──┴──┬──────┐
+                  │continue │ load    │ start   │music │gallery│sett.│ exit │
+                  └─────────┴─────────┴────┬────┴──────┴──────┴─────┴──────┘
+                                            ▼
+                                       nbook001.nb
+                                            │
+                                        scene(end)
+                                            │
+                                            ▼
+                                       mainmenu.nb</code></pre>
+
+<hr>
+
+<h2>4. 变更历史</h2>
+<table>
+<tr><th>日期</th><th>变更</th></tr>
+<tr><td>2026-07-27</td><td>从 C02 拆分：概念部分独立为本文档。命令详情见各专题文档。</td></tr>
+</table>
+
+</main>
+</body>
+</html>

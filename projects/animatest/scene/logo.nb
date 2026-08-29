@@ -1,0 +1,4 @@
+sceneconf(){, menu}
+bg(naizlogo,normal,normal)
+bg(powered,normal,normal)
+scene(op)

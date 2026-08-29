@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>MAG 图片机制 — Naiz Guildbook</title>
+<link rel="stylesheet" href="../style.css">
+</head>
+<body>
+<nav class="sidebar" id="sidebar-nav"></nav>
+<script src="../sidebar-reference.js"></script>
+<main class="main">
+
+<h1>MAG 图片机制</h1>
+<blockquote><strong>创建</strong>：2026-08-29<br><strong>最后更新</strong>：2026-08-29</blockquote>
+<p>本文从<strong>制作者</strong>视角说明 Naiz 引擎的图像格式 MAG、归档存储、共享调色板与透明色约定——即所有背景与立绘在引擎侧的加载与显示机制。更低层的字节规范见仓库内 <code>docs/B11-MAG图片加载与显示规范.md</code>。</p>
+<hr>
+
+<h2>1. MAG 格式与 256 色模式</h2>
+<p>MAG (MAKI02) 是 PC-98 平台主流图像格式，支持 16 色（4bpp）与 256 色（8bpp）。Naiz 引擎<strong>固定使用 256 色模式</strong>（PEGC，bpp=8，num_colors≤256）：解码后的像数值 0–255 直接对应硬件调色板索引，无需位平面拆分或额外颜色映射。</p>
+<table>
+<tr><th>组件</th><th>16 色</th><th>256 色（引擎采用）</th></tr>
+<tr><td>像素数据</td><td>4bpp（Flag A/B + color stream）</td><td>8bpp</td></tr>
+<tr><td>内嵌调色板</td><td>16 组 GRB</td><td>最多 256 组 GRB</td></tr>
+<tr><td>屏幕模式</td><td>screen_mode=0x00</td><td>screen_mode=0x80</td></tr>
+</table>
+
+<h2>2. 两种图像类型与 user-string 约定</h2>
+<p>MAG 头部 16 字节 user 域用于标识图像类型，引擎据此决定加载行为：</p>
+<table>
+<tr><th>User String</th><th>类型</th><th>引擎行为</th></tr>
+<tr><td><code>"naiz\x1a"</code></td><td>背景 / 全屏</td><td>调用 <code>image_set_palette()</code> 设全场景调色板 + <code>vram_blit()</code> 整屏写入</td></tr>
+<tr><td><code>"sprt\x1a"</code></td><td>立绘 / 精灵</td><td><strong>不</strong>调 <code>image_set_palette()</code>，用 <code>vram_blit_sprite(idx=15)</code> 跳过透明像素</td></tr>
+</table>
+<p>精灵（<code>char</code> 命令使用的立绘）与背景<strong>共享同一套 256 色调色板</strong>：背景先加载设调色板，精灵后加载只写像素，以背景调色板渲染。详见 <a href="mc03-图层渲染与换装机制.html">mc03 图层渲染与换装机制</a>。</p>
+
+<h2>3. 归档 IMAGE.DAT 与逻辑 ID</h2>
+<p>多张 MAG 在构建时被打包为单一归档 <code>IMAGE.DAT</code>，减少 HDI 根目录条目，引擎通过逻辑 ID 直接 O(1) 索引。</p>
+<ul>
+<li>资源映射表 <code>ASSETS.DB</code> 的 <code>img_map</code> 表：<code>id</code>（logical_id，即场景命令参数值）、<code>filename</code>、<code>type</code>（<code>'IMG'</code>/<code>'SPR'</code>）。</li>
+<li><code>pack_images.py</code> 读取 <code>img_map</code> 将列出的文件打包为 <code>IMAGE.DAT</code>；TOC 条目数组下标 = logical_id，引擎 <code>image_load(id)</code> 直接数组寻址，无需文件名匹配。</li>
+<li>角色与表情另由 <code>characters.yaml</code> 定义，<code>char_expressions</code> 将 <code>expr</code> 映射到 <code>img_map.id</code>。</li>
+</ul>
+
+<h2>4. 共享调色板与预留索引</h2>
+<p>256 色模式下所有图像像素 + UI 元素共用同一调色板。为避免 UI 色（文字、透明、对话框底色）与图像像素冲突，引擎采用<strong>10 个预留索引</strong>：</p>
+<table>
+<tr><th>索引</th><th>默认色</th><th>用途</th></tr>
+<tr><td>7</td><td>白</td><td>文字 / 边框 / 提示</td></tr>
+<tr><td>15</td><td>黑</td><td>精灵透明色（blit 时跳过）</td></tr>
+<tr><td>248</td><td>黑</td><td>对话框底色（dlgstyle 动态改色）</td></tr>
+<tr><td>249–255</td><td>—</td><td>备用 UI 色（250=菜单文字，251=菜单选中）</td></tr>
+</table>
+<p><strong>三段保护层次</strong>（任一阶段阻断冲突）：</p>
+<ul>
+<li>阶段 1 素材生成：<code>mag_convert.py --reserved 7,15,248,...</code>，量化即避开预留索引。</li>
+<li>阶段 2 归档打包：<code>pack_images.py</code> 全部图像 remap 到共享调色板时跳过 <code>PROTECTED_IDX</code>。</li>
+<li>阶段 3 引擎运行：<code>image_set_palette()</code> 跳过 7/15/248–255，永不覆写 UI 色。</li>
+</ul>
+
+<h2>5. 透明色约定</h2>
+<ul>
+<li>精灵 PNG 经 <code>mag_convert.py --sprite</code> 转换：alpha&lt;128 区域映射为索引 15（透明标记），<strong>不 resize</strong> 保持原始尺寸，写入 <code>"sprt\x1a"</code>。</li>
+<li>精灵 <code>--reserved</code> <strong>不含</strong> 15，因为需要在索引 15 存储透明标记。</li>
+<li>立绘底部 y≥280 区域需与对话框布局一致（<code>pack_images.py</code> 对多套表情做 y≥280 一致性校验），避免半透明对话框下露馅。</li>
+</ul>
+
+<h2>6. 构建流程</h2>
+<pre><code>mag_convert.py  PNG → MAG（--sprite / --256 / --reserved）
+        │
+pack_images.py  ASSETS.DB(img_map) → IMAGE.DAT
+        │         （共享调色板量化 + remap + 后校验）
+        ▼
+makegame.sh build &lt;game&gt;  注入 HDI</code></pre>
+<p>精灵镜像由 <code>char</code> 命令位置参数隐式决定（<code>l</code> 左位自动镜像，<code>c</code>/<code>r</code> 不镜像），见 <a href="mc02-立绘与角色.html">mc02 立绘与角色</a>。</p>
+
+<h2>7. 与脚本命令的关系</h2>
+<ul>
+<li><code>bg</code> 命令：加载背景 MAG → 设调色板 → 整屏 blit → 重绘精灵 → 恢复对话框底色(248) → 保存背景快照。调色板必须先于像素写入，否则闪烁。</li>
+<li><code>char</code> 命令：加载精灵 MAG → 只写像素（共享背景调色板）→ 透明索引 15 跳过。</li>
+</ul>
+<p>命令语法详见 <a href="sc02-bg.html">sc02-bg 背景切换</a> 与 <a href="sc03-char.html">sc03-char 立绘与对话</a>。</p>
+
+</main>
+</body>
+</html>

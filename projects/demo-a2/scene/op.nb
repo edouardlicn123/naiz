@@ -1,0 +1,4 @@
+sceneconf(){, menu}
+bg(logo,normal,normal)
+delay(1.5)
+scene(mainmenu)

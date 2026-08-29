@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>host — Naiz Guildbook</title>
+<link rel="stylesheet" href="../style.css">
+</head>
+<body>
+<nav class="sidebar" id="sidebar-nav"></nav>
+<script src="../sidebar-scripts.js"></script>
+<main class="main">
+
+<h1>host 系统旁白</h1>
+<hr>
+<blockquote><strong>创建</strong>：2026-08-29</blockquote>
+<p><code>host()</code> 命令用于显示系统旁白（无角色名）。它与 <code>sc03-char.html</code> 中的 <code>fei/ira/neon</code> 角色台词不同：旁白不显示角色名前缀。</p>
+
+<h2>1. 语法</h2>
+<pre><code>host &lt;text&gt;</code></pre>
+<table>
+<tr><th>参数</th><th>类型</th><th>说明</th></tr>
+<tr><td><code>text</code></td><td>string</td><td>旁白文本</td></tr>
+</table>
+
+<h2>2. 示例</h2>
+<pre><code>host 暴风雨渐息，海面恢复平静。</code></pre>
+
+<div class="note-box"><p>旁白不以角色名前缀显示，其排版样式由当前对话框样式方案（<code>cf03-对话框样式方案.html</code>）决定。</p></div>
+
+</main>
+</body>
+</html>

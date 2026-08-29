@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>动画制作工作流（给不写程序的你）— Naiz Guildbook</title>
+<link rel="stylesheet" href="../style.css">
+</head>
+<body>
+<nav class="sidebar" id="sidebar-nav"></nav>
+<script src="../sidebar-animation.js"></script>
+<main class="main">
+
+<h1>动画制作工作流</h1>
+<blockquote><strong>创建</strong>：2026-08-29<br><strong>最后更新</strong>：2026-08-29</blockquote>
+<p>本页是给<strong>不写程序</strong>的 galgame 制作者看的动画制作指南。做一段游戏动画其实就三步：① 准备好图片素材；② 写一张「分镜小本子」（<code>.na</code> 脚本，写法见 <a href="anim-语法.html">语法总览</a>）；③ 用动画小工具生成最终的 <code>.ANI</code> 文件。本文讲第①步和第③步。</p>
+<hr>
+
+<h2>1. 动画放在哪里</h2>
+<p>每一段动画都属于一个<strong>动画项目</strong>（比如「主角眨眼」「标题界面流光」）。项目就是一个文件夹，里面分两处：</p>
+<ul>
+<li><strong>素材文件夹</strong>：放你画的图片（和变色动画用的「色表」文件）。</li>
+<li><strong>脚本文件夹</strong>：放那张分镜小本子 <code>.na</code>。</li>
+</ul>
+<p>工具会自动建好这些文件夹，你不用手动摆弄路径。</p>
+
+<h2>2. 用动画小工具（anima.sh）生成动画</h2>
+<p>在终端里输入下面这些命令（把「项目名」「脚本名」换成你自己的）：</p>
+<table>
+<tr><th>你想做的事</th><th>输入什么</th></tr>
+<tr><td>新建一个动画项目（自动建好文件夹）</td><td><code>anima.sh init 项目名</code></td></tr>
+<tr><td>把素材登记进「昵称表」</td><td><code>anima.sh register 项目名</code></td></tr>
+<tr><td>检查有没有漏登记的素材</td><td><code>anima.sh check 项目名</code></td></tr>
+<tr><td>按脚本生成动画文件</td><td><code>anima.sh build 项目名/脚本名</code></td></tr>
+<tr><td>一次性生成项目里所有动画</td><td><code>anima.sh buildall</code></td></tr>
+<tr><td>看看这个项目有哪些动画</td><td><code>anima.sh list</code></td></tr>
+</table>
+<p>如果直接输入 <code>anima.sh</code> 不加任何参数，会弹出一个菜单一步步带你操作，适合不熟悉命令的时候用。</p>
+<p><strong>小提示</strong>：生成动画前最好先 <code>register</code> 一次（也可以直接在 <code>build</code> 后面加 <code>--sync</code>，它会先自动登记再生成）。</p>
+
+<h2>3. 给素材起「昵称」（素材昵称表）</h2>
+<p>写脚本时，你<strong>不用写图片的真实路径和文件名</strong>，只需要写一个简单的「昵称」。例如脚本里写 <code>{微笑}</code>，工具就会去找那张叫「微笑」的图片。</p>
+<p>这些昵称由 <code>register</code> 这一步自动登记好——它扫描你的素材文件夹，把每张图记进一张「昵称表」。所以：</p>
+<ul>
+<li>先 <code>register</code>，再 <code>build</code>；</li>
+<li>如果脚本里写了某个昵称、但素材没登记（或图片被删了），工具会报错提醒你，不会悄悄生成一个坏掉的动画。</li>
+</ul>
+
+<h2>4. 生成的产物：.ANI 文件</h2>
+<p>工具按你的脚本，把图片打包成最终的 <code>.ANI</code> 文件，这就是能放进游戏里播放的动画。</p>
+<ul>
+<li><strong>全屏动画</strong>：铺满整个画面，尺寸固定 640×400。</li>
+<li><strong>对话框上方的横条动画</strong>：只占对话框上面那条，固定 640×280。</li>
+</ul>
+
+<h2>5. 还想了解</h2>
+<ul>
+<li><a href="anim-语法.html">语法总览</a> —— 怎么写那张分镜小本子（<code>.na</code> 脚本）。</li>
+<li><a href="mc05-动画机制.html">动画机制</a> —— 在游戏里怎么播放这段动画。</li>
+<li><a href="mc04-MAG图片机制.html">MAG 图片机制</a> —— 图片在引擎里是怎么显示和调色的。</li>
+</ul>
+
+</main>
+</body>
+</html>

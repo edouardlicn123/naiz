@@ -1,0 +1,11 @@
+# PNG→MAG 映射表
+# 格式: <png_rel_path>  <mag_rel_path>  [选项]
+# 路径相对于 assets/animatest/ 和 projects/animatest/
+# PNG 比 MAG 新时自动重新转换
+# 注意: MAG 文件名需 ≤11 字符（IMAGE.DAT TOC 名字段宽度，超长截断会撞名）
+
+png/bg/naizlogo.png     images/naizlogo.MAG    --256color
+png/bg/powered.png      images/powered.MAG     --256color
+png/bg/mainmenu.png     images/mainmenu.MAG    --256color
+anim/frame001.png    images/anim-f1.MAG   --256color
+anim/frame002.png    images/anim-f2.MAG   --256color

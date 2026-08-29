@@ -1,0 +1,12 @@
+# naiz_screendig 运行时依赖
+#
+# 安装命令（Debian/Ubuntu 系统，使用 --break-system-packages 绕过 PEP 668）：
+#   pip3 install --user --break-system-packages -r tools/naiz_screendig/requirements.txt
+#
+# 或使用系统包管理器：
+#   sudo apt install python3-pil python3-numpy
+#
+# 这些组件必须安装，否则图像分析功能不可用（截图捕获功能仍可独立工作）
+
+Pillow>=10.0.0
+numpy>=1.24.0

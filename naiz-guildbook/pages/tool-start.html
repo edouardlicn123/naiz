@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>start.sh 使用说明 — Naiz Guildbook</title>
+<link rel="stylesheet" href="../style.css">
+</head>
+<body>
+<nav class="sidebar" id="sidebar-nav"></nav>
+<script src="../sidebar-tools.js"></script>
+<main class="main">
+
+<h1>start.sh 使用说明</h1>
+<blockquote><strong>创建</strong>：2026-08-29<br><strong>最后更新</strong>：2026-08-29</blockquote>
+<p><code>start.sh</code> 是仓库的<strong>统一入口脚本</strong>，负责环境安装检查、各类依赖/模拟器安装、以及代码审计。<strong>日常最推荐直接运行、用数字菜单操作</strong>；命令行子命令适合写进脚本或熟练后使用。</p>
+<hr>
+
+<h2>1. 交互式菜单（主要用法）</h2>
+<p>不带任何参数运行：</p>
+<pre><code>./start.sh</code></pre>
+<p>会显示一个菜单，<strong>输入数字并按回车</strong>即可执行对应功能：</p>
+<table>
+<tr><th>菜单数字</th><th>功能</th></tr>
+<tr><td><code>1</code></td><td>运行环境检查（check）</td></tr>
+<tr><td><code>2</code></td><td>进入「环境安装」子菜单（可逐项安装依赖、模拟器、编译器等，详见下）</td></tr>
+<tr><td><code>3</code></td><td>运行代码审计（audit）</td></tr>
+<tr><td><code>4</code></td><td>运行完整审计（fullaudit，含编译）</td></tr>
+<tr><td><code>0</code></td><td>退出</td></tr>
+</table>
+<p>选 <code>2</code> 进入安装子菜单后，会再列出可安装项，同样按数字选择，例如安装 Open Watcom 编译器、NP2kai 模拟器、系统级工具等。菜单操作失败不会退出，会回到菜单让你重试。</p>
+<p><em>新手提示：第一次搭环境就先跑 <code>1</code> 看缺什么，再用 <code>2</code> 逐项补齐。</em></p>
+<div class="note-box">
+<strong>哪些是「备用的东西」，不一定要装？</strong>
+<p>安装子菜单里有几项属于<strong>可选 / 备用</strong>，正常开发用不到，不必安装：</p>
+<ul>
+<li><code>djgpp</code>：另一套编译器工具链，仅当 Open Watcom（主力）不可用时的备选，一般不用装。</li>
+<li><code>retroarch</code>：备份模拟器配置（backup-emu），仅在想换用 RetroArch 等其他前端时才需要，NP2kai 才是默认测试用的模拟器。</li>
+<li><code>mirror</code>：Git 仓库来源（镜像）设置，只在下载慢、要切换镜像源时才用。</li>
+<li><code>commercial</code>：商用相关菜单，仅涉及商用分发时才需要。</li>
+</ul>
+<p>真正<strong>必装</strong>的只有：<code>pip</code>（Python 依赖）、<code>deps</code>（系统工具）、<code>watcom</code>（引擎编译器）、<code>np2kai</code>（测试模拟器）——其余按需再装即可。</p>
+</div>
+
+<h2>2. 命令行用法（进阶 / 脚本化）</h2>
+<p>熟练或要写进自动化脚本时，可直接跟子命令，跳过菜单：</p>
+<pre><code>./start.sh &lt;子命令&gt; [参数]</code></pre>
+<table>
+<tr><th>子命令</th><th>作用</th></tr>
+<tr><td><code>check</code></td><td>检查当前环境（Python venv、依赖、工具链）是否就绪</td></tr>
+<tr><td><code>pip</code></td><td>安装 Python 依赖（pip-install）</td></tr>
+<tr><td><code>deps</code></td><td>安装系统级工具（system-tools）</td></tr>
+<tr><td><code>np2kai</code></td><td>安装/准备 NP2kai 模拟器</td></tr>
+<tr><td><code>retroarch</code></td><td>备份模拟器配置（backup-emu）</td></tr>
+<tr><td><code>watcom</code></td><td>安装 Open Watcom 编译器（引擎编译用）</td></tr>
+<tr><td><code>djgpp</code></td><td>安装 DJGPP 工具链</td></tr>
+<tr><td><code>mirror</code></td><td>进入 Git 仓库来源（镜像）设置</td></tr>
+<tr><td><code>commercial</code></td><td>商用相关菜单（commercial_menu）</td></tr>
+<tr><td><code>audit</code></td><td>运行代码审计（符号审计日志输出到终端与 logs/）</td></tr>
+<tr><td><code>fullaudit [--no-make]</code></td><td>六步流水线审计；<code>--no-make</code> 跳过 make 节</td></tr>
+</table>
+
+<h2>3. 常见用法示例</h2>
+<pre><code># 交互菜单里按 1 看环境缺什么（推荐）
+./start.sh
+# 等效的命令行写法：
+./start.sh check
+
+# 安装引擎编译所需的 Watcom 编译器
+./start.sh watcom
+
+# 提交前跑完整审计（含编译）
+./start.sh fullaudit
+# 只跑审计不重新编译
+./start.sh fullaudit --no-make</code></pre>
+
+<h2>4. 关联</h2>
+<ul>
+<li><a href="tool-makegame.html">makegame.sh</a> — 游戏数据构建与 HDI 注入。</li>
+<li><a href="tool-anima.html">anima.sh</a> — 动画制作工具。</li>
+</ul>
+
+</main>
+</body>
+</html>

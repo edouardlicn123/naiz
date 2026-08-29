@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>动画脚本语法总览（给不写程序的你）— Naiz Guildbook</title>
+<link rel="stylesheet" href="../style.css">
+</head>
+<body>
+<nav class="sidebar" id="sidebar-nav"></nav>
+<script src="../sidebar-animation.js"></script>
+<main class="main">
+
+<h1>动画脚本语法总览</h1>
+<blockquote><strong>创建</strong>：2026-08-29<br><strong>最后更新</strong>：2026-08-29</blockquote>
+<p>本页用大白话讲清楚：怎么写那张<strong>分镜小本子</strong>（<code>.na</code> 文件）。它就像动画的「拍摄清单」——先写开场设定，再一行一行列出每一张画面（或每一次变色）。每个命令的详细写法见：<a href="anim-animaconf.html">animaconf</a> / <a href="anim-frame.html">frame</a> / <a href="anim-base.html">base</a> / <a href="anim-pal.html">pal</a>。怎么生成动画见 <a href="anim-制作.html">制作工作流</a>。</p>
+<hr>
+
+<h2>1. 小本子要用 .na 结尾</h2>
+<p>动画脚本的文件名必须以 <code>.na</code> 结尾（例如 <code>眨眼.na</code>）。这是和普通剧本文件（<code>.nb</code>）区分开的标记，写错后缀工具会拒绝处理。</p>
+
+<h2>2. 四种写法（命令）</h2>
+<table>
+<tr><th>写法</th><th>用在哪种动画</th><th>作用</th></tr>
+<tr><td><code>animaconf(...)</code></td><td>两种都用到</td><td>开场设定：这段动画是全屏还是横条？是整图动画还是变色动画？属于哪个项目？</td></tr>
+<tr><td><code>frame(...){...}</code></td><td>整图动画</td><td>放一张（或几张）画面，并写清楚停留几秒</td></tr>
+<tr><td><code>base(){...}</code></td><td>变色动画</td><td>写出「变色前」的第一张底图</td></tr>
+<tr><td><code>pal(...){...}</code></td><td>变色动画</td><td>写出每一次颜色该怎么变，以及停留几秒</td></tr>
+</table>
+<p>括号里写数字或选项，大括号 <code>{ }</code> 里写素材的「昵称」（就是你在登记时起的名字）。</p>
+
+<h2>3. 几个通用的小规矩</h2>
+<ul>
+<li><strong>开场设定放最前面</strong>：<code>animaconf</code> 必须是小本子的第一行（前面可以空行或写 <code>#</code> 备注）。</li>
+<li><strong>整图动画</strong>用 <code>frame</code>；<strong>变色动画</strong>用 <code>base</code> + <code>pal</code>。两者不要混用。</li>
+<li><strong>变色动画里，base 必须写在 pal 前面</strong>（先有底图，再有变化）。</li>
+<li>大括号里可以写多个昵称，用逗号分开，例如 <code>{云1,云2,云3}</code>——它们会一张接一张轮流播放，且共用同一个停留时间。</li>
+<li>行末加 <code>#</code> 可以写备注（例如 <code>frame(0.3){云1} # 飘一下</code>），工具会忽略备注，不影响动画。</li>
+</ul>
+
+<h2>4. 写动画时容易踩的坑（排错小抄）</h2>
+<p>工具报错时会告诉你「第几行、出了什么问题」。下面把常见情况翻译成人话：</p>
+<table>
+<tr><th>现象</th><th>通常是……</th></tr>
+<tr><td>提示「脚本须为 .na 后缀」</td><td>文件名没以 <code>.na</code> 结尾，改一下文件名就好</td></tr>
+<tr><td>提示 animaconf 有问题</td><td>开场设定忘了写、写了两次，或写在不是第一行的位置</td></tr>
+<tr><td>提示区域/类型/项目名不对</td><td>animaconf 里的选项拼错，或对应的项目文件夹不存在</td></tr>
+<tr><td>提示「跨轨」或命令用错地方</td><td>整图动画里混入了 base/pal，或变色动画里写了 frame（两者别混）</td></tr>
+<tr><td>提示缺少画面 / 缺少底图</td><td>整图动画至少要有 1 个 frame；变色动画要有 1 个 base 和至少 1 个 pal</td></tr>
+<tr><td>提示「未登记的名字」</td><td>大括号里的昵称在素材昵称表里找不到——回去跑一次 <code>register</code></td></tr>
+<tr><td>提示尺寸不对</td><td>全屏动画的图片必须是 640×400；横条动画宽不超过 640、高不超过 400</td></tr>
+<tr><td>提示 .pal 文件格式错</td><td>变色用的色表里，每一行应是「编号 红 绿 蓝」四个数字，且别重复同一个编号</td></tr>
+<tr><td>提示 pal 必须在 base 之后</td><td>变色动画里把 pal 写在了 base 前面，调换顺序即可</td></tr>
+</table>
+
+<h2>5. 四种写法详细看</h2>
+<div class="index-section">
+  <div class="index-grid-2">
+    <div class="index-card">
+      <a href="anim-animaconf.html">
+        <span class="card-badge b-anim">an</span>
+        <h3>animaconf（开场设定）</h3>
+        <p>全屏还是横条？整图还是变色？属于哪个项目？</p>
+      </a>
+    </div>
+    <div class="index-card">
+      <a href="anim-frame.html">
+        <span class="card-badge b-anim">an</span>
+        <h3>frame（放一张画面）</h3>
+        <p>整图动画：哪张图、停留几秒</p>
+      </a>
+    </div>
+    <div class="index-card">
+      <a href="anim-base.html">
+        <span class="card-badge b-anim">an</span>
+        <h3>base（变色底图）</h3>
+        <p>变色动画：变化前的第一张图</p>
+      </a>
+    </div>
+    <div class="index-card">
+      <a href="anim-pal.html">
+        <span class="card-badge b-anim">an</span>
+        <h3>pal（让颜色变化）</h3>
+        <p>变色动画：颜色怎么变、停留几秒</p>
+      </a>
+    </div>
+  </div>
+</div>
+
+<h2>6. 还想了解</h2>
+<ul>
+<li><a href="anim-制作.html">制作工作流</a> —— 用工具生成 .ANI。</li>
+<li><a href="mc05-动画机制.html">动画机制</a> —— 在游戏里怎么播放。</li>
+<li><a href="mc04-MAG图片机制.html">MAG 图片机制</a> —— 图片与调色板是怎么一回事。</li>
+</ul>
+
+</main>
+</body>
+</html>

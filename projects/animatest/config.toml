@@ -1,0 +1,19 @@
+# =============================================================
+# Naiz 游戏工程配置 (TOML) — 支持 # 注释
+# animatest — 动画功能测试项目
+#
+# version 行由 bump_version 工具自动维护，请勿手动修改。
+# =============================================================
+
+[i18n]
+source_lang = "eng"
+targets = []
+
+[project]
+title = "animatest"
+description = "Naiz 动画功能测试项目"
+version = "0.2.063"
+
+[transition]
+type = "cut"
+frames = 16

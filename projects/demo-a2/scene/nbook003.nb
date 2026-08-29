@@ -1,0 +1,8 @@
+sceneconf(){Come with me, normal}
+bg(seasidebg,normal)
+char(fei,r,swimming,body)
+char(ira,l,normal,body)
+fei(){What a good day!}
+fei(){Isn't it,Ira?}
+ira(){Yes but I don't want to swim,I just want to stay at the beach.}
+scene(end)

@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>bgm / sound / voice — Naiz Guildbook</title>
+<link rel="stylesheet" href="../style.css">
+</head>
+<body>
+<nav class="sidebar" id="sidebar-nav"></nav>
+<script src="../sidebar-scripts.js"></script>
+<main class="main">
+
+<h1>bgm / sound / voice 音频指令</h1>
+<hr>
+<blockquote><strong>创建</strong>：2026-08-13</blockquote>
+<p><code>bgm()</code>、<code>sound()</code>、<code>voice()</code> 三个命令分别控制背景音乐、音效和语音。当前实现为平台占位（stub），音频键会经 HAL 转出，暂不产生实际声音。</p>
+
+<h2>1. 语法</h2>
+<pre><code>bgm(key)
+bgm(stop)
+sound(key)
+voice(key)</code></pre>
+<table>
+<tr><th>命令</th><th>参数</th><th>说明</th></tr>
+<tr><td><code>bgm</code></td><td><code>key</code> 或 <code>stop</code></td><td>播放 / 停止 BGM</td></tr>
+<tr><td><code>sound</code></td><td><code>key</code></td><td>播放音效（SE）</td></tr>
+<tr><td><code>voice</code></td><td><code>key</code></td><td>播放语音</td></tr>
+</table>
+
+<h2>2. 参数说明</h2>
+<ul>
+<li><code>key</code> 为音频资源键名，对应平台侧音频资源</li>
+<li><code>bgm(stop)</code> 停止当前 BGM；<code>bgm</code> 传入其他键名则播放</li>
+<li><code>sound</code> / <code>voice</code> 当前只支持播放，无停止形式</li>
+</ul>
+
+<h2>3. 示例</h2>
+<pre><code>bgm(morning)       # 播放清晨 BGM
+bgm(stop)          # 停止 BGM
+sound(door_knock)  # 敲门音效
+voice(fei_hello)   # 角色语音</code></pre>
+
+</main>
+</body>
+</html>

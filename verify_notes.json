@@ -1,0 +1,230 @@
+{
+  "version": 2,
+  "notes": {
+    "core/detect_watcom.sh:1": {
+      "verdict": "ok",
+      "text": "sourced helper script; strict-mode norm not applicable",
+      "date": "2026-08-19T11:01:58",
+      "sha256": "39b3c3527106a055b968157bd5db1e94eea1f16c15511c579b93613e4c801568",
+      "line": "#!/bin/bash"
+    },
+    "core/engine/image.c:109": {
+      "verdict": "ok",
+      "text": "memcpy into ref_r constant-size [256]; source pal fixed-width",
+      "date": "2026-08-19T11:01:58",
+      "sha256": "5670dda162df2d62874829e25e41152ec26d87e3c7003ca13f96b3de6bbe64c5",
+      "line": "                memcpy(ref_r, pr, 256);"
+    },
+    "core/engine/image.c:110": {
+      "verdict": "ok",
+      "text": "memcpy into ref_g constant-size [256]; source pal fixed-width",
+      "date": "2026-08-19T11:01:58",
+      "sha256": "5670dda162df2d62874829e25e41152ec26d87e3c7003ca13f96b3de6bbe64c5",
+      "line": "                memcpy(ref_g, pg, 256);"
+    },
+    "core/engine/image.c:111": {
+      "verdict": "ok",
+      "text": "memcpy into ref_b constant-size [256]; source pal fixed-width",
+      "date": "2026-08-19T11:01:58",
+      "sha256": "5670dda162df2d62874829e25e41152ec26d87e3c7003ca13f96b3de6bbe64c5",
+      "line": "                memcpy(ref_b, pb, 256);"
+    },
+    "core/engine/image.c:65": {
+      "verdict": "fixed",
+      "text": "fsize<4 now hal_logs before return -1",
+      "date": "2026-08-18T13:14:50",
+      "sha256": "5670dda162df2d62874829e25e41152ec26d87e3c7003ca13f96b3de6bbe64c5"
+    },
+    "core/engine/layer_dialog.c:137": {
+      "verdict": "ok",
+      "text": "malloc result guarded by truthy check below; OOM degrades gracefully via dialog_drawn=0",
+      "date": "2026-08-24T12:05:36",
+      "sha256": "47bfc1eced6a86a850c3dd696144ad387976790fd6901d5a0ab22b9b15dff59b",
+      "line": "        dialog_snapshot = (unsigned char *)malloc(LAYER_DIALOG_W * LAYER_DIALOG_H);"
+    },
+    "core/engine/layer_dialog.c:43": {
+      "verdict": "ok",
+      "text": "malloc guarded by truthy check at :45 before deref;",
+      "date": "2026-08-18T12:02:38",
+      "sha256": "a36e6569b8ee56818d0e4c3c9858c84f4c91a32ff41e6ef53519d76770c77f03"
+    },
+    "core/engine/nb_commands.c:131": {
+      "verdict": "ok",
+      "text": "memcpy into buf sized sizeof(buf); source fixed struct member",
+      "date": "2026-08-18T13:12:57",
+      "sha256": "1c24886cfae9bf085a3df85c36694080be538481f5cb7a59342864588d9d3be7"
+    },
+    "core/engine/nb_commands.c:327": {
+      "verdict": "fixed",
+      "text": "INT_MIN negation guarded, nb_var_add uses 64-bit math",
+      "date": "2026-08-18T13:12:57",
+      "sha256": "1c24886cfae9bf085a3df85c36694080be538481f5cb7a59342864588d9d3be7"
+    },
+    "core/lib/tr.c:65": {
+      "verdict": "ok",
+      "text": "memcpy into tr_table governed by table_len bounds check above",
+      "date": "2026-08-18T13:12:57",
+      "sha256": "8ec268384478a31a403ff39c1818fa7558c7317c5a4545f9d0e57371ce6c9121"
+    },
+    "makegame.sh:143": {
+      "verdict": "ok",
+      "text": "assignment RHS; no word-splitting context",
+      "date": "2026-08-18T13:18:13",
+      "sha256": "5aa88572b4794ef9dfb0890cfe2e2e227329e0085bb3e545c71976889bbf2cc7"
+    },
+    "makegame.sh:43": {
+      "verdict": "ok",
+      "text": "shift guarded by || true when no args",
+      "date": "2026-08-18T13:18:13",
+      "sha256": "5aa88572b4794ef9dfb0890cfe2e2e227329e0085bb3e545c71976889bbf2cc7"
+    },
+    "tools/diag/np2kai_serial.py:37": {
+      "verdict": "ok",
+      "text": "lazy import of gen_com serialwrite generator",
+      "date": "2026-08-18T13:17:03",
+      "sha256": "eb55a8bf9eac69254c1b1a4a01aa8cbac8a1696d81d37a17a948378058e8c44c"
+    },
+    "tools/env_setup/env_test.py:250": {
+      "verdict": "ok",
+      "text": "lazy stdlib urllib import in retroarch installer",
+      "date": "2026-08-18T13:17:03",
+      "sha256": "311f673c263f7590cdfbc304a08e958d3b519278c391d206730473a42d95cf27"
+    },
+    "tools/env_setup/env_utils.py:102": {
+      "verdict": "ok",
+      "text": "lazy stdlib getpass only for sudo prompt",
+      "date": "2026-08-18T13:17:03",
+      "sha256": "d66fed7793b18354a604968c2c066f6c215ff8c93efd35d58fedc410521d2080"
+    },
+    "tools/env_setup/env_utils.py:115": {
+      "verdict": "ok",
+      "text": "lazy stdlib getpass only when sudo password prompt needed",
+      "date": "2026-08-24T12:05:36",
+      "sha256": "949a83057fc50db120cfb93f1fcdc651ea1c1ef52f73e646128590e7656ab67d",
+      "line": "        import getpass"
+    },
+    "tools/naiz_build/anim_import.py:89": {
+      "verdict": "ok",
+      "text": "lazy mag_convert import defers PIL-dependent converter chain",
+      "date": "2026-08-24T12:05:36",
+      "sha256": "0c64e7220823fccbebaef0d494e90c208da65434a02625265deeb3f41c5f8136",
+      "line": "    from PIL import Image"
+    },
+    "tools/naiz_build/build_game.py:95": {
+      "verdict": "ok",
+      "text": "lazy naiz_conv import avoids startup cost",
+      "date": "2026-08-18T13:17:03",
+      "sha256": "5e057942a14a84d1397bdedcd82e28d3e1c726875fdc354ec28a18f3df1392cf"
+    },
+    "tools/naiz_build/pack_images.py:42": {
+      "verdict": "ok",
+      "text": "lazy optional PIL dependency (median-cut quantizer)",
+      "date": "2026-08-24T12:05:36",
+      "sha256": "73787a0dd720fe480f78ff7eb332092a9f5ab08f4509067f331518e481bd7084",
+      "line": "    from PIL import Image"
+    },
+    "tools/naiz_conv/mag_convert.py:64": {
+      "verdict": "ok",
+      "text": "lazy optional PIL dependency in resize helper",
+      "date": "2026-08-24T12:05:36",
+      "sha256": "f92fca3a1979707ee405de4043814d64fd3132b7b4a09642342be7ffc978004a",
+      "line": "    from PIL import Image as PIL_Image"
+    },
+    "tools/naiz_font/gen_cjk_font.py:151": {
+      "verdict": "ok",
+      "text": "verify read on own written file; fixed-size unpack",
+      "date": "2026-08-18T13:17:03",
+      "sha256": "0e811b9ac4435935307fb10d4880ef47b009bb6d3947297b53e79714625bab23"
+    },
+    "tools/naiz_font/gen_cjk_font.py:152": {
+      "verdict": "ok",
+      "text": "verify skip of fixed 4 reserved bytes",
+      "date": "2026-08-18T13:17:03",
+      "sha256": "0e811b9ac4435935307fb10d4880ef47b009bb6d3947297b53e79714625bab23"
+    },
+    "tools/naiz_font/gen_cjk_font.py:156": {
+      "verdict": "ok",
+      "text": "verify read; header rc bounds checked",
+      "date": "2026-08-18T13:17:03",
+      "sha256": "0e811b9ac4435935307fb10d4880ef47b009bb6d3947297b53e79714625bab23"
+    },
+    "tools/naiz_font/gen_cjk_font.py:157": {
+      "verdict": "ok",
+      "text": "verify read; header rc bounds checked",
+      "date": "2026-08-18T13:17:03",
+      "sha256": "0e811b9ac4435935307fb10d4880ef47b009bb6d3947297b53e79714625bab23"
+    },
+    "tools/naiz_font/gen_cjk_font.py:158": {
+      "verdict": "ok",
+      "text": "verify read; header rc bounds checked",
+      "date": "2026-08-18T13:17:03",
+      "sha256": "0e811b9ac4435935307fb10d4880ef47b009bb6d3947297b53e79714625bab23"
+    },
+    "tools/naiz_font/gen_cjk_font.py:159": {
+      "verdict": "ok",
+      "text": "verify read of fixed 4 reserved bytes",
+      "date": "2026-08-18T13:17:03",
+      "sha256": "0e811b9ac4435935307fb10d4880ef47b009bb6d3947297b53e79714625bab23"
+    },
+    "tools/naiz_font/gen_cjk_font.py:166": {
+      "verdict": "ok",
+      "text": "seek(10) after header already read; rc>0 implies file large enough",
+      "date": "2026-08-18T13:17:03",
+      "sha256": "0e811b9ac4435935307fb10d4880ef47b009bb6d3947297b53e79714625bab23"
+    },
+    "tools/naiz_font/gen_cjk_font.py:167": {
+      "verdict": "ok",
+      "text": "verify read; seek bounded by validated header",
+      "date": "2026-08-18T13:17:03",
+      "sha256": "0e811b9ac4435935307fb10d4880ef47b009bb6d3947297b53e79714625bab23"
+    },
+    "tools/naiz_font/gen_cjk_font.py:168": {
+      "verdict": "ok",
+      "text": "verify read; seek bounded by validated header",
+      "date": "2026-08-18T13:17:03",
+      "sha256": "0e811b9ac4435935307fb10d4880ef47b009bb6d3947297b53e79714625bab23"
+    },
+    "tools/naiz_img/__init__.py:47": {
+      "verdict": "ok",
+      "text": "lazy submodule import inside format branch",
+      "date": "2026-08-18T13:17:03",
+      "sha256": "6493228fab7855853df3ed2c6f6923f3e52dfb7d20982cd2ebe6e4fa29a59410"
+    },
+    "tools/naiz_img/fat_entries.py:77": {
+      "verdict": "ok",
+      "text": "lazy stdlib datetime when timestamp omitted",
+      "date": "2026-08-18T13:17:03",
+      "sha256": "21165eb25a40300eb398e37093d89cb676538a975be3dc7fcf3fe8763444402c"
+    },
+    "tools/naiz_lib/image_dat.py:35": {
+      "verdict": "ok",
+      "text": "lazy mag_codec import avoids import cycle",
+      "date": "2026-08-18T13:17:03",
+      "sha256": "68b9474be95c280f9d57c18782171b3484cdf31ccbbccb9cb2c73d581829cea0"
+    },
+    "tools/naiz_lib/mag_codec.py:161": {
+      "verdict": "ok",
+      "text": "lazy stdlib Counter import",
+      "date": "2026-08-18T13:17:03",
+      "sha256": "d8d5b422c9bdbd73fceee5cc0fbf1b57b9b173244a93fe0014fe3bb5a0f8c22f"
+    },
+    "tools/naiz_screendig/__init__.py:15": {
+      "verdict": "ok",
+      "text": "documented lazy import (PIL/numpy optional)",
+      "date": "2026-08-18T13:17:03",
+      "sha256": "79161cda41137f9e2f7af10dcf8c1aa0b10d05b9a26d95a1516013a519b7c942"
+    },
+    "tools/naiz_screendig/__main__.py:177": {
+      "verdict": "ok",
+      "text": "lazy analyzer import only when --analyze",
+      "date": "2026-08-18T13:17:03",
+      "sha256": "d22b35b70efb7207170c7e6cdbb7d36a5380e229665467fa6749007c7aaffcb9"
+    },
+    "tools/naiz_screendig/screendig.py:115": {
+      "verdict": "ok",
+      "text": "lazy stdlib json/Path inside method",
+      "date": "2026-08-18T13:17:03",
+      "sha256": "fbb765afda054b0fc330b61ddbcb5375f0df8e41490e146ca2e381dd530c6074"
+    }
+  }
+}

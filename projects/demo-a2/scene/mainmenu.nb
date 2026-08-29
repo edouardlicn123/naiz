@@ -1,0 +1,4 @@
+sceneconf(){, menu}
+bg(mainmenu,normal)
+# 删除参数即可隐藏对应按钮，exit 必须是最后一个参数
+mainmenu(400,200,2,0,continue,load,start,scenes,music,gallery,special,settings,exit)

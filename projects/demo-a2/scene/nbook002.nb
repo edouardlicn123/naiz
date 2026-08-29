@@ -1,0 +1,9 @@
+sceneconf(){Have question?, normal}
+bg(splbg,normal)
+char(fei,l,normal,body)
+char(ira,r,normal,body)
+fei(){Ira.do you want to go to seaside with me?}
+ira(){Hmm...}
+question(Go?;Yes,bond_ira,+,1;No,bond_neon,+,1)
+fei(){OIC.}
+scene(bond_ira,>=,1,003;bond_neon,>=,1,004)

@@ -1,0 +1,20 @@
+sceneconf(){A normal day, normal}
+bg(splbg,normal)
+host(){Welcome to the Naiz engine demo.This is a visual novel engine for PC-98 systems.}
+bg(hidedialog)
+char(fei,l,normal,body)
+char(ira,r,normal,body)
+ira(){Good Morning,Fei.}
+char(fei,l,smile,face)
+fei(){Now I feel happy that I have finished my homework.}
+ira(){Really?You Forgot the exam on next week,you have to have great effort to solve it.It is a very important test as we know.And more,you have lots of house work,including washing dishes,cleaning floor,cut the weeds.And more...}
+char(fei,l,sad,face)
+fei(){Oh,NO!}
+fei(){No way,I am planing to the beach.}
+char(ira,r,sad,face)
+fei(){You again.}
+char(neon,c,normal,face)
+neon(){That is great!Sun shine and beach,what a great time.}
+char(hideall)
+host(){A day passed,and what will happen on next day?}
+scene(002)

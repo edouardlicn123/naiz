@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>动画机制 — Naiz Guildbook</title>
+<link rel="stylesheet" href="../style.css">
+</head>
+<body>
+<nav class="sidebar" id="sidebar-nav"></nav>
+<script src="../sidebar-reference.js"></script>
+<main class="main">
+
+<h1>动画机制</h1>
+<blockquote><strong>创建</strong>：2026-08-29<br><strong>最后更新</strong>：2026-08-29</blockquote>
+<p>本文从<strong>制作者</strong>视角说明 Naiz 引擎的序列帧动画系统（NAIZ_ANIM）：动画如何制作、打包为 <code>.ANI</code> 容器，以及如何在剧本中播放，并与对话框并发显示而不产生残影。</p>
+<hr>
+
+<h2>1. 动画系统总览</h2>
+<p>NAIZ_ANIM 是引擎的序列帧动画统一入口，采用自研 <code>.ANI</code> 容器（v1），包含<strong>两条轨道</strong>：</p>
+<ul>
+<li><strong>像素轨</strong>：逐帧整屏（或固定子区域）替换，vblank 同步绘制，复用 MAG 帧编解码。</li>
+<li><strong>调色板轨</strong>：每帧 <code>palette_set_all</code> 整体换色（容器内嵌原始调色板表，旁路共享调色板不变量）。</li>
+</ul>
+<p>两条轨相互独立，可仅用其一。动画与转场系统、调色板原语共用 <code>palette.c/h</code> 纯数据函数。</p>
+
+<h2>2. .ANI 容器与逐帧 tick 表</h2>
+<p>v1 容器以<strong>逐帧 tick 表</strong>取代固定 fps：每帧携带自身时长（tick 数），播放节奏由 tick 表唯一事实源决定。</p>
+<table>
+<tr><th>尺寸策略（路线 S 定死）</th><th>区域</th></tr>
+<tr><td>fullscreen</td><td>640×400 @(0,0)</td></tr>
+<tr><td>cine</td><td>640×280 @(0,0)（固定占据对话框上方整条）</td></tr>
+</table>
+<p>坐标机制整体不存在——动画尺寸由容器头声明，播放命令<strong>不</strong>再指定类型/坐标（类型自省）。<code>sec</code> 修饰可覆盖总时长窗口：引擎按 <code>ceil(sec×60)</code> 换算 tick 预算，once 到期即停、loop 到期重置继续。</p>
+
+<h2>3. 制作工作流</h2>
+<p>动画由专属 <code>.na</code> 脚本描述（与剧本 <code>.nb</code> 严格分离），经 <code>anima.sh</code> 工具链产出独立 <code>.ANI</code>：</p>
+<pre><code>anima.sh init &lt;项目&gt;          # 创建 animation/projects/&lt;项目&gt;/{config.toml,scripts/,db/}
+anima.sh register &lt;项目&gt;      # 裸名字 → 名字索引库 db/&lt;项目&gt;.db（仅存索引）
+anima.sh check &lt;项目&gt;         # 只读对账未登记/失效/待更新（有差异 exit 1）
+anima.sh build &lt;项目&gt;/&lt;脚本&gt;  # 解析 .na → 产出 .ANI（--sync 先同步登记库）</code></pre>
+<ul>
+<li>脚本放 <code>scripts/&lt;名&gt;.na</code>，花括号内写<strong>裸名字</strong>（无路径无扩展名），由名字索引库映射到具体帧文件。</li>
+<li>帧素材放 <code>assets/&lt;项目名&gt;/anim/</code>，成品 <code>.ANI</code> 全局输出到 <code>animation/output/</code>。</li>
+<li>脚本语法支持 animaconf / frame / base / pal 裸括号区段与 V1–V8 校验；多图 <code>{f1,f2}</code> 显式交错序列共用秒数。</li>
+</ul>
+
+<h2>4. 播放命令</h2>
+<p>播放侧处理函数位于 <code>core/engine/nb_anim.c</code>，注册于 NB 命令表：</p>
+<pre><code>playanima(){name}                 # 缺省 once：播完自动停止
+playanima(once){name}            # 显式一次（等价缺省）
+playanima(loop){name}            # 循环播放（即发即忘的环境特效）
+playanima(once,sec){name}        # 限定总时长 sec 秒（once 到期即停）
+playanima(loop,sec){name}        # 循环 + 每轮预算 sec 秒（到期重置继续）
+waitanima()                      # 阻塞至当前动画播完；无活动动画直接通过
+stopanima()                      # 停止并释放当前动画；无活动动画直接通过</code></pre>
+<ul>
+<li>动画名走花括号载荷，仿台词主载荷形态；命令不声明 fullscreen/cine/track/fps（容器头是唯一事实源）。</li>
+<li>拒启规则（消灭静默失败）：未知关键字、缺名、多余参数、<code>sec≤0</code> 一律拒启 + 日志，脚本继续。</li>
+<li><code>waitanima</code> 作用于 loop 动画时告警（循环永不播完，属作者错误）；<code>waitanima</code>/<code>stopanima</code> 收到参数时告警并忽略之、功能照常。</li>
+</ul>
+
+<h2>5. 对话框并发与 clip_h 裁剪</h2>
+<p>当动画落入对话框区域（y≥280）时，必须避免精灵 blit 写入对话框 VRAM 或留下残影：</p>
+<ul>
+<li><code>vram_blit_sprite()</code> 的 <code>clip_h</code> 参数（&gt;0 时限定绘制行数）是架构级约束手段，强制只绘制对话框上方区域。</li>
+<li>若需写入对话框区域做全身替换，须用 <code>layer_sprite_replace()</code> 并主动调 <code>layer_dialog_refresh()</code>。</li>
+<li><code>layer_sprite_face()</code> 不得写入 y≥280 区域。</li>
+</ul>
+<p>这与 <a href="mc03-图层渲染与换装机制.html">mc03 图层渲染与换装机制</a> 的对话框快照/恢复策略一致。</p>
+
+<h2>6. 与机制 / 脚本的关系</h2>
+<ul>
+<li>动画帧的像素/调色板最终经 <a href="mc04-MAG图片机制.html">mc04 MAG 图片机制</a> 同款 MAG 编解码与调色板通路。</li>
+<li>动画播放是独立于背景/立绘的一趟绘制，叠加在 <a href="mc03-图层渲染与换装机制.html">mc03</a> 描述的渲染顺序之上。</li>
+<li>制作命令与播放命令权威规范见 <code>docs/B92-NB脚本命令参考.md</code> 的 <code>playanima</code> / <code>waitanima</code> / <code>stopanima</code> 条目与 <code>anima.sh</code> 工作流。</li>
+<li>动画<strong>制作侧</strong>（<code>.na</code> 脚本语法、<code>anima.sh</code> 工作流、名字索引库）详见 <a href="../animation.html">动画设计分类页</a>。</li>
+</ul>
+
+</main>
+</body>
+</html>

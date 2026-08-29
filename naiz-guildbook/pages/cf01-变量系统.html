@@ -1,0 +1,145 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>变量系统 — Naiz Guildbook</title>
+<link rel="stylesheet" href="../style.css">
+</head>
+<body>
+<nav class="sidebar" id="sidebar-nav"></nav>
+<script src="../sidebar-reference.js"></script>
+<main class="main">
+<h1>变量系统</h1>
+<hr>
+<blockquote><strong>创建</strong>：2026-06-27<br><strong>最后更新</strong>：2026-07-28</blockquote>
+
+<p>Naiz 项目通过 4 个 JSON 文件集中管理配置。这些文件位于 <code>projects/&lt;game&gt;/</code> 目录下，构建时自动编译到引擎中。</p>
+<p><strong>修改后需同步更新本文档</strong>，确保文档与实际定义一致。</p>
+
+<hr>
+
+<h2>1. variables.json — 变量定义</h2>
+<p>定义游戏运行时变量（好感度、剧情 flag、计数等）。</p>
+<pre><code>{
+  "variables": [
+    {
+      "id":       "bond_fei",
+      "name":     "Fei好感度",
+      "desc":     "Fei对玩家的好感度",
+      "initial":  0,
+      "min":      0,
+      "max":      100
+    }
+  ]
+}</code></pre>
+
+<table>
+<thead>
+<tr><th>字段</th><th>类型</th><th>说明</th></tr>
+</thead>
+<tbody>
+<tr><td><code>id</code></td><td>string</td><td>变量标识符（小写+下划线），供脚本命令和内部查找使用</td></tr>
+<tr><td><code>name</code></td><td>string</td><td>显示名称（存档界面、调试输出）</td></tr>
+<tr><td><code>desc</code></td><td>string</td><td>说明文字</td></tr>
+<tr><td><code>initial</code></td><td>int</td><td>初始值，引擎冷启动/开始新游戏时重置为此值</td></tr>
+<tr><td><code>min</code></td><td>int</td><td>最小值（默认 0），超限时自动截断</td></tr>
+<tr><td><code>max</code></td><td>int</td><td>最大值（默认 9999），超限时自动截断</td></tr>
+</tbody>
+</table>
+
+<p>构建管线：<code>variables.json</code> → <code>export_vars.py</code> → <code>nb_var_table.h</code>（<code>NbVarDef</code> 结构体数组 + <code>NB_VAR_COUNT</code>）。</p>
+
+<p>当前项目 demo-a2 定义了 3 条变量：</p>
+<table>
+<thead>
+<tr><th>id</th><th>name</th><th>范围</th><th>初始</th></tr>
+</thead>
+<tbody>
+<tr><td><code>bond_fei</code></td><td>Fei好感度</td><td>0–100</td><td>0</td></tr>
+<tr><td><code>bond_ira</code></td><td>Ira好感度</td><td>0–100</td><td>0</td></tr>
+<tr><td><code>bond_neon</code></td><td>Neon好感度</td><td>0–100</td><td>0</td></tr>
+</tbody>
+</table>
+
+<h2>2. characters.json — 角色定义</h2>
+<p>定义游戏中可用角色，供 <code>char</code> 命令和 <code>expressions.json</code> 关联使用。</p>
+<pre><code>{
+  "characters": [
+    {"id": 9,  "key": "fei",  "name": "Fei"},
+    {"id": 10, "key": "ira",  "name": "Ira"},
+    {"id": 11, "key": "neon", "name": "Neon"}
+  ]
+}</code></pre>
+
+<table>
+<thead>
+<tr><th>字段</th><th>类型</th><th>说明</th></tr>
+</thead>
+<tbody>
+<tr><td><code>id</code></td><td>int</td><td>角色数字 ID。与 <code>expressions.json</code> 的 <code>char_id</code> 对应，<code>char_map[]</code> 中 <code>id</code> 字段也使用此值</td></tr>
+<tr><td><code>key</code></td><td>string</td><td>角色键名。供脚本 <code>char(ira, ...)</code>、<code>fei{...}</code> 等命令使用。全局唯一</td></tr>
+<tr><td><code>name</code></td><td>string</td><td>显示名称。对话框角色名标签使用此值</td></tr>
+</tbody>
+</table>
+
+<p>构建管线：<code>characters.json</code> → <code>export_asset_table.py</code> → <code>nb_asset_table.h</code>（<code>char_map[]</code>：key→id→name 查找表）。</p>
+
+<h2>3. expressions.json — 表情映射</h2>
+<p>定义每个角色的表情与精灵资源的对应关系，供 <code>char(name, pos, expr)</code> 命令查找。</p>
+<pre><code>{"expressions": [
+    {"char_id": 9,  "expr": "normal",    "asset_id": 1},
+    {"char_id": 9,  "expr": "sad",       "asset_id": 8},
+    {"char_id": 9,  "expr": "smile",     "asset_id": 9},
+    {"char_id": 9,  "expr": "surprised", "asset_id": 10},
+    {"char_id": 10, "expr": "normal",    "asset_id": 2},
+    ...
+]}</code></pre>
+
+<table>
+<thead>
+<tr><th>字段</th><th>类型</th><th>说明</th></tr>
+</thead>
+<tbody>
+<tr><td><code>char_id</code></td><td>int</td><td>角色 ID（对应 <code>characters.json</code> 的 <code>id</code>）</td></tr>
+<tr><td><code>expr</code></td><td>string</td><td>表情名称（如 <code>normal</code>、<code>sad</code>、<code>smile</code>）。供 <code>char(name, pos, expr)</code> 命令使用</td></tr>
+<tr><td><code>asset_id</code></td><td>int</td><td>精灵资源 ID（对应 ASSETS.DB 中 <code>type='SPR'</code> 的 id）</td></tr>
+</tbody>
+</table>
+
+<p>构建管线：<code>expressions.json</code> → <code>export_asset_table.py</code> → <code>nb_asset_table.h</code>（<code>expr_map[]</code>：(char_id, expr)→asset_id 查找表）。</p>
+
+<h2>4. config.toml — 项目配置</h2>
+<p>项目级全局配置，涵盖语言、标题、版本和过渡效果。构建时自动注入到 <code>settings.txt</code> 中。采用 TOML 格式，支持 <code>#</code> 注释；<code>version</code> 行由工具自动维护。完整说明见 <a href="cf02-项目配置文件.html">cf02 项目配置文件</a>。</p>
+
+<p>构建管线：<code>config.toml</code> → <code>export_config.py</code> → <code>nb_config.h</code>（过渡相关宏）；版本号 → <code>build_game.py</code> → 注入到 <code>settings.txt</code>。</p>
+
+<h2>5. 构建管线总览</h2>
+<table>
+<thead>
+<tr><th>配置文件</th><th>导出脚本</th><th>生成的头文件</th><th>用途</th></tr>
+</thead>
+<tbody>
+<tr><td><code>variables.json</code></td><td><code>export_vars.py</code></td><td><code>nb_var_table.h</code></td><td>变量定义表 + <code>var()</code> 命令</td></tr>
+<tr><td><code>characters.json</code></td><td><code>export_asset_table.py</code></td><td><code>nb_asset_table.h</code></td><td><code>char_map[]</code> 角色查找表</td></tr>
+<tr><td><code>expressions.json</code></td><td><code>export_asset_table.py</code></td><td><code>nb_asset_table.h</code></td><td><code>expr_map[]</code> 表情查找表</td></tr>
+<tr><td><code>config.toml</code></td><td><code>export_config.py</code></td><td><code>nb_config.h</code></td><td>过渡 + 版本 + 项目配置</td></tr>
+</tbody>
+</table>
+
+<h2>6. 脚本命令指引</h2>
+<p>相关 NB 脚本命令：</p>
+<ul>
+<li><a href="sc09-var.html">sc09 — var 变量操作</a>：独立读写变量</li>
+<li><a href="sc08-question.html">sc08 — question 选择分支</a>：选项与变量联动</li>
+<li><a href="sc04-scene.html">sc04 — scene 场景跳转</a>：条件链跳转</li>
+<li><a href="sc03-char.html">sc03 — char 立绘操作</a>：角色显示与表情切换</li>
+<li><a href="cf05-过渡效果.html">cf05 — 过渡效果</a>：场景过渡配置</li>
+</ul>
+
+<hr>
+<p class="muted-note"><strong>更新提醒</strong>：修改上述任一 JSON 文件后，请同步更新本文档对应章节。</p>
+
+</main>
+</body>
+</html>

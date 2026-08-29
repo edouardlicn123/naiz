@@ -1,0 +1,100 @@
+# =============================================================
+# Naiz 游戏工程配置 (TOML) — 支持 # 注释
+# Naiz project configuration (TOML) — supports # comments
+#
+# 值类型约定 / Value type conventions:
+#   - 字符串 Strings: 双引号包住，如 title = "Demo-A2"
+#   - 布尔 Booleans:   true / false，不带引号（加引号会被当成字符串、误判为"开"）
+#                       No quotes (quoted "false" is a string and reads as ON)
+#   - 列表 Lists:      [ "a", "b" ]
+#
+# 唯一例外 / Only exception: 下面的 version 行由 bump_version 工具自动维护，
+# 请勿手动修改，其余行均可随意编辑、增删注释。
+# The version line below is auto-maintained by the bump_version tool;
+# do not edit it by hand. All other lines are free to edit and comment.
+# =============================================================
+
+# ---- 国际化 / Internationalization (i18n) ----
+# 语言相关配置，供 i18n_gen 生成翻译文件使用。
+# Language settings consumed by i18n_gen to generate translation files.
+[i18n]
+# 源语言（文案基准），必填。i18n_gen 以此为基准生成翻译。
+# Source language (text baseline), required. i18n_gen translates from it.
+source_lang = "eng"
+
+# 需要生成翻译的目标语言列表（i18n_gen 用）。不能包含 source_lang 本身。
+# Target languages to generate translations for. Must not include source_lang.
+targets = ["chi", "jpn"]
+
+# ---- 项目信息 / Project info ----
+# 游戏基本信息；version 由工具自动维护，勿手改。
+# Basic game info; version is auto-maintained, do not edit.
+[project]
+# 游戏标题（主菜单 / 启动画面显示）
+# Game title (shown in main menu / splash screen)
+title = "Demo-A2"
+
+# 游戏描述（简短说明，仅用于项目内辨识）
+# Game description (short note for identification within the project)
+description = "Naiz Engine 技术演示"
+
+# 版本号 X.Y.ZZZ —— 由 bump_version 自动维护，请勿手动修改
+# Version X.Y.ZZZ — auto-maintained by bump_version, do not edit by hand
+version = "0.2.072"
+
+# ---- 场景转场 / Scene transition ----
+# 场景切换时的全屏视觉过渡，构建时编译进引擎（无需 settings.txt）。
+# Full-screen visual transition on scene switch, compiled into the engine at
+# build time (no settings.txt needed).
+[transition]
+# 转场类型：cut | vblinds | hblinds | dblinds | rdblinds | pfade | checker
+# Transition type: cut | vblinds | hblinds | dblinds | rdblinds | pfade | checker
+#   百叶窗系列为 VRAM 黑幕扫过，原画面保留到边界扫到该条带为止：
+#   VRAM black-front sweep; the scene survives until the front covers it:
+#   vblinds/hblinds = 20 条竖/横细条，从细条渐变为全黑（竖自左向右、横自顶向下）
+#                     20 vertical/horizontal thin strips grow to black
+#   dblinds/rdblinds = 正/反斜 20 条细条沿对角方向扫过刷黑
+#                      forward/reverse diagonal 20-strip sweep to black
+#   checker = 棋盘交错抹黑：16×10（40px 方格）小格，奇偶秩格分前后两波沿对角扫黑，
+#             波前全程保持棋盘纹理，末帧全黑
+#              staggered checker wipe over a 16x10 grid of 40px cells;
+#              even/odd rank cells sweep in two waves, full black at the end
+#   pfade   = 全屏统一淡出至黑（保留背景像素）
+#             full-screen uniform dim to black (keeps pixels intact)
+#   cut     = 瞬时直切黑屏
+#             instant cut to black
+type = "checker"
+
+# 转场帧数（1-64），数值越大转场越慢
+# Transition frame count (1-64); larger = slower transition
+# 细条越多步进越细，建议帧数 ≥ 条带数（20 条带 → 32 帧）
+# More strips = finer steps; recommend frames >= strip count (20 -> 32)
+frames = 16
+
+# ---- 黑花体 / Blackletter ----
+# 黑花体字型仅含拉丁字符；仅当运行时语言为 eng 等非 CJK 时生效，
+# chi/jpn/kor 下自动回退原字体，不会串字。
+# Blackletter covers Latin characters only; it takes effect only when the
+# runtime language is non-CJK (e.g. eng). Under chi/jpn/kor it falls back to
+# the default font with no broken glyphs.
+# 布尔值必须为 true/false 不带引号。
+# Values must be booleans true/false without quotes.
+[blackletter]
+# 加载页标题 LODE / SAVE 是否使用黑花体 MAG（loadtitle / savetitle）。
+# Whether the LOAD / SAVE page title uses the blackletter MAG.
+#   true  = 开（用黑花体 MAG 替代默认大字标题）
+#   true  = on (use blackletter MAG instead of the default large title)
+#   false = 关（默认，用 draw_title_large 渲染标题）
+#   false = off (default, rendered with draw_title_large)
+title = false
+
+# 正文（对话 / 问题选项 / 存档菜单等）ASCII 文字是否使用黑花体 16×16（BLACK.DAT）。
+# Whether body ASCII text (dialogue / question options / save menu etc.) uses
+# the 16×16 blackletter glyphs (BLACK.DAT).
+# 仅影响 ASCII 拉丁字符；CJK 走 CJK.DAT 不受影响。
+# Affects ASCII Latin characters only; CJK uses CJK.DAT and is unaffected.
+#   true  = 开
+#   true  = on
+#   false = 关（默认）
+#   false = off (default)
+dialog = false

@@ -1,0 +1,170 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>项目配置文件 — Naiz Guildbook</title>
+<link rel="stylesheet" href="../style.css">
+</head>
+<body>
+<nav class="sidebar" id="sidebar-nav"></nav>
+<script src="../sidebar-reference.js"></script>
+<main class="main">
+
+<h1>项目配置文件（config.toml）</h1>
+<hr>
+<blockquote><strong>创建</strong>：2026-08-04</blockquote>
+
+<p>每个项目根目录有 <code>config.toml</code>，集中管理项目级全局配置（语言、标题、版本、过渡、黑花字开关）。构建时由多段工具读取并分配到 <code>settings.txt</code>、引擎头文件等。</p>
+
+<h2>1. 值类型约定</h2>
+<table>
+<tr><th>类型</th><th>写法</th><th>示例</th></tr>
+<tr>
+  <td>字符串</td>
+  <td>双引号包住</td>
+  <td><code>title = "Demo-A2"</code></td>
+</tr>
+<tr>
+  <td>布尔</td>
+  <td><code>true</code> / <code>false</code>，<strong>不带引号</strong></td>
+  <td><code>title = false</code></td>
+</tr>
+<tr>
+  <td>整数</td>
+  <td>十进制整数</td>
+  <td><code>frames = 2</code></td>
+</tr>
+<tr>
+  <td>字符串列表</td>
+  <td>中括号，逗号分隔</td>
+  <td><code>targets = ["chi", "jpn"]</code></td>
+</tr>
+<tr>
+  <td>嵌套段</td>
+  <td>用 <code>[段名]</code></td>
+  <td><code>[blackletter]</code></td>
+</tr>
+</table>
+<div class="note-box">
+<strong>提醒</strong>：布尔值不要加引号。<code>"false"</code> 是字符串而非布尔，构建工具会把它当成"存在 → 开"，导致原本想关的功能被打开。
+</div>
+
+<h2>2. 完整配置与注释</h2>
+<pre><code># =============================================================
+# Naiz 游戏工程配置 (TOML) — 支持 # 注释
+# 唯一例外: 下面的 version 行由 bump_version 工具自动维护，
+# 请勿手动修改，其余行均可随意编辑、增删注释。
+# =============================================================
+
+# ---- 国际化（i18n）----
+[i18n]
+# 源语言（文案基准），必填。i18n_gen 以此为基准生成翻译。
+source_lang = "eng"
+# 需要生成翻译的目标语言列表（i18n_gen 用）。不能包含 source_lang 本身。
+targets = ["chi", "jpn"]
+
+# ---- 项目信息 ----
+[project]
+# 游戏标题（主菜单 / 启动画面显示）
+title = "Demo-A2"
+# 游戏描述（简短说明，仅用于项目内辨识）
+description = "Naiz Engine 技术演示"
+# 版本号 X.Y.ZZZ —— 由 bump_version 自动维护，请勿手动修改
+version = "0.1.053"
+
+# ---- 场景转场 ----
+[transition]
+# 场景切换转场类型：cut | fade | vblinds | hblinds | dblinds | rdblinds
+type = "vblinds"
+# 转场帧数（1-64），数值越大转场越慢
+frames = 2
+
+# ---- 黑花体（Blackletter）----
+[blackletter]
+# 读/存档页标题 LOAD / SAVE 是否用黑花体 MAG
+title = false
+# 正文 ASCII 是否用黑花体 16×16（BLACK.DAT）
+dialog = false</code></pre>
+<p>黑花体相关字段说明见 <a href="cf06-黑花字.html">cf06 黑花字</a>。</p>
+
+<h2>3. 键速查表</h2>
+<table>
+<tr><th>段</th><th>字段</th><th>类型</th><th>默认</th><th>说明</th></tr>
+<tr>
+  <td><code>i18n</code></td><td><code>source_lang</code></td><td>string</td><td>—</td>
+  <td>源语言（文案基准），必填。供 <code>i18n_gen</code> 使用。</td>
+</tr>
+<tr>
+  <td><code>i18n</code></td><td><code>targets</code></td><td>string[]</td><td>—</td>
+  <td>需生成翻译的目标语言列表，不能包含 <code>source_lang</code>。</td>
+</tr>
+<tr>
+  <td><code>project</code></td><td><code>title</code></td><td>string</td><td>—</td>
+  <td>游戏标题。</td>
+</tr>
+<tr>
+  <td><code>project</code></td><td><code>description</code></td><td>string</td><td>—</td>
+  <td>游戏描述。</td>
+</tr>
+<tr>
+  <td><code>project</code></td><td><code>version</code></td><td>string</td><td>—</td>
+  <td>版本号 <code>X.Y.ZZZ</code>，由 <code>bump_version</code> 自动维护，勿手改。</td>
+</tr>
+<tr>
+  <td><code>transition</code></td><td><code>type</code></td><td>string</td><td><code>vblinds</code></td>
+  <td>场景转场类型。— <a href="cf05-过渡效果.html">cf05 详情</a></td>
+</tr>
+<tr>
+  <td><code>transition</code></td><td><code>frames</code></td><td>int</td><td><code>16</code></td>
+  <td>转场帧数（1–64）。— <a href="cf05-过渡效果.html">cf05 详情</a></td>
+</tr>
+<tr>
+  <td><code>blackletter</code></td><td><code>title</code> / <code>dialog</code></td><td>table</td><td>—</td>
+  <td>黑花字开关（仅非 CJK 语言生效）。— <a href="cf06-黑花字.html">cf06 详情</a></td>
+</tr>
+</table>
+
+<h2>4. 工具链消费矩阵</h2>
+<table>
+<tr><th>段</th><th>字段</th><th>读取工具</th><th>去向 / 用途</th></tr>
+<tr>
+  <td><code>i18n</code></td><td><code>source_lang</code>、<code>targets</code></td>
+  <td><code>tools/naiz_conv/i18n_gen.py</code></td>
+  <td>生成 / 合并翻译文件。</td>
+</tr>
+<tr>
+  <td><code>project</code> / <code>blackletter</code></td><td><code>title</code>、<code>version</code>、<code>title</code> / <code>dialog</code></td>
+  <td><code>tools/naiz_build/build_game.py</code></td>
+  <td>注入到 <code>settings.txt</code>（<code>version=</code> / <code>blacktitle=</code> / <code>blackdialog=</code>）。</td>
+</tr>
+<tr>
+  <td><code>transition</code></td><td><code>type</code>、<code>frames</code></td>
+  <td><code>tools/naiz_build/export_config.py</code></td>
+  <td>生成引擎头文件 <code>nb_config.h</code>（宏 <code>NAIZ_TRANSITION_*</code>），编译期内嵌。</td>
+</tr>
+<tr>
+  <td><code>project</code></td><td><code>version</code></td>
+  <td><code>tools/naiz_build/bump_version.py</code></td>
+  <td>版本自增（下方 §5）。</td>
+</tr>
+</table>
+
+<h2>5. 版本自增</h2>
+<p>每次修改源码后运行：</p>
+<pre><code>python -m tools.naiz_build.bump_version &lt;game&gt;</code></pre>
+<ul>
+  <li>将 <code>version</code> 最右段 +1（如 <code>0.1.052 → 0.1.053</code>）。</li>
+  <li>采用<strong>按行替换</strong>写回，只改 <code>version = "…"</code> 这一行，其余 <code>#</code> 注释与排版<strong>全部保留</strong>（TOML 读取库 <code>tomllib</code> 只读，故不再整文件序列化回写）。</li>
+  <li><code>version</code> 行必须存在且恰为一行，否则工具报错。</li>
+</ul>
+
+<h2>6. 运行链路</h2>
+<ul>
+  <li><strong>设置类</strong>（version / 黑花字等）：<code>config.toml</code> → <code>build_game.py</code> 注入 <code>settings.txt</code> → 引擎 <code>settings_load()</code> 解析到 <code>GameSettings</code>（settings.c/settings.h）。</li>
+  <li><strong>编译期类</strong>（转场）：<code>config.toml</code> → <code>export_config.py</code> → <code>nb_config.h</code> 宏 → 引擎编译期内嵌。</li>
+</ul>
+
+</main>
+</body>
+</html>

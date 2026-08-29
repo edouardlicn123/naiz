@@ -1,0 +1,3 @@
+# Shared background assets (processed before per-game assets)
+png/bg/yellow_grid.png  images/yellow_grid.MAG  --256color
+png/bg/pink_grid.png    images/pink_grid.MAG    --256color

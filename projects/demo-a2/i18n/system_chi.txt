@@ -1,0 +1,9 @@
+continue=
+exit=
+gallery=
+load=
+music=
+scenes=
+settings=
+special=
+start=

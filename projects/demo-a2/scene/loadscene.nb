@@ -1,0 +1,3 @@
+sceneconf(){, menu}
+bg(yellow_grid)
+loadscene()
