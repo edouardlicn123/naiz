@@ -175,7 +175,7 @@ static int dump_composite_layer(const char *filename)
 
 /*==== Public API =========================================================*/
 
-int layer_dump(int z_order, const char *filename)
+static int layer_dump(int z_order, const char *filename)
 {
     char msg[80];
     switch (z_order) {
@@ -192,12 +192,12 @@ int layer_dump(int z_order, const char *filename)
     }
 }
 
-int layer_dump_composite(const char *filename)
+static int layer_dump_composite(const char *filename)
 {
     return dump_composite_layer(filename);
 }
 
-int layer_dump_all(const char *prefix)
+static int layer_dump_all(const char *prefix)
 {
     char fname[64];
     int count = 0;

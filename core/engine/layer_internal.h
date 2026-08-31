@@ -38,9 +38,6 @@ void layer_capture_bg_dialog_from_image(const uint8_t *pixels, int img_w,
 
 /*=== Sprite (implemented in layer_sprite.c) ================================*/
 
-/* Return 1 if at least one sprite is active in the table. */
-int layer_has_any_sprite(void);
-
 /*=== Dialog (implemented in layer_dialog.c) ================================*/
 
 /* Redraw dialog content (text, name, etc.) without re-snapshotting.

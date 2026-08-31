@@ -56,6 +56,9 @@ static SpriteEntry *alloc_sprite(int id)
     return NULL;
 }
 
+/* Forward declaration (mutual recursion between show and replace). */
+static void layer_sprite_replace(int sprite_id, int asset_id, int x, int y, int mirror);
+
 /* Calculate sprite clip height: limit output to rows above the dialog area.
  * Returns positive rows to clip (LAYER_DIALOG_Y - y) when sprite partially
  * extends into dialog area, 0 when fully above (no clip needed) or when
@@ -68,7 +71,7 @@ static int calc_sprite_clip_h(int y, int img_h)
 }
 
 /* Return 1 if at least one sprite is active in the table. */
-int layer_has_any_sprite(void)
+static int layer_has_any_sprite(void)
 {
     int i;
     for (i = 0; i < LAYER_MAX_SPRITES; i++) {
@@ -83,7 +86,7 @@ int layer_has_any_sprite(void)
  * If dialog is drawn and no other sprites exist, saves the dialog background first.
  * Always draws the sprite at full height (no clip_h).
  * Registers the sprite for subsequent face/replace/hide operations. */
-void layer_sprite_show(int sprite_id, int asset_id, int x, int y, int mirror)
+static void layer_sprite_show(int sprite_id, int asset_id, int x, int y, int mirror)
 {
     SpriteEntry *se;
     MagImage *img;
@@ -217,7 +220,7 @@ void layer_sprite_face(int sprite_id, int asset_id, int x, int y, int mirror)
  * Unlike layer_sprite_show(), this restores the background under the old sprite rect,
  * draws the new sprite, then refreshes the dialog on top.
  * Used when a new sprite may have different content in the dialog area. */
-void layer_sprite_replace(int sprite_id, int asset_id, int x, int y, int mirror)
+static void layer_sprite_replace(int sprite_id, int asset_id, int x, int y, int mirror)
 {
     SpriteEntry *se;
     MagImage *img;
@@ -274,7 +277,7 @@ void layer_sprite_replace(int sprite_id, int asset_id, int x, int y, int mirror)
  * Restores background under the sprite. If the sprite extended into the dialog area,
  * refreshes the dialog.  If this was the last sprite, restores full background
  * and recaptures the dialog background. */
-void layer_sprite_hide(int id)
+static void layer_sprite_hide(int id)
 {
     SpriteEntry *se;
 

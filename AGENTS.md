@@ -199,11 +199,11 @@ make -C core && python -m py_compile tools/...file.py ...
 - 版本格式 `X.Y.ZZZ`（如 `0.1.001`），ZZZ 为三位补零
 - **自增时机**：每次 AI 修改 `.c` / `.h` / `.py` / `.nb` 等源代码文件后，需主动调用
   ```bash
-  python -m tools.naiz_build.bump_version <game>
+  python -m tools.naiz_build.bump_version [game]
   ```
-  将 config.toml 中 version 的最右段 +1（按行替换写回，保留全部 `#` 注释）
+  一次调用即**作用于 `projects/` 下全部项目**：统一目标 = 所有项目当前版本的最大值 +1（`--minor` 则对最大值做 minor 归零），历史版本漂移在下次 bump 时自动自愈收敛到同一号（按行替换写回，保留全部 `#` 注释）。`[game]` 为可选兼容参数，仅校验该项目存在
 - **手动编辑禁止**：`config.toml` 的 `version` 行由工具自动维护，禁止手动修改
-- **所有项目版本同步**：`projects/` 下所有项目的版本号必须与引擎版本保持一致。修改任意项目源码后，`bump_version` 应对所有项目同步执行（`python -m tools.naiz_build.bump_version <game>` 逐个调用）
+- **所有项目版本同步**：`projects/` 下所有项目的版本号必须与引擎版本保持一致（`tools/tests/test_version_sync.py` 仓库不变量测试守护，fullaudit 的 pytest 步骤自动校验）；`bump_version` 一次调用即同步全部项目，无需逐个执行
 
 ### 编译带入
 

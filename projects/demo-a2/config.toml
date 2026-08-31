@@ -40,7 +40,7 @@ description = "Naiz Engine 技术演示"
 
 # 版本号 X.Y.ZZZ —— 由 bump_version 自动维护，请勿手动修改
 # Version X.Y.ZZZ — auto-maintained by bump_version, do not edit by hand
-version = "0.2.072"
+version = "0.2.075"
 
 # ---- 场景转场 / Scene transition ----
 # 场景切换时的全屏视觉过渡，构建时编译进引擎（无需 settings.txt）。

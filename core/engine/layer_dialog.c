@@ -129,7 +129,7 @@ static void dialog_snapshot_capture(void);
  * 1. Draws the dialog frame via scene_draw_dialog()
  * 2. Captures dialog pixels into dialog_snapshot for corruption detection
  * Sets dialog_drawn = 1. */
-void layer_dialog_open(void)
+static void layer_dialog_open(void)
 {
     hal_mouse_invalidate_cursor();
     scene_draw_dialog();
@@ -173,7 +173,7 @@ void layer_dialog_restore(void)
 /* Lazy dialog snapshot: when dialog_dirty, re-captures dialog pixels.
  * Sequence: restore bg under dialog -> redraw sprites -> redraw dialog -> snapshot.
  * Keeps the dialog snapshot synchronized after sprite changes. */
-void layer_dialog_snap(void)
+static void layer_dialog_snap(void)
 {
     if (!dialog_dirty) return;
     hal_mouse_invalidate_cursor();
@@ -249,13 +249,4 @@ void layer_dialog_show(void)
     else
         layer_dialog_snap();
     layer_dialog_restore();
-}
-
-/* Unified dialog hide: hide dialog + redraw sprites that may be overlapped. */
-void layer_dialog_hide_clean(void)
-{
-    if (!layer_dialog_drawn())
-        return;
-    layer_dialog_hide();
-    layer_redraw_sprites();
 }

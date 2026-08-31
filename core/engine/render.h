@@ -81,8 +81,5 @@ void fill_diag_sweep(int x, int y, int w, int h, uint8_t color,
 void vblank_wait(void);
 /* 绘制 2× 大标题（16×32 每字）带黑色外发光 */
 void draw_title_large(const char *s, int x, int y, int spacing, uint8_t color);
-/* 绘制 2× 文字带黑色外发光（spacing=1，public 版本） */
-void draw_text_outlined_2x(const char *s, int byte_start,
-                           int x, int y, uint8_t color);
 
 #endif

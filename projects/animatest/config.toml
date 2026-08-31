@@ -12,7 +12,7 @@ targets = []
 [project]
 title = "animatest"
 description = "Naiz 动画功能测试项目"
-version = "0.2.063"
+version = "0.2.075"
 
 [transition]
 type = "cut"

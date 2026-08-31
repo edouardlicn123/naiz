@@ -99,27 +99,17 @@ typedef struct {
 void scene_end(int skip_transition);
 /* 截取当前 VRAM 作为背景层 */
 void layer_capture_bg(void);
-/* 截取对话框区域的背景 */
-void layer_capture_bg_dialog(void);
 /* 从纯背景快照重建对话框背景（避免 VRAM 上对话框叠加层污染） */
 void layer_capture_bg_dialog_from_bg(void);
-/* 打开 VN 对话框 */
-void layer_dialog_open(void);
 /* 还原对话框区域的背景 */
 void layer_dialog_restore(void);
-/* 截取当前对话框像素用于后续还原 */
-void layer_dialog_snap(void);
 /* 隐藏对话框 */
 void layer_dialog_hide(void);
 /* 对话框是否已绘制 */
 int  layer_dialog_drawn(void);
 
-/* 显示精灵（全身），y 不受限制 */
-void layer_sprite_show(int sprite_id, int asset_id, int x, int y, int mirror);
 /* 换表情（仅上半身），限制 y < LAYER_DIALOG_Y */
 void layer_sprite_face(int sprite_id, int asset_id, int x, int y, int mirror);
-/* 替换精灵（全身 + 刷新对话框区域） */
-void layer_sprite_replace(int sprite_id, int asset_id, int x, int y, int mirror);
 /* 隐藏所有精灵 + 清理状态 */
 void layer_sprite_hide_all(void);
 /* 查询指定精灵是否存在 */
@@ -135,8 +125,6 @@ void layer_bg_change(MagImage *img);
 void layer_sprite_update(int sprite_id, int asset_id, int x, int y, int mirror);
 /* 统一对话框显示操作（内部自动选择 open/snap + restore） */
 void layer_dialog_show(void);
-/* 统一对话框隐藏操作（hide + redraw sprites） */
-void layer_dialog_hide_clean(void);
 
 /*==== Layer Z-order state query ===========================================*/
 
@@ -146,7 +134,5 @@ int  layer_is_active(int z_order);
 void layer_set_active(int z_order, int active);
 /* 获取某层的可写区域 */
 LayerBounds layer_get_bounds(int z_order);
-/* 检查在指定y坐标写入某层是否安全（不破坏更高层） */
-int  layer_can_blit_at(int z_order, int y);
 
 #endif

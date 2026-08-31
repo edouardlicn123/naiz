@@ -269,27 +269,3 @@ void draw_title_large(const char *s, int x, int y, int spacing, uint8_t color)
         draw_glyph_scaled(g, cx, y, color);
     }
 }
-
-/* Draw text at 2x scale (16x32 per char) with black outline glow.
- * Like draw_title_large but spacing=1 and public for settings_menu use. */
-void draw_text_outlined_2x(const char *s, int byte_start,
-                           int x, int y, uint8_t color)
-{
-    int i, cx;
-    const uint8_t *g;
-    (void)byte_start;
-    for (i = 0; s[i]; i++) {
-        g = font_get_glyph((uint8_t)s[i]);
-        if (!g) continue;
-        cx = x + i * (FONT_GLYPH_W * 2 + 1);
-        draw_glyph_scaled(g, cx - 2, y - 2, PAL_CURSOR_BLACK);
-        draw_glyph_scaled(g, cx    , y - 2, PAL_CURSOR_BLACK);
-        draw_glyph_scaled(g, cx + 2, y - 2, PAL_CURSOR_BLACK);
-        draw_glyph_scaled(g, cx - 2, y    , PAL_CURSOR_BLACK);
-        draw_glyph_scaled(g, cx + 2, y    , PAL_CURSOR_BLACK);
-        draw_glyph_scaled(g, cx - 2, y + 2, PAL_CURSOR_BLACK);
-        draw_glyph_scaled(g, cx    , y + 2, PAL_CURSOR_BLACK);
-        draw_glyph_scaled(g, cx + 2, y + 2, PAL_CURSOR_BLACK);
-        draw_glyph_scaled(g, cx, y, color);
-    }
-}

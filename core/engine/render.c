@@ -9,27 +9,17 @@
  * Optimization: hal_vram_bank_select() is a slow hardware port write (outw).
  * All inner loops track the current bank and only switch when needed.
  * VRAM window pointer is cached once per function via hal_vram_get_window().
+ *
+ * This module holds the rectangle/pattern filling primitives and the
+ * vblank synchronization helper.  Image blits live in render_blit.c and
+ * bulk VRAM reads/writes live in render_vram.c; clip_rect is shared via
+ * render_internal.h.
  */
 #include "render.h"
+#include "render_internal.h"
 
-/* Forward declarations for static bulk helpers */
+/* Forward declaration for the static bulk fill helper */
 static void vram_fill_row(volatile uint8_t *win, int off, uint8_t color, int n);
-static void vram_row_read(volatile uint8_t *win, int off, uint8_t *dst, int n);
-static void vram_row_write(const uint8_t *src, volatile uint8_t *win, int off, int n);
-
-/* Clip a rectangle to [0, max_w) x [0, max_h).
- * Mutates (x,y,w,h) in-place.  Returns 0 if fully clipped (nothing to draw). */
-static int clip_rect(int *x, int *y, int *w, int *h, int max_w, int max_h)
-{
-    if (*w <= 0 || *h <= 0) return 0;
-    if (*x < 0) { *w += *x; *x = 0; }
-    if (*y < 0) { *h += *y; *y = 0; }
-    if (*x >= max_w || *y >= max_h) return 0;
-    if (*x + *w > max_w) *w = max_w - *x;
-    if (*y + *h > max_h) *h = max_h - *y;
-    if (*w <= 0 || *h <= 0) return 0;
-    return 1;
-}
 
 /* Set a single pixel at a linear pixel address (y * LAYER_SCREEN_W + x).
  * Selects the correct bank and writes to the VRAM window.
@@ -41,7 +31,6 @@ void vram_pset_addr(int addr, uint8_t color)
     hal_vram_bank_select(addr >> 15);
     win[addr & (VRAM_BANK_SZ - 1)] = color;
 }
-
 
 /* Fill a rectangular region with a solid color.
  * Optimized: processes VRAM in bank-aligned segments with minimal
@@ -129,43 +118,6 @@ void draw_rect(int x, int y, int w, int h, int t, uint8_t color)
     }
 }
 
-/* Blit an entire MagImage to VRAM at (x,y).
- * No transparency — every pixel is written.  Delegates to vram_blit_sprite. */
-void vram_blit(const MagImage *img, int x, int y)
-{
-    vram_blit_sprite(img, x, y, PAL_NO_TRANSPARENCY, 0, 0);
-}
-
-/* Fast row copy into the banked VRAM window via rep movsb.
- *
- * The PEGC bank window is plain RAM (no read/write side effects), so a
- * non-volatile bulk copy is safe here.  This matters enormously under
- * interpreted emulation: one REP MOVSB keeps the emulator inside a single
- * instruction's internal loop, while per-byte volatile stores pay full
- * fetch/decode cost for every pixel (a fullscreen blit would take ~1s).
- */
-static void vram_row_copy(volatile uint8_t *win, int off, const uint8_t *src, int n)
-{
-    if (n <= 0)
-        return;
-    __asm {
-        push    es
-        push    ds
-        pop     es                  /* ES = DS: flat model, both cover linear space */
-        push    edi
-        push    esi
-        mov     edi, dword ptr [win]
-        add     edi, dword ptr [off]
-        mov     esi, dword ptr [src]
-        mov     ecx, dword ptr [n]
-        cld
-        rep     movsb
-        pop     esi
-        pop     edi
-        pop     es
-    }
-}
-
 /* Fast row fill in the banked VRAM window via rep stosb.
  * Fills 'n' bytes at win[off] with 'color'. */
 static void vram_fill_row(volatile uint8_t *win, int off, uint8_t color, int n)
@@ -183,128 +135,6 @@ static void vram_fill_row(volatile uint8_t *win, int off, uint8_t color, int n)
         rep     stosb
         pop     edi
         pop     es
-    }
-}
-
-/* Fast row read from VRAM window into a buffer via rep movsb. */
-static void vram_row_read(volatile uint8_t *win, int off, uint8_t *dst, int n)
-{
-    if (n <= 0)
-        return;
-    __asm {
-        push    es
-        push    edi
-        push    esi
-        push    ds
-        pop     es                  /* ES = DS for flat model */
-        mov     edi, dword ptr [dst]
-        mov     esi, dword ptr [win]
-        add     esi, dword ptr [off]
-        mov     ecx, dword ptr [n]
-        cld
-        rep     movsb
-        pop     esi
-        pop     edi
-        pop     es
-    }
-}
-
-/* Fast row write from buffer into VRAM window via rep movsb. */
-static void vram_row_write(const uint8_t *src, volatile uint8_t *win, int off, int n)
-{
-    if (n <= 0)
-        return;
-    __asm {
-        push    es
-        push    edi
-        push    esi
-        push    ds
-        pop     es                  /* ES = DS for flat model */
-        mov     edi, dword ptr [win]
-        add     edi, dword ptr [off]
-        mov     esi, dword ptr [src]
-        mov     ecx, dword ptr [n]
-        cld
-        rep     movsb
-        pop     esi
-        pop     edi
-        pop     es
-    }
-}
-
-/* Blit a sprite image to VRAM with transparency and optional mirror.
- * Optimized: processes each screen line in bank-aligned segments.
- * Within each segment, non-transparent pixels are written without per-pixel
- * bank checking.  Run detection scans the source (in regular RAM), then
- * writes contiguous pixel runs to VRAM in tight loops. */
-void vram_blit_sprite(const MagImage *img, int x, int y, uint8_t transparent_idx,
-                      int mirror, int clip_h)
-{
-    int py, addr, cur_bank, bank, off, seg, remain, line_addr;
-    int sx0 = 0, sy0 = 0;
-    int dw = img->width, dh = img->height;
-    int px, src_x, run_len, line_off, k;
-    const uint8_t *src_line;
-    volatile uint8_t *win = hal_vram_get_window();
-    if (dw <= 0 || dh <= 0) return;
-    if (clip_h > 0 && clip_h < dh) dh = clip_h;
-    if (x < 0) { sx0 = -x; dw += x; x = 0; }
-    if (y < 0) { sy0 = -y; dh += y; y = 0; }
-    if (dw <= 0 || dh <= 0) return;
-    if (x >= LAYER_SCREEN_W || y >= LAYER_SCREEN_H) return;
-    if (x + dw > LAYER_SCREEN_W) dw = LAYER_SCREEN_W - x;
-    if (y + dh > LAYER_SCREEN_H) dh = LAYER_SCREEN_H - y;
-    cur_bank = -1;
-    for (py = 0; py < dh; py++) {
-        int line_off = 0;
-        src_line = img->pixels + (sy0 + py) * img->width;
-        line_addr = (y + py) * LAYER_SCREEN_W + x;
-        remain = dw;
-        addr = line_addr;
-        while (remain > 0) {
-            bank = addr >> 15;
-            if (bank != cur_bank) {
-                cur_bank = bank;
-                hal_vram_bank_select(bank);
-            }
-            off = addr & (VRAM_BANK_SZ - 1);
-            seg = VRAM_BANK_SZ - off;
-            if (seg > remain) seg = remain;
-            if (!mirror && transparent_idx == PAL_NO_TRANSPARENCY) {
-                /* Opaque blit fast path: bulk-copy the whole bank segment.
-                 * Source offset is a straight line: sx0 + line_off. */
-                vram_row_copy(win, off,
-                              src_line + sx0 + line_off, seg);
-            } else {
-            /* Scan and write non-transparent runs within this bank segment */
-            px = 0;
-            while (px < seg) {
-                /* Skip transparent pixels */
-                while (px < seg) {
-                    src_x = mirror ? (img->width - 1 - (sx0 + line_off + px)) : (sx0 + line_off + px);
-                    if (src_line[src_x] != transparent_idx) break;
-                    px++;
-                }
-                if (px >= seg) break;
-                /* Find length of non-transparent run */
-                run_len = 0;
-                while (px + run_len < seg) {
-                    src_x = mirror ? (img->width - 1 - (sx0 + line_off + px + run_len)) : (sx0 + line_off + px + run_len);
-                    if (src_line[src_x] == transparent_idx) break;
-                    run_len++;
-                }
-                /* Write the run */
-                for (k = 0; k < run_len; k++) {
-                    src_x = mirror ? (img->width - 1 - (sx0 + line_off + px + k)) : (sx0 + line_off + px + k);
-                    win[off + px + k] = src_line[src_x];
-                }
-                px += run_len;
-            }
-            }
-            addr += seg;
-            remain -= seg;
-            line_off += seg;
-        }
     }
 }
 
@@ -359,74 +189,6 @@ void fill_rect_pattern(int x, int y, int w, int h,
             }
             addr++;
             px++;
-        }
-    }
-}
-
-/* Read a rectangular region from VRAM into a pre-allocated buffer.
- * Used for background/dialog snapshots.
- * Optimized: processes each row in bank-aligned segments via rep movsb. */
-void vram_read(int x, int y, int w, int h, uint8_t *buf)
-{
-    int py, addr, remain, bank, off, seg;
-    int cur_bank = -1;
-    int orig_w = w, orig_x = x, orig_y = y;
-    volatile uint8_t *win = hal_vram_get_window();
-    if (!clip_rect(&x, &y, &w, &h, LAYER_SCREEN_W, LAYER_SCREEN_H)) return;
-    {
-        int skip_x = x - orig_x;
-        int skip_y = y - orig_y;
-        for (py = 0; py < h; py++) {
-            addr = (y + py) * LAYER_SCREEN_W + x;
-            remain = w;
-            while (remain > 0) {
-                bank = addr >> 15;
-                if (bank != cur_bank) {
-                    cur_bank = bank;
-                    hal_vram_bank_select(bank);
-                }
-                off = addr & (VRAM_BANK_SZ - 1);
-                seg = VRAM_BANK_SZ - off;
-                if (seg > remain) seg = remain;
-                vram_row_read(win, off,
-                              buf + (skip_y + py) * orig_w + skip_x + (w - remain), seg);
-                addr += seg;
-                remain -= seg;
-            }
-        }
-    }
-}
-
-/* Write a rectangular buffer back to VRAM.
- * Used for restoring dialog/background snapshots.
- * Optimized: processes each row in bank-aligned segments via rep movsb. */
-void vram_write(const uint8_t *buf, int x, int y, int w, int h)
-{
-    int py, addr, remain, bank, off, seg;
-    int cur_bank = -1;
-    int orig_w = w, orig_x = x, orig_y = y;
-    volatile uint8_t *win = hal_vram_get_window();
-    if (!clip_rect(&x, &y, &w, &h, LAYER_SCREEN_W, LAYER_SCREEN_H)) return;
-    {
-        int skip_x = x - orig_x;
-        int skip_y = y - orig_y;
-        for (py = 0; py < h; py++) {
-            addr = (y + py) * LAYER_SCREEN_W + x;
-            remain = w;
-            while (remain > 0) {
-                bank = addr >> 15;
-                if (bank != cur_bank) {
-                    cur_bank = bank;
-                    hal_vram_bank_select(bank);
-                }
-                off = addr & (VRAM_BANK_SZ - 1);
-                seg = VRAM_BANK_SZ - off;
-                if (seg > remain) seg = remain;
-                vram_row_write(buf + (skip_y + py) * orig_w + skip_x + (w - remain),
-                               win, off, seg);
-                addr += seg;
-                remain -= seg;
-            }
         }
     }
 }

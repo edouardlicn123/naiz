@@ -271,13 +271,3 @@ void settings_menu_run(void)
     NB_DEBUG("settings_menu: selected lang=%s (%s)\r\n",
              LANG_NAMES[lang_idx], LANG_CODES[lang_idx]);
 }
-
-int settings_file_exists(void)
-{
-    FILE *f = fopen("settings.txt", "r");
-    if (f) {
-        fclose(f);
-        return 1;
-    }
-    return 0;
-}

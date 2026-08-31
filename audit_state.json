@@ -1,7 +1,7 @@
 {
   "version": 2,
-  "git_head": "8c09357",
-  "checked_at": "2026-08-27T14:19:37",
+  "git_head": "92fa43b",
+  "checked_at": "2026-08-31T09:51:02",
   "files": {
     "core/build.sh": {
       "sha256": "0e6bb3f41cae8f6c5a014a49767f93990ddd3e2c461a85ec991c01b40b66b11e",
@@ -56,7 +56,7 @@
       "findings": []
     },
     "core/engine/layer.c": {
-      "sha256": "c122e0ca81510d8430a88ebbb55f0c06f661016e0ca9264d36b810e4c81e229f",
+      "sha256": "6035be9cfafedea13b157375f407a9ac61baf25ec72386e6f2da8841db662f83",
       "violations": 0,
       "candidates": 1,
       "findings": [
@@ -68,13 +68,13 @@
       ]
     },
     "core/engine/layer_bg.c": {
-      "sha256": "10a895fcb46858f07be13ba6e0da5b17e0a17ac9413f1b35d8d9db12d26edf4c",
+      "sha256": "a3019796c9d99dacf5bf966918db6d94e825ce2c1e229c096e4626c15cbb81df",
       "violations": 0,
       "candidates": 0,
       "findings": []
     },
     "core/engine/layer_debug.c": {
-      "sha256": "8e95f94afab17a9029604c319a631e7c9037df25d3240b6e0e94b0858b44d7ed",
+      "sha256": "9cb1aad8dae15e99c4ac0cbd52da776104b1dcb6a3e0233cbf7da1a9903512e0",
       "violations": 0,
       "candidates": 1,
       "findings": [
@@ -86,7 +86,7 @@
       ]
     },
     "core/engine/layer_dialog.c": {
-      "sha256": "046271d6710b8f47fc1e76e23d4b1afa6849a0e0f386a92e904e5f965b813519",
+      "sha256": "867dff1e34e47979ec32a9193d32f21a4f329c957979b81de44afe935e96521f",
       "violations": 0,
       "candidates": 1,
       "findings": [
@@ -98,7 +98,7 @@
       ]
     },
     "core/engine/layer_sprite.c": {
-      "sha256": "1fffa017bf9a338274dd48ac0f2bd899ee21a3a92ab3abafd991eb930bf3c818",
+      "sha256": "a58fd4d0399449c03a9171629db83d9d2f4c5edc74c335e97a59ba875eee7c57",
       "violations": 0,
       "candidates": 0,
       "findings": []
@@ -211,13 +211,25 @@
       "findings": []
     },
     "core/engine/render.c": {
-      "sha256": "1611d2a50871afb2857b5abbeb39dfb77f0c35cdd3ad4a5401c6f6af329172fe",
+      "sha256": "1f84b66a47edb5423011fc4b862806e461999d27e67a231f73a924e1d58434e8",
+      "violations": 0,
+      "candidates": 0,
+      "findings": []
+    },
+    "core/engine/render_blit.c": {
+      "sha256": "eea64539acf8c7ef612cdf6d14d20d686bd4f1cac82d5ad4bb129dcf2b1138a0",
       "violations": 0,
       "candidates": 0,
       "findings": []
     },
     "core/engine/render_text.c": {
-      "sha256": "745eaa70a7d88af96f322cedc54fdc55e17765e77304c5147fd51d168c02d270",
+      "sha256": "69cf3ec0760b7e37b7a6ef235b11875657f0eb69500ca3cce8a4d6fdbc2ca249",
+      "violations": 0,
+      "candidates": 0,
+      "findings": []
+    },
+    "core/engine/render_vram.c": {
+      "sha256": "eb1838627c6df4393708da5babcb6b42be752dd9122d4a41c2c8e9cc8e9c72a2",
       "violations": 0,
       "candidates": 0,
       "findings": []
@@ -247,16 +259,10 @@
       "findings": []
     },
     "core/engine/settings_menu.c": {
-      "sha256": "4101e75733a94e5fd23505601e13871470909d9d1d3b1f7080381e7be50ed5fd",
+      "sha256": "35b160a54f22d5f3bc1fd0b5a7573b6474cf70e6955f677fb6d920f6c90d6c5f",
       "violations": 0,
-      "candidates": 1,
-      "findings": [
-        {
-          "line": 277,
-          "rule": "C2",
-          "level": "HEUR"
-        }
-      ]
+      "candidates": 0,
+      "findings": []
     },
     "core/engine/transition.c": {
       "sha256": "e58b6480cd10c5de5e1dc835115b815b9204401336b91dd7900f39b8526fef99",
@@ -402,7 +408,7 @@
       ]
     },
     "start.sh": {
-      "sha256": "bdfe2074b0f10b925f574a9461cb33376550822500f45ffa3b1192713269d8be",
+      "sha256": "86726b6945f47e6682dbe508a59b7f9489bb32673763e74647f8d9d7f985ee04",
       "violations": 0,
       "candidates": 0,
       "findings": []
@@ -462,7 +468,7 @@
       "findings": []
     },
     "tools/env_setup/env_np2kai.py": {
-      "sha256": "8deff37a69cb799ca4ebeb17d17d12f76197e7657dd833caf054d3e35978f4d4",
+      "sha256": "0935c43116d5b5705ecd8f32db65f5fc2e95bab81f8e43179348fa232b20fe79",
       "violations": 0,
       "candidates": 0,
       "findings": []
@@ -480,25 +486,25 @@
       ]
     },
     "tools/env_setup/env_toolchains.py": {
-      "sha256": "73f8c0d002b8bebe12be12fc6c51532d8a5d05d09114d55f0685be27c0e28aef",
+      "sha256": "57a7df6779df07e35fc100a3a3731e374cee4f5edae626026667542a1edee7fd",
       "violations": 0,
       "candidates": 0,
       "findings": []
     },
     "tools/env_setup/env_utils.py": {
-      "sha256": "949a83057fc50db120cfb93f1fcdc651ea1c1ef52f73e646128590e7656ab67d",
+      "sha256": "a39cac5d9fc50177119cbfee74f5c3973f91649f34003e369f11e200de69ddc3",
       "violations": 0,
       "candidates": 1,
       "findings": [
         {
-          "line": 115,
+          "line": 121,
           "rule": "P8",
           "level": "HEUR"
         }
       ]
     },
     "tools/env_setup/install_env.py": {
-      "sha256": "9dd42046073ef0559c99e58971385d7ed52cb095a5262b5cb7be438b7769b05d",
+      "sha256": "3683d1377dbb51b0a99c5a0cea3a6be325b3559dc7e6a96f8d5f322edb35881a",
       "violations": 0,
       "candidates": 0,
       "findings": []
@@ -552,7 +558,7 @@
       ]
     },
     "tools/naiz_build/bump_version.py": {
-      "sha256": "7a8822513d26aeadaf8812dd1061049ffc234d7a609dbc169fca7077ace288f6",
+      "sha256": "ef36e92bf20611370df926bfda4bfafbd40b3451d2a20b53d0087911c640976c",
       "violations": 0,
       "candidates": 0,
       "findings": []
@@ -947,15 +953,15 @@
     }
   },
   "summary": {
-    "files": 121,
-    "changed": 3,
-    "skipped": 118,
+    "files": 123,
+    "changed": 1,
+    "skipped": 122,
     "out_of_scope": 0,
     "violations": 0,
-    "candidates": 38,
+    "candidates": 37,
     "fresh_violations": 0,
-    "fresh_candidates": 2,
-    "verified": 19,
+    "fresh_candidates": 0,
+    "verified": 18,
     "stale": 2,
     "open": 17
   }

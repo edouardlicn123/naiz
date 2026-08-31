@@ -11,7 +11,4 @@
  * Returns after user clicks "Start Game". */
 void settings_menu_run(void);
 
-/* Check if settings.txt exists (non-zero = file exists). */
-int settings_file_exists(void);
-
 #endif

@@ -102,14 +102,3 @@ LayerBounds layer_get_bounds(int z_order)
     }
     return b;
 }
-
-int layer_can_blit_at(int z_order, int y)
-{
-    if (z_order == LAYER_Z_CURSOR)
-        return 1;
-    if (z_order == LAYER_Z_DIALOG || z_order == LAYER_Z_TEXT)
-        return (y >= LAYER_DIALOG_Y);
-    if (z_order == LAYER_Z_ANIM || z_order == LAYER_Z_SPRITE)
-        return (!layer_is_active(LAYER_Z_DIALOG) || y < LAYER_DIALOG_Y);
-    return 1;
-}

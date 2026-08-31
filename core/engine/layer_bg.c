@@ -20,6 +20,9 @@ static unsigned char  snapshot_valid = 0;
 /* Background behind dialog area (captured before first sprite show). */
 static unsigned char *bg_dialog_snapshot = NULL;
 
+/* Forward declaration (called by layer_capture_bg_dialog_from_bg). */
+static void layer_capture_bg_dialog(void);
+
 /*=== Helpers =============================================================*/
 
 /* Restore a rectangular region from bg_snapshot to VRAM.
@@ -98,7 +101,7 @@ void layer_capture_bg_dialog_from_bg(void)
 
 /* Capture only the dialog-area background from VRAM.
  * Used when the last sprite is removed to restore the pristine dialog background. */
-void layer_capture_bg_dialog(void)
+static void layer_capture_bg_dialog(void)
 {
     if (!bg_dialog_snapshot) {
         bg_dialog_snapshot = (unsigned char *)malloc(LAYER_DIALOG_W * LAYER_DIALOG_H);
