@@ -28,6 +28,7 @@ from naiz_lib.nb_line import parse_nb_line
 # (min_args, max_args_or_None, description)
 SIGNATURES = {
     'bg':       (1, 3, 'bg(key[, effect[, transition]])'),
+    'cg':       (1, 1, 'cg(key)'),
     'char':     (1, 4, 'char(name, pos[, expr[, type]])'),
     'scene':    (1, None, 'scene(name)'),
     'sceneconf': (0, 0, 'sceneconf(){title[,type]}'),
@@ -38,6 +39,7 @@ SIGNATURES = {
     'sound':    (1, 1, 'sound(key)'),
     'voice':    (1, 1, 'voice(key)'),
     'loadscene': (0, 0, 'loadscene()'),
+    'cgvmenu':  (0, 0, 'cgvmenu()'),
     'startsetting': (0, 0, 'startsetting()'),
     'var':      (3, 3, 'var(id, op(=|+| -), value)'),
     'playanima': (0, 2, 'playanima([once|loop[,sec]]){name}'),
@@ -49,13 +51,13 @@ SIGNATURES = {
 # Stub commands: registered in the engine cmd_table but their handlers only
 # log "not implemented yet" (nb_mainmenu.c).  Deliberately kept flagged here
 # so a script using one fails validation instead of silently no-op'ing.
-STUBS = frozenset({'settingmenu', 'cgvmenu', 'musicmenu'})
+STUBS = frozenset({'settingmenu', 'musicmenu'})
 
 
 def load_reference(project_dir):
     """Read img_map from ASSETS.DB + characters/expressions from JSON.
 
-    Returns (img_keys, anim_keys, char_keys, expr_set, nb_files).
+    Returns (img_keys, anim_keys, cg_keys, char_keys, expr_set, nb_files).
     """
     db_path = Path(project_dir) / 'ASSETS.DB'
     db = sqlite3.connect(str(db_path))
@@ -63,6 +65,8 @@ def load_reference(project_dir):
     img_keys = {row[0] for row in cur}
     cur = db.execute("SELECT name FROM img_map WHERE type='ANI'")
     anim_keys = {row[0] for row in cur}
+    cur = db.execute("SELECT name FROM img_map WHERE type='CG'")
+    cg_keys = {row[0] for row in cur}
     db.close()
 
     char_keys = {}
@@ -89,12 +93,12 @@ def load_reference(project_dir):
         for p in scene_dir.glob('*.nb'):
             nb_files.add(p.stem)  # e.g. "nbook001"
 
-    return img_keys, anim_keys, char_keys, expr_set, nb_files
+    return img_keys, anim_keys, cg_keys, char_keys, expr_set, nb_files
 
 
 def validate_scene(nb_path, ref):
     """Validate a single .nb file.  Return list of error strings."""
-    img_keys, anim_keys, char_keys, expr_set, nb_files = ref
+    img_keys, anim_keys, cg_keys, char_keys, expr_set, nb_files = ref
     errors = []
     text_ref = nb_path.read_text(encoding='utf-8', errors='replace')
 
@@ -169,6 +173,12 @@ def validate_scene(nb_path, ref):
                     errors.append(
                         f"  {nb_path.name}:{lineno}: bg key {args[0]!r} "
                         "not in img_map (type=IMG)")
+
+            elif cmd == 'cg' and len(args) >= 1:
+                if args[0] not in cg_keys:
+                    errors.append(
+                        f"  {nb_path.name}:{lineno}: cg key {args[0]!r} "
+                        "not in img_map (type=CG)")
 
             elif cmd == 'char':
                 if len(args) >= 1 and args[0] == 'hideall':

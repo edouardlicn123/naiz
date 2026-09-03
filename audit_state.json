@@ -1,7 +1,7 @@
 {
   "version": 2,
-  "git_head": "92fa43b",
-  "checked_at": "2026-08-31T09:51:02",
+  "git_head": "afec92b",
+  "checked_at": "2026-09-03T14:34:38",
   "files": {
     "core/build.sh": {
       "sha256": "0e6bb3f41cae8f6c5a014a49767f93990ddd3e2c461a85ec991c01b40b66b11e",
@@ -133,8 +133,14 @@
       "candidates": 0,
       "findings": []
     },
+    "core/engine/nb_cg.c": {
+      "sha256": "7afad880850b264a4b9eedbe485746211d125bcf11a6b8315b3f72ed8a22bbb5",
+      "violations": 0,
+      "candidates": 0,
+      "findings": []
+    },
     "core/engine/nb_commands.c": {
-      "sha256": "afec9e8d3db44f90d483480eaab5a7f296d75db1cef64334e5a627208846e4f3",
+      "sha256": "3993ec3f18fb012cfab7d73ceaa2ca6e024147b9bbe2835233300042f0ad5cce",
       "violations": 0,
       "candidates": 2,
       "findings": [
@@ -157,7 +163,7 @@
       "findings": []
     },
     "core/engine/nb_mainmenu.c": {
-      "sha256": "0d3e5be1f2ef34864fb63427afa24ca321ec042647e035f44a2809e8b7da00d8",
+      "sha256": "20f86bd211c74c64a2a4a09716afde19c10ce71bce3937f87fe775bae1435f59",
       "violations": 0,
       "candidates": 0,
       "findings": []
@@ -247,7 +253,7 @@
       "findings": []
     },
     "core/engine/save_sys.c": {
-      "sha256": "7441ef84162472ba2a484a751ae42972711855ae2da091a46e9b3c5c9f6133d8",
+      "sha256": "005e2b54dcdef8f01f054ec3dc7b2d2ef0c6b9a12a802d7c4c7fc6f029e0a3b7",
       "violations": 0,
       "candidates": 0,
       "findings": []
@@ -546,7 +552,7 @@
       "findings": []
     },
     "tools/naiz_build/build_game.py": {
-      "sha256": "956acfe6decdee0349e76089c036891197664344345c6e0b4c32339eeb1d0b2b",
+      "sha256": "f0edc4dbbad5cd003b8ee858816d9eea2ccbfc43c1417b2f146d31ffeb29f950",
       "violations": 0,
       "candidates": 1,
       "findings": [
@@ -570,7 +576,7 @@
       "findings": []
     },
     "tools/naiz_build/export_asset_table.py": {
-      "sha256": "29e6325f5fd89cccbeb1c1c8e0187ee5ab3a319f3dce58696d01399f81222050",
+      "sha256": "e9274051bd3a790b6668e49213a6215bff10b2d6d0c3680a4b239c22afc03b4d",
       "violations": 0,
       "candidates": 0,
       "findings": []
@@ -600,7 +606,7 @@
       ]
     },
     "tools/naiz_build/nb_validator.py": {
-      "sha256": "79370fd493393e0eca4090505369996e2c6a8e1af578fd161a68b2808a6a3f63",
+      "sha256": "5bd252683795e59d9075431f0dc06be923551cdf61b0e414f75164c371f3af43",
       "violations": 0,
       "candidates": 0,
       "findings": []
@@ -953,9 +959,9 @@
     }
   },
   "summary": {
-    "files": 123,
+    "files": 124,
     "changed": 1,
-    "skipped": 122,
+    "skipped": 123,
     "out_of_scope": 0,
     "violations": 0,
     "candidates": 37,

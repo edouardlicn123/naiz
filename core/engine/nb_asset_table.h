@@ -57,5 +57,15 @@ static const struct { const char *name; int id; } anim_map[] = {
     {NULL, 0}
 };
 
+/* CG asset key->ID lookup (for cg command) */
+static const struct { const char *key; int id; } cg_map[] = {
+    {"cg01", 19},
+    {"cg02", 20},
+    {NULL, 0}
+};
+
+/* Number of registered CG assets */
+#define CG_COUNT 2
+
 
 #endif /* NB_ASSET_TABLE_H */

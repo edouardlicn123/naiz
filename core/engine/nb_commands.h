@@ -13,6 +13,9 @@ int  nb_asset_id(const char *key);
 void cmd_scene(int argc, const char **argv, const char *cmd_name);
 void cmd_question(int argc, const char **argv, const char *cmd_name);
 
+/* CG display command (nb_cg.c, registered in cmd_table). */
+void cmd_cg(int argc, const char **argv, const char *cmd_name);
+
 /* Handlers split into nb_audio.c / nb_mainmenu.c (registered in cmd_table). */
 void cmd_bgm(int argc, const char **argv, const char *cmd_name);
 void cmd_sound(int argc, const char **argv, const char *cmd_name);

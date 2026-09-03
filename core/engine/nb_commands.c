@@ -362,6 +362,7 @@ typedef struct {
 
 static const CmdEntry cmd_table[] = {
     {"bg",           cmd_bg},
+    {"cg",           cmd_cg},
     {"char",         cmd_char},
     {"scene",        cmd_scene},
     {"sceneconf",    cmd_sceneconf},

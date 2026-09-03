@@ -53,3 +53,18 @@ void sys_save_unlock_scene(int scene_id)
     sys_sd.scene_flags[(scene_id - 1) / 32] |= (1u << ((scene_id - 1) % 32));
     sys_save_write();
 }
+
+/* Unlock a CG (1..CG_TOTAL) in SYSTEM.SAV and flush to disk. */
+void sys_save_unlock_cg(int cg_id)
+{
+    if (cg_id < 1 || cg_id > CG_TOTAL) return;
+    sys_sd.cg_flags[(cg_id - 1) / 32] |= (1u << ((cg_id - 1) % 32));
+    sys_save_write();
+}
+
+/* Return non-zero when CG cg_id has been unlocked. */
+int sys_save_is_cg_unlocked(int cg_id)
+{
+    if (cg_id < 1 || cg_id > CG_TOTAL) return 0;
+    return (sys_sd.cg_flags[(cg_id - 1) / 32] & (1u << ((cg_id - 1) % 32))) != 0;
+}

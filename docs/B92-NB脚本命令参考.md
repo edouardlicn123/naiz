@@ -24,7 +24,8 @@
 | `question` | `cmd_question` (nb.c) | `question <text;opt,var,op,delta;...>` | 选项+变量操作(+/-/=)，结果存 nb.last_choice |
 | `var` | `cmd_var` (nb.c) | `var <id> <=/+|/-> <value>` | 变量读写（赋值/加减），需在 variables.json 定义 |
 | `settingmenu` | `cmd_settingmenu` (nb.c) | — | 设置菜单（TODO） |
-| `cgvmenu` | `cmd_cgvmenu` (nb.c) | — | CG 查看（TODO） |
+| `cg` | `cmd_cg` (nb_cg.c) | `cg <asset_key>` | 展示 CG（type='CG' 资产，用法同背景图），绘制后永久解锁该 CG 至 SYSTEM.SAV |
+| `cgvmenu` | `cmd_cgvmenu` (nb_mainmenu.c) | — | 打开 CG 画廊（由 cgview.nb 调用）：网格浏览 + 锁定占位 + 翻页 + 全屏预览，ESC/Back 回主菜单 |
 | `musicmenu` | `cmd_musicmenu` (nb.c) | — | 音乐菜单（TODO） |
 | `host` | `cmd_host` (nb.c) | `host <text>` | 系统旁白（无角色名） |
 | `loadscene` | `cmd_loadscene` (nb.c) | — | 打开读档选单（由 loadscene.nb 调用） |
@@ -111,7 +112,7 @@ IMAGE.DAT → core/engine/image.c/h       图片归档（pack_images.py 打包�
 ```
 PNG → naiz_conv/mag_convert.py → MAG
 ASSETS.DB → naiz_build/pack_images.py → IMAGE.DAT
-ASSETS.DB → naiz_build/export_asset_table.py → core/engine/nb_asset_table.h（asset/spr/char/expr/anim_map 五表）
+ASSETS.DB → naiz_build/export_asset_table.py → core/engine/nb_asset_table.h（asset/spr/char/expr/anim/cg_map 六表 + CG_COUNT 常量）
 assets + .nb → naiz_build/build_game.py → games/<game>/
 games/<game>/ → naiz_img/inject.py → disks/<game>.hdi
 animation/projects/<项目名>/scripts/<名>.na + animation/projects/<项目名>/db/<项目名>.db → anima.sh build <项目>/<脚本>（naiz_build/anim_import.py）→ animation/output/<NAME>.ANI

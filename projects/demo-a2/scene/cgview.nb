@@ -1,0 +1,3 @@
+sceneconf(){CG Gallery, menu}
+bg(yellow_grid)
+cgvmenu()

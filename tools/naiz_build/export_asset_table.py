@@ -125,6 +125,25 @@ def generate(project_dir, output_path):
         lines.append('};')
         lines.append('')
 
+        # -- cg_map: CG assets (type='CG') --
+        lines.append('/* CG asset key->ID lookup (for cg command) */')
+        lines.append('static const struct { const char *key; int id; } cg_map[] = {')
+        cg_rows = list(db.execute(
+            "SELECT id, name FROM img_map WHERE type='CG' ORDER BY id"
+        ))
+        if not cg_rows:
+            lines.append('    {"__dummy__", 0},')
+        for row in cg_rows:
+            lines.append('    {"%s", %d},' % (escape(row[1]), row[0]))
+        lines.append('    {NULL, 0}')
+        lines.append('};')
+        lines.append('')
+
+        # -- CG_COUNT constant --
+        lines.append('/* Number of registered CG assets */')
+        lines.append('#define CG_COUNT %d' % len(cg_rows))
+        lines.append('')
+
         lines.extend(header_footer('NB_ASSET_TABLE_H'))
 
         try:
@@ -135,7 +154,7 @@ def generate(project_dir, output_path):
     finally:
         if db:
             db.close()
-    return len(img_rows), len(chars), len(exprs), len(spr_rows)
+    return len(img_rows), len(chars), len(exprs), len(spr_rows), len(cg_rows)
 
 
 if __name__ == '__main__':
@@ -143,6 +162,6 @@ if __name__ == '__main__':
         print("Usage: export_asset_table.py <project_dir> <output_path>")
         sys.exit(1)
 
-    n_img, n_char, n_expr, n_spr = generate(sys.argv[1], sys.argv[2])
-    print("export_asset_table: %d img, %d spr, %d chars, %d expressions -> %s" % (
-        n_img, n_spr, n_char, n_expr, sys.argv[2]))
+    n_img, n_char, n_expr, n_spr, n_cg = generate(sys.argv[1], sys.argv[2])
+    print("export_asset_table: %d img, %d spr, %d cg, %d chars, %d expressions -> %s" % (
+        n_img, n_spr, n_cg, n_char, n_expr, sys.argv[2]))

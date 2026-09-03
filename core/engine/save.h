@@ -69,5 +69,7 @@ int  slot_info(int slot, SlotInfo *info);
 
 void sys_save_load(void);
 void sys_save_unlock_scene(int scene_id);
+void sys_save_unlock_cg(int cg_id);
+int  sys_save_is_cg_unlocked(int cg_id);
 
 #endif

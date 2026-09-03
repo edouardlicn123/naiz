@@ -127,7 +127,7 @@ def convert_png_to_mag(assets_dir: Path, proj_dir: Path):
         # Determine type from ASSETS.DB
         mag_filename = Path(mag_rel).name
         atype = asset_types.get(mag_filename)
-        if atype is not None and atype not in ('IMG', 'SPR'):
+        if atype is not None and atype not in ('IMG', 'SPR', 'CG'):
             print(f"ERROR: unknown asset type {atype!r} for {mag_filename}")
             sys.exit(1)
 
