@@ -94,7 +94,7 @@ char charlie c body       # 从 body 切换，不受 clip_h 限制</code></pre>
 
 <h2>4. 背景与场景切换</h2>
 <ul>
-<li><code>bg(...)</code>：加载新背景 MAG，捕获全屏快照和对话框区域纯背景快照，关闭对话框</li>
+<li><code>bg(...){key}</code>：加载新背景 MAG，捕获全屏快照和对话框区域纯背景快照，关闭对话框（背景 key 写在花括号负载）</li>
 <li><code>bg(hidedialog)</code>：只关闭对话框并还原对话框区域背景，不加载新背景</li>
 <li>每次 <code>scene(...)</code> 切换：自动清屏为黑屏，然后执行新场景的 <code>bg(...)</code> 指令</li>
 </ul>
@@ -105,9 +105,9 @@ char charlie c body       # 从 body 切换，不受 clip_h 限制</code></pre>
 <tr><th>NB 命令</th><th>效果</th><th>渲染策略</th></tr>
 </thead>
 <tbody>
-<tr><td><code>char name pos</code></td><td>显示立绘（默认 body）</td><td>覆盖式 blit，capture bg dialog</td></tr>
-<tr><td><code>char name pos expr</code></td><td>换表情</td><td>clip_h 限定区域，不触发 dialog rebuild</td></tr>
-<tr><td><code>char name pos body</code></td><td>换全身</td><td>完整重绘，触发 dialog rebuild</td></tr>
+<tr><td><code>char(pos, body){name}</code></td><td>显示立绘（默认 body）</td><td>覆盖式 blit，capture bg dialog</td></tr>
+<tr><td><code>char(pos, expr){name}</code></td><td>换表情</td><td>clip_h 限定区域，不触发 dialog rebuild</td></tr>
+<tr><td><code>char(pos, body){name}</code></td><td>换全身</td><td>完整重绘，触发 dialog rebuild</td></tr>
 <tr><td><code>char(hideall)</code></td><td>隐藏所有立绘 + 对话框 + 清空台词</td><td>逐精灵隐藏 → 还原对话框背景 → 清空台词状态（见 §3.5）</td></tr>
 </tbody>
 </table>

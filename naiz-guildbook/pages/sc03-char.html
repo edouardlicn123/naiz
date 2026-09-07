@@ -17,11 +17,12 @@
 <p><code>char()</code> 命令用于控制立绘的显示、隐藏和表情切换。角色对话和旁白也归入本文。</p>
 
 <h2>1. 语法</h2>
-<pre><code>char(charname, pos, expr, type)
+<pre><code>char(pos[, expr[, type]]){charname}
 char(hideall)</code></pre>
+<p><strong>对象（角色名）写在花括号负载中</strong>；括号位承载显示参数 pos/expr/type。这与 <code>bg(effect){key}</code> 等一致的"对象在花括号、括号=参数±keyword"约定。</p>
 <table>
 <tr><th>参数</th><th>类型</th><th>说明</th></tr>
-<tr><td><code>charname</code></td><td>string</td><td>角色 key，如 <code>fei</code>、<code>ira</code></td></tr>
+<tr><td><code>charname</code></td><td>string</td><td>角色 key，如 <code>fei</code>、<code>ira</code>，写在花括号负载</td></tr>
 <tr><td><code>pos</code></td><td>string</td><td>位置：<code>l</code>（左）、<code>c</code>（中）、<code>r</code>（右）</td></tr>
 <tr><td><code>expr</code></td><td>string</td><td><strong>可选</strong>，默认 <code>normal</code>。表情名</td></tr>
 <tr><td><code>type</code></td><td>string</td><td><strong>可选</strong>，默认自动推断。<code>body</code>（全身/换装）或 <code>face</code>（仅换表情）</td></tr>
@@ -41,11 +42,12 @@ char(hideall)</code></pre>
 </table>
 
 <h2>4. 示例</h2>
-<pre><code>char(fei, l, normal, body)    ← 首次显示 fei 在左位
-char(ira, r, normal, body)    ← 首次显示 ira 在右位
-char(fei, r, smile)           ← fei 换微笑表情
-char(ira, r, sad, face)       ← ira 换难过表情
+<pre><code>char(l, normal, body){fei}    ← 首次显示 fei 在左位
+char(r, normal, body){ira}    ← 首次显示 ira 在右位
+char(r, smile){fei}           ← fei 换微笑表情
+char(r, sad, face){ira}       ← ira 换难过表情
 char(hideall)                 ← 隐藏所有立绘</code></pre>
+<div class="note-box"><p><strong>注意</strong>：<code>char(charname, pos, expr, type)</code>（角色名写在括号里）的形态已废止，会被引擎与脚本校验器拒绝——角色 key 必须写进花括号。</p></div>
 
 <hr>
 

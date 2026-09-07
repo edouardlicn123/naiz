@@ -208,9 +208,9 @@ python3 -m tools.naiz_conv.img2mag bg_flat_colors.png -o BG002.MAG --256</code><
 <tr><th>操作</th><th>方法</th><th>对话框影响</th></tr>
 </thead>
 <tbody>
-<tr><td>显示精灵（首次）</td><td><code>char(key, pos, expr, body)</code></td><td>无影响</td></tr>
-<tr><td>换表情</td><td><code>char(key, pos, expr, face)</code></td><td><strong>不重绘对话框</strong> ✅</td></tr>
-<tr><td>换装/换位</td><td><code>char(key, pos, expr, body)</code>（已显示时）</td><td><strong>自动重绘对话框</strong> ✅</td></tr>
+<tr><td>显示精灵（首次）</td><td><code>char(pos, expr, body){key}</code></td><td>无影响</td></tr>
+<tr><td>换表情</td><td><code>char(pos, expr, face){key}</code></td><td><strong>不重绘对话框</strong> ✅</td></tr>
+<tr><td>换装/换位</td><td><code>char(pos, expr, body){key}</code>（已显示时）</td><td><strong>自动重绘对话框</strong> ✅</td></tr>
 <tr><td>隐藏所有</td><td><code>char(hideall)</code></td><td>清除精灵，对话框区域恢复纯背景</td></tr>
 </tbody>
 </table>

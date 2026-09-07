@@ -17,10 +17,11 @@
 <p><code>sceneconf()</code> 命令用于设置当前场景的章节标题与类型。标题随存档记录，类型控制存档热键等行为。</p>
 
 <h2>1. 语法</h2>
-<pre><code>sceneconf &lt;title&gt;[,type]</code></pre>
+<pre><code>sceneconf(){title[, type]}</code></pre>
+<p><strong>仅花括号形态</strong>：标题与类型都写在花括号负载中（paren 别名已废止）。</p>
 <table>
 <tr><th>参数</th><th>类型</th><th>说明</th></tr>
-<tr><td><code>title</code></td><td>string</td><td>章节标题文本，随存档记录并显示</td></tr>
+<tr><td><code>title</code></td><td>string</td><td>章节标题文本，随存档记录并显示（写在花括号负载）</td></tr>
 <tr><td><code>type</code></td><td>string</td><td>场景类型 <code>normal</code> / <code>cg</code> / <code>menu</code>，默认 <code>normal</code></td></tr>
 </table>
 
@@ -33,9 +34,9 @@
 </table>
 
 <h2>2. 示例</h2>
-<pre><code>sceneconf 序章,normal
-sceneconf 画廊,cg
-sceneconf 主菜单,menu</code></pre>
+<pre><code>sceneconf(){序章, normal}
+sceneconf(){画廊, cg}
+sceneconf(){, menu}   # 菜单类场景：标题可省略</code></pre>
 
 <div class="note-box"><p><strong>注意</strong>：<code>type=menu</code> 时会禁用存档热键，避免在主菜单/设置场景内误触发存档。</p></div>
 

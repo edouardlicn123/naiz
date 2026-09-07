@@ -17,26 +17,28 @@
 <p><code>bg()</code> 命令用于切换场景背景，或关闭对话框还原背景区域。</p>
 
 <h2>1. 语法</h2>
-<pre><code>bg(key, type)
-bg(key, type, extra)
+<pre><code>bg(effect[, transition]){key}
 bg(hidedialog)</code></pre>
+<p><strong>对象（背景 key）写在花括号负载中</strong>；括号位预留给 effect / transition 参数（当前为占位，暂不作效）。这是与 <code>cg(){key}</code> 等一致的"对象在花括号、括号=参数±keyword"约定。</p>
 <table>
 <tr><th>参数</th><th>类型</th><th>说明</th></tr>
-<tr><td><code>key</code></td><td>string</td><td>资源名称，对应 <code>asset_map.name</code>（非 filename）</td></tr>
-<tr><td><code>type</code></td><td>string</td><td>显示方式（<code>normal</code> 等）</td></tr>
-<tr><td><code>extra</code></td><td>string</td><td>可选附加参数</td></tr>
+<tr><td><code>key</code></td><td>string</td><td>资源名称，对应 <code>asset_map.name</code>（非 filename），写在花括号负载</td></tr>
+<tr><td><code>effect</code></td><td>string</td><td>显示方式（<code>normal</code> 等），括号参数槽（现为占位）</td></tr>
+<tr><td><code>transition</code></td><td>string</td><td>可选过渡参数（现为占位）</td></tr>
 </table>
 
 <h3>1.1 子命令</h3>
 <table>
 <tr><th>命令</th><th>说明</th></tr>
-<tr><td><code>bg(hidedialog)</code></td><td>关闭对话框并还原背景区域</td></tr>
+<tr><td><code>bg(hidedialog)</code></td><td>关闭对话框并还原背景区域（keyword 指令，无负载）</td></tr>
 </table>
 
 <h2>2. 示例</h2>
-<pre><code>bg(splbg,normal)
-bg(logo,normal,normal)
+<pre><code>bg(normal){splbg}
+bg(normal, normal){logo}
+bg(normal, normal){powered}
 bg(hidedialog)</code></pre>
+<div class="note-box"><p><strong>注意</strong>：<code>bg(key)</code>（key 写在括号里）的形态已废止，会被引擎与脚本校验器拒绝——背景 key 必须写进花括号。</p></div>
 
 </main>
 </body>
