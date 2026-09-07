@@ -43,9 +43,6 @@ typedef struct {
 /* Non-zero while a waitanima pause is in effect */
 int anim_waiting(void);
 
-/* Query whether an animation is currently playing */
-int anim_playing(void);
-
 /* Idempotent stop of any active animation (bg/scene implicit stop too) */
 void anim_stop(void);
 

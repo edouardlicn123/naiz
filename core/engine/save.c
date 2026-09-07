@@ -163,9 +163,7 @@ int load_game_slot(int slot)
 int slot_info(int slot, SlotInfo *info)
 {
     char path[32];
-    unsigned int magic;
-    char slot_name[32], timestamp[20];
-    FILE *f;
+    SaveHeader h;
 
     if (slot < 0 || slot >= SAVE_SLOTS) return 0;
     info->exists = 0;
@@ -176,40 +174,18 @@ int slot_info(int slot, SlotInfo *info)
     info->chapter_title[0] = '\0';
 
     slot_path(slot, path, sizeof(path));
-    f = fopen(path, "rb");
-    if (!f) return 0;
-
-    if (fread(&magic, sizeof(magic), 1, f) != 1) { fclose(f); return 0; }
-    if (fread(&info->version, sizeof(info->version), 1, f) != 1) { fclose(f); return 0; }
-    if (fread(slot_name, sizeof(slot_name), 1, f) != 1) { fclose(f); return 0; }
-    if (fread(timestamp, sizeof(timestamp), 1, f) != 1) { fclose(f); return 0; }
-    /* skip past checksum + var_values to reach filename */
-    {
-        int skip = (int)(offsetof(SaveData, filename) - offsetof(SaveData, checksum));
-        if (fseek(f, skip, SEEK_CUR) != 0) { fclose(f); return 0; }
-    }
-    if (fread(info->filename, sizeof(info->filename), 1, f) != 1) { fclose(f); return 0; }
-    /* skip lang[] between filename and chapter_title */
-    {
-        int lang_skip = (int)(offsetof(SaveData, chapter_title) - offsetof(SaveData, lang));
-        if (fseek(f, lang_skip, SEEK_CUR) != 0) { fclose(f); return 0; }
-    }
-    /* read chapter_title for v3+ */
-    if (info->version >= 3) {
-        if (fread(info->chapter_title, sizeof(info->chapter_title), 1, f) != 1)
-            info->chapter_title[0] = '\0';
-    }
-
-    fclose(f);
-
-    if (magic != SAVE_MAGIC) return 0;
+    if (save_read_header(path, &h) != 0) return 0;
+    if (h.magic != SAVE_MAGIC) return 0;
 
     info->exists = 1;
-    strncpy(info->slot_name, slot_name, sizeof(info->slot_name) - 1);
+    info->version = h.version;
+    strncpy(info->slot_name, h.slot_name, sizeof(info->slot_name) - 1);
     info->slot_name[sizeof(info->slot_name) - 1] = '\0';
-    strncpy(info->timestamp, timestamp, sizeof(info->timestamp) - 1);
+    strncpy(info->timestamp, h.timestamp, sizeof(info->timestamp) - 1);
     info->timestamp[sizeof(info->timestamp) - 1] = '\0';
+    strncpy(info->filename, h.filename, sizeof(info->filename) - 1);
     info->filename[sizeof(info->filename) - 1] = '\0';
+    strncpy(info->chapter_title, h.chapter_title, sizeof(info->chapter_title) - 1);
     info->chapter_title[sizeof(info->chapter_title) - 1] = '\0';
     return 1;
 }

@@ -9,6 +9,7 @@
 #include <string.h>
 #include <limits.h>
 #include "render.h"
+#include "palette.h"
 #include "image.h"
 #include "scene_layers.h"
 #include "hal.h"
@@ -139,10 +140,16 @@ int nb_next_field(const char **s, char *buf, size_t bufsz)
 
 /*=== Command handlers ======================================================*/
 
+/* Grammar (mirrors cmd_cg):
+ *   bg(effect[,transition]){key}   key is the brace payload; the paren
+ *                                  position carries effect/transition params
+ *                                  (currently unused placeholders).
+ *   bg(hidedialog)                 keyword directive, no payload. */
 static void cmd_bg(int argc, const char **argv, const char *cmd_name)
 {
     int id;
     MagImage *img;
+    const char *key;
 
     (void)cmd_name;
     if (argc < 1) { NB_DEBUG("bg: no args\r\n"); return; }
@@ -154,9 +161,18 @@ static void cmd_bg(int argc, const char **argv, const char *cmd_name)
         return;
     }
 
-    id = resolve_asset(argv[0]);
+    /* Hard gate: the asset key must arrive via the brace payload; parens
+     * are reserved for parameters and never carry the asset. */
+    if (nb_get_last_brace_arg() != argc - 1) {
+        NB_DEBUG("bg: usage bg(effect[,transition]){asset_key} "
+                 "(parens reserved for params)\r\n");
+        return;
+    }
+    key = argv[argc - 1];
+
+    id = resolve_asset(key);
     if (id < 0) {
-        NB_DEBUG("bg: unknown asset '%s'\r\n", argv[0]);
+        NB_DEBUG("bg: unknown asset '%s'\r\n", key);
         return;
     }
     anim_stop();          /* implicit stop: new background ends any animation */
@@ -166,12 +182,10 @@ static void cmd_bg(int argc, const char **argv, const char *cmd_name)
         return;
     }
     hal_mouse_invalidate_cursor();
-    hal_set_palette(PAL_WHITE, 0xFF, 0xFF, 0xFF);
-    hal_set_palette(PAL_TRANSPARENT, 0xFF, 0xFF, 0xFF);
-    hal_set_palette(PAL_CURSOR_BLACK, 0x00, 0x00, 0x00);
+    palette_reset_reserved();
     layer_bg_change(img);
     mag_release(img);
-    NB_DEBUG("bg: id=%d key=%s\r\n", id, argv[0]);
+    NB_DEBUG("bg: id=%d key=%s\r\n", id, key);
 }
 
 static void cmd_host(int argc, const char **argv, const char *cmd_name)
@@ -181,10 +195,15 @@ static void cmd_host(int argc, const char **argv, const char *cmd_name)
     dialog_show(NULL, tr(argv[0]));
 }
 
+/* Grammar (mirrors cmd_cg):
+ *   char(pos[,expr[,type]]){name}  name is the brace payload; parens carry
+ *                                  display parameters (position/expression/
+ *                                  body|face).  expr/type default like before.
+ *   char(hideall)                  keyword directive, no payload. */
 static void cmd_char(int argc, const char **argv, const char *cmd_name)
 {
     int char_id, asset_id, x;
-    const char *expr, *type;
+    const char *name, *expr, *type;
 
     (void)cmd_name;
     if (argc == 1 && strcmp(argv[0], "hideall") == 0) {
@@ -194,12 +213,20 @@ static void cmd_char(int argc, const char **argv, const char *cmd_name)
         NB_DEBUG("char: hideall\r\n");
         return;
     }
-    if (argc < 2) { NB_DEBUG("char: not enough args\r\n"); return; }
-    if (argv[1][0] == '\0') { NB_DEBUG("char: empty pos\r\n"); return; }
 
-    char_id = resolve_char_id(argv[0]);
+    /* Hard gate: the character name must arrive via the brace payload. */
+    if (nb_get_last_brace_arg() != argc - 1) {
+        NB_DEBUG("char: usage char(pos[,expr[,type]]){name} "
+                 "(name in braces, parens reserved for params)\r\n");
+        return;
+    }
+    name = argv[argc - 1];
+    if (argc < 2) { NB_DEBUG("char: need position + {name}\r\n"); return; }
+    if (argv[0][0] == '\0') { NB_DEBUG("char: empty pos\r\n"); return; }
+
+    char_id = resolve_char_id(name);
     if (char_id < 0) {
-        NB_DEBUG("char: unknown character '%s'\r\n", argv[0]);
+        NB_DEBUG("char: unknown character '%s'\r\n", name);
         return;
     }
     if (char_id >= LAYER_MAX_SPRITES) {
@@ -207,17 +234,17 @@ static void cmd_char(int argc, const char **argv, const char *cmd_name)
         return;
     }
 
-    x = pos_to_x(argv[1][0]);
+    x = pos_to_x(argv[0][0]);
 
-    expr = (argc >= 3 && argv[2][0]) ? argv[2] : "normal";
+    expr = (argc >= 3 && argv[1][0]) ? argv[1] : "normal";
 
     asset_id = resolve_expression(char_id, expr);
     if (asset_id < 0) {
-        NB_DEBUG("char: no asset for char '%s' expr '%s'\r\n", argv[0], expr);
+        NB_DEBUG("char: no asset for char '%s' expr '%s'\r\n", name, expr);
         return;
     }
 
-    type = (argc >= 4 && argv[3][0]) ? argv[3] : NULL;
+    type = (argc >= 4 && argv[2][0]) ? argv[2] : NULL;
     if (type == NULL) {
         type = layer_has_sprite(char_id) ? "face" : "body";
     }
@@ -243,9 +270,9 @@ static void cmd_dialogue(int argc, const char **argv, const char *cmd_name)
 
 
 /* Scene configuration: title + type.
- *   sceneconf(){Title, type}   text form: {..} is a single arg "Title, type"
- *   sceneconf(Title, type)     paren form: parsed as two separate args
- * type: normal (default) / cg / menu */
+ * Grammar (brace-only): sceneconf(){Title[,type]} — the {..} payload is a
+ * single arg "Title, type", split on ',' below.  The paren alias
+ * sceneconf(Title,type) was removed: parens are reserved for parameters. */
 static void cmd_sceneconf(int argc, const char **argv, const char *cmd_name)
 {
     char title[NB_LINE_MAX];
@@ -255,29 +282,27 @@ static void cmd_sceneconf(int argc, const char **argv, const char *cmd_name)
     (void)cmd_name;
     if (argc < 1) return;
 
+    /* Hard gate: title/type must arrive via the brace payload. */
+    if (nb_get_last_brace_arg() != argc - 1) {
+        NB_DEBUG("sceneconf: usage sceneconf(){title[,type]}\r\n");
+        return;
+    }
+
     title[0] = '\0';
     type[0] = '\0';
 
-    if (argc >= 2) {
-        /* Paren form: title and type are already separate args. */
+    /* Text form: {Title, type} arrives as one arg; split on ','. */
+    p = argv[0];
+    if (nb_next_field(&p, title, sizeof(title))) {
+        /* title read; p points to type (may be empty). */
+        if (*p) {
+            strncpy(type, p, sizeof(type) - 1);
+            type[sizeof(type) - 1] = '\0';
+        }
+    } else {
+        /* No comma: entire arg is the title, type defaults to NULL. */
         strncpy(title, argv[0], sizeof(title) - 1);
         title[sizeof(title) - 1] = '\0';
-        strncpy(type, argv[1], sizeof(type) - 1);
-        type[sizeof(type) - 1] = '\0';
-    } else {
-        /* Text form: {Title, type} arrives as one arg; split on ','. */
-        p = argv[0];
-        if (nb_next_field(&p, title, sizeof(title))) {
-            /* title read; p points to type (may be empty). */
-            if (*p) {
-                strncpy(type, p, sizeof(type) - 1);
-                type[sizeof(type) - 1] = '\0';
-            }
-        } else {
-            /* No comma: entire arg is the title, type defaults to NULL. */
-            strncpy(title, argv[0], sizeof(title) - 1);
-            title[sizeof(title) - 1] = '\0';
-        }
     }
 
     nb_set_scene_conf(tr(title), type[0] ? type : NULL);

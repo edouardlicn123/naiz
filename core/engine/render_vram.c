@@ -32,29 +32,6 @@ static void vram_row_read(volatile uint8_t *win, int off, uint8_t *dst, int n)
     }
 }
 
-/* Fast row write from buffer into VRAM window via rep movsb. */
-static void vram_row_write(const uint8_t *src, volatile uint8_t *win, int off, int n)
-{
-    if (n <= 0)
-        return;
-    __asm {
-        push    es
-        push    edi
-        push    esi
-        push    ds
-        pop     es                  /* ES = DS for flat model */
-        mov     edi, dword ptr [win]
-        add     edi, dword ptr [off]
-        mov     esi, dword ptr [src]
-        mov     ecx, dword ptr [n]
-        cld
-        rep     movsb
-        pop     esi
-        pop     edi
-        pop     es
-    }
-}
-
 /* Read a rectangular region from VRAM into a pre-allocated buffer.
  * Used for background/dialog snapshots.
  * Optimized: processes each row in bank-aligned segments via rep movsb. */

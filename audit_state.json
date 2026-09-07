@@ -1,7 +1,7 @@
 {
   "version": 2,
-  "git_head": "afec92b",
-  "checked_at": "2026-09-03T14:34:38",
+  "git_head": "d9d3a3d",
+  "checked_at": "2026-09-07T17:49:55",
   "files": {
     "core/build.sh": {
       "sha256": "0e6bb3f41cae8f6c5a014a49767f93990ddd3e2c461a85ec991c01b40b66b11e",
@@ -23,6 +23,18 @@
     },
     "core/engine/cursor.c": {
       "sha256": "778b91e319691c720fa02123c778af0b9b8d600e656dfd006ef14ff60d03c443",
+      "violations": 0,
+      "candidates": 0,
+      "findings": []
+    },
+    "core/engine/cursor.h": {
+      "sha256": "d1f1bf7fdd1bbef61fbf4cd6cdb8f893cffce1d458d91746fce5d91a873595c5",
+      "violations": 0,
+      "candidates": 0,
+      "findings": []
+    },
+    "core/engine/debug.h": {
+      "sha256": "60e92f3bb77b39e95e0c002f12ecf93bad43dfffdc4fe36235d1234a7ac9dc0b",
       "violations": 0,
       "candidates": 0,
       "findings": []
@@ -49,8 +61,20 @@
         }
       ]
     },
+    "core/engine/image.h": {
+      "sha256": "39ae1a0bce5766854119434d19466bc7b3f120e9dd0a11e298344ffa2de73a07",
+      "violations": 0,
+      "candidates": 0,
+      "findings": []
+    },
     "core/engine/image_cache.c": {
       "sha256": "a19f1a5dd8a9e9f9898d1ab5f984f1ef1cc71a01404db70ee8013be016fb19a8",
+      "violations": 0,
+      "candidates": 0,
+      "findings": []
+    },
+    "core/engine/image_internal.h": {
+      "sha256": "046cf0830ce7092b2f028eedc4b60a40c712a0e4a7ab2110d722e5de463e12a3",
       "violations": 0,
       "candidates": 0,
       "findings": []
@@ -68,7 +92,7 @@
       ]
     },
     "core/engine/layer_bg.c": {
-      "sha256": "a3019796c9d99dacf5bf966918db6d94e825ce2c1e229c096e4626c15cbb81df",
+      "sha256": "0ea8e92dd543e9d1cfb4648c3a20adb2c64d4634e6c28720c5bc9ac793a8e9d7",
       "violations": 0,
       "candidates": 0,
       "findings": []
@@ -85,6 +109,12 @@
         }
       ]
     },
+    "core/engine/layer_debug.h": {
+      "sha256": "b011867168b4d0a3a7178242c65f02a0122d3269b423b4c303fd69939bf5af2e",
+      "violations": 0,
+      "candidates": 0,
+      "findings": []
+    },
     "core/engine/layer_dialog.c": {
       "sha256": "867dff1e34e47979ec32a9193d32f21a4f329c957979b81de44afe935e96521f",
       "violations": 0,
@@ -96,6 +126,12 @@
           "level": "HEUR"
         }
       ]
+    },
+    "core/engine/layer_internal.h": {
+      "sha256": "cc8dd9e787ef6126852525fae5ba06c1af38604d247d99ed731028d254ce96b5",
+      "violations": 0,
+      "candidates": 0,
+      "findings": []
     },
     "core/engine/layer_sprite.c": {
       "sha256": "a58fd4d0399449c03a9171629db83d9d2f4c5edc74c335e97a59ba875eee7c57",
@@ -110,13 +146,19 @@
       "findings": []
     },
     "core/engine/nb.c": {
-      "sha256": "56dd4ec02ed5cfb7fbf5040aeefedad2a97d1e6a127a1d49927118fa7a9ed121",
+      "sha256": "a84c7a152a1307b29a56524831bfad2929150d3a1f8909808bf0d6ed4d1d02c7",
+      "violations": 0,
+      "candidates": 0,
+      "findings": []
+    },
+    "core/engine/nb.h": {
+      "sha256": "a0d8c24c658ed2c2847ab0b818b70d48f23c9208e6c39f0d2cad5aa59f0c43a4",
       "violations": 0,
       "candidates": 0,
       "findings": []
     },
     "core/engine/nb_anim.c": {
-      "sha256": "628f2b66630a52cc47ccf14eee1adf9875810f3bf8b06c54b118f7a1db897708",
+      "sha256": "1a6d124696a56bfc92026e37d698b809e121cddf440d398ae9620c56995b0f8d",
       "violations": 0,
       "candidates": 1,
       "findings": [
@@ -127,34 +169,64 @@
         }
       ]
     },
+    "core/engine/nb_anim.h": {
+      "sha256": "51f3f6c7dcd7bcc635b705801b85dbba7c645e6b6ae8f818e7c9935da339eb88",
+      "violations": 0,
+      "candidates": 0,
+      "findings": []
+    },
+    "core/engine/nb_asset_table.h": {
+      "sha256": "b547bbcad8d013d2af7b55dfead784b0f11c4c7a0b63d7019c2051bd8051108e",
+      "violations": 0,
+      "candidates": 0,
+      "findings": []
+    },
     "core/engine/nb_audio.c": {
-      "sha256": "face7768cbcca634e88c702b4719e80b7d548e53f291b1959ab689b0487ccf8e",
+      "sha256": "edc515c7b44ddf40ea6d199fa387f0c3c4a3dfc29b491b2fbbd78eda02c3e060",
       "violations": 0,
       "candidates": 0,
       "findings": []
     },
     "core/engine/nb_cg.c": {
-      "sha256": "7afad880850b264a4b9eedbe485746211d125bcf11a6b8315b3f72ed8a22bbb5",
+      "sha256": "909fc3cd0f4538849bba2508abce3e4766fecf64a9d6e0f35c67c239a712bdb6",
+      "violations": 0,
+      "candidates": 0,
+      "findings": []
+    },
+    "core/engine/nb_cggallery.c": {
+      "sha256": "4b17874afa6da38e1e861b3aabfc8c4514fb9095557bd9fc2613c0ea7a5206fe",
       "violations": 0,
       "candidates": 0,
       "findings": []
     },
     "core/engine/nb_commands.c": {
-      "sha256": "3993ec3f18fb012cfab7d73ceaa2ca6e024147b9bbe2835233300042f0ad5cce",
+      "sha256": "732762e0f114046c2d967153bbf00fbb5c446628503db9781e7c1b1c9fc03780",
       "violations": 0,
       "candidates": 2,
       "findings": [
         {
-          "line": 321,
+          "line": 346,
           "rule": "C8",
           "level": "HEUR"
         },
         {
-          "line": 133,
+          "line": 134,
           "rule": "C9",
           "level": "HEUR"
         }
       ]
+    },
+    "core/engine/nb_commands.h": {
+      "sha256": "03c7d4a810cce62e2e6026977117ac13b7ed1332df4ee8b007ee14f9f64ba2ff",
+      "violations": 0,
+      "candidates": 0,
+      "findings": []
+    },
+    "core/engine/nb_config.h": {
+      "sha256": "d728d8d23e4509234762c1630cce9c42642685b93645f5b577cc11dc21b08272",
+      "violations": 0,
+      "candidates": 0,
+      "findings": []
     },
     "core/engine/nb_dialog.c": {
       "sha256": "aa7781ac06aa65926ca27e29555260fadb81c68332672806b276e824264d9c93",
@@ -162,8 +234,20 @@
       "candidates": 0,
       "findings": []
     },
+    "core/engine/nb_dialog.h": {
+      "sha256": "e07890d7ddff9d7d717e2b5b0f4529b9e493fe0cc60ef1d014b875c7ec7fb4ae",
+      "violations": 0,
+      "candidates": 0,
+      "findings": []
+    },
+    "core/engine/nb_internal.h": {
+      "sha256": "a9ef20edb4e7f88f38c7edd5e606a09757a03179eb24b2371f3f16d584d4f3b8",
+      "violations": 0,
+      "candidates": 0,
+      "findings": []
+    },
     "core/engine/nb_mainmenu.c": {
-      "sha256": "20f86bd211c74c64a2a4a09716afde19c10ce71bce3937f87fe775bae1435f59",
+      "sha256": "e9bf184198f5b12e84a8d02f55ae6fe676657b2608e4d9487452cbc99cc86373",
       "violations": 0,
       "candidates": 0,
       "findings": []
@@ -175,7 +259,7 @@
       "findings": []
     },
     "core/engine/nb_parser.c": {
-      "sha256": "072512a7c44742afbc18ba4586474db6a86f497f71a9b8f2e1ddc7c430f2b8a2",
+      "sha256": "29d33dead32f64b3d39f3ed2b0c181d055b7fb85c320cffe551d321c17b90c11",
       "violations": 0,
       "candidates": 0,
       "findings": []
@@ -198,8 +282,26 @@
       "candidates": 0,
       "findings": []
     },
+    "core/engine/nb_saveload.h": {
+      "sha256": "d7cd2bcdab9075b797c399b7df10a610d29d4fd021164fd40052f28bea781833",
+      "violations": 0,
+      "candidates": 0,
+      "findings": []
+    },
     "core/engine/nb_scene.c": {
       "sha256": "a11b400b79438a5b96a92554d6347f1179bc94dd78a2cf1563f9d114a5e77d94",
+      "violations": 0,
+      "candidates": 0,
+      "findings": []
+    },
+    "core/engine/nb_var_defs.h": {
+      "sha256": "498f84610a7e2369b3edd22cb2fd1ac3860d24ca88e32fa411a6e804d5582e73",
+      "violations": 0,
+      "candidates": 0,
+      "findings": []
+    },
+    "core/engine/nb_var_table.h": {
+      "sha256": "8c82146a06f5cc100f38160befa5f58b937f859bb250f52ac7a76cbfeebc9a91",
       "violations": 0,
       "candidates": 0,
       "findings": []
@@ -210,20 +312,44 @@
       "candidates": 0,
       "findings": []
     },
+    "core/engine/nb_vars.h": {
+      "sha256": "dbcbdbd87db3ae097fa9addb303cea9717c4b5e3e2bb9794e6951ef4fbc0986e",
+      "violations": 0,
+      "candidates": 0,
+      "findings": []
+    },
     "core/engine/palette.c": {
-      "sha256": "00102f0f25dd7507d2aaeef5e2a49639f422d282c6154bc39de5825440c1e8d9",
+      "sha256": "901f74ecef828f74ae28ac844c47712cd5e49507fa202201194d5bf2cc448175",
+      "violations": 0,
+      "candidates": 0,
+      "findings": []
+    },
+    "core/engine/palette.h": {
+      "sha256": "faeeba0a695c8c0db24853afe394e73cffe978ff2878cfddce3ccc7c02354779",
       "violations": 0,
       "candidates": 0,
       "findings": []
     },
     "core/engine/render.c": {
-      "sha256": "1f84b66a47edb5423011fc4b862806e461999d27e67a231f73a924e1d58434e8",
+      "sha256": "a69ee824c2346f64ed98b280fe9f287fb16de715c778e262ab0b0233c72e4c84",
+      "violations": 0,
+      "candidates": 0,
+      "findings": []
+    },
+    "core/engine/render.h": {
+      "sha256": "c4c05f5098264fba72261049e55d9deaa6f85193c76a1f4d96b260494ff7a298",
       "violations": 0,
       "candidates": 0,
       "findings": []
     },
     "core/engine/render_blit.c": {
-      "sha256": "eea64539acf8c7ef612cdf6d14d20d686bd4f1cac82d5ad4bb129dcf2b1138a0",
+      "sha256": "23ee0df4c6ee26488f61ee0d2f02d1a6c6568ffd874bae066b07cef167f017a3",
+      "violations": 0,
+      "candidates": 0,
+      "findings": []
+    },
+    "core/engine/render_internal.h": {
+      "sha256": "86cd2ebc2af0be21357c9c2331a7c65bfa3b3fe6b0cd5878f2b2184d7df5b06c",
       "violations": 0,
       "candidates": 0,
       "findings": []
@@ -235,19 +361,25 @@
       "findings": []
     },
     "core/engine/render_vram.c": {
-      "sha256": "eb1838627c6df4393708da5babcb6b42be752dd9122d4a41c2c8e9cc8e9c72a2",
+      "sha256": "d9e7d16248667f2cf36a6b85f9e9a0f7441795ecacd1abd244e77d2d57206638",
       "violations": 0,
       "candidates": 0,
       "findings": []
     },
     "core/engine/save.c": {
-      "sha256": "92c6016c333515078ae4cfdea5ee0f4277f4a4ca7114aefc975563a945465a5d",
+      "sha256": "c7101574248dcdbc7416284bc6dc4510283655205fe01f3253c631aa1528890a",
+      "violations": 0,
+      "candidates": 0,
+      "findings": []
+    },
+    "core/engine/save.h": {
+      "sha256": "186fd9d28306252c3b11f2348c625c33271192350a1affb7a3091c0d677656fe",
       "violations": 0,
       "candidates": 0,
       "findings": []
     },
     "core/engine/save_io.c": {
-      "sha256": "b9208d37dc80222ae3ee710bfedea4533fbcb0b7cfbd91e4799288ea5f2429c4",
+      "sha256": "0fae6701606dd14c5c3fa1a84ea5b81881f52eaef83361846b709c548143d3fc",
       "violations": 0,
       "candidates": 0,
       "findings": []
@@ -258,8 +390,20 @@
       "candidates": 0,
       "findings": []
     },
+    "core/engine/scene_layers.h": {
+      "sha256": "ba7ee7ade9d27fea14930a02a93930de8eb66607c3b9e1bc0ee9f36b5222180f",
+      "violations": 0,
+      "candidates": 0,
+      "findings": []
+    },
     "core/engine/settings.c": {
       "sha256": "7f0a3b1281e755976ddbe4636f0953db4c9b1bdc5f87d20fdc750efa2d9f190b",
+      "violations": 0,
+      "candidates": 0,
+      "findings": []
+    },
+    "core/engine/settings.h": {
+      "sha256": "5eb46a4fc250213f2bc4ed96571ce1f8545693f61dc701e526b6f6d65793e549",
       "violations": 0,
       "candidates": 0,
       "findings": []
@@ -270,8 +414,20 @@
       "candidates": 0,
       "findings": []
     },
+    "core/engine/settings_menu.h": {
+      "sha256": "e5e68e1d788e4a02fb0a17cdb7d35d9e88ea6f4184517bad4d525cd0937f0bd3",
+      "violations": 0,
+      "candidates": 0,
+      "findings": []
+    },
     "core/engine/transition.c": {
       "sha256": "e58b6480cd10c5de5e1dc835115b815b9204401336b91dd7900f39b8526fef99",
+      "violations": 0,
+      "candidates": 0,
+      "findings": []
+    },
+    "core/engine/transition.h": {
+      "sha256": "00aac4d0af2d9e2e96b1f7aff89d63ca58007a5a93c65e404c84b3cab19a9683",
       "violations": 0,
       "candidates": 0,
       "findings": []
@@ -288,6 +444,12 @@
       "candidates": 0,
       "findings": []
     },
+    "core/engine/transition_internal.h": {
+      "sha256": "8b9861ebebea573acbacdd34a2516437a341fb05dd26183aff5c4c08ab78cd8b",
+      "violations": 0,
+      "candidates": 0,
+      "findings": []
+    },
     "core/engine/transition_pfade.c": {
       "sha256": "170cd6a1e3c28b33b351167e82388fddef02fa5cbbb77771a274e1027ff11045",
       "violations": 0,
@@ -300,8 +462,20 @@
       "candidates": 0,
       "findings": []
     },
+    "core/engine/ui.h": {
+      "sha256": "fdf85040fa3da4c60a6ba5eea80f7fe9d0f1b86044dce620c33b29508ec4fc54",
+      "violations": 0,
+      "candidates": 0,
+      "findings": []
+    },
     "core/engine/vm.c": {
       "sha256": "78bb27d1ac4f001487db029319f08595a9f895b84c61fd958e695e1b7b775d6c",
+      "violations": 0,
+      "candidates": 0,
+      "findings": []
+    },
+    "core/engine/vm.h": {
+      "sha256": "e9457e8943f27ba487471da9868d2411b68781d3075200d15b313bf27396d4e7",
       "violations": 0,
       "candidates": 0,
       "findings": []
@@ -312,8 +486,26 @@
       "candidates": 0,
       "findings": []
     },
+    "core/lib/cjk.h": {
+      "sha256": "eed18c828c72a1cd32f05fbc4bd3c5127383cab1861407e691a50d227bd575a0",
+      "violations": 0,
+      "candidates": 0,
+      "findings": []
+    },
+    "core/lib/endian.h": {
+      "sha256": "45bbda6244e139b2ab40b50841265d1692a4ceda75cbaabf218fa6dee1751679",
+      "violations": 0,
+      "candidates": 0,
+      "findings": []
+    },
     "core/lib/font.c": {
       "sha256": "89824ac699ab2488a50c006264cd9c3723866558f19b6b3fc9fdf2a6c8b908fd",
+      "violations": 0,
+      "candidates": 0,
+      "findings": []
+    },
+    "core/lib/font.h": {
+      "sha256": "d3a32ef5ef2072ce27915d7ba6fb1aecb2a1a5a4273449014245c84bf10c08e1",
       "violations": 0,
       "candidates": 0,
       "findings": []
@@ -324,8 +516,26 @@
       "candidates": 0,
       "findings": []
     },
+    "core/lib/mag.h": {
+      "sha256": "684d04792a2452da362109ed3948b7150cde8c2ae0751081961dca1c780ee49d",
+      "violations": 0,
+      "candidates": 0,
+      "findings": []
+    },
+    "core/lib/mag_format.h": {
+      "sha256": "6dcf27bea5e15e4ab3328f0dbfc35fbb41bd6ec9e4f402c806fdf8451bb20719",
+      "violations": 0,
+      "candidates": 0,
+      "findings": []
+    },
     "core/lib/naiz_file.c": {
       "sha256": "5bc6439f09ff8a855d46950018de89e6e7df4c84ebedd16edaa798cb0f73a268",
+      "violations": 0,
+      "candidates": 0,
+      "findings": []
+    },
+    "core/lib/naiz_file.h": {
+      "sha256": "9b6f7b40514bb7da39f11892fd07c5522d921c6ab9a911ddf5081cc20b514715",
       "violations": 0,
       "candidates": 0,
       "findings": []
@@ -342,8 +552,26 @@
         }
       ]
     },
+    "core/lib/tr.h": {
+      "sha256": "b542b9d8555f545af4391c8925b8c9ba001d27c2653b92ad7c48d896c55e3e72",
+      "violations": 0,
+      "candidates": 0,
+      "findings": []
+    },
     "core/plat/gdc.c": {
       "sha256": "5ad3bf78f5e8dc5a9fe3ec3690d52b0e88a6c3df304b6c2d48194c439f381479",
+      "violations": 0,
+      "candidates": 0,
+      "findings": []
+    },
+    "core/plat/gdc.h": {
+      "sha256": "44b3cb10ca95f1e9185bc148bc005b21fcd1af2e85cd66a0227203f5fbbaccc7",
+      "violations": 0,
+      "candidates": 0,
+      "findings": []
+    },
+    "core/plat/hal.h": {
+      "sha256": "bc8ce086ff395f6f82318b50abcbead8de47ad35a96397a6f3a0e74999920c25",
       "violations": 0,
       "candidates": 0,
       "findings": []
@@ -378,8 +606,26 @@
       "candidates": 0,
       "findings": []
     },
+    "core/plat/keyboard.h": {
+      "sha256": "addf00d447c7464098959a5482e9b2a5d3fba535ccefc6e5d5bc40b65830e6a4",
+      "violations": 0,
+      "candidates": 0,
+      "findings": []
+    },
     "core/plat/mouse.c": {
       "sha256": "e5f7a4acb73bcdf002438d03f2f69687b7a4afebcca60546e3c2b9d12242f3fd",
+      "violations": 0,
+      "candidates": 0,
+      "findings": []
+    },
+    "core/plat/mouse.h": {
+      "sha256": "82a39b1bd7caa87ab21e6a8ac3fbb8797bbbe2cde7bd5508d58e69d3b22a915e",
+      "violations": 0,
+      "candidates": 0,
+      "findings": []
+    },
+    "core/plat/pc98.h": {
+      "sha256": "bb98e8873270f1a0f45318fd09c3b1b05363e136f18583520522914c29e94648",
       "violations": 0,
       "candidates": 0,
       "findings": []
@@ -390,8 +636,20 @@
       "candidates": 0,
       "findings": []
     },
+    "core/plat/serial.h": {
+      "sha256": "18f343e2e201e4d40f2a5712e1fdea1554e74aa9a2eb94b62a1cc6d1ed29d5be",
+      "violations": 0,
+      "candidates": 0,
+      "findings": []
+    },
     "core/plat/video.c": {
       "sha256": "9317340bc479cc9f30242a0ad08bef75ce67cd57b6894ee98b1475e20b089970",
+      "violations": 0,
+      "candidates": 0,
+      "findings": []
+    },
+    "core/plat/video.h": {
+      "sha256": "fa24ac332b2ce9dcffb842153271330a3a02ffbf5119cba3f67ad0a20e3aae4a",
       "violations": 0,
       "candidates": 0,
       "findings": []
@@ -606,7 +864,7 @@
       ]
     },
     "tools/naiz_build/nb_validator.py": {
-      "sha256": "5bd252683795e59d9075431f0dc06be923551cdf61b0e414f75164c371f3af43",
+      "sha256": "baa67737e9e4a6c8eedbe5020d26899b802fcffb3ada1221b2114f181046dd8f",
       "violations": 0,
       "candidates": 0,
       "findings": []
@@ -959,16 +1217,16 @@
     }
   },
   "summary": {
-    "files": 124,
-    "changed": 1,
-    "skipped": 123,
+    "files": 167,
+    "changed": 0,
+    "skipped": 167,
     "out_of_scope": 0,
     "violations": 0,
     "candidates": 37,
     "fresh_violations": 0,
     "fresh_candidates": 0,
-    "verified": 18,
+    "verified": 20,
     "stale": 2,
-    "open": 17
+    "open": 15
   }
 }

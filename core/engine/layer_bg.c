@@ -170,14 +170,17 @@ const unsigned char *layer_bg_dialog_snapshot(void)
 
 /*==== Unified entry point ================================================*/
 
-/* Unified background change: blit + conditional capture + redraw + palette + snapshot.
- * Encapsulates the 7-step ritual previously inlined in cmd_bg(). */
+/* Unified background change: blit + re-capture + redraw + palette + snapshot.
+ * Encapsulates the 7-step ritual previously inlined in cmd_bg().
+ * The dialog-area snapshot is ALWAYS re-captured after the blit: the layer is
+ * opaque and physically overwrites the dialog rect, so a stale snapshot taken
+ * while the dialog was already open would leave a ghost on cg/bg(hidedialog)
+ * later (devdoc 94 root fix). */
 void layer_bg_change(MagImage *img)
 {
     if (!img) return;
     vram_blit(img, 0, 0);
-    if (!layer_dialog_drawn())
-        layer_capture_bg_dialog();
+    layer_capture_bg_dialog();
     layer_redraw_sprites();
     dlg_update_palette();
     btn_update_palette();

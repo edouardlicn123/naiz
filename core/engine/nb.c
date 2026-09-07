@@ -46,6 +46,18 @@ typedef struct {
 
 static NbState nb;  /* Interpreter state — owned exclusively by nb.c */
 
+/* Argv index of the brace payload on the last parsed line, or -1 when that
+ * line carried none.  Set by the line parser; consumed by commands (e.g. cg)
+ * to tell cg(){key} apart from the paren-only form. */
+static int last_brace_arg = -1;
+
+/* Return the brace-payload argv index from the most recently parsed line
+ * (see nb_parse_line).  Declared in nb_internal.h. */
+int nb_get_last_brace_arg(void)
+{
+    return last_brace_arg;
+}
+
 /* Set the chapter title string (metadata, saved to save files). */
 static void nb_set_chapter_title(const char *title)
 {
@@ -316,7 +328,7 @@ int nb_process(void)
 
             /* Parse command and arguments (comma-separated). */
             argc = nb_parse_line(line, cmd_name, sizeof(cmd_name),
-                              args, NB_ARGS_MAX);
+                              args, NB_ARGS_MAX, &last_brace_arg);
 
             if (argc < 0) {
                 NB_DEBUG("ERROR: parse failed: %s\r\n", line);

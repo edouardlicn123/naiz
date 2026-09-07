@@ -140,3 +140,46 @@ int save_file_read(const char *path, void *buf, size_t bufsz, size_t min_size,
     hal_log(b);
     return 0;
 }
+
+/*
+ * save_read_header — Read the SaveData header fields (magic, version,
+ * slot_name, timestamp, filename, chapter_title) that slot_info needs.
+ * Uses offsetof() to jump straight to each field, so the struct-layout
+ * arithmetic lives here instead of being hand-rolled in save.c.
+ * Accepts any magic (validity is left to the caller via h->magic) so the
+ * caller can distinguish an empty/garbage slot from a real one.
+ * Returns 0 on success, -1 on failure (already fclosed).
+ */
+int save_read_header(const char *path, SaveHeader *h)
+{
+    FILE *f;
+    char slot_name[32], timestamp[20];
+
+    memset(h, 0, sizeof(*h));
+    f = fopen(path, "rb");
+    if (!f) return -1;
+
+    if (fread(&h->magic, sizeof(h->magic), 1, f) != 1) { fclose(f); return -1; }
+    if (fread(&h->version, sizeof(h->version), 1, f) != 1) { fclose(f); return -1; }
+    if (fread(slot_name, sizeof(slot_name), 1, f) != 1) { fclose(f); return -1; }
+    if (fread(timestamp, sizeof(timestamp), 1, f) != 1) { fclose(f); return -1; }
+
+    /* jump past checksum + var_values to filename */
+    if (fseek(f, (long)offsetof(SaveData, filename), SEEK_SET) != 0) { fclose(f); return -1; }
+    if (fread(h->filename, sizeof(h->filename), 1, f) != 1) { fclose(f); return -1; }
+
+    /* chapter_title only exists for v3+ */
+    if (h->version >= 3) {
+        if (fseek(f, (long)offsetof(SaveData, chapter_title), SEEK_SET) != 0) { fclose(f); return -1; }
+        if (fread(h->chapter_title, sizeof(h->chapter_title), 1, f) != 1) { fclose(f); return -1; }
+    }
+
+    fclose(f);
+    strncpy(h->slot_name, slot_name, sizeof(h->slot_name) - 1);
+    h->slot_name[sizeof(h->slot_name) - 1] = '\0';
+    strncpy(h->timestamp, timestamp, sizeof(h->timestamp) - 1);
+    h->timestamp[sizeof(h->timestamp) - 1] = '\0';
+    h->filename[sizeof(h->filename) - 1] = '\0';
+    h->chapter_title[sizeof(h->chapter_title) - 1] = '\0';
+    return 0;
+}

@@ -52,6 +52,16 @@ typedef struct {
     unsigned int reserved[32 - SCENE_FLAG_WORDS];
 } SystemSave;
 
+/* On-disk SaveData header fields surfaced by save_read_header(). */
+typedef struct {
+    unsigned int magic;
+    unsigned int version;
+    char         slot_name[32];
+    char         timestamp[20];
+    char         filename[64];
+    char         chapter_title[64];
+} SaveHeader;
+
 /* Shared save I/O helpers (implemented in save_io.c) */
 int save_file_write(const char *path, void *data, size_t sz,
                     unsigned int magic, unsigned int version,
@@ -59,6 +69,7 @@ int save_file_write(const char *path, void *data, size_t sz,
 int save_file_read(const char *path, void *buf, size_t bufsz, size_t min_size,
                    unsigned int expected_magic, unsigned int max_version,
                    size_t cs_offset, const char *tag);
+int save_read_header(const char *path, SaveHeader *h);
 
 const char *save_get_filename(void);
 int  save_game_temp(void);

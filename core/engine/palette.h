@@ -27,4 +27,9 @@ void palette_interp(const uint8_t from[PALETTE_SIZE][3],
                     const uint8_t to[PALETTE_SIZE][3],
                     int step, int div, uint8_t out[PALETTE_SIZE][3]);
 
+/* Reset the reserved VN palette slots (WHITE/TRANSPARENT/CURSOR_BLACK) to
+ * their canonical values.  Shared by the bg/cg full-screen render paths so
+ * the three entries cannot drift between call sites. */
+void palette_reset_reserved(void);
+
 #endif /* PALETTE_H */

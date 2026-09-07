@@ -14,25 +14,26 @@
 
 | 命令 | 处理函数 | 签名 | 说明 |
 |---|---|---|---|
-| `bg` | `cmd_bg` (nb.c) | `bg <asset_key>` | 加载背景，capture_bg |
+| `bg` | `cmd_bg` (nb.c) | `bg(effect[,transition]){<asset_key>}` | 加载背景：**资产 key 必须在花括号负载**，括号位留给 effect/transition 参数（现为占位不作效）；capture_bg |
 | | | `bg(hidedialog)` | 关闭对话框，还原背景区域 |
-| `char` | `cmd_char` (nb.c) | `char <name> <l\|c\|r> [expr] [body\|face]` | 显示/替换立绘，auto-detect body/face |
+| `char` | `cmd_char` (nb.c) | `char(pos[,expr[,type]]){<name>}` | 显示/替换立绘：**角色名在花括号负载**，括号承载 pos(l\|c\|r)/expr/body\|face 参数；auto-detect body/face |
 | | | `char(hideall)` | 隐藏所有立绘 + clean reset |
 | `scene` | `cmd_scene` (nb.c) | `scene <id\|"end">` / `scene <var,op,val,target;...;default>` | 无条件/条件链跳转，id → nbook{id}.nb。默认值约定：最后一段无逗号→显式默认；无显式默认→fallback 到第一段 target |
-| `sceneconf` | `cmd_sceneconf` (nb.c) | `sceneconf <title>[,type]` | 场景配置：章节标题 + 类型（normal/cg/menu，默认 normal），随存档记录标题，type=menu 时禁用存档热键 |
+| `sceneconf` | `cmd_sceneconf` (nb.c) | `sceneconf(){<title>[,type]}` | 场景配置：章节标题 + 类型（normal/cg/menu，默认 normal）。**仅花括号形态**（paren 别名已废止），随存档记录标题，type=menu 时禁用存档热键 |
 | `mainmenu` | `cmd_mainmenu` (nb.c) | `mainmenu <x> <y> <w> <h> <opt1> <opt2> ...` | 主菜单，"start"→game, "exit"→end |
 | `question` | `cmd_question` (nb.c) | `question <text;opt,var,op,delta;...>` | 选项+变量操作(+/-/=)，结果存 nb.last_choice |
 | `var` | `cmd_var` (nb.c) | `var <id> <=/+|/-> <value>` | 变量读写（赋值/加减），需在 variables.json 定义 |
 | `settingmenu` | `cmd_settingmenu` (nb.c) | — | 设置菜单（TODO） |
-| `cg` | `cmd_cg` (nb_cg.c) | `cg <asset_key>` | 展示 CG（type='CG' 资产，用法同背景图），绘制后永久解锁该 CG 至 SYSTEM.SAV |
+| `cg` | `cmd_cg` (nb_cg.c) | `cg(){<asset_key>}` | 展示 CG（type='CG' 资产）：资产 key 必须写在花括号负载中——括号位预留给未来的参数设置，**不再承载资产描述**（`cg(key)` 括号形态被硬性拒绝）；绘制后永久解锁该 CG 至 SYSTEM.SAV |
+| | | `cg(hidedialog)` | 关闭对话框，还原背景区域（与 `bg(hidedialog)` 平行） |
 | `cgvmenu` | `cmd_cgvmenu` (nb_mainmenu.c) | — | 打开 CG 画廊（由 cgview.nb 调用）：网格浏览 + 锁定占位 + 翻页 + 全屏预览，ESC/Back 回主菜单 |
 | `musicmenu` | `cmd_musicmenu` (nb.c) | — | 音乐菜单（TODO） |
 | `host` | `cmd_host` (nb.c) | `host <text>` | 系统旁白（无角色名） |
 | `loadscene` | `cmd_loadscene` (nb.c) | — | 打开读档选单（由 loadscene.nb 调用） |
 | `fei` / `ira` / `neon` | `cmd_dialogue` (nb.c) | `<name>{<text>}` 或 `<name>(<text>)` | 角色台词 |
-| `bgm` | `cmd_bgm` (nb_commands.c) | `bgm <key>` | BGM 播放 |
-| `sound` | `cmd_sound` (nb_commands.c) | `sound <key>` | SE 播放 |
-| `voice` | `cmd_voice` (nb_commands.c) | `voice <key>` | 语音播放 |
+| `bgm` | `cmd_bgm` (nb_commands.c) | `bgm(){<key>}` / `bgm(stop)` | BGM 播放（key 在花括号负载；`bgm(stop)` keyword 停止） |
+| `sound` | `cmd_sound` (nb_commands.c) | `sound(){<key>}` | SE 播放（key 在花括号负载） |
+| `voice` | `cmd_voice` (nb_commands.c) | `voice(){<key>}` | 语音播放（key 在花括号负载） |
 | `playanima` | `cmd_playanima` (nb_anim.c) | `playanima{name}` / `playanima(once\|loop[,sec]){name}` | 播放 .ANI 动画；省略修饰=once；sec 为总时长秒数（覆盖容器 tick 表），loop 时到期重置 | 
 | `waitanima` | `cmd_waitanima` (nb_anim.c) | `waitanima{}` | 暂停剧本推进直至动画播完 |
 | `stopanima` | `cmd_stopanima` (nb_anim.c) | `stopanima{}` | 立即停止当前动画并唤醒剧本 |
@@ -42,6 +43,7 @@
 
 - `cmd(arg1, arg2, ...)` — 括号参数
 - `cmd{text content}` 或 `cmd(){text content}` — 文本参数
+- **对象在花括号、括号=参数 ± keyword 指令**：资源对象（bg/cg/char/host/role 台词/bgm/sound/voice/playanima）均把**对象名写在花括号负载**，括号位仅承载参数或保留给未来参数设置；keyword 指令（`bg(hidedialog)`/`cg(hidedialog)`/`char(hideall)`/`bgm(stop)`）无负载。`cg(key)`/`char(name,..)`/`bg(key)` 等"括号承载对象"的形态被硬性拒绝。
 
 ### 角色名映射
 

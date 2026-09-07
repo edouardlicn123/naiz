@@ -3,12 +3,17 @@
  *
  * Shows an event CG (type='CG' asset) using the same rendering path as
  * bg, then permanently unlocks it in SYSTEM.SAV (devdoc 89/90).
- * Syntax: cg <asset_key>
+ * Syntax:
+ *   cg(){<asset_key>}   show the CG; the brace payload carries the asset key.
+ *                       Parens are reserved for future parameter settings
+ *                       and NEVER load the asset.
+ *   cg(hidedialog)      close the dialog and restore the background area.
  */
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include "render.h"
+#include "palette.h"
 #include "image.h"
 #include "scene_layers.h"
 #include "hal.h"
@@ -18,6 +23,7 @@
 #include "nb_anim.h"
 #include "nb_commands.h"
 #include "nb_internal.h"
+#include "nb_dialog.h"
 
 void cmd_cg(int argc, const char **argv, const char *cmd_name)
 {
@@ -27,8 +33,20 @@ void cmd_cg(int argc, const char **argv, const char *cmd_name)
     MagImage *img;
 
     (void)cmd_name;
-    if (argc < 1) {
-        NB_DEBUG("cg: no args\r\n");
+
+    /* cg(hidedialog): keyword directive, no payload (parallel to bg(...)). */
+    if (argc == 1 && strcmp(argv[0], "hidedialog") == 0) {
+        NB_DEBUG("cg: hidedialog\r\n");
+        layer_dialog_hide();
+        nb_dialog_reset();
+        return;
+    }
+
+    /* Hard gate: the asset key must arrive via the brace payload
+     * cg(){key}.  Parens are reserved for future parameters and never load
+     * the asset, so the legacy paren form cg(key) is rejected. */
+    if (argc != 1 || nb_get_last_brace_arg() != argc - 1) {
+        NB_DEBUG("cg: usage cg(){asset_key} (parens reserved for params)\r\n");
         return;
     }
 
@@ -63,9 +81,7 @@ void cmd_cg(int argc, const char **argv, const char *cmd_name)
     sys_save_unlock_cg(cg_id);
 
     hal_mouse_invalidate_cursor();
-    hal_set_palette(PAL_WHITE, 0xFF, 0xFF, 0xFF);
-    hal_set_palette(PAL_TRANSPARENT, 0xFF, 0xFF, 0xFF);
-    hal_set_palette(PAL_CURSOR_BLACK, 0x00, 0x00, 0x00);
+    palette_reset_reserved();
     layer_bg_change(img);
     mag_release(img);
 

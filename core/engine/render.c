@@ -18,9 +18,6 @@
 #include "render.h"
 #include "render_internal.h"
 
-/* Forward declaration for the static bulk fill helper */
-static void vram_fill_row(volatile uint8_t *win, int off, uint8_t color, int n);
-
 /* Set a single pixel at a linear pixel address (y * LAYER_SCREEN_W + x).
  * Selects the correct bank and writes to the VRAM window.
  * Silently returns if addr is out of valid VRAM range [0, 256000). */
@@ -118,25 +115,8 @@ void draw_rect(int x, int y, int w, int h, int t, uint8_t color)
     }
 }
 
-/* Fast row fill in the banked VRAM window via rep stosb.
- * Fills 'n' bytes at win[off] with 'color'. */
-static void vram_fill_row(volatile uint8_t *win, int off, uint8_t color, int n)
-{
-    if (n <= 0)
-        return;
-    __asm {
-        push    es
-        push    edi
-        mov     edi, dword ptr [win]
-        add     edi, dword ptr [off]
-        mov     al, byte ptr [color]
-        mov     ecx, dword ptr [n]
-        cld
-        rep     stosb
-        pop     edi
-        pop     es
-    }
-}
+/* vram_fill_row is a shared static inline in render_internal.h (rep stosb
+ * fill into the banked VRAM window). */
 
 /* Fill a rectangle with a dither pattern.
  * pattern[8] — 8-byte vertical pattern (e.g. PAT75 for 75% dither)

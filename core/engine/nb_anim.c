@@ -568,11 +568,6 @@ int anim_waiting(void)
     return (g_anim.active && g_anim.wait) ? 1 : 0;
 }
 
-int anim_playing(void)
-{
-    return g_anim.active;
-}
-
 void anim_stop(void)
 {
     anim_stop_internal();

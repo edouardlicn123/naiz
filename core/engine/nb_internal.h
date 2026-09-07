@@ -43,9 +43,17 @@ const char *nb_get_buffer(void);
 
 /*=== Line parser (implemented in nb_parser.c) ==============================*/
 
-/* Parse one NB script line into cmd + args.  See nb_parser.c. */
+/* Parse one NB script line into cmd + args.  See nb_parser.c.
+ * brace_arg returns the argv index of the '{...}' payload (or -1 when the
+ * line carries none); the payload is always the last arg. */
 int nb_parse_line(char *line, char *cmd, int cmd_size,
-                  const char **args, int max_args);
+                  const char **args, int max_args,
+                  int *brace_arg);
+
+/* Argv index of the brace payload on the most recently parsed line, or -1
+ * when that line carried none.  Lets commands distinguish cg(){key} from the
+ * paren-only form cg(key) — the paren position is reserved for parameters. */
+int  nb_get_last_brace_arg(void);
 
 /* Parse one NB script line using ';' as the top-level argument delimiter
  * (multi-segment commands: question/scene).  See nb_parser.c. */

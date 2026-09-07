@@ -13,13 +13,21 @@
  * @param cmd_size cmd buffer size
  * @param args     Output argument pointer array
  * @param max_args args array max length
+ * @param brace_arg Output: argv index of the '{...}' payload argument, or -1
+ *                  when the line carries no brace payload.  The brace payload
+ *                  is always the last arg (a bare key, never a paren param).
  * @return Number of arguments (excluding command name)
  */
 int nb_parse_line(char *line, char *cmd, int cmd_size,
-                  const char **args, int max_args)
+                  const char **args, int max_args,
+                  int *brace_arg)
 {
     int argc = 0;
     char *p = line;
+    int brace_idx = -1;
+
+    if (brace_arg != NULL)
+        *brace_arg = -1;
 
     while (*p == ' ' || *p == '\t') p++;
 
@@ -62,16 +70,20 @@ int nb_parse_line(char *line, char *cmd, int cmd_size,
      * This is correct: the empty paren adds no argv entry.
      */
     if (*p == '{' && argc < max_args) {
+        int brace_idx_candidate = argc;  /* payload argv index, if captured */
         p++;
         if (*p) {
             args[argc] = p;
             argc++;
+            brace_idx = brace_idx_candidate;
         }
         /* find closing } */
         while (*p && *p != '}') p++;
         if (*p == '}') *((char *)p) = '\0';
     }
 
+    if (brace_arg != NULL)
+        *brace_arg = brace_idx;
     return argc;
 }
 

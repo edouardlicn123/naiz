@@ -6,6 +6,7 @@
  * fade-out, NAIZ_ANIM palette track) own the frame/timing loop.
  */
 #include "palette.h"
+#include "render.h"
 #include "hal.h"
 
 /* Read all 256 palette entries from the hardware palette ports. */
@@ -47,4 +48,12 @@ void palette_interp(const uint8_t from[PALETTE_SIZE][3],
             out[i][c] = (uint8_t)v;
         }
     }
+}
+
+/* Canonical values for the reserved VN palette slots (see render.h). */
+void palette_reset_reserved(void)
+{
+    hal_set_palette(PAL_WHITE, 0xFF, 0xFF, 0xFF);
+    hal_set_palette(PAL_TRANSPARENT, 0xFF, 0xFF, 0xFF);
+    hal_set_palette(PAL_CURSOR_BLACK, 0x00, 0x00, 0x00);
 }

@@ -27,17 +27,17 @@ from naiz_lib.nb_line import parse_nb_line
 # ── Known commands & their signatures ──────────────────────────────────────
 # (min_args, max_args_or_None, description)
 SIGNATURES = {
-    'bg':       (1, 3, 'bg(key[, effect[, transition]])'),
-    'cg':       (1, 1, 'cg(key)'),
-    'char':     (1, 4, 'char(name, pos[, expr[, type]])'),
+    'bg':       (0, 2, 'bg(effect[,transition]){key} | bg(hidedialog)'),
+    'cg':       (0, 1, 'cg(){key} | cg(hidedialog)'),
+    'char':     (1, 3, 'char(pos[,expr[,type]]){name} | char(hideall)'),
     'scene':    (1, None, 'scene(name)'),
     'sceneconf': (0, 0, 'sceneconf(){title[,type]}'),
     'mainmenu': (5, None, 'mainmenu(x, y, w, h, opt, ...)'),
     'host':     (0, 0, 'host(){text}'),
     'question': (2, None, 'question(prompt, opt, ...)'),
-    'bgm':      (1, 1, 'bgm(key|stop)'),
-    'sound':    (1, 1, 'sound(key)'),
-    'voice':    (1, 1, 'voice(key)'),
+    'bgm':      (0, 1, 'bgm(){key} | bgm(stop)'),
+    'sound':    (0, 0, 'sound(){key}'),
+    'voice':    (0, 0, 'voice(){key}'),
     'loadscene': (0, 0, 'loadscene()'),
     'cgvmenu':  (0, 0, 'cgvmenu()'),
     'startsetting': (0, 0, 'startsetting()'),
@@ -166,34 +166,83 @@ def validate_scene(nb_path, ref):
                     f"  {nb_path.name}:{lineno}: '{cmd}' needs ≤{max_a} "
                     f"args, got {len(args)}  ({desc})")
 
-            if cmd == 'bg' and len(args) >= 1 and args[0] == 'hidedialog':
-                pass
-            elif cmd == 'bg' and len(args) >= 1:
-                if args[0] not in img_keys:
+            if cmd == 'bg':
+                if args == ['hidedialog']:
+                    pass  # keyword directive — no payload, no asset lookup
+                elif text is not None and text.strip():
+                    key = text.strip()
+                    if key not in img_keys:
+                        errors.append(
+                            f"  {nb_path.name}:{lineno}: bg key {key!r} "
+                            "not in img_map (type=IMG)")
+                else:
                     errors.append(
-                        f"  {nb_path.name}:{lineno}: bg key {args[0]!r} "
-                        "not in img_map (type=IMG)")
+                        f"  {nb_path.name}:{lineno}: bg asset key must be in "
+                        f"braces 'bg(effect[,transition]){{key}}' — parens "
+                        f"are reserved for params; 'bg(hidedialog)' closes "
+                        f"the dialog")
 
-            elif cmd == 'cg' and len(args) >= 1:
-                if args[0] not in cg_keys:
+            elif cmd == 'cg':
+                if args == ['hidedialog']:
+                    pass  # keyword directive — no payload, no asset lookup
+                elif len(args) == 0 and text is not None and text.strip():
+                    key = text.strip()
+                    if key not in cg_keys:
+                        errors.append(
+                            f"  {nb_path.name}:{lineno}: cg key {key!r} "
+                            "not in img_map (type=CG)")
+                else:
                     errors.append(
-                        f"  {nb_path.name}:{lineno}: cg key {args[0]!r} "
-                        "not in img_map (type=CG)")
+                        f"  {nb_path.name}:{lineno}: cg asset key must be in "
+                        f"braces 'cg(){{<key>}}' — parens are reserved for "
+                        f"params; 'cg(hidedialog)' closes the dialog")
 
             elif cmd == 'char':
-                if len(args) >= 1 and args[0] == 'hideall':
-                    pass
-                elif len(args) >= 1 and args[0] not in char_keys:
+                if args == ['hideall']:
+                    pass  # keyword directive — no payload, no lookup
+                elif text is None or not text.strip():
                     errors.append(
-                        f"  {nb_path.name}:{lineno}: char name "
-                        f"{args[0]!r} not in characters.json")
-                if len(args) >= 3 and args[0] in char_keys:
-                    cid = char_keys[args[0]]
-                    if (cid, args[2]) not in expr_set:
+                        f"  {nb_path.name}:{lineno}: char name must be in "
+                        f"braces 'char(pos[,expr[,type]]){{name}}' — parens "
+                        f"reserved for params; 'char(hideall)' hides all")
+                else:
+                    name = text.strip()
+                    if name not in char_keys:
                         errors.append(
-                            f"  {nb_path.name}:{lineno}: expression "
-                            f"{args[2]!r} not defined for {args[0]} "
-                            f"(char_id={cid})")
+                            f"  {nb_path.name}:{lineno}: char name "
+                            f"{name!r} not in characters.json")
+                    else:
+                        expr = args[1] if len(args) >= 2 else 'normal'
+                        if (char_keys[name], expr) not in expr_set:
+                            errors.append(
+                                f"  {nb_path.name}:{lineno}: expression "
+                                f"{expr!r} not defined for {name} "
+                                f"(char_id={char_keys[name]})")
+
+            elif cmd == 'bgm':
+                if args == ['stop']:
+                    pass  # keyword directive
+                elif args:
+                    errors.append(
+                        f"  {nb_path.name}:{lineno}: bgm: only 'stop' is "
+                        f"allowed in parens; the key goes in braces "
+                        f"'bgm(){{key}}'")
+                elif text is None or not text.strip():
+                    errors.append(
+                        f"  {nb_path.name}:{lineno}: bgm needs key in "
+                        f"braces 'bgm(){{key}}'")
+
+            elif cmd in ('sound', 'voice'):
+                if text is None or not text.strip():
+                    errors.append(
+                        f"  {nb_path.name}:{lineno}: {cmd} needs key in "
+                        f"braces '{cmd}(){{key}}'")
+
+            elif cmd == 'sceneconf':
+                if text is None or not text.strip():
+                    errors.append(
+                        f"  {nb_path.name}:{lineno}: sceneconf requires "
+                        f"title in braces 'sceneconf(){{title[,type]}}'")
 
             elif cmd == 'playanima':
                 if text is None or not text.strip():

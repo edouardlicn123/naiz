@@ -41,12 +41,20 @@ def _build_manual_notes():
 
 
 def collect_files(root):
-    """Return ordered [(relpath, abspath)] for every audited source file."""
+    """Return ordered [(relpath, abspath)] for every audited source file.
+
+    C = core/{engine,lib,plat}/*.c plus *.h headers (headers carry static
+    inline bodies and struct layouts, so they get the same rule sweep; C13
+    unused-static and C14 must-hal_log are gated off for headers in
+    run_audit because cross-file static usage is not visible from a single
+    header and inline helpers have no logging obligation).
+    """
     c_files = []
     for path in sorted((root / "core").glob("*/*.c")):
         if path.name == "vram.c":  # opt-in reference impl, excluded from build
             continue
         c_files.append(path)
+    h_files = sorted((root / "core").glob("*/*.h"))
     p_files = []
     for path in sorted((root / "tools").rglob("*.py")):
         rel = path.relative_to(root)
@@ -64,7 +72,7 @@ def collect_files(root):
         if p.is_file():
             s_files.append(p)
     s_files += sorted((root / "core").glob("*.sh"))
-    return c_files + p_files + s_files
+    return c_files + h_files + p_files + s_files
 
 
 def _kind_of(rel):
@@ -234,6 +242,13 @@ def run_audit(root=None, reset=False, verbose=False, quiet=False,
         changed += 1
         kind = _kind_of(rel)
         rule_ids = [rid for rid in sorted(wanted) if rid.startswith(kind)]
+        if rel.endswith(".h"):
+            # Headers: scope C rules to real code-hostile checks.  C13
+            # (unused static) cannot judge cross-file usage from one header
+            # (static inline helpers legitimately used by several .c files
+            # appear once here), and C14 (must hal_log) does not apply to
+            # inline helpers that have no logging obligation.
+            rule_ids = [r for r in rule_ids if r not in ("C13", "C14")]
         if not rule_ids:
             new_state[rel] = info
             continue

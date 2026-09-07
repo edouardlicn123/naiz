@@ -48,11 +48,32 @@
       "date": "2026-08-18T12:02:38",
       "sha256": "a36e6569b8ee56818d0e4c3c9858c84f4c91a32ff41e6ef53519d76770c77f03"
     },
+    "core/engine/nb_anim.c:490": {
+      "verdict": "ok",
+      "text": "decode_buf malloc 下一行 if(a->decode_buf) 已判空，R9 文件",
+      "date": "2026-09-07T12:30:46",
+      "sha256": "1a6d124696a56bfc92026e37d698b809e121cddf440d398ae9620c56995b0f8d",
+      "line": "        a->decode_buf = (uint8_t *)malloc(pool);"
+    },
     "core/engine/nb_commands.c:131": {
       "verdict": "ok",
       "text": "memcpy into buf sized sizeof(buf); source fixed struct member",
       "date": "2026-08-18T13:12:57",
       "sha256": "1c24886cfae9bf085a3df85c36694080be538481f5cb7a59342864588d9d3be7"
+    },
+    "core/engine/nb_commands.c:134": {
+      "verdict": "ok",
+      "text": "memcpy 前 if(len>=bufsz) len=bufsz-1 钳位，目标 buf[bufsz] 足够",
+      "date": "2026-09-07T12:30:46",
+      "sha256": "6993f8ce92a076030e1507d14cd4c7eaa90abafc4b213ae9ad00e39f9876934d",
+      "line": "    memcpy(buf, p, len);"
+    },
+    "core/engine/nb_commands.c:320": {
+      "verdict": "ok",
+      "text": "int d=(val==INT_MIN)?INT_MIN:-val 即 C22 守卫式，R8 修复后保留",
+      "date": "2026-09-07T12:30:46",
+      "sha256": "6993f8ce92a076030e1507d14cd4c7eaa90abafc4b213ae9ad00e39f9876934d",
+      "line": "        int d = (val == INT_MIN) ? INT_MIN : -val;"
     },
     "core/engine/nb_commands.c:327": {
       "verdict": "fixed",

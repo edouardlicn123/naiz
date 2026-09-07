@@ -8,36 +8,7 @@
  * are documented in render.c's header.
  */
 #include "render.h"
-
-/* Fast row copy into the banked VRAM window via rep movsb.
- *
- * The PEGC bank window is plain RAM (no read/write side effects), so a
- * non-volatile bulk copy is safe here.  This matters enormously under
- * interpreted emulation: one REP MOVSB keeps the emulator inside a single
- * instruction's internal loop, while per-byte volatile stores pay full
- * fetch/decode cost for every pixel (a fullscreen blit would take ~1s).
- */
-static void vram_row_copy(volatile uint8_t *win, int off, const uint8_t *src, int n)
-{
-    if (n <= 0)
-        return;
-    __asm {
-        push    es
-        push    ds
-        pop     es                  /* ES = DS: flat model, both cover linear space */
-        push    edi
-        push    esi
-        mov     edi, dword ptr [win]
-        add     edi, dword ptr [off]
-        mov     esi, dword ptr [src]
-        mov     ecx, dword ptr [n]
-        cld
-        rep     movsb
-        pop     esi
-        pop     edi
-        pop     es
-    }
-}
+#include "render_internal.h"
 
 /* Blit an entire MagImage to VRAM at (x,y).
  * No transparency — every pixel is written.  Delegates to vram_blit_sprite. */
@@ -91,8 +62,7 @@ void vram_blit_sprite(const MagImage *img, int x, int y, uint8_t transparent_idx
             if (!mirror && transparent_idx == PAL_NO_TRANSPARENCY) {
                 /* Opaque blit fast path: bulk-copy the whole bank segment.
                  * Source offset is a straight line: sx0 + line_off. */
-                vram_row_copy(win, off,
-                              src_line + sx0 + line_off, seg);
+                vram_row_write(src_line + sx0 + line_off, win, off, seg);
             } else {
             /* Scan and write non-transparent runs within this bank segment */
             px = 0;
