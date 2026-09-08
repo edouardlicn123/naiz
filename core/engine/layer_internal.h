@@ -33,7 +33,7 @@ const unsigned char *layer_bg_dialog_snapshot(void);
 
 /* Capture dialog-area background from a MagImage pixel buffer directly
  * (RAM-to-RAM copy, no VRAM readback).  src_x/src_y = blit origin. */
-void layer_capture_bg_dialog_from_image(const uint8_t *pixels, int img_w,
+void layer_capture_bg_dialog_from_image(const uint8_t *pixels, int img_w, int img_h,
                                         int src_x, int src_y);
 
 /*=== Sprite (implemented in layer_sprite.c) ================================*/

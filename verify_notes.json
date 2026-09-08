@@ -35,6 +35,20 @@
       "date": "2026-08-18T13:14:50",
       "sha256": "5670dda162df2d62874829e25e41152ec26d87e3c7003ca13f96b3de6bbe64c5"
     },
+    "core/engine/layer.c:80": {
+      "verdict": "ok",
+      "text": "switch no default but b pre-initialized full-screen {0,0,640,400}; unknown z falls through to full-screen bounds, safe",
+      "date": "2026-09-08T11:10:08",
+      "sha256": "6035be9cfafedea13b157375f407a9ac61baf25ec72386e6f2da8841db662f83",
+      "line": "    switch (z_order) {"
+    },
+    "core/engine/layer_debug.c:35": {
+      "verdict": "ok",
+      "text": "diagnostic PPM export; short write only degrades debug snapshot, fclose still runs, no game-state impact",
+      "date": "2026-09-08T11:10:08",
+      "sha256": "9cb1aad8dae15e99c4ac0cbd52da776104b1dcb6a3e0233cbf7da1a9903512e0",
+      "line": "    fwrite(rgb, 1, len, f);"
+    },
     "core/engine/layer_dialog.c:137": {
       "verdict": "ok",
       "text": "malloc result guarded by truthy check below; OOM degrades gracefully via dialog_drawn=0",
@@ -48,12 +62,19 @@
       "date": "2026-08-18T12:02:38",
       "sha256": "a36e6569b8ee56818d0e4c3c9858c84f4c91a32ff41e6ef53519d76770c77f03"
     },
+    "core/engine/nb_anim.c:477": {
+      "verdict": "ok",
+      "text": "decode_buf malloc guarded by if(a->decode_buf) next line; OOM falls back to per-frame alloc (R13 dedup shifted line)",
+      "date": "2026-09-08T11:10:08",
+      "sha256": "bfb6c4e490056b96485769cab7d05f87d66a49d50a0a7aba2320c2142decde9e",
+      "line": "        a->decode_buf = (uint8_t *)malloc(pool);"
+    },
     "core/engine/nb_anim.c:490": {
       "verdict": "ok",
-      "text": "decode_buf malloc 下一行 if(a->decode_buf) 已判空，R9 文件",
-      "date": "2026-09-07T12:30:46",
-      "sha256": "1a6d124696a56bfc92026e37d698b809e121cddf440d398ae9620c56995b0f8d",
-      "line": "        a->decode_buf = (uint8_t *)malloc(pool);"
+      "text": "stale record replaced by nb_anim.c:477 after R13 dedup removed 14 lines",
+      "date": "2026-09-08T11:10:08",
+      "sha256": "bfb6c4e490056b96485769cab7d05f87d66a49d50a0a7aba2320c2142decde9e",
+      "line": "    a->type = atype;"
     },
     "core/engine/nb_commands.c:131": {
       "verdict": "ok",
@@ -80,6 +101,13 @@
       "text": "INT_MIN negation guarded, nb_var_add uses 64-bit math",
       "date": "2026-08-18T13:12:57",
       "sha256": "1c24886cfae9bf085a3df85c36694080be538481f5cb7a59342864588d9d3be7"
+    },
+    "core/engine/nb_commands.c:347": {
+      "verdict": "ok",
+      "text": "(\\-val) INT_MIN-guarded identical to nb_commands.c:320 R8 fix; nb_var_add clamps via 64-bit",
+      "date": "2026-09-08T10:19:38",
+      "sha256": "246712ddb7b45dd00d57ad21fa6f10ff94d3f413d7d23738dd23bad66cc24aea",
+      "line": "        int d = (val == INT_MIN) ? INT_MIN : -val;"
     },
     "core/lib/tr.c:65": {
       "verdict": "ok",
@@ -124,6 +152,13 @@
       "sha256": "949a83057fc50db120cfb93f1fcdc651ea1c1ef52f73e646128590e7656ab67d",
       "line": "        import getpass"
     },
+    "tools/env_setup/env_utils.py:121": {
+      "verdict": "ok",
+      "text": "lazy stdlib getpass only when sudo password prompt needed",
+      "date": "2026-09-08T11:10:08",
+      "sha256": "a39cac5d9fc50177119cbfee74f5c3973f91649f34003e369f11e200de69ddc3",
+      "line": "        import getpass"
+    },
     "tools/naiz_build/anim_import.py:89": {
       "verdict": "ok",
       "text": "lazy mag_convert import defers PIL-dependent converter chain",
@@ -136,6 +171,13 @@
       "text": "lazy naiz_conv import avoids startup cost",
       "date": "2026-08-18T13:17:03",
       "sha256": "5e057942a14a84d1397bdedcd82e28d3e1c726875fdc354ec28a18f3df1392cf"
+    },
+    "tools/naiz_build/mp4_to_ani.py:122": {
+      "verdict": "ok",
+      "text": "lazy PIL import defers optional dependency",
+      "date": "2026-09-08T11:10:08",
+      "sha256": "fca388e480e6716cb78c6c63d566e6e1c217d0bac5ba7d7b2a9fcd303a85cf2e",
+      "line": "    from PIL import Image"
     },
     "tools/naiz_build/pack_images.py:42": {
       "verdict": "ok",
@@ -205,6 +247,69 @@
       "date": "2026-08-18T13:17:03",
       "sha256": "0e811b9ac4435935307fb10d4880ef47b009bb6d3947297b53e79714625bab23"
     },
+    "tools/naiz_font/gen_cjk_font.py:251": {
+      "verdict": "ok",
+      "text": "verify read rc<2 bytes; truncated file raises struct.error loudly, no silent corruption",
+      "date": "2026-09-08T11:10:08",
+      "sha256": "583e014297683ec3bb8e7564ea0e7d480af66ff653860248cb402124174b58de",
+      "line": "        rc = struct.unpack(\"<H\", f.read(2))[0]"
+    },
+    "tools/naiz_font/gen_cjk_font.py:252": {
+      "verdict": "ok",
+      "text": "verify skip of fixed 4 reserved bytes after rc read",
+      "date": "2026-09-08T11:10:08",
+      "sha256": "583e014297683ec3bb8e7564ea0e7d480af66ff653860248cb402124174b58de",
+      "line": "        _ = f.read(4)  # skip reserved"
+    },
+    "tools/naiz_font/gen_cjk_font.py:256": {
+      "verdict": "ok",
+      "text": "verify read of range start; fixed<4B fails loudly",
+      "date": "2026-09-08T11:10:08",
+      "sha256": "583e014297683ec3bb8e7564ea0e7d480af66ff653860248cb402124174b58de",
+      "line": "            s = struct.unpack(\"<I\", f.read(4))[0]"
+    },
+    "tools/naiz_font/gen_cjk_font.py:257": {
+      "verdict": "ok",
+      "text": "verify read of range end; fixed<4B fails loudly",
+      "date": "2026-09-08T11:10:08",
+      "sha256": "583e014297683ec3bb8e7564ea0e7d480af66ff653860248cb402124174b58de",
+      "line": "            e = struct.unpack(\"<I\", f.read(4))[0]"
+    },
+    "tools/naiz_font/gen_cjk_font.py:258": {
+      "verdict": "ok",
+      "text": "verify read of glyph offset; fixed<4B fails loudly",
+      "date": "2026-09-08T11:10:08",
+      "sha256": "583e014297683ec3bb8e7564ea0e7d480af66ff653860248cb402124174b58de",
+      "line": "            o = struct.unpack(\"<I\", f.read(4))[0]"
+    },
+    "tools/naiz_font/gen_cjk_font.py:259": {
+      "verdict": "ok",
+      "text": "verify skip of fixed 4 reserved bytes",
+      "date": "2026-09-08T11:10:09",
+      "sha256": "583e014297683ec3bb8e7564ea0e7d480af66ff653860248cb402124174b58de",
+      "line": "            _ = f.read(4)"
+    },
+    "tools/naiz_font/gen_cjk_font.py:266": {
+      "verdict": "ok",
+      "text": "verify re-read after seek(10); file just written, header validated",
+      "date": "2026-09-08T11:10:09",
+      "sha256": "583e014297683ec3bb8e7564ea0e7d480af66ff653860248cb402124174b58de",
+      "line": "            s = struct.unpack(\"<I\", f.read(4))[0]"
+    },
+    "tools/naiz_font/gen_cjk_font.py:267": {
+      "verdict": "ok",
+      "text": "verify read range end after seek; fails loudly on short data",
+      "date": "2026-09-08T11:10:09",
+      "sha256": "583e014297683ec3bb8e7564ea0e7d480af66ff653860248cb402124174b58de",
+      "line": "            e = struct.unpack(\"<I\", f.read(4))[0]"
+    },
+    "tools/naiz_font/gen_cjk_font.py:268": {
+      "verdict": "ok",
+      "text": "verify read glyph offset after seek; fails loudly on short data",
+      "date": "2026-09-08T11:10:09",
+      "sha256": "583e014297683ec3bb8e7564ea0e7d480af66ff653860248cb402124174b58de",
+      "line": "            o = struct.unpack(\"<I\", f.read(4))[0]"
+    },
     "tools/naiz_img/__init__.py:47": {
       "verdict": "ok",
       "text": "lazy submodule import inside format branch",
@@ -222,6 +327,20 @@
       "text": "lazy mag_codec import avoids import cycle",
       "date": "2026-08-18T13:17:03",
       "sha256": "68b9474be95c280f9d57c18782171b3484cdf31ccbbccb9cb2c73d581829cea0"
+    },
+    "tools/naiz_lib/image_dat.py:36": {
+      "verdict": "ok",
+      "text": "lazy mag_codec import avoids import cycle",
+      "date": "2026-09-08T11:10:08",
+      "sha256": "ad59a81f0ab92b7c688f802210176c020cc3d3806f17a3c8d722bef862147a82",
+      "line": "    from naiz_lib.mag_codec import decode_mag_palette"
+    },
+    "tools/naiz_lib/image_dat.py:37": {
+      "verdict": "ok",
+      "text": "lazy MAG_SIGNATURE import, same function as :36",
+      "date": "2026-09-08T11:10:08",
+      "sha256": "ad59a81f0ab92b7c688f802210176c020cc3d3806f17a3c8d722bef862147a82",
+      "line": "    from naiz_lib.mag_constants import MAG_SIGNATURE"
     },
     "tools/naiz_lib/mag_codec.py:161": {
       "verdict": "ok",

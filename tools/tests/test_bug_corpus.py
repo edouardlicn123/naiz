@@ -61,6 +61,19 @@ CORPUS = [
     ("R8", "C25", "use-after-free dereference",
      "void f(void){ void *p = malloc(4); free(p); p->x = 1; }"),
 
+    # --- Tier-3 rules (R13/R14: full-project audits) ---
+    ("R13", "C26", "mag_release: pool struct free escapes is_pool guard",
+     "void r(void){ if (!img->is_pool) free(img->pixels); free(img); }"),
+    ("R13", "C27", "cmd_char: argv[argc-1] reached with argc==0",
+     "void c(int argc, const char **argv){ name = argv[argc - 1]; }"),
+    ("R14", "C28", "cine dialog OOB: strided row read with no image height",
+     "void c(const uint8_t *pixels, int img_w, int src_x, int src_y){"
+     " src_row = LAYER_DIALOG_Y + dy;"
+     " memcpy(s, pixels + src_row * img_w + x, LAYER_DIALOG_W); }"),
+    ("R13", "C29", "mag off_img: struct ptr guarded without sizeof term",
+     "void d(void){ if (off > buf_size) return 1;"
+     " img = (MagImage *)(buf + off); }"),
+
     # --- P rules ---
     ("R1", "P1", "bare except",
      "try:\n    x()\nexcept:\n    pass\n"),

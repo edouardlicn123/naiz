@@ -1,7 +1,7 @@
 {
   "version": 2,
-  "git_head": "d9d3a3d",
-  "checked_at": "2026-09-07T17:49:55",
+  "git_head": "0ed3f50",
+  "checked_at": "2026-09-08T11:30:57",
   "files": {
     "core/build.sh": {
       "sha256": "0e6bb3f41cae8f6c5a014a49767f93990ddd3e2c461a85ec991c01b40b66b11e",
@@ -92,7 +92,7 @@
       ]
     },
     "core/engine/layer_bg.c": {
-      "sha256": "0ea8e92dd543e9d1cfb4648c3a20adb2c64d4634e6c28720c5bc9ac793a8e9d7",
+      "sha256": "dda6b064747360bf54ad7ed5da978bdd3ef94832f846ccb2b95bd1798b872823",
       "violations": 0,
       "candidates": 0,
       "findings": []
@@ -128,13 +128,13 @@
       ]
     },
     "core/engine/layer_internal.h": {
-      "sha256": "cc8dd9e787ef6126852525fae5ba06c1af38604d247d99ed731028d254ce96b5",
+      "sha256": "4c9c733b15a39d45d472df82d02bfe69a754f659c428b8d76be08f4a90576b79",
       "violations": 0,
       "candidates": 0,
       "findings": []
     },
     "core/engine/layer_sprite.c": {
-      "sha256": "a58fd4d0399449c03a9171629db83d9d2f4c5edc74c335e97a59ba875eee7c57",
+      "sha256": "4e6b5288817a6673143643153ec405e8eea8363fdf1c61ad5f12a0b0f9c8c87c",
       "violations": 0,
       "candidates": 0,
       "findings": []
@@ -158,12 +158,12 @@
       "findings": []
     },
     "core/engine/nb_anim.c": {
-      "sha256": "1a6d124696a56bfc92026e37d698b809e121cddf440d398ae9620c56995b0f8d",
+      "sha256": "373e32426ea6210d443051480f284e5dd29e8286ab287158a0fc515c0145c173",
       "violations": 0,
       "candidates": 1,
       "findings": [
         {
-          "line": 490,
+          "line": 474,
           "rule": "C1",
           "level": "HEUR"
         }
@@ -176,7 +176,7 @@
       "findings": []
     },
     "core/engine/nb_asset_table.h": {
-      "sha256": "b547bbcad8d013d2af7b55dfead784b0f11c4c7a0b63d7019c2051bd8051108e",
+      "sha256": "bb7e80904c8d4a337052d731aea5b1c786241bd54b2e54998981090bd9f00122",
       "violations": 0,
       "candidates": 0,
       "findings": []
@@ -194,18 +194,18 @@
       "findings": []
     },
     "core/engine/nb_cggallery.c": {
-      "sha256": "4b17874afa6da38e1e861b3aabfc8c4514fb9095557bd9fc2613c0ea7a5206fe",
+      "sha256": "f2998efd20ec02ca5896747478b582e5dad5286d8d7c92fd3d4f4ab1b5457360",
       "violations": 0,
       "candidates": 0,
       "findings": []
     },
     "core/engine/nb_commands.c": {
-      "sha256": "732762e0f114046c2d967153bbf00fbb5c446628503db9781e7c1b1c9fc03780",
+      "sha256": "246712ddb7b45dd00d57ad21fa6f10ff94d3f413d7d23738dd23bad66cc24aea",
       "violations": 0,
       "candidates": 2,
       "findings": [
         {
-          "line": 346,
+          "line": 347,
           "rule": "C8",
           "level": "HEUR"
         },
@@ -223,7 +223,7 @@
       "findings": []
     },
     "core/engine/nb_config.h": {
-      "sha256": "d728d8d23e4509234762c1630cce9c42642685b93645f5b577cc11dc21b08272",
+      "sha256": "7cca47c3046118014c1fc80c7a175f802cc0b649c891417448b627a2367c35af",
       "violations": 0,
       "candidates": 0,
       "findings": []
@@ -511,7 +511,7 @@
       "findings": []
     },
     "core/lib/mag.c": {
-      "sha256": "d7cfbd4207f3e82420986b8096aa9d10df4bae2efa911af6411df59a5cf71cd0",
+      "sha256": "1fb5873facc2aa937a31f635d3f8730834df0676c5787be799cce13bfe6e229e",
       "violations": 0,
       "candidates": 0,
       "findings": []
@@ -1225,8 +1225,8 @@
     "candidates": 37,
     "fresh_violations": 0,
     "fresh_candidates": 0,
-    "verified": 20,
+    "verified": 34,
     "stale": 2,
-    "open": 15
+    "open": 1
   }
 }

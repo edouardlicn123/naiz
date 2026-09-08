@@ -469,9 +469,12 @@ int mag_read_palette(const uint8_t *data, int size,
  */
 void mag_release(MagImage *img) {
     if (img && --img->refcount <= 0) {
-        if (!img->is_pool)
+        if (!img->is_pool) {
             free(img->pixels);  /* Free pixel buffer (unless pool-allocated) */
-        free(img);          /* Free struct itself */
+            free(img);          /* Free struct itself */
+        }
+        /* is_pool: struct + pixels live inside the caller's work buffer
+         * (see mag_decode_into); the caller owns and frees that buffer. */
     }
 }
 
@@ -624,9 +627,11 @@ int mag_decode_into(const uint8_t *data, int size,
     cropped_size = (pad_px_left > 0 || pad_px_right > 0 || crop_width != pixel_width)
                    ? crop_width * crop_height : 0;
 
-    off_img = off_cropped + cropped_size + sizeof(MagImage);
+    off_img = off_cropped + cropped_size;
 
-    if (off_img > buf_size) return 1;
+    /* struct spans [off_img, off_img+sizeof): bound must cover its end. */
+    if (off_img > buf_size ||
+        (size_t)off_img + sizeof(MagImage) > (size_t)buf_size) return 1;
 
     output = buf + off_output;
     action = buf + off_action;

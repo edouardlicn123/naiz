@@ -215,6 +215,7 @@ static void cmd_char(int argc, const char **argv, const char *cmd_name)
     }
 
     /* Hard gate: the character name must arrive via the brace payload. */
+    if (argc < 1) return;
     if (nb_get_last_brace_arg() != argc - 1) {
         NB_DEBUG("char: usage char(pos[,expr[,type]]){name} "
                  "(name in braces, parens reserved for params)\r\n");

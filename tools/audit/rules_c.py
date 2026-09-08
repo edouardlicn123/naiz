@@ -569,6 +569,140 @@ def check_c25(text, _path):
 
 
 # ---------------------------------------------------------------------------
+# Tier-3 HEUR rules from the R13/R14 full-project audits
+# ---------------------------------------------------------------------------
+
+def check_c26(text, _path):
+    """Ownership-split free (HEUR): ``if (cond) free(p->member); free(p);``
+
+    R13 mag_release: the struct free was outside the ``!p->is_pool`` guard
+    that skipped the pixel free, so pool-owned images whose struct lives
+    inside the caller's work buffer were handed to free() (interior pointer,
+    heap corruption).  A guarded member free immediately followed by an
+    unguarded base free is the shape to confirm.
+    """
+    out = []
+    clean = _strip_c_comments(text)
+    for m in re.finditer(
+            r"if\s*\([^;{}]*\)\s*free\s*\(\s*(\w+)\s*->\s*\w+\s*\)\s*;"
+            r"\s*free\s*\(\s*\1\s*\)\s*;", clean, flags=re.DOTALL):
+        out.append((_line(clean, m.start()),
+                    f"ownership-split free: 'free({m.group(1)})' follows a "
+                    "flag-guarded 'free({...}->...)' but escapes the guard; "
+                    "verify the base pointer is not an interior buffer "
+                    "pointer owned by the caller"))
+    return out
+
+
+RE_NEGSUB = re.compile(
+    r"\[\s*(argc|nargs|num_args|arg_count|npargs)\w*\s*-\s*(\d+)\s*\]")
+RE_NEGSUB_GUARD = re.compile(
+    r"if\s*\(\s*(argc|nargs|num_args|arg_count|npargs)\w*\s*"
+    r"(?:<|<=|==)\s*(\d+)\s*\)")
+
+
+def check_c27(text, _path):
+    """Count-derived negative subscript (HEUR).
+
+    R13 cmd_char: ``argv[argc-1]`` was reached with argc==0 (empty ``char()``
+    / bare ``char``), indexing argv[-1].  Only arg-count-style names are
+    scanned to keep loop counters out; a ``count < K`` / ``count == 0``
+    guard anywhere in the function exempts the use.
+    """
+    out = []
+    clean = _strip_c_comments(text)
+    for name, fs, fe in _find_functions(clean):
+        span = clean[fs:fe]
+        guards = {(m.group(1), int(m.group(2)))
+                  for m in RE_NEGSUB_GUARD.finditer(span)}
+        for m in RE_NEGSUB.finditer(span):
+            var = m.group(1)
+            k = int(m.group(2))
+            if k == 0:
+                continue
+            if any(v == var and g <= k for v, g in guards):
+                continue
+            out.append((_line(clean, fs + m.start()),
+                        f"negative-index risk: '{var}[{var}-{k}]' without an "
+                        f"'{var}<{k}' / '{var}==0' guard in the function"))
+    return out
+
+
+RE_STRIDE_W = r"(?:[a-z]\w*_[Ww]\b|\w*[Ww]idth\w*|(?<![A-Za-z0-9_])[Ww](?![A-Za-z0-9_]))"
+RE_STRIDE_H = r"(?:[a-z]\w*_[Hh]\b|\w*[Hh]eight\w*|(?<![A-Za-z0-9_])[Hh](?![A-Za-z0-9_]))"
+RE_STRIDED_READ = re.compile(
+    r"\b([A-Za-z_]\w*)\s*\*\s*(" + RE_STRIDE_W + r")\b"
+    r"|\b(" + RE_STRIDE_W + r")\s*\*\s*([A-Za-z_]\w*)\b")
+
+
+def check_c28(text, _path):
+    """Row-strided read without a height extent (HEUR).
+
+    R14 cine OOB: layer_capture_bg_dialog_from_image took a width param and
+    indexed rows via ``pixels + src_row * img_w`` but never clamped against
+    the image's own height (only LAYER_SCREEN_H), so a 640x280 palette-track
+    cine read 115 rows past the buffer end.  A function that multiplies a
+    width-named stride and exposes no height-named parameter/mention in the
+    surrounding scope is a manual-review candidate.
+    """
+    out = []
+    clean = _strip_c_comments(text)
+    seen = set()
+    for name, fs, fe in _find_functions(clean):
+        span = clean[fs:fe]
+        paren = clean.find("(", fs)
+        if paren < 0 or paren >= fe:
+            continue
+        open_brace = clean.find("{", paren)
+        if open_brace < 0 or open_brace >= fe:
+            continue
+        header = clean[paren:open_brace]
+        body = clean[open_brace:fe]
+        if not re.search(RE_STRIDE_W, header):
+            continue
+        if re.search(RE_STRIDE_H, header) or re.search(RE_STRIDE_H, body):
+            continue
+        for m in RE_STRIDED_READ.finditer(span):
+            line = _line(clean, fs + m.start())
+            if line in seen:
+                continue
+            seen.add(line)
+            out.append((line,
+                        f"row-stride read ('{m.group(0)}') in '{name}' with "
+                        "no height extent in scope; verify row index is "
+                        "clamped against the buffer's own row count"))
+    return out
+
+
+def check_c29(text, _path):
+    """Computed struct pointer with start-only bound check (HEUR).
+
+    R13/R14 mag_decode_into: ``img = (MagImage *)(buf + off_img)`` was gated
+    by ``if (off_img > buf_size)`` alone, so the struct's own trailing bytes
+    could run past buf_size; the fixed form also checks
+    ``off + sizeof(T) > buf_size``.  Any guarded buffer+offset struct cast
+    whose guard lacks a sizeof term is a candidate.
+    """
+    out = []
+    clean = _strip_c_comments(text)
+    for name, fs, fe in _find_functions(clean):
+        span = clean[fs:fe]
+        for m in re.finditer(
+                r"\b(\w+)\s*=\s*\([^;{}]*?\*\s*\)\s*\(\s*(\w+)\s*\+\s*"
+                r"(\w+)\s*\)", span):
+            off = m.group(3)
+            win = span[max(0, m.start() - 400):m.start()]
+            guard = re.search(r"if\s*\([^()]*\b" + re.escape(off)
+                              + r"\b[^()]*\)\s*(?:return|goto)", win)
+            if guard and "sizeof" not in guard.group(0):
+                out.append((_line(clean, fs + m.start()),
+                            f"struct pointer from buffer+offset with a "
+                            f"start-only bound on '{off}' ('{name}'); add "
+                            "the sizeof term to the guard"))
+    return out
+
+
+# ---------------------------------------------------------------------------
 # lifecycle / logic (C16-C20) -- MANUAL review hints only
 # ---------------------------------------------------------------------------
 
@@ -591,6 +725,14 @@ MANUAL_NOTES = {
           "reset completeness, and VM variable/stack bounds.",
     "C20": "Dead logic: hunt always-true/always-false conditions and if() "
           "typos; re-check layer.c scene_end and the transition_run call.",
+    "C30": "Dialog/sprite backdrop restore: every hide path "
+          "(layer_sprite_hide when dialog is not drawn, dialog close, "
+          "cg(hidedialog)) must restore the captured background; review each "
+          "hide/deactivate branch for a missing restore (R13 sprite ghost).",
+    "C31": "Menu/gallery focus repaint: when focus moves off a highlighted "
+          "control (Back button, selected cell), that control must be "
+          "repainted in its idle colour; verify every arrow/click transition "
+          "paints the losing control (R13 gallery Back residual).",
 }
 
 
@@ -614,4 +756,8 @@ def registry():
         "C23": (check_c23, "AUTO", "double free without NULL reset"),
         "C24": (check_c24, "AUTO", "memcpy size vs dest array"),
         "C25": (check_c25, "HEUR", "use-after-free candidate"),
+        "C26": (check_c26, "HEUR", "ownership-split free"),
+        "C27": (check_c27, "HEUR", "count-derived negative subscript"),
+        "C28": (check_c28, "HEUR", "row-stride read without height extent"),
+        "C29": (check_c29, "HEUR", "struct ptr start-only bound"),
     }

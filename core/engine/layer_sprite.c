@@ -283,7 +283,11 @@ static void layer_sprite_hide(int id)
 
     if (!layer_dialog_drawn()) {
         se = find_sprite(id);
-        if (se) se->active = 0;
+        if (se) {
+            if (layer_bg_snapshot_valid() && layer_bg_snapshot())
+                layer_bg_restore_rect(se->x, se->y, LAYER_SPRITE_W, LAYER_SPRITE_H, 0);
+            se->active = 0;
+        }
         return;
     }
 

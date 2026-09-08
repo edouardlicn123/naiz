@@ -117,7 +117,7 @@ static void layer_capture_bg_dialog(void)
  * instead of reading back from VRAM.  Used during animation playback:
  * the image is already in RAM (just decoded), so this avoids a 55KB
  * VRAM readback per frame.  src_x/src_y is the blit origin on screen. */
-void layer_capture_bg_dialog_from_image(const uint8_t *pixels, int img_w,
+void layer_capture_bg_dialog_from_image(const uint8_t *pixels, int img_w, int img_h,
                                         int src_x, int src_y)
 {
     int dy, src_row;
@@ -130,10 +130,11 @@ void layer_capture_bg_dialog_from_image(const uint8_t *pixels, int img_w,
         }
     }
     for (dy = 0; dy < LAYER_DIALOG_H; dy++) {
-        src_row = src_y + LAYER_DIALOG_Y + dy;
-        if (src_row < 0 || src_row >= LAYER_SCREEN_H) continue;
+        /* Image row index the blit maps onto screen row (src_y+img_row). */
+        src_row = LAYER_DIALOG_Y + dy;
+        if (src_row - src_y < 0 || src_row - src_y >= img_h) continue;
         memcpy(bg_dialog_snapshot + dy * LAYER_DIALOG_W,
-               pixels + src_row * img_w + src_x + LAYER_DIALOG_X,
+               pixels + (src_row - src_y) * img_w + src_x + LAYER_DIALOG_X,
                LAYER_DIALOG_W);
     }
 }

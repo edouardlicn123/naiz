@@ -110,6 +110,9 @@ static void gallery_draw_cells_range(int page, int from_sel, int to_sel, int foc
     int x, y, abs_idx;
 
     if (!focus_on_back) {
+        /* Back loses focus (was possibly highlighted): repaint white. */
+        draw_text("Back", 0, 76, 363, 136, 379, 1, PAL_WHITE);
+
         /* Old cell loses focus */
         gallery_cell_xy(from_sel, &x, &y);
         abs_idx = page * GAL_CELLS + from_sel;

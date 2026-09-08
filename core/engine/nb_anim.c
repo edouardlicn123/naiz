@@ -163,7 +163,8 @@ static int anim_frame_ticks(const AnimState *a)
 static void anim_rebuild_dialog_if_open(const MagImage *img, int blit_x, int blit_y)
 {
     if (layer_dialog_drawn() && img && img->pixels)
-        layer_capture_bg_dialog_from_image(img->pixels, img->width, blit_x, blit_y);
+        layer_capture_bg_dialog_from_image(img->pixels, img->width, img->height,
+                                           blit_x, blit_y);
 }
 
 /* Palette indices protected during cine playback — must not be overwritten
@@ -463,23 +464,6 @@ void cmd_playanima(int argc, const char **argv, const char *cmd_name)
         }
     }
 
-    /* Arm state, then decode frame 0 before going active so a decode failure
-     * never leaves a half-initialized animation behind. */
-    a->blob = blob;
-    a->offs = offs_base;
-    a->ticks = offs_base + (long)nblob_ul * 4L;
-    a->pals = (atrack == 1) ? (blob + (blob_len - (long)palsz_ul)) : NULL;
-    a->data_end = data_end;
-    a->type = atype;
-    a->track = atrack;
-    a->nframes = nframes;
-    a->frame = 0;
-    a->loop = mode;
-    a->tick = anim_frame_ticks(a);
-    a->duration_ticks = has_dur ? dur_ticks : 0;
-    a->duration_total = has_dur ? dur_ticks : 0;
-    a->base_blitted = 0;
-
     /* OPT-11: allocate decode work buffer for pixel-track animations.
      * All frames share the same dimensions, so one allocation serves all.
      * Worst case pool: output(w*h) + action(w/4) + final(w*h) + crop(w*h) + struct */
@@ -495,6 +479,8 @@ void cmd_playanima(int argc, const char **argv, const char *cmd_name)
             hal_log("anim: decode buf OOM, falling back to per-frame alloc\r\n");
         }
     }
+    /* Arm state, then decode frame 0 before going active so a decode failure
+     * never leaves a half-initialized animation behind. */
     a->blob = blob;
     a->offs = offs_base;
     a->ticks = offs_base + (long)nblob_ul * 4L;

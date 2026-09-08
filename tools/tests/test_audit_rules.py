@@ -8,7 +8,8 @@ import pytest
 from tools.audit import audit, state, verify
 from tools.audit.rules_c import (check_c1, check_c4, check_c5, check_c11,
                                  check_c14, check_c21, check_c22, check_c23,
-                                 check_c24, check_c25)
+                                 check_c24, check_c25, check_c26, check_c27,
+                                 check_c28, check_c29)
 from tools.audit.rules_p import (check_p1, check_p2, check_p3, check_p5,
                                  check_p6, check_p7, check_p8, check_p9,
                                  check_p10, check_p14)
@@ -168,6 +169,77 @@ def test_c25_use_after_free_same_block():
                  " p = malloc(8); p->x = 1; }") == []
     assert _hits(check_c25,
                  "void f(){ if (!p) { free(p); return 1; } p->x = 1; }") == []
+
+
+def test_c26_ownership_split_free():
+    # R13 mag_release: guarded member free + unguarded base free.
+    buggy = ("void mag_release(MagImage *img) {"
+             " if (img && --img->refcount <= 0) {"
+             " if (!img->is_pool) free(img->pixels); free(img); } }")
+    assert len(_hits(check_c26, buggy)) == 1
+    fixed = ("void mag_release(MagImage *img) {"
+             " if (img && --img->refcount <= 0) {"
+             " if (!img->is_pool) { free(img->pixels); free(img); } } }")
+    assert _hits(check_c26, fixed) == []
+    # plain double free is C23's job, not C26's
+    assert _hits(check_c26,
+                 "void f(){ void *p = malloc(4); free(p); free(p); }") == []
+
+
+def test_c27_count_derived_negative_subscript():
+    # R13 cmd_char: argv[argc-1] without argc<1 guard.
+    buggy = ("static void cmd_char(int argc, const char **argv){"
+             " name = argv[argc - 1]; }")
+    assert len(_hits(check_c27, buggy)) == 1
+    fixed = ("static void cmd_char(int argc, const char **argv){"
+             " if (argc < 1) return; name = argv[argc - 1]; }")
+    assert _hits(check_c27, fixed) == []
+    # loop counters are out of scope for this rule
+    assert _hits(check_c27,
+                 "void f(int i){ int x = a[i - 1]; }") == []
+    # count==0 guard also exempts
+    assert _hits(check_c27,
+                 "void f(int argc, const char **argv){"
+                 " if (argc == 0) return; name = argv[argc - 1]; }") == []
+
+
+def test_c28_row_stride_read_without_height():
+    # R14 cine: width param, strided rows, no image-height clamp.
+    buggy = ("void capture(const uint8_t *pixels, int img_w, int src_x,"
+             " int src_y) { for (dy = 0; dy < LAYER_DIALOG_H; dy++) {"
+             " src_row = LAYER_DIALOG_Y + dy;"
+             " if (src_row < 0 || src_row >= LAYER_SCREEN_H) continue;"
+             " memcpy(snap + dy * LAYER_DIALOG_W,"
+             " pixels + src_row * img_w + src_x, LAYER_DIALOG_W); } }")
+    assert len(_hits(check_c28, buggy)) == 1
+    fixed = ("void capture(const uint8_t *pixels, int img_w, int img_h,"
+             " int src_x, int src_y) { for (dy = 0; dy < LAYER_DIALOG_H;"
+             " dy++) { src_row = LAYER_DIALOG_Y + dy;"
+             " if (src_row - src_y < 0 || src_row - src_y >= img_h)"
+             " continue;"
+             " memcpy(snap + dy * LAYER_DIALOG_W,"
+             " pixels + (src_row - src_y) * img_w + src_x, LAYER_DIALOG_W);"
+             " } }")
+    assert _hits(check_c28, fixed) == []
+    # macro constants like LAYER_DIALOG_H must not be mistaken for height
+
+
+def test_c29_struct_ptr_start_only_bound():
+    # R13/R14 mag_decode_into: (T *)(buf + off) guarded without sizeof term.
+    buggy = ("int decode(uint8_t *buf, int buf_size){"
+             " off_img = off_cropped + cropped_size;"
+             " if (off_img > buf_size) return 1;"
+             " img = (MagImage *)(buf + off_img); return 0; }")
+    assert len(_hits(check_c29, buggy)) == 1
+    fixed = ("int decode(uint8_t *buf, int buf_size){"
+             " off_img = off_cropped + cropped_size;"
+             " if (off_img > buf_size || (size_t)off_img + sizeof(MagImage)"
+             " > (size_t)buf_size) return 1;"
+             " img = (MagImage *)(buf + off_img); return 0; }")
+    assert _hits(check_c29, fixed) == []
+    # unbounded cast (no guard at all) is a different defect
+    assert _hits(check_c29,
+                 "void f(){ p = (T *)(buf + off); }") == []
 
 
 # ---------------------------------------------------------------------------
