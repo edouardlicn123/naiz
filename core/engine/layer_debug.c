@@ -21,12 +21,10 @@ static int write_ppm(const char *filename, int w, int h, const uint8_t *rgb)
 {
     FILE *f;
     int len;
-    char msg[128];
 
     f = fopen(filename, "wb");
     if (!f) {
-        snprintf(msg, sizeof(msg), "layer_debug: cannot open '%s'\r\n", filename);
-        hal_log(msg);
+        hal_logf("layer_debug: cannot open '%s'\r\n", filename);
         return -1;
     }
 
@@ -34,8 +32,7 @@ static int write_ppm(const char *filename, int w, int h, const uint8_t *rgb)
     len = w * h * 3;
     fwrite(rgb, 1, len, f);
     fclose(f);
-    snprintf(msg, sizeof(msg), "layer_debug: exported '%s' (%dx%d)\r\n", filename, w, h);
-    hal_log(msg);
+    hal_logf("layer_debug: exported '%s' (%dx%d)\r\n", filename, w, h);
     return 0;
 }
 
@@ -61,7 +58,6 @@ static int dump_bg_layer(const char *filename)
     const uint8_t *snap;
     uint8_t *rgb;
     int size;
-    char msg[80];
 
     snap = layer_bg_snapshot();
     if (!snap) {
@@ -177,7 +173,6 @@ static int dump_composite_layer(const char *filename)
 
 static int layer_dump(int z_order, const char *filename)
 {
-    char msg[80];
     switch (z_order) {
     case LAYER_Z_BG:      return dump_bg_layer(filename);
     case LAYER_Z_SPRITE:  return dump_sprite_layer(filename);
@@ -186,8 +181,7 @@ static int layer_dump(int z_order, const char *filename)
         /* Animation uses the same VRAM as bg; export composite instead */
         return dump_composite_layer(filename);
     default:
-        snprintf(msg, sizeof(msg), "layer_debug: unsupported z_order %d\r\n", z_order);
-        hal_log(msg);
+        hal_logf("layer_debug: unsupported z_order %d\r\n", z_order);
         return -1;
     }
 }
@@ -219,18 +213,12 @@ static int layer_dump_all(const char *prefix)
 
 static void debug_dump_status(void)
 {
-    char msg[80];
     hal_log("layer status:\r\n");
-    snprintf(msg, sizeof(msg), "  bg:      %s\r\n", layer_is_active(LAYER_Z_BG) ? "active" : "inactive");
-    hal_log(msg);
-    snprintf(msg, sizeof(msg), "  sprite:  %s\r\n", layer_is_active(LAYER_Z_SPRITE) ? "active" : "inactive");
-    hal_log(msg);
-    snprintf(msg, sizeof(msg), "  anim:    %s\r\n", layer_is_active(LAYER_Z_ANIM) ? "active" : "inactive");
-    hal_log(msg);
-    snprintf(msg, sizeof(msg), "  dialog:  %s\r\n", layer_is_active(LAYER_Z_DIALOG) ? "active" : "inactive");
-    hal_log(msg);
-    snprintf(msg, sizeof(msg), "  text:    %s\r\n", layer_is_active(LAYER_Z_TEXT) ? "active" : "inactive");
-    hal_log(msg);
+    hal_logf("  bg:      %s\r\n", layer_is_active(LAYER_Z_BG) ? "active" : "inactive");
+    hal_logf("  sprite:  %s\r\n", layer_is_active(LAYER_Z_SPRITE) ? "active" : "inactive");
+    hal_logf("  anim:    %s\r\n", layer_is_active(LAYER_Z_ANIM) ? "active" : "inactive");
+    hal_logf("  dialog:  %s\r\n", layer_is_active(LAYER_Z_DIALOG) ? "active" : "inactive");
+    hal_logf("  text:    %s\r\n", layer_is_active(LAYER_Z_TEXT) ? "active" : "inactive");
     hal_log("  cursor:  always active\r\n");
 }
 

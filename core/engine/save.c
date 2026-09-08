@@ -145,12 +145,12 @@ int load_game_slot(int slot)
         if (!sd) { hal_log("[LOAD] slot malloc fail\r\n"); return -1; }
     }
     slot_path(slot, path, sizeof(path));
-    { char _b[96]; snprintf(_b, sizeof(_b), "[LOAD] load_game_slot(%d) path=%s\r\n", slot, path); hal_log(_b); }
+    hal_logf("[LOAD] load_game_slot(%d) path=%s\r\n", slot, path);
     if (save_read(path, sd) != 0) {
         hal_log("[LOAD] save_read failed\r\n");
         return -1;
     }
-    { char _b[96]; snprintf(_b, sizeof(_b), "[LOAD] filename='%s' ver=%u\r\n", sd->filename, sd->version); hal_log(_b); }
+    hal_logf("[LOAD] filename='%s' ver=%u\r\n", sd->filename, sd->version);
     save_apply(sd);
     if (vm_get_flags() & VMFLAG_ERROR) {
         hal_log("[LOAD] nb_load failed (VMFLAG_ERROR)\r\n");

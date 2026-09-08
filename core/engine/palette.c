@@ -57,3 +57,43 @@ void palette_reset_reserved(void)
     hal_set_palette(PAL_TRANSPARENT, 0xFF, 0xFF, 0xFF);
     hal_set_palette(PAL_CURSOR_BLACK, 0x00, 0x00, 0x00);
 }
+
+/* Dirty-diff from separate R/G/B arrays (Image struct path). */
+void palette_apply_dirty_rgb(const uint8_t src_r[256],
+                             const uint8_t src_g[256],
+                             const uint8_t src_b[256],
+                             const uint8_t prot[256], int count,
+                             uint8_t prev_r[256],
+                             uint8_t prev_g[256],
+                             uint8_t prev_b[256])
+{
+    int i;
+    for (i = 0; i < count && i < 256; i++) {
+        uint8_t r = src_r[i], g = src_g[i], b = src_b[i];
+        if (prot && prot[i]) continue;
+        if (r == prev_r[i] && g == prev_g[i] && b == prev_b[i]) continue;
+        hal_set_palette(i, r, g, b);
+        prev_r[i] = r;
+        prev_g[i] = g;
+        prev_b[i] = b;
+    }
+}
+
+/* Dirty-diff from interleaved pal[count][3] (ANIM palette track path). */
+void palette_apply_dirty_pal(const uint8_t pal[][3],
+                             const uint8_t prot[256], int count,
+                             uint8_t prev_r[256],
+                             uint8_t prev_g[256],
+                             uint8_t prev_b[256])
+{
+    int i;
+    for (i = 0; i < count && i < 256; i++) {
+        uint8_t r = pal[i][0], g = pal[i][1], b = pal[i][2];
+        if (prot && prot[i]) continue;
+        if (r == prev_r[i] && g == prev_g[i] && b == prev_b[i]) continue;
+        hal_set_palette(i, r, g, b);
+        prev_r[i] = r;
+        prev_g[i] = g;
+        prev_b[i] = b;
+    }
+}

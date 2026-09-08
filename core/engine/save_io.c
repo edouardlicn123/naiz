@@ -41,12 +41,10 @@ int save_file_write(const char *path, void *data, size_t sz,
 {
     FILE *f;
     unsigned char *p = (unsigned char *)data;
-    char b[96];
 
     f = fopen(path, "wb");
     if (!f) {
-        snprintf(b, sizeof(b), "%s fopen fail\r\n", tag);
-        hal_log(b);
+        hal_logf("%s fopen fail\r\n", tag);
         return -1;
     }
     memcpy(p + 0, &magic, sizeof(magic));
@@ -58,8 +56,7 @@ int save_file_write(const char *path, void *data, size_t sz,
         memcpy(p + cs_offset, &cs, sizeof(cs));
     }
     if (fwrite(data, sz, 1, f) != 1) {
-        snprintf(b, sizeof(b), "%s fwrite fail\r\n", tag);
-        hal_log(b);
+        hal_logf("%s fwrite fail\r\n", tag);
         fclose(f);
         return -1;
     }
@@ -83,36 +80,30 @@ int save_file_read(const char *path, void *buf, size_t bufsz, size_t min_size,
     unsigned char *p = (unsigned char *)buf;
     unsigned int magic, ver;
     size_t read_sz;
-    unsigned int saved_cs, sum;
-    char b[96];
+unsigned int saved_cs, sum;
 
     f = fopen(path, "rb");
     if (!f) {
-        snprintf(b, sizeof(b), "%s fopen fail\r\n", tag);
-        hal_log(b);
+        hal_logf("%s fopen fail\r\n", tag);
         return -1;
     }
     if (fread(&magic, sizeof(magic), 1, f) != 1) {
-        snprintf(b, sizeof(b), "%s fread magic fail\r\n", tag);
-        hal_log(b);
+        hal_logf("%s fread magic fail\r\n", tag);
         fclose(f);
         return -1;
     }
     if (fread(&ver, sizeof(ver), 1, f) != 1) {
-        snprintf(b, sizeof(b), "%s fread version fail\r\n", tag);
-        hal_log(b);
+        hal_logf("%s fread version fail\r\n", tag);
         fclose(f);
         return -1;
     }
     if (magic != expected_magic) {
-        snprintf(b, sizeof(b), "%s magic fail\r\n", tag);
-        hal_log(b);
+        hal_logf("%s magic fail\r\n", tag);
         fclose(f);
         return -1;
     }
     if (ver > max_version) {
-        snprintf(b, sizeof(b), "%s unsupported version\r\n", tag);
-        hal_log(b);
+        hal_logf("%s unsupported version\r\n", tag);
         fclose(f);
         return -1;
     }
@@ -121,8 +112,7 @@ int save_file_read(const char *path, void *buf, size_t bufsz, size_t min_size,
     memset(p, 0, bufsz);
     rewind(f);
     if (fread(buf, read_sz, 1, f) != 1) {
-        snprintf(b, sizeof(b), "%s fread body fail\r\n", tag);
-        hal_log(b);
+        hal_logf("%s fread body fail\r\n", tag);
         fclose(f);
         return -1;
     }
@@ -132,12 +122,11 @@ int save_file_read(const char *path, void *buf, size_t bufsz, size_t min_size,
     sum = save_checksum(buf, read_sz);
     memcpy(p + cs_offset, &saved_cs, sizeof(saved_cs));
     if (sum != saved_cs) {
-        snprintf(b, sizeof(b), "%s checksum fail\r\n", tag);
-        hal_log(b);
+        hal_logf("%s checksum fail\r\n", tag);
+        fclose(f);
         return -1;
     }
-    snprintf(b, sizeof(b), "%s read ok\r\n", tag);
-    hal_log(b);
+    hal_logf("%s read ok\r\n", tag);
     return 0;
 }
 

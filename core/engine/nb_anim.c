@@ -21,6 +21,7 @@
 #include <string.h>
 #include "nb_anim.h"
 #include "render.h"
+#include "palette.h"
 #include "image.h"
 #include "scene_layers.h"
 #include "layer_internal.h"
@@ -211,7 +212,7 @@ static void anim_fill_dialog_border(void)
 static void anim_draw_frame(AnimState *a)
 {
     const unsigned char *pal;
-    int i, dlg_on;
+    int dlg_on;
 
     /* OPT-14: cache once — avoids repeated layer_dialog_drawn() overhead
      * inside the palette loops and branch below. */
@@ -224,19 +225,10 @@ static void anim_draw_frame(AnimState *a)
          * through whatever palette the previous background left behind
          * (observed: dark-blue frames rendering near-black).
          * Dirty-diff: skip entries whose RGB hasn't changed. */
-        for (i = 0; i < a->img->num_colors && i < 256; i++) {
-            uint8_t r = a->img->palette_r[i];
-            uint8_t g = a->img->palette_g[i];
-            uint8_t b = a->img->palette_b[i];
-            if (dlg_on && prot_pal[i])
-                continue;
-            if (r == a->prev_pal_r[i] && g == a->prev_pal_g[i] && b == a->prev_pal_b[i])
-                continue;
-            hal_set_palette(i, r, g, b);
-            a->prev_pal_r[i] = r;
-            a->prev_pal_g[i] = g;
-            a->prev_pal_b[i] = b;
-        }
+        palette_apply_dirty_rgb(a->img->palette_r, a->img->palette_g,
+                                a->img->palette_b, dlg_on ? prot_pal : NULL,
+                                a->img->num_colors,
+                                a->prev_pal_r, a->prev_pal_g, a->prev_pal_b);
         if (dlg_on)
             anim_fill_dialog_border();
         if (dlg_on && a->type == 0)
@@ -261,33 +253,9 @@ static void anim_draw_frame(AnimState *a)
     if (!a->pals)
         return;
     pal = a->pals + (long)a->frame * ANI_PALETTE_BYTES;
-    if (!dlg_on) {
-        for (i = 0; i < 256; i++) {
-            uint8_t r = pal[i * 3];
-            uint8_t g = pal[i * 3 + 1];
-            uint8_t b = pal[i * 3 + 2];
-            if (r == a->prev_pal_r[i] && g == a->prev_pal_g[i] && b == a->prev_pal_b[i])
-                continue;
-            hal_set_palette(i, r, g, b);
-            a->prev_pal_r[i] = r;
-            a->prev_pal_g[i] = g;
-            a->prev_pal_b[i] = b;
-        }
-    } else {
-        for (i = 0; i < 256; i++) {
-            uint8_t r = pal[i * 3];
-            uint8_t g = pal[i * 3 + 1];
-            uint8_t b = pal[i * 3 + 2];
-            if (prot_pal[i])
-                continue;
-            if (r == a->prev_pal_r[i] && g == a->prev_pal_g[i] && b == a->prev_pal_b[i])
-                continue;
-            hal_set_palette(i, r, g, b);
-            a->prev_pal_r[i] = r;
-            a->prev_pal_g[i] = g;
-            a->prev_pal_b[i] = b;
-        }
-    }
+    palette_apply_dirty_pal((const uint8_t(*)[3])pal,
+                            dlg_on ? prot_pal : NULL, 256,
+                            a->prev_pal_r, a->prev_pal_g, a->prev_pal_b);
     if (dlg_on)
         anim_fill_dialog_border();
 }

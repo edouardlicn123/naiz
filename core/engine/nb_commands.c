@@ -327,9 +327,7 @@ static void cmd_var(int argc, const char **argv, const char *cmd_name)
 
     idx = nb_var_lookup(argv[0]);
     if (idx < 0) {
-        char _b[80];
-        snprintf(_b, sizeof(_b), "WARN: var: unknown variable '%s'\r\n", argv[0]);
-        hal_log(_b);
+        hal_logf("WARN: var: unknown variable '%s'\r\n", argv[0]);
         return;
     }
 
@@ -348,9 +346,7 @@ static void cmd_var(int argc, const char **argv, const char *cmd_name)
         nb_var_add(idx, d);
         NB_DEBUG("var: add %s-=%d\r\n", argv[0], val);
     } else {
-        char _b[80];
-        snprintf(_b, sizeof(_b), "WARN: var: unknown op '%s' (use =/+/ -)\r\n", argv[1]);
-        hal_log(_b);
+        hal_logf("WARN: var: unknown op '%s' (use =/+/ -)\r\n", argv[1]);
     }
 }
 

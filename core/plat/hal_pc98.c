@@ -21,6 +21,8 @@
 #include "serial.h"
 #include "gdc.h"
 #include <i86.h>
+#include <stdarg.h>
+#include <stdio.h>
 
 /*
  * Platform initialization.
@@ -40,6 +42,23 @@ void hal_init(void) { serial_init(); }
  * @param s  NUL-terminated string
  */
 void hal_log(const char *s) { serial_puts(s); }
+
+/*
+ * Formatted debug log output.
+ *
+ * printf-style convenience wrapper: formats into a stack buffer then calls
+ * hal_log().  Replaces the ad-hoc snprintf+hal_log two-liner scattered across
+ * the engine, giving one uniform buffer size and truncation policy.
+ */
+void hal_logf(const char *fmt, ...)
+{
+    char buf[512];
+    va_list ap;
+    va_start(ap, fmt);
+    vsnprintf(buf, sizeof(buf), fmt, ap);
+    va_end(ap);
+    hal_log(buf);
+}
 
 /*
  * Set RGB values for a palette index.

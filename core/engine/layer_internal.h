@@ -10,6 +10,20 @@
 #ifndef LAYER_INTERNAL_H
 #define LAYER_INTERNAL_H
 
+#include <stdlib.h>
+#include "hal.h"
+
+/* Allocate a dialog-area snapshot buffer (LAYER_DIALOG_W x LAYER_DIALOG_H).
+ * Shared by layer_bg.c (bg_dialog_snapshot) and layer_dialog.c
+ * (dialog_snapshot) so the malloc size and OOM log stay in one place.
+ * Returns NULL on OOM (after logging via tag). */
+static inline unsigned char *layer_snapshot_alloc_dialog(const char *tag)
+{
+    unsigned char *buf = (unsigned char *)malloc(LAYER_DIALOG_W * LAYER_DIALOG_H);
+    if (!buf) hal_logf("OOM: %s malloc fail\r\n", tag);
+    return buf;
+}
+
 /*=== Background (implemented in layer_bg.c) ===============================*/
 
 /* Free both background snapshots and clear the valid flag.

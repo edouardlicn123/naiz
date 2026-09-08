@@ -137,9 +137,7 @@ void cmd_scene(int argc, const char **argv, const char *cmd_name)
             for (j = 0; j < nt; j++) {
                 int idx = nb_var_lookup(cond_vars[j]);
                 if (idx < 0) {
-                    char _b[80];
-                    snprintf(_b, sizeof(_b), "WARN: scene: unknown var '%s'\r\n", cond_vars[j]);
-                    hal_log(_b);
+                    hal_logf("WARN: scene: unknown var '%s'\r\n", cond_vars[j]);
                     all_true = 0;
                     break;
                 }

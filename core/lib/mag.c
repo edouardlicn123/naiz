@@ -11,7 +11,46 @@
 #include <stdlib.h>
 #include <string.h>
 
-/*=== Helpers =============================================================*/
+/*=== Shared decode helpers ===============================================*/
+/*
+ * Strip per-row left/right padding by copying crop_width bytes from each
+ * source row (at pad_px_left) into the row-strided destination.  Shared by
+ * the heap (mag_decode) and pool (mag_decode_into) ownership paths so the
+ * crop arithmetic cannot drift between them.
+ *
+ * src_w and crop_width/pad_px_left are row indices/sizes in bytes
+ * (1 byte/pixel after 4bpp expansion in both call sites).
+ */
+static void mag_crop_rows(uint8_t *dst, const uint8_t *src,
+                          int src_w, int crop_width, int pad_px_left,
+                          int crop_height)
+{
+    int y;
+    for (y = 0; y < crop_height; y++) {
+        memcpy(dst + (size_t)y * crop_width,
+               src + (size_t)y * src_w + pad_px_left,
+               (size_t)crop_width);
+    }
+}
+
+/* Fill the MagImage 256-entry palette from the decoded num_colors entries,
+ * zeroing the remainder — shared between the two ownership paths. */
+static void mag_fill_palette(MagImage *img, const uint8_t *pal_r,
+                             const uint8_t *pal_g, const uint8_t *pal_b,
+                             int num_colors)
+{
+    int i;
+    for (i = 0; i < num_colors; i++) {
+        img->palette_r[i] = pal_r[i];
+        img->palette_g[i] = pal_g[i];
+        img->palette_b[i] = pal_b[i];
+    }
+    for (; i < 256; i++) {
+        img->palette_r[i] = img->palette_g[i] = img->palette_b[i] = 0;
+    }
+}
+
+/*=== Data reader =========================================================*/
 
 /*
  * BitReader — Bit-level reader that extracts bits from a byte array (MSB first).
@@ -359,16 +398,12 @@ int mag_decode(const uint8_t *data, int size, MagImage **out) {
     crop_height  = pixel_height;
 
     if (pad_px_left > 0 || pad_px_right > 0 || crop_width != pixel_width) {
-        int y;
         /* Pixel buffer is always 1 byte/pixel here (8bpp direct, 4bpp already
          * expanded), so cropping is a per-row memcpy of crop_width bytes. */
         cropped = (uint8_t *)malloc(crop_width * crop_height);
         if (!cropped) { free(output); free(action); return 1; }
-        for (y = 0; y < crop_height; y++) {
-            memcpy(cropped + (size_t)y * crop_width,
-                   output + (size_t)y * pixel_width + pad_px_left,
-                   (size_t)crop_width);
-        }
+        mag_crop_rows(cropped, output, pixel_width, crop_width,
+                      pad_px_left, crop_height);
         free(output);
         output = cropped;
         pixel_width  = crop_width;
@@ -385,14 +420,7 @@ int mag_decode(const uint8_t *data, int size, MagImage **out) {
     img->num_colors = num_colors;
     img->is_sprite  = is_sprite_flag;
     img->refcount   = 1;
-    for (i = 0; i < num_colors; i++) {
-        img->palette_r[i] = pal_r[i];
-        img->palette_g[i] = pal_g[i];
-        img->palette_b[i] = pal_b[i];
-    }
-    for (; i < 256; i++) {
-        img->palette_r[i] = img->palette_g[i] = img->palette_b[i] = 0;
-    }
+    mag_fill_palette(img, pal_r, pal_g, pal_b, num_colors);
 
     free(action);
     *out = img;
@@ -721,13 +749,9 @@ int mag_decode_into(const uint8_t *data, int size,
 
     /* -- Strip padding -- */
     if (pad_px_left > 0 || pad_px_right > 0 || crop_width != pixel_width) {
-        int y;
         cropped = buf + off_cropped;
-        for (y = 0; y < crop_height; y++) {
-            memcpy(cropped + (size_t)y * crop_width,
-                   output + (size_t)y * pixel_width + pad_px_left,
-                   (size_t)crop_width);
-        }
+        mag_crop_rows(cropped, output, pixel_width, crop_width,
+                      pad_px_left, crop_height);
         output = cropped;
         pixel_width  = crop_width;
         pixel_height = crop_height;
@@ -743,14 +767,7 @@ int mag_decode_into(const uint8_t *data, int size,
     img->is_sprite  = is_sprite_flag;
     img->refcount   = 1;
     img->is_pool    = 1;
-    for (i = 0; i < num_colors; i++) {
-        img->palette_r[i] = pal_r[i];
-        img->palette_g[i] = pal_g[i];
-        img->palette_b[i] = pal_b[i];
-    }
-    for (; i < 256; i++) {
-        img->palette_r[i] = img->palette_g[i] = img->palette_b[i] = 0;
-    }
+    mag_fill_palette(img, pal_r, pal_g, pal_b, num_colors);
 
     *out = img;
     return 0;

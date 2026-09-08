@@ -87,9 +87,8 @@ void layer_capture_bg_dialog_from_bg(void)
         return;
     }
     if (!bg_dialog_snapshot) {
-        bg_dialog_snapshot = (unsigned char *)malloc(LAYER_DIALOG_W * LAYER_DIALOG_H);
+        bg_dialog_snapshot = layer_snapshot_alloc_dialog("bg_dialog_snapshot");
         if (!bg_dialog_snapshot) {
-            hal_log("OOM: bg_dialog_snapshot malloc fail\r\n");
             return;
         }
     }
@@ -104,9 +103,7 @@ void layer_capture_bg_dialog_from_bg(void)
 static void layer_capture_bg_dialog(void)
 {
     if (!bg_dialog_snapshot) {
-        bg_dialog_snapshot = (unsigned char *)malloc(LAYER_DIALOG_W * LAYER_DIALOG_H);
-        if (!bg_dialog_snapshot)
-            hal_log("OOM: bg_dialog_snapshot malloc fail\r\n");
+        bg_dialog_snapshot = layer_snapshot_alloc_dialog("bg_dialog_snapshot");
     }
     if (bg_dialog_snapshot) {
         vram_read(LAYER_DIALOG_X, LAYER_DIALOG_Y, LAYER_DIALOG_W, LAYER_DIALOG_H, bg_dialog_snapshot);
@@ -123,9 +120,8 @@ void layer_capture_bg_dialog_from_image(const uint8_t *pixels, int img_w, int im
     int dy, src_row;
 
     if (!bg_dialog_snapshot) {
-        bg_dialog_snapshot = (unsigned char *)malloc(LAYER_DIALOG_W * LAYER_DIALOG_H);
+        bg_dialog_snapshot = layer_snapshot_alloc_dialog("bg_dialog_snapshot");
         if (!bg_dialog_snapshot) {
-            hal_log("OOM: bg_dialog_snapshot malloc fail\r\n");
             return;
         }
     }

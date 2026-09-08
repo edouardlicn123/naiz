@@ -161,7 +161,7 @@ static void save_load_menu(int is_load, int from_mainmenu)
                 if (confirm_yes) {
                     if (is_load) {
                         if (load_game_slot(abs_slot) != 0) {
-                            { char _b[64]; snprintf(_b, sizeof(_b), "[LOAD] load_game_slot(%d) FAILED\r\n", abs_slot); hal_log(_b); }
+                            hal_logf("[LOAD] load_game_slot(%d) FAILED\r\n", abs_slot);
                             confirm = 0; confirm_yes = 1;
                             save_load_draw(is_load, page, slot_idx, focus_on_back, confirm, confirm_yes, total_pages, 1);
                             show_error_msg("Load failed.", LAYER_DIALOG_X + LAYER_DIALOG_INDENT + 168, LAYER_DIALOG_Y + LAYER_DIALOG_TEXT_Y - 10);
@@ -262,7 +262,7 @@ static void save_load_menu(int is_load, int from_mainmenu)
                         if (confirm_yes) {
                             if (is_load) {
                                 if (load_game_slot(page * 4 + slot_idx) != 0) {
-                                    { char _b[64]; snprintf(_b, sizeof(_b), "[LOAD] load_game_slot(%d) FAILED\r\n", page * 4 + slot_idx); hal_log(_b); }
+                                    hal_logf("[LOAD] load_game_slot(%d) FAILED\r\n", page * 4 + slot_idx);
                                     confirm = 0; confirm_yes = 1;
                                     save_load_draw(is_load, page, slot_idx, focus_on_back, confirm, confirm_yes, total_pages, 1);
                                     show_error_msg("Load failed.", 260, 298);

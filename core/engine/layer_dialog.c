@@ -134,7 +134,7 @@ static void layer_dialog_open(void)
     hal_mouse_invalidate_cursor();
     scene_draw_dialog();
     if (!dialog_snapshot) {
-        dialog_snapshot = (unsigned char *)malloc(LAYER_DIALOG_W * LAYER_DIALOG_H);
+        dialog_snapshot = layer_snapshot_alloc_dialog("dialog_snapshot");
     }
     if (dialog_snapshot) {
         dialog_snapshot_capture();

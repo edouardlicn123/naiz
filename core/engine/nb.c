@@ -188,12 +188,8 @@ void nb_load(const char *filename)
                  * Any trailing lines beyond the buffer are dropped with a
                  * WARN; num_lines only counts complete lines, so the script
                  * halts cleanly rather than mis-executing partial lines. */
-                {
-                    char _b[160];
-                    snprintf(_b, sizeof(_b), "WARN: '%s' truncated at %d bytes (max %d)\r\n",
-                             filename, pos, NB_BUF_SIZE);
-                    hal_log(_b);
-                }
+                hal_logf("WARN: '%s' truncated at %d bytes (max %d)\r\n",
+                         filename, pos, NB_BUF_SIZE);
                 break;
             }
         }
@@ -206,7 +202,7 @@ void nb_load(const char *filename)
     nb.chapter_title[0] = '\0';
     nb.scene_type[0] = '\0';
 
-    { char _b[160]; snprintf(_b, sizeof(_b), "[LOAD] nb_load '%s' (%d lines)\r\n", filename, nb.num_lines); hal_log(_b); }
+    hal_logf("[LOAD] nb_load '%s' (%d lines)\r\n", filename, nb.num_lines);
     vm_request_scene_change();
 }
 
@@ -286,7 +282,8 @@ int nb_process(void)
         /* Check if script has finished. */
         if (nb.pc >= nb.num_lines) {
             if (nb.num_lines == 0)
-                { char _b[160]; snprintf(_b, sizeof(_b), "[LOAD] ERROR: script '%s' has 0 lines, halting\r\n", nb.filename); hal_log(_b); }
+                hal_logf("[LOAD] ERROR: script '%s' has 0 lines, halting\r\n",
+                         nb.filename);
             else
                 NB_DEBUG("WARN: pc=%d beyond end, stopping\r\n", nb.pc);
             vm_pause_process();

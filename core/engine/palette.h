@@ -32,4 +32,25 @@ void palette_interp(const uint8_t from[PALETTE_SIZE][3],
  * the three entries cannot drift between call sites. */
 void palette_reset_reserved(void);
 
+/* Dirty-diff palette update: compare source RGB against prev, skip unchanged
+ * entries and entries where prot[i] != 0 (e.g. VN dialog border colours).
+ * hal_set_palette() is called only for changed entries; prev arrays are
+ * updated in place.  pass prot = NULL to skip the protection check.
+ *
+ * _rgb variant: three separate 256-byte source arrays (Image struct).
+ * _pal variant: interleaved uint8_t pal[count][3] (ANIM palette track). */
+void palette_apply_dirty_rgb(const uint8_t src_r[256],
+                             const uint8_t src_g[256],
+                             const uint8_t src_b[256],
+                             const uint8_t prot[256], int count,
+                             uint8_t prev_r[256],
+                             uint8_t prev_g[256],
+                             uint8_t prev_b[256]);
+
+void palette_apply_dirty_pal(const uint8_t pal[][3],
+                             const uint8_t prot[256], int count,
+                             uint8_t prev_r[256],
+                             uint8_t prev_g[256],
+                             uint8_t prev_b[256]);
+
 #endif /* PALETTE_H */

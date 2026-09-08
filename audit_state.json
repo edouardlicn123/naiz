@@ -1,7 +1,7 @@
 {
   "version": 2,
-  "git_head": "0ed3f50",
-  "checked_at": "2026-09-08T11:30:57",
+  "git_head": "b3cdd83",
+  "checked_at": "2026-09-08T15:14:12",
   "files": {
     "core/build.sh": {
       "sha256": "0e6bb3f41cae8f6c5a014a49767f93990ddd3e2c461a85ec991c01b40b66b11e",
@@ -92,18 +92,18 @@
       ]
     },
     "core/engine/layer_bg.c": {
-      "sha256": "dda6b064747360bf54ad7ed5da978bdd3ef94832f846ccb2b95bd1798b872823",
+      "sha256": "1fb4553cc768473ff2faac5aa91857c2c31b52019150ec0b5296fb1e0583b62a",
       "violations": 0,
       "candidates": 0,
       "findings": []
     },
     "core/engine/layer_debug.c": {
-      "sha256": "9cb1aad8dae15e99c4ac0cbd52da776104b1dcb6a3e0233cbf7da1a9903512e0",
+      "sha256": "36fb49daab2744b55961f25602464362b044e1dbd746eafabe28c64bda82b8f2",
       "violations": 0,
       "candidates": 1,
       "findings": [
         {
-          "line": 35,
+          "line": 33,
           "rule": "C3",
           "level": "HEUR"
         }
@@ -116,19 +116,13 @@
       "findings": []
     },
     "core/engine/layer_dialog.c": {
-      "sha256": "867dff1e34e47979ec32a9193d32f21a4f329c957979b81de44afe935e96521f",
+      "sha256": "361fcc2e38d963460d80116021483539646520f28fa00084ffc9eb3905651f4c",
       "violations": 0,
-      "candidates": 1,
-      "findings": [
-        {
-          "line": 137,
-          "rule": "C1",
-          "level": "HEUR"
-        }
-      ]
+      "candidates": 0,
+      "findings": []
     },
     "core/engine/layer_internal.h": {
-      "sha256": "4c9c733b15a39d45d472df82d02bfe69a754f659c428b8d76be08f4a90576b79",
+      "sha256": "34883b1577171593abf6fba1546557a0550d11141aa8943190b015733d5795bb",
       "violations": 0,
       "candidates": 0,
       "findings": []
@@ -146,7 +140,7 @@
       "findings": []
     },
     "core/engine/nb.c": {
-      "sha256": "a84c7a152a1307b29a56524831bfad2929150d3a1f8909808bf0d6ed4d1d02c7",
+      "sha256": "173958aedefa74cb927a0ccedd02d3276afca83ac22ef2fddbf1227372583ac1",
       "violations": 0,
       "candidates": 0,
       "findings": []
@@ -158,12 +152,12 @@
       "findings": []
     },
     "core/engine/nb_anim.c": {
-      "sha256": "373e32426ea6210d443051480f284e5dd29e8286ab287158a0fc515c0145c173",
+      "sha256": "d3985ab4269895a543a88b825d19065f2a871166a12671666ac5a1f5a1b07d4d",
       "violations": 0,
       "candidates": 1,
       "findings": [
         {
-          "line": 474,
+          "line": 442,
           "rule": "C1",
           "level": "HEUR"
         }
@@ -200,12 +194,12 @@
       "findings": []
     },
     "core/engine/nb_commands.c": {
-      "sha256": "246712ddb7b45dd00d57ad21fa6f10ff94d3f413d7d23738dd23bad66cc24aea",
+      "sha256": "fef88df83d5614266b2e4838d284835a93455823bea2ab1a6c90360634694a76",
       "violations": 0,
       "candidates": 2,
       "findings": [
         {
-          "line": 347,
+          "line": 345,
           "rule": "C8",
           "level": "HEUR"
         },
@@ -277,7 +271,7 @@
       "findings": []
     },
     "core/engine/nb_saveload.c": {
-      "sha256": "1ca1ee079ec8795dc6ca919da13703cf44d2a1ea12bc55332f0e8265becbcb18",
+      "sha256": "2155c91a8ce6e25754e98aaa95f41d64db9dccb2ab696b70cbd9759da13bacb6",
       "violations": 0,
       "candidates": 0,
       "findings": []
@@ -289,7 +283,7 @@
       "findings": []
     },
     "core/engine/nb_scene.c": {
-      "sha256": "a11b400b79438a5b96a92554d6347f1179bc94dd78a2cf1563f9d114a5e77d94",
+      "sha256": "d11d11a2cf4ae23c6eb323bdc729e6c7a4d3a63835f969959334cf8b65979677",
       "violations": 0,
       "candidates": 0,
       "findings": []
@@ -319,13 +313,13 @@
       "findings": []
     },
     "core/engine/palette.c": {
-      "sha256": "901f74ecef828f74ae28ac844c47712cd5e49507fa202201194d5bf2cc448175",
+      "sha256": "39364a8e4833294e1f18005c970ac51379071f0c639a53937b333d45d07fa8fd",
       "violations": 0,
       "candidates": 0,
       "findings": []
     },
     "core/engine/palette.h": {
-      "sha256": "faeeba0a695c8c0db24853afe394e73cffe978ff2878cfddce3ccc7c02354779",
+      "sha256": "4990e4e53b048587125d6529f4069b445b033a30ccf407818c0afff343055df6",
       "violations": 0,
       "candidates": 0,
       "findings": []
@@ -367,7 +361,7 @@
       "findings": []
     },
     "core/engine/save.c": {
-      "sha256": "c7101574248dcdbc7416284bc6dc4510283655205fe01f3253c631aa1528890a",
+      "sha256": "3bbd23973fe3e897e42826d1e9414a44d02feb17ea6786071e00cd70d2e0f7ed",
       "violations": 0,
       "candidates": 0,
       "findings": []
@@ -379,7 +373,7 @@
       "findings": []
     },
     "core/engine/save_io.c": {
-      "sha256": "0fae6701606dd14c5c3fa1a84ea5b81881f52eaef83361846b709c548143d3fc",
+      "sha256": "93de12d5aa639b9d26fa1ecf18d52a9194ff825afcecd3a6bd0fab48c1314842",
       "violations": 0,
       "candidates": 0,
       "findings": []
@@ -511,7 +505,7 @@
       "findings": []
     },
     "core/lib/mag.c": {
-      "sha256": "1fb5873facc2aa937a31f635d3f8730834df0676c5787be799cce13bfe6e229e",
+      "sha256": "072f4bcd86f4866cab1331087014c34c3fa120fd470aa8beee93daa766a74a9a",
       "violations": 0,
       "candidates": 0,
       "findings": []
@@ -571,7 +565,7 @@
       "findings": []
     },
     "core/plat/hal.h": {
-      "sha256": "bc8ce086ff395f6f82318b50abcbead8de47ad35a96397a6f3a0e74999920c25",
+      "sha256": "b9a6e662efc88563109277fde461d648bd250e8dcf7ed7dc0d5dc1c12e56885c",
       "violations": 0,
       "candidates": 0,
       "findings": []
@@ -589,7 +583,7 @@
       "findings": []
     },
     "core/plat/hal_pc98.c": {
-      "sha256": "91b49e0ac80153643ae8c676e2ee56c63172a1b45bd22aa81ca45bc2ed2e1cdd",
+      "sha256": "8061b3eafbbbf530f7a1a96513f8dbec5a33062d5fc4c5e7073ffa99189f1be2",
       "violations": 0,
       "candidates": 0,
       "findings": []
@@ -1218,15 +1212,15 @@
   },
   "summary": {
     "files": 167,
-    "changed": 0,
-    "skipped": 167,
+    "changed": 16,
+    "skipped": 151,
     "out_of_scope": 0,
     "violations": 0,
-    "candidates": 37,
+    "candidates": 36,
     "fresh_violations": 0,
-    "fresh_candidates": 0,
-    "verified": 34,
+    "fresh_candidates": 4,
+    "verified": 31,
     "stale": 2,
-    "open": 1
+    "open": 3
   }
 }

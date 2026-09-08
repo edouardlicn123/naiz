@@ -70,6 +70,17 @@ void hal_init(void);
 void hal_log(const char *s);
 
 /*
+ * 格式化调试输出
+ *
+ * printf 风格的便捷封装：内部格式化到栈缓冲后调用 hal_log()。
+ * 替代散落在引擎各处的手写 snprintf+hal_log 两段式，统一缓冲长度
+ * 与截断策略。
+ *
+ * @param fmt  printf 风格格式串
+ */
+void hal_logf(const char *fmt, ...);
+
+/*
  * 设置调色板索引的 RGB 值
  *
  * 各分量使用 8-bit 精度（0-255）。PC-98 PEGC 模式下通过
