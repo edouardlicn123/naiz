@@ -14,8 +14,8 @@
 
 | 命令 | 处理函数 | 签名 | 说明 |
 |---|---|---|---|
-| `bg` | `cmd_bg` (nb.c) | `bg(effect[,transition]){<asset_key>}` | 加载背景：**资产 key 必须在花括号负载**，括号位留给 effect/transition 参数（现为占位不作效）；capture_bg |
-| | | `bg(hidedialog)` | 关闭对话框，还原背景区域 |
+| `bg` | `cmd_bg` (nb.c) | `bg(effect[,transition]){<asset_key>}` | 加载背景：**资产 key 必须在花括号负载**，括号位留给 effect/transition 参数（现为占位不作效）；capture_bg；**绘制后自动复位对话框**（翻页状态），脚本无需尾随 hidedialog |
+| | | `bg(hidedialog)` | 关闭对话框，还原背景区域（show 已自动复位；保留为可选指令：不换图只收起对话） |
 | `char` | `cmd_char` (nb.c) | `char(pos[,expr[,type]]){<name>}` | 显示/替换立绘：**角色名在花括号负载**，括号承载 pos(l\|c\|r)/expr/body\|face 参数；auto-detect body/face |
 | | | `char(hideall)` | 隐藏所有立绘 + clean reset |
 | `scene` | `cmd_scene` (nb.c) | `scene <id\|"end">` / `scene <var,op,val,target;...;default>` | 无条件/条件链跳转，id → nbook{id}.nb。默认值约定：最后一段无逗号→显式默认；无显式默认→fallback 到第一段 target |
@@ -24,8 +24,8 @@
 | `question` | `cmd_question` (nb.c) | `question <text;opt,var,op,delta;...>` | 选项+变量操作(+/-/=)，结果存 nb.last_choice |
 | `var` | `cmd_var` (nb.c) | `var <id> <=/+|/-> <value>` | 变量读写（赋值/加减），需在 variables.json 定义 |
 | `settingmenu` | `cmd_settingmenu` (nb.c) | — | 设置菜单（TODO） |
-| `cg` | `cmd_cg` (nb_cg.c) | `cg(){<asset_key>}` | 展示 CG（type='CG' 资产）：资产 key 必须写在花括号负载中——括号位预留给未来的参数设置，**不再承载资产描述**（`cg(key)` 括号形态被硬性拒绝）；绘制后永久解锁该 CG 至 SYSTEM.SAV |
-| | | `cg(hidedialog)` | 关闭对话框，还原背景区域（与 `bg(hidedialog)` 平行） |
+| `cg` | `cmd_cg` (nb_cg.c) | `cg(){<asset_key>}` | 展示 CG（type='CG' 资产）：资产 key 必须写在花括号负载中——括号位预留给未来的参数设置，**不再承载资产描述**（`cg(key)` 括号形态被硬性拒绝）；绘制后永久解锁该 CG 至 SYSTEM.SAV；**绘制后自动复位对话框**（翻页状态），脚本无需尾随 hidedialog |
+| | | `cg(hidedialog)` | 关闭对话框，还原背景区域（与 `bg(hidedialog)` 平行；show 已自动复位，现为可选指令） |
 | `cgvmenu` | `cmd_cgvmenu` (nb_mainmenu.c) | — | 打开 CG 画廊（由 cgview.nb 调用）：网格浏览 + 锁定占位 + 翻页 + 全屏预览，ESC/Back 回主菜单 |
 | `musicmenu` | `cmd_musicmenu` (nb.c) | — | 音乐菜单（TODO） |
 | `host` | `cmd_host` (nb.c) | `host <text>` | 系统旁白（无角色名） |

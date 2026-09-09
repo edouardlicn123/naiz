@@ -193,6 +193,16 @@ void layer_dialog_hide(void)
 {
     const unsigned char *bg_snap;
     hal_mouse_invalidate_cursor();
+    if (!dialog_drawn) {
+        /* No dialog is on screen: VRAM already shows the pure background, so
+         * the 55KB restore write below would be redundant — and could clobber
+         * sprite pixels overlapping the dialog rect.  Just clear the flags. */
+        dialog_snapshot_valid = 0;
+        dialog_dirty = 0;
+        layer_set_active(LAYER_Z_DIALOG, 0);
+        layer_set_active(LAYER_Z_TEXT, 0);
+        return;
+    }
     bg_snap = layer_bg_dialog_snapshot();
     if (bg_snap) {
         vram_write(bg_snap, LAYER_DIALOG_X, LAYER_DIALOG_Y,

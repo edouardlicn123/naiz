@@ -84,6 +84,7 @@ void cmd_cg(int argc, const char **argv, const char *cmd_name)
     palette_reset_reserved();
     layer_bg_change(img);
     mag_release(img);
-
+    nb_dialog_reset();   /* full-screen blit wiped the dialog: reset paging state
+                          * here so scripts need no trailing hidedialog */
     NB_DEBUG("cg: id=%d cg_id=%d key=%s\r\n", id, cg_id, argv[0]);
 }

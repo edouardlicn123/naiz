@@ -1,7 +1,7 @@
 {
   "version": 2,
-  "git_head": "b3cdd83",
-  "checked_at": "2026-09-08T15:14:12",
+  "git_head": "af9c25b",
+  "checked_at": "2026-09-09T11:29:40",
   "files": {
     "core/build.sh": {
       "sha256": "0e6bb3f41cae8f6c5a014a49767f93990ddd3e2c461a85ec991c01b40b66b11e",
@@ -116,7 +116,7 @@
       "findings": []
     },
     "core/engine/layer_dialog.c": {
-      "sha256": "361fcc2e38d963460d80116021483539646520f28fa00084ffc9eb3905651f4c",
+      "sha256": "b8e3cff7f37e616f5f4bd2ee0e7b3e24c56726fdfabac0bd2847765e42756ac8",
       "violations": 0,
       "candidates": 0,
       "findings": []
@@ -182,7 +182,7 @@
       "findings": []
     },
     "core/engine/nb_cg.c": {
-      "sha256": "909fc3cd0f4538849bba2508abce3e4766fecf64a9d6e0f35c67c239a712bdb6",
+      "sha256": "f4bc050390d81346ad1b7ffd520886a7071877da2cc6694ddc27812df4ebcb49",
       "violations": 0,
       "candidates": 0,
       "findings": []
@@ -194,12 +194,12 @@
       "findings": []
     },
     "core/engine/nb_commands.c": {
-      "sha256": "fef88df83d5614266b2e4838d284835a93455823bea2ab1a6c90360634694a76",
+      "sha256": "24f00027a59aa21d5b576dd79a117b6fc275ef5ea24b08575c9aef9d620c44e8",
       "violations": 0,
       "candidates": 2,
       "findings": [
         {
-          "line": 345,
+          "line": 347,
           "rule": "C8",
           "level": "HEUR"
         },
@@ -1212,15 +1212,15 @@
   },
   "summary": {
     "files": 167,
-    "changed": 16,
-    "skipped": 151,
+    "changed": 3,
+    "skipped": 164,
     "out_of_scope": 0,
     "violations": 0,
     "candidates": 36,
     "fresh_violations": 0,
-    "fresh_candidates": 4,
-    "verified": 31,
+    "fresh_candidates": 2,
+    "verified": 32,
     "stale": 2,
-    "open": 3
+    "open": 2
   }
 }

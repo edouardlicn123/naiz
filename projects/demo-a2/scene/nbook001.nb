@@ -2,7 +2,6 @@ sceneconf(){A normal day, normal}
 bg(normal){splbg}
 host(){Welcome to the Naiz engine demo.This is a visual novel engine for PC-98 systems.}
 cg(){cg01}
-cg(hidedialog)
 char(l,normal,body){fei}
 char(r,normal,body){ira}
 ira(){Good Morning,Fei.}
