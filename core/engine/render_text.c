@@ -7,12 +7,41 @@
 #include "render.h"
 #include "font.h"
 #include "cjk.h"
+#include <stdlib.h>
 
 
 /* Blackletter (16x16 Latin alt glyph) flag for dialog text, injected by the
  * NB layer via text_set_blackletter(). Keeps render_text a pure function of
  * its arguments instead of reading NB interpreter global state. */
 static int text_blackletter = 0;
+
+/* File-level glyph write target for dialog compositing.  NULL = VRAM mode
+ * (default for every pre-existing caller).  When set, draw_text glyphs land
+ * in the RAM buffer instead — the dialog layer composes box+text there and
+ * blits the result (devdoc 96 phase A/B). */
+static uint8_t *text_tgt_buf = NULL;
+static int      text_tgt_w = 0;
+static int      text_tgt_h = 0;
+static int      text_tgt_stride = 0;
+static int      text_tgt_offx = 0;
+static int      text_tgt_offy = 0;
+
+void text_set_target(uint8_t *buf, int w, int h, int stride, int offx, int offy)
+{
+    text_tgt_buf = buf;
+    text_tgt_w = w;
+    text_tgt_h = h;
+    text_tgt_stride = stride;
+    text_tgt_offx = offx;
+    text_tgt_offy = offy;
+}
+
+void text_set_target_vram(void)
+{
+    text_tgt_buf = NULL;
+    text_tgt_w = text_tgt_h = text_tgt_stride = 0;
+    text_tgt_offx = text_tgt_offy = 0;
+}
 
 void text_set_blackletter(int on)
 {
@@ -48,11 +77,19 @@ static void draw_glyph_internal(const uint8_t *g, int x, int y, uint8_t color,
         word = (unsigned short)(g[row * 2] << 8) | g[row * 2 + 1];
         if (bold) word = word | (word >> 1);
         for (col = 0; col < glyph_w; col++) {
-            int px;
+            int px, bx, by;
             if (!(word & (1u << (15 - col)))) continue;
             px = x + col;
             if (px < 0 || px >= LAYER_SCREEN_W) continue;
-            {
+            if (text_tgt_buf) {
+                /* RAM target: map absolute screen coords into the buffer,
+                 * clip to the buffer w x h (C6 boundary guard). */
+                bx = px - text_tgt_offx;
+                by = py - text_tgt_offy;
+                if (bx < 0 || bx >= text_tgt_w) continue;
+                if (by < 0 || by >= text_tgt_h) continue;
+                text_tgt_buf[by * text_tgt_stride + bx] = color;
+            } else {
                 int addr = py * LAYER_SCREEN_W + px;
                 VRAM_SET_BANK(addr, cur_bank);
                 win[addr & (VRAM_BANK_SZ - 1)] = color;

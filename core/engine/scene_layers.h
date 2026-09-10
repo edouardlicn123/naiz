@@ -81,8 +81,10 @@ void fill_dialog_bg(int x, int y, int w, int h);
 
 /*
  * INVARIANT: layer_sprite_face() must NOT write to y >= LAYER_DIALOG_Y.
- * Sprite draws that must affect the dialog area must use
- * layer_sprite_replace() which calls layer_dialog_refresh().
+ * Sprite draws that must affect the dialog area use
+ * layer_sprite_replace(); the dialog composite is re-blitted on top
+ * (Option X: while open, the dialog is the last layer in its rect, and the
+ * dialog close path redraws sprites at full body).
  */
 
 /* 精灵条目：记录位置、资源 ID 和镜像状态 */
@@ -97,16 +99,22 @@ typedef struct {
 /* 统一场景结束处理：失效鼠标快照 → 全屏清黑 → 重置图层 → 排空键盘
  * skip_transition: 为 1 时跳过过渡动画，直接全屏黑屏 */
 void scene_end(int skip_transition);
-/* 截取当前 VRAM 作为背景层 */
-void layer_capture_bg(void);
-/* 从纯背景快照重建对话框背景（避免 VRAM 上对话框叠加层污染） */
-void layer_capture_bg_dialog_from_bg(void);
+/* 从源图直取对话框区下方纯净背景（under_dialog, 480x115, 零 VRAM 回读） */
+void layer_capture_bg_dialog_from_image(const uint8_t *pixels, int img_w, int img_h,
+                                        int src_x, int src_y);
 /* 还原对话框区域的背景 */
 void layer_dialog_restore(void);
 /* 隐藏对话框 */
 void layer_dialog_hide(void);
 /* 对话框是否已绘制 */
 int  layer_dialog_drawn(void);
+/* 将一页（框+角色名+正文）渲染进对话框合成缓冲;返回正文 draw_text 续行偏移 */
+/* （draw_text 分页契约）;合成缓冲不可用时文字直绘 VRAM（OOM 降级）。仅入缓冲,不 blit */
+int  layer_dialog_render_page(const char *name, const char *text, int off);
+/* 存当前页渲染投影（角色名/正文/偏移）,供层换图重绘（devdoc 96 裁决 A 存活） */
+void dialog_layer_store_render(const char *name, const char *text, int off);
+/* 合成缓冲 → VRAM（开框/翻页/菜单恢复时调用） */
+void dialog_layer_blit(void);
 
 /* 换表情（仅上半身），限制 y < LAYER_DIALOG_Y */
 void layer_sprite_face(int sprite_id, int asset_id, int x, int y, int mirror);

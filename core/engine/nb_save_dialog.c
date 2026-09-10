@@ -180,23 +180,18 @@ void save_dialog_menu(void)
     menu_restore_item_palette();
     hal_mouse_erase_cursor();
 
-    /* Restore clean dialog snapshot, then redraw saved text */
-    {
-        int cx = LAYER_DIALOG_X + LAYER_DIALOG_INDENT;
-        int cw = LAYER_DIALOG_W - LAYER_DIALOG_INDENT - LAYER_DIALOG_RIGHT_INDENT;
-        layer_dialog_restore();
-        if (has_text) {
-            if (saved_charname[0])
-                draw_text(saved_charname, 0,
-                          cx, LAYER_DIALOG_Y + LAYER_DIALOG_HEADER_Y,
-                          cw, LAYER_DIALOG_BOTTOM, 1, PAL_WHITE);
-            {
-                int draw_off = (saved_offset >= 0) ? saved_offset : 0;
-                draw_text(saved_text, draw_off,
-                          cx, LAYER_DIALOG_Y + LAYER_DIALOG_TEXT_Y,
-                          cw, LAYER_DIALOG_Y + LAYER_DIALOG_TEXT_Y + 60, 0, PAL_WHITE);
-            }
-        }
+    /* Rebuild the dialog composite (box repaint clears the menu overlay and
+     * any stale in-buffer text), then render the saved text into the buffer
+     * and blit once — the dialog composite is the persistent layer (devdoc
+     * 96), the save menu was a transient VRAM overlay. */
+    layer_dialog_show();
+    if (has_text) {
+        int draw_off = (saved_offset >= 0) ? saved_offset : 0;
+        layer_dialog_render_page(saved_charname, saved_text, draw_off);
+        dialog_layer_store_render(saved_charname, saved_text, draw_off);
+        dialog_layer_blit();
+    } else {
+        dialog_layer_blit();
     }
 }
 

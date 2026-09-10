@@ -80,11 +80,14 @@ void cmd_cg(int argc, const char **argv, const char *cmd_name)
     /* Unlock BEFORE drawing: persist even if a later panic cuts us off. */
     sys_save_unlock_cg(cg_id);
 
+    /* R20: a CG is a full-screen event — close the dialog and drop the paged
+     * dialogue so the next text command opens a fresh page over the CG. */
+    layer_dialog_hide();
+    nb_dialog_reset();
+
     hal_mouse_invalidate_cursor();
     palette_reset_reserved();
     layer_bg_change(img);
     mag_release(img);
-    nb_dialog_reset();   /* full-screen blit wiped the dialog: reset paging state
-                          * here so scripts need no trailing hidedialog */
     NB_DEBUG("cg: id=%d cg_id=%d key=%s\r\n", id, cg_id, argv[0]);
 }

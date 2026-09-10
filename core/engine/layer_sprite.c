@@ -2,6 +2,13 @@
  * Sprite registry + operations — part of the scene layer subsystem.
  * Extracted from layer.c (refactor): show/face/replace/hide/redraw.
  * Implements the sprite half of C04-图层渲染与换装机制.md.
+ *
+ * R20 pseudo-transparency (revokes the Option X clipping): while the dialog
+ * is open sprites are drawn at full body (extending into the dialog rect,
+ * under it in z-order).  After every sprite change the live dialog occluder
+ * (underneath + sprites) is rebuilt and the dialog composite recomposed over
+ * it, so the dialog dither holes keep the actors visible.  Closing the
+ * dialog restores the underneath and redraws sprites at full body.
  */
 #include <stdlib.h>
 #include "render.h"
@@ -59,6 +66,66 @@ static SpriteEntry *alloc_sprite(int id)
 /* Forward declaration (mutual recursion between show and replace). */
 static void layer_sprite_replace(int sprite_id, int asset_id, int x, int y, int mirror);
 
+/* Write a sprite's pixels that overlap the dialog rect into the live dialog
+ * occluder (PAL_TRANSPARENT skipped, mirror supported).  The occluder is the
+ * composite seed for the dialog box, so its dither holes keep the actors
+ * visible under the box (pseudo-transparency, R20). */
+static void dialog_occluder_sprite_blit(const MagImage *img, int x, int y, int mirror)
+{
+    uint8_t *occ;
+    int y0, y1, sy, sx;
+
+    if (!img) return;
+    occ = layer_dialog_occluder();
+    if (!occ) return;
+    /* Reject the sprite outright when it cannot reach the dialog rect. */
+    y0 = y;
+    y1 = y + img->height;
+    if (y1 <= LAYER_DIALOG_Y || y0 >= LAYER_DIALOG_Y + LAYER_DIALOG_H) return;
+    if (x + img->width <= LAYER_DIALOG_X || x >= LAYER_DIALOG_X + LAYER_DIALOG_W) return;
+
+    for (sy = 0; sy < img->height; sy++) {
+        int ry = y + sy;
+        int buf_y;
+        int xs, xe, sxx;
+        if (ry < LAYER_DIALOG_Y) continue;
+        if (ry >= LAYER_DIALOG_Y + LAYER_DIALOG_H) break;
+        buf_y = ry - LAYER_DIALOG_Y;
+        xs = x < LAYER_DIALOG_X ? LAYER_DIALOG_X : x;
+        xe = x + img->width > LAYER_DIALOG_X + LAYER_DIALOG_W
+             ? LAYER_DIALOG_X + LAYER_DIALOG_W : x + img->width;
+        for (sxx = xs; sxx < xe; sxx++) {
+            int src_x = mirror ? (img->width - 1 - (sxx - x)) : (sxx - x);
+            uint8_t c = img->pixels[sy * img->width + src_x];
+            if (c != PAL_TRANSPARENT)
+                occ[buf_y * LAYER_DIALOG_W + (sxx - LAYER_DIALOG_X)] = c;
+        }
+    }
+}
+
+/* Rebuild the live dialog occluder (pristine underneath + every active
+ * sprite) and recompose the dialog over it.  Called after each sprite change
+ * while the dialog is open and at dialog open, so the box shows the actors
+ * through its dither holes. */
+void layer_sprite_sync_dialog_base(void)
+{
+    int i;
+
+    if (!layer_dialog_occluder() || !layer_dialog_drawn()) return;
+    dialog_occluder_reset_base();
+    for (i = 0; i < LAYER_MAX_SPRITES; i++) {
+        SpriteEntry *se = &sprite_table[i];
+        if (se->active) {
+            MagImage *img = image_load((unsigned short)se->asset_id);
+            if (img) {
+                dialog_occluder_sprite_blit(img, se->x, se->y, se->mirror);
+                mag_release(img);
+            }
+        }
+    }
+    layer_dialog_recompose();
+}
+
 /* Calculate sprite clip height: limit output to rows above the dialog area.
  * Returns positive rows to clip (LAYER_DIALOG_Y - y) when sprite partially
  * extends into dialog area, 0 when fully above (no clip needed) or when
@@ -70,42 +137,18 @@ static int calc_sprite_clip_h(int y, int img_h)
     return 0;
 }
 
-/* Return 1 if at least one sprite is active in the table. */
-static int layer_has_any_sprite(void)
-{
-    int i;
-    for (i = 0; i < LAYER_MAX_SPRITES; i++) {
-        if (sprite_table[i].active) return 1;
-    }
-    return 0;
-}
-
 /*=== Sprite operations ===================================================*/
 
 /* Show a sprite (full body) — first-time display or full replacement.
- * If dialog is drawn and no other sprites exist, saves the dialog background first.
- * Always draws the sprite at full height (no clip_h).
- * Registers the sprite for subsequent face/replace/hide operations. */
+ * Drawn at full height even while the dialog is open — it sits under the
+ * dialog composite in z-order; layer_sprite_sync_dialog_base() rebuilds the
+ * occluder and recomposes the dialog over it (pseudo-transparency, R20). */
 static void layer_sprite_show(int sprite_id, int asset_id, int x, int y, int mirror)
 {
     SpriteEntry *se;
     MagImage *img;
-    const unsigned char *bg_snap;
 
     hal_mouse_invalidate_cursor();
-
-    if (layer_dialog_drawn()) {
-        bg_snap = layer_bg_dialog_snapshot();
-        if (!layer_has_any_sprite() && bg_snap) {
-            /* First sprite: restore pristine dialog background before drawing. */
-            vram_write(bg_snap, LAYER_DIALOG_X, LAYER_DIALOG_Y,
-                       LAYER_DIALOG_W, LAYER_DIALOG_H);
-        } else {
-            /* Sprite already exists: delegate to replace (handles dirty rect). */
-            layer_sprite_replace(sprite_id, asset_id, x, y, mirror);
-            return;
-        }
-    }
 
     img = image_load((unsigned short)asset_id);
     if (img) {
@@ -119,21 +162,15 @@ static void layer_sprite_show(int sprite_id, int asset_id, int x, int y, int mir
     }
 
     layer_set_active(LAYER_Z_SPRITE, 1);
-
-    if (layer_dialog_drawn()) {
-        layer_dialog_refresh();
-        layer_dialog_mark_dirty();
-    }
+    layer_sprite_sync_dialog_base();
 }
 
 /*
- * Face-only sprite replace — does NOT touch the dialog area.
- *
- * INVARIANT: sprite blit is clipped to y < LAYER_DIALOG_Y to avoid
- * overwriting dialog pixels.  The sprite's lower portion (under dialog)
- * is never visible and must be pixel-identical across expressions.
- *
- * If dialog refresh is needed, use layer_sprite_replace() instead.
+ * Face-only sprite replace — updates only the upper body (clipped to
+ * y < LAYER_DIALOG_Y) so the dialog rect pixels stay untouched; the full
+ * body below comes from the last show/replace and stays visible through the
+ * dialog box.  Use layer_sprite_replace() (full body) when the pose must
+ * change below the dialog boundary.
  */
 void layer_sprite_face(int sprite_id, int asset_id, int x, int y, int mirror)
 {
@@ -163,24 +200,22 @@ void layer_sprite_face(int sprite_id, int asset_id, int x, int y, int mirror)
     img = image_load((unsigned short)asset_id);
     if (img) {
         int clip_h = 0;
-        if (dialog_drawn) {
-            /* Sprite entirely inside dialog area: discard.  Note this is a
-             * script-authoring error (face position must stay above the
-             * dialog); we still deactivate any tracked entry so a later
-             * face/replace can't resurrect pixels, but a caller that never
-             * registered the sprite (se==NULL) has no background restore —
-             * that path relies on the sprite not having been drawn yet. */
-            if (y >= LAYER_DIALOG_Y) {
-                mag_release(img);
-                if (se) { se->active = 0; }
-                return;
-            }
-            /* Clip to dialog boundary to avoid overwriting dialog pixels. */
-            clip_h = calc_sprite_clip_h(y, img->height);
+        /* Sprite entirely inside dialog area: discard.  Note this is a
+         * script-authoring error (face position must stay above the
+         * dialog); we still deactivate any tracked entry so a later
+         * face/replace can't resurrect pixels, but a caller that never
+         * registered the sprite (se==NULL) has no background restore —
+         * that path relies on the sprite not having been drawn yet. */
+        if (y >= LAYER_DIALOG_Y) {
+            mag_release(img);
+            if (se) { se->active = 0; }
+            return;
         }
+        /* Clip to dialog boundary to avoid overwriting dialog pixels. */
+        clip_h = calc_sprite_clip_h(y, img->height);
         vram_blit_sprite(img, x, y, PAL_TRANSPARENT, mirror, clip_h);
 #ifdef NAIZ_DEBUG
-        if (dialog_drawn && layer_dialog_snapshot() && clip_h > 0) {
+        if (layer_dialog_snapshot() && clip_h > 0) {
             int ox = x < LAYER_DIALOG_X ? LAYER_DIALOG_X : x;
             int ow = (x + LAYER_SPRITE_W > LAYER_DIALOG_X + LAYER_DIALOG_W)
                      ? (LAYER_DIALOG_X + LAYER_DIALOG_W - ox) : (x + LAYER_SPRITE_W - ox);
@@ -216,10 +251,10 @@ void layer_sprite_face(int sprite_id, int asset_id, int x, int y, int mirror)
     }
 }
 
-/* Replace a sprite (full body + dialog refresh).
- * Unlike layer_sprite_show(), this restores the background under the old sprite rect,
- * draws the new sprite, then refreshes the dialog on top.
- * Used when a new sprite may have different content in the dialog area. */
+/* Replace a sprite (full body): restore the background under the old sprite
+ * rect (dialog rect untouched — clip_dialog=1), then draw the new sprite at
+ * full height.  The dialog composite is then rebuilt over the fresh occluder
+ * via layer_sprite_sync_dialog_base() (pseudo-transparency, R20). */
 static void layer_sprite_replace(int sprite_id, int asset_id, int x, int y, int mirror)
 {
     SpriteEntry *se;
@@ -248,16 +283,13 @@ static void layer_sprite_replace(int sprite_id, int asset_id, int x, int y, int 
         ux2 = x + LAYER_SPRITE_W; uy2 = y + LAYER_SPRITE_H;
     }
 
-    layer_bg_restore_rect(ux1, uy1, ux2 - ux1, uy2 - uy1, 0);
+    layer_bg_restore_rect(ux1, uy1, ux2 - ux1, uy2 - uy1, 1);
 
     img = image_load((unsigned short)asset_id);
     if (img) {
         vram_blit_sprite(img, x, y, PAL_TRANSPARENT, mirror, 0);
         mag_release(img);
     }
-
-    layer_dialog_refresh();
-    layer_dialog_mark_dirty();
 
     if (se) {
         sprite_entry_update(se, sprite_id, asset_id, x, y, mirror);
@@ -271,50 +303,22 @@ static void layer_sprite_replace(int sprite_id, int asset_id, int x, int y, int 
             se->mirror = mirror;
         }
     }
+    layer_sprite_sync_dialog_base();
 }
 
-/* Hide a specific sprite by ID.
- * Restores background under the sprite. If the sprite extended into the dialog area,
- * refreshes the dialog.  If this was the last sprite, restores full background
- * and recaptures the dialog background. */
+/* Hide a specific sprite by ID: restore the background under its rect
+ * (dialog rect untouched — clip_dialog=1), drop it from the occluder and
+ * recompose the dialog (R20). */
 static void layer_sprite_hide(int id)
 {
-    SpriteEntry *se;
-
-    if (!layer_dialog_drawn()) {
-        se = find_sprite(id);
-        if (se) {
-            if (layer_bg_snapshot_valid() && layer_bg_snapshot())
-                layer_bg_restore_rect(se->x, se->y, LAYER_SPRITE_W, LAYER_SPRITE_H, 0);
-            se->active = 0;
-        }
-        return;
-    }
-
+    SpriteEntry *se = find_sprite(id);
+    if (!se) return;
     hal_mouse_invalidate_cursor();
-    se = find_sprite(id);
-    if (se) {
-        layer_bg_restore_rect(se->x, se->y, LAYER_SPRITE_W, LAYER_SPRITE_H, 0);
-
-        /* If sprite overlapped dialog, refresh the dialog overlay. */
-        if (se->y + LAYER_SPRITE_H > LAYER_DIALOG_Y) {
-            layer_dialog_refresh();
-            layer_dialog_mark_dirty();
-        }
-
-        se->active = 0;
-
-        /*
-         * Last sprite removed: restore background above dialog only,
-         * then recapture dialog region.  Full restore would overwrite
-         * the dialog overlay, corrupting the dialog snapshot.
-         */
-        if (!layer_has_any_sprite() && layer_bg_snapshot_valid() && layer_bg_snapshot()) {
-            layer_bg_restore_rect(0, 0, LAYER_SCREEN_W, LAYER_DIALOG_Y, 0);
-            layer_capture_bg_dialog_from_bg();
-            layer_dialog_mark_dirty();
-        }
+    if (layer_bg_snapshot_valid() && layer_bg_snapshot()) {
+        layer_bg_restore_rect(se->x, se->y, LAYER_SPRITE_W, LAYER_SPRITE_H, 1);
     }
+    se->active = 0;
+    layer_sprite_sync_dialog_base();
 }
 
 /* Hide all active sprites. */
@@ -336,9 +340,8 @@ int layer_has_sprite(int id)
     return find_sprite(id) != NULL;
 }
 
-/* Redraw all active sprites on top of the background.
- * Each sprite respects clip_h when dialog is drawn (no writes below dialog).
- * Used during dialog_snap and scene transitions. */
+/* Redraw all active sprites on top of the background at full body (the
+ * dialog, when open, is recomposed over them afterwards — R20). */
 void layer_redraw_sprites(void)
 {
     int i;
@@ -346,19 +349,14 @@ void layer_redraw_sprites(void)
         SpriteEntry *se = &sprite_table[i];
         if (se->active) {
             MagImage *img;
-            int clip_h;
             img = image_load((unsigned short)se->asset_id);
             if (img) {
-                if (layer_dialog_drawn() && se->y >= LAYER_DIALOG_Y) {
-                    mag_release(img);
-                    continue;
-                }
-                clip_h = layer_dialog_drawn() ? calc_sprite_clip_h(se->y, img->height) : 0;
-                vram_blit_sprite(img, se->x, se->y, PAL_TRANSPARENT, se->mirror, clip_h);
+                vram_blit_sprite(img, se->x, se->y, PAL_TRANSPARENT, se->mirror, 0);
                 mag_release(img);
             }
         }
     }
+    layer_sprite_sync_dialog_base();
 }
 
 /*==== Unified entry point ================================================*/

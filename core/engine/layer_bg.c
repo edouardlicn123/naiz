@@ -1,9 +1,9 @@
 /*
- * Background snapshots — captured before sprites/dialog are drawn so the
- * pristine background can be restored on sprite hide / dialog restore.
- * Extracted from layer.c (refactor): full-screen + dialog-area captures.
- * Internal glue (layer_bg_*) is exposed via layer_internal.h; the public
- * capture API lives in scene_layers.h.
+ * Background snapshots — captured from the source image (never VRAM
+ * readback) so the pristine background can be restored on sprite hide and
+ * dialog close.  Extracted from layer.c (refactor): full-screen + dialog
+ * underneath captures.  Internal glue (layer_bg_*) is exposed via
+ * layer_internal.h; the public capture API lives in scene_layers.h.
  */
 #include <stdio.h>
 #include <stdlib.h>
@@ -13,21 +13,25 @@
 #include "layer_internal.h"
 #include "hal.h"
 
-/* Background snapshot: full-screen VRAM copy before sprites drawn. */
+/* Background snapshot (640x400): pristine source image, captured from the
+ * blitted MagImage pixels — never VRAM — so it cannot be contaminated by
+ * sprites (devdoc 96 fixes the legacy capture-after-redraw order bug). */
 static unsigned char *bg_snapshot = NULL;
 /* Non-zero when bg_snapshot holds valid data. */
 static unsigned char  snapshot_valid = 0;
-/* Background behind dialog area (captured before first sprite show). */
-static unsigned char *bg_dialog_snapshot = NULL;
-
-/* Forward declaration (called by layer_capture_bg_dialog_from_bg). */
-static void layer_capture_bg_dialog(void);
+/* Background behind the dialog rect (480x115), pure source pixels (bg image
+ * or animation frame).  Renamed from bg_dialog_snapshot to under_dialog: the
+ * dialog composite seeds its dither holes from here and dialog close
+ * restores it over the rect. */
+static unsigned char *under_dialog = NULL;
 
 /*=== Helpers =============================================================*/
 
 /* Restore a rectangular region from bg_snapshot to VRAM.
  * When clip_dialog is nonzero and dialog is drawn, pixels within the dialog
- * area are skipped (used by face sprites to avoid overwriting the dialog). */
+ * area are skipped — erasing a sprite (or restoring under a replaced sprite)
+ * must not overwrite the dialog composite, which sits above the sprites
+ * (R20 z-order: dialog box over full-body sprites). */
 void layer_bg_restore_rect(int x, int y, int w, int h, int clip_dialog)
 {
     int py, px, addr;
@@ -58,80 +62,65 @@ void layer_bg_restore_rect(int x, int y, int w, int h, int clip_dialog)
 
 /*=== Background ==========================================================*/
 
-/* Capture the full VRAM screen into bg_snapshot.
- * Called after loading a new background image (e.g. cmd_bg).
- * Resets dialog_drawn/dialog_dirty; dialog reopens on next text. */
-void layer_capture_bg(void)
+/* Capture the full-screen background from a MagImage pixel buffer directly
+ * (RAM-to-RAM copy, no VRAM readback).  The image is opaque and covers the
+ * screen, leaving bg_snapshot pristine by construction.  Out-of-bounds rows
+ * (image smaller than the screen) are zeroed so no stale pixels survive. */
+static void layer_capture_bg_from_image(const uint8_t *pixels, int img_w, int img_h)
 {
+    int y, row_w;
+
+    if (!pixels || !img_w || !img_h) return;
     if (!bg_snapshot) {
         bg_snapshot = (unsigned char *)malloc(LAYER_SCREEN_W * LAYER_SCREEN_H);
-        if (!bg_snapshot)
+        if (!bg_snapshot) {
             hal_log("OOM: bg_snapshot malloc fail\r\n");
-    }
-    if (bg_snapshot) {
-        vram_read(0, 0, LAYER_SCREEN_W, LAYER_SCREEN_H, bg_snapshot);
-        snapshot_valid = 1;
-        layer_set_active(LAYER_Z_BG, 1);
-    }
-    layer_dialog_clear();
-}
-
-/* Reconstruct bg_dialog_snapshot from bg_snapshot (pure background,
- * no dialog overlay). Used when the last sprite is removed after
- * dialog_refresh has drawn the overlay on VRAM. */
-void layer_capture_bg_dialog_from_bg(void)
-{
-    int y;
-    if (!bg_snapshot || !snapshot_valid) {
-        layer_capture_bg_dialog();
-        return;
-    }
-    if (!bg_dialog_snapshot) {
-        bg_dialog_snapshot = layer_snapshot_alloc_dialog("bg_dialog_snapshot");
-        if (!bg_dialog_snapshot) {
             return;
         }
     }
-    for (y = 0; y < LAYER_DIALOG_H; y++)
-        memcpy(bg_dialog_snapshot + y * LAYER_DIALOG_W,
-               bg_snapshot + (LAYER_DIALOG_Y + y) * LAYER_SCREEN_W + LAYER_DIALOG_X,
-               LAYER_DIALOG_W);
+    memset(bg_snapshot, 0, (size_t)LAYER_SCREEN_W * LAYER_SCREEN_H);
+    for (y = 0; y < LAYER_SCREEN_H && y < img_h; y++) {
+        row_w = img_w < LAYER_SCREEN_W ? img_w : LAYER_SCREEN_W;
+        memcpy(bg_snapshot + y * LAYER_SCREEN_W, pixels + y * img_w, (size_t)row_w);
+    }
+    snapshot_valid = 1;
+    layer_set_active(LAYER_Z_BG, 1);
 }
 
-/* Capture only the dialog-area background from VRAM.
- * Used when the last sprite is removed to restore the pristine dialog background. */
-static void layer_capture_bg_dialog(void)
-{
-    if (!bg_dialog_snapshot) {
-        bg_dialog_snapshot = layer_snapshot_alloc_dialog("bg_dialog_snapshot");
-    }
-    if (bg_dialog_snapshot) {
-        vram_read(LAYER_DIALOG_X, LAYER_DIALOG_Y, LAYER_DIALOG_W, LAYER_DIALOG_H, bg_dialog_snapshot);
-    }
-}
-
-/* Capture dialog-area background directly from a MagImage pixel buffer
- * instead of reading back from VRAM.  Used during animation playback:
- * the image is already in RAM (just decoded), so this avoids a 55KB
- * VRAM readback per frame.  src_x/src_y is the blit origin on screen. */
+/* Capture the dialog-area underneath background directly from a MagImage
+ * pixel buffer (RAM-to-RAM copy, no VRAM readback).  Used on background
+ * change and during animation playback: the image is already in RAM, so this
+ * avoids a 55KB VRAM readback per capture.  src_x/src_y = blit origin. */
 void layer_capture_bg_dialog_from_image(const uint8_t *pixels, int img_w, int img_h,
                                         int src_x, int src_y)
 {
     int dy, src_row;
+    int row_start, copy_len;
 
-    if (!bg_dialog_snapshot) {
-        bg_dialog_snapshot = layer_snapshot_alloc_dialog("bg_dialog_snapshot");
-        if (!bg_dialog_snapshot) {
+    if (!pixels || !img_w || !img_h) return;
+    if (!under_dialog) {
+        under_dialog = layer_snapshot_alloc_dialog("under_dialog");
+        if (!under_dialog) {
             return;
         }
     }
+    /* Zero first so rows the image does not cover (cine 640x280 case) keep
+     * no stale pixels; guarded rows are skipped below. */
+    memset(under_dialog, 0, (size_t)LAYER_DIALOG_W * LAYER_DIALOG_H);
+    row_start = src_x + LAYER_DIALOG_X;
+    if (row_start >= img_w) return;
+    copy_len = LAYER_DIALOG_W;
+    if (row_start + copy_len > img_w) copy_len = img_w - row_start;
+    if (copy_len <= 0) return;
     for (dy = 0; dy < LAYER_DIALOG_H; dy++) {
         /* Image row index the blit maps onto screen row (src_y+img_row). */
         src_row = LAYER_DIALOG_Y + dy;
         if (src_row - src_y < 0 || src_row - src_y >= img_h) continue;
-        memcpy(bg_dialog_snapshot + dy * LAYER_DIALOG_W,
-               pixels + (src_row - src_y) * img_w + src_x + LAYER_DIALOG_X,
-               LAYER_DIALOG_W);
+        /* Row-clamped copy (copy_len <= remaining image columns), so the
+         * memcpy never reads across into the next image row (C9/C28). */
+        memcpy(under_dialog + dy * LAYER_DIALOG_W,
+               pixels + (src_row - src_y) * img_w + row_start,
+               (size_t)copy_len);
     }
 }
 
@@ -140,7 +129,7 @@ void layer_capture_bg_dialog_from_image(const uint8_t *pixels, int img_w, int im
 void layer_bg_reset(void)
 {
     if (bg_snapshot) { free(bg_snapshot); bg_snapshot = NULL; }
-    if (bg_dialog_snapshot) { free(bg_dialog_snapshot); bg_dialog_snapshot = NULL; }
+    if (under_dialog) { free(under_dialog); under_dialog = NULL; }
     snapshot_valid = 0;
     layer_set_active(LAYER_Z_BG, 0);
 }
@@ -153,33 +142,34 @@ int layer_bg_snapshot_valid(void)
     return snapshot_valid;
 }
 
-/* Full-screen background snapshot (640x400). NULL when not captured. */
+/* Full-screen pristine background snapshot (640x400). NULL when not captured. */
 const unsigned char *layer_bg_snapshot(void)
 {
     return bg_snapshot;
 }
 
-/* Pristine dialog-area background (480x115, no dialog overlay). */
-const unsigned char *layer_bg_dialog_snapshot(void)
+/* Pristine underneath dialog rect (480x115, source pixels). NULL when not
+ * captured.  Sprite restore must not touch this (Option X). */
+const unsigned char *layer_bg_under_dialog(void)
 {
-    return bg_dialog_snapshot;
+    return under_dialog;
 }
 
 /*==== Unified entry point ================================================*/
 
-/* Unified background change: blit + re-capture + redraw + palette + snapshot.
- * Encapsulates the 7-step ritual previously inlined in cmd_bg().
- * The dialog-area snapshot is ALWAYS re-captured after the blit: the layer is
- * opaque and physically overwrites the dialog rect, so a stale snapshot taken
- * while the dialog was already open would leave a ghost on cg/bg(hidedialog)
- * later (devdoc 94 root fix). */
+/* Unified background change (devdoc 96 phase C, R20): blit -> capture both
+ * snapshots from the source image (no VRAM readback anywhere) -> redraw
+ * sprites at full body.  layer_redraw_sprites ends with
+ * layer_sprite_sync_dialog_base(), which re-bases the live occluder to the
+ * fresh underneath, redraws the sprites into it, and recomposes the dialog
+ * over it when open (pseudo-transparency survival). */
 void layer_bg_change(MagImage *img)
 {
     if (!img) return;
     vram_blit(img, 0, 0);
-    layer_capture_bg_dialog();
+    layer_capture_bg_from_image(img->pixels, img->width, img->height);
+    layer_capture_bg_dialog_from_image(img->pixels, img->width, img->height, 0, 0);
     layer_redraw_sprites();
     dlg_update_palette();
     btn_update_palette();
-    layer_capture_bg();
 }

@@ -97,6 +97,7 @@ void cmd_question(int argc, const char **argv, const char *cmd_name)
     NB_DEBUG("question: %s (%d valid, %d displayed)\r\n", argv[0], total_opts, display_opts);
 
     layer_dialog_show();
+    dialog_layer_blit();
     hal_mouse_erase_cursor();
 
     menu_save_item_palette();

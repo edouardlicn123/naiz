@@ -51,6 +51,12 @@ void draw_rect(int x, int y, int w, int h, int t, uint8_t color);
 /* 文字渲染函数在 render_text.c 中实现 */
 /* 设置对话框文字是否使用黑花体（16x16 Latin alt 字形） */
 void text_set_blackletter(int on);
+/* Set the glyph write target for draw_text: when buf != NULL, glyphs draw
+ * into buf[(y-offy)*stride + (x-offx)] (screen coords x/y, clipped to the
+ * w x h buffer) instead of VRAM. Used by the dialog composite layer. */
+void text_set_target(uint8_t *buf, int w, int h, int stride, int offx, int offy);
+/* Restore the default VRAM glyph target. */
+void text_set_target_vram(void);
 /* 绘制文本，返回下一字符字节偏移 */
 int  draw_text(const char *s, int byte_start, int x, int y,
                int max_width, int max_y, int bold, uint8_t color);

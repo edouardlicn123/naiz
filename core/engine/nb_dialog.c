@@ -28,7 +28,6 @@ static DialogState dialog_state;
 
 void dialog_show(const char *charname, const char *text)
 {
-    int mw = LAYER_DIALOG_W - LAYER_DIALOG_INDENT - LAYER_DIALOG_RIGHT_INDENT;
     NB_DEBUG("dialog_show: enter\r\n");
     NB_DEBUG("dialog_show: charname=%s text_offset=%d\r\n",
              charname ? charname : "NULL", dialog_state.text_offset);
@@ -54,18 +53,19 @@ void dialog_show(const char *charname, const char *text)
 
     layer_dialog_show();
 
-    if (dialog_state.charname)
-        draw_text(dialog_state.charname, 0,
-                  LAYER_DIALOG_X + LAYER_DIALOG_INDENT, LAYER_DIALOG_Y + LAYER_DIALOG_HEADER_Y,
-                   mw, LAYER_DIALOG_BOTTOM, 1, PAL_WHITE);
-
     {
-        int next = draw_text(dialog_state.text, dialog_state.text_offset,
-                             LAYER_DIALOG_X + LAYER_DIALOG_INDENT, LAYER_DIALOG_Y + LAYER_DIALOG_TEXT_Y,
-                             mw, LAYER_DIALOG_Y + LAYER_DIALOG_TEXT_Y + 60, 0, PAL_WHITE);
+        /* Render the page into the dialog composite buffer (box + text) and
+         * blit once.  store_render keeps a copy of the page parameters so a
+         * later bg(){}/cg(){} change can redraw this page (devdoc 96 A). */
+        int next = layer_dialog_render_page(dialog_state.charname, dialog_state.text,
+                                            dialog_state.text_offset);
 
         NB_DEBUG("dialog_show: draw_text returned %d (vm_flags=0x%02X)\r\n",
                  next, vm_get_flags());
+
+        dialog_layer_store_render(dialog_state.charname, dialog_state.text,
+                                  dialog_state.text_offset);
+        dialog_layer_blit();
 
 #ifdef AUTOEXIT
         /* Headless test build: never page — display the whole text at once
