@@ -13,7 +13,7 @@
 
 <h1>mainmenu 主菜单命令</h1>
 <hr>
-<blockquote><strong>创建</strong>：2026-07-27</blockquote>
+<blockquote><strong>创建</strong>：2026-07-27<br><strong>最后更新</strong>：2026-09-11</blockquote>
 <p><code>mainmenu()</code> 命令用于构建游戏的主菜单。视觉规格见 <a href="cf04-按钮样式方案.html">cf04-按钮样式方案</a>，设计指南见 <a href="ui01-主菜单设计.html">ui01-主菜单设计</a>。</p>
 
 <h2>1. 语法</h2>
@@ -29,16 +29,16 @@
 
 <h2>2. 选项</h2>
 <table>
-<tr><th>选项</th><th>行为</th></tr>
-<tr><td><code>continue</code></td><td>继续上次游戏（预留）</td></tr>
-<tr><td><code>load</code></td><td>读取存档（预留）</td></tr>
-<tr><td><code>start</code></td><td>开始新游戏 → <code>nbook001.nb</code></td></tr>
-<tr><td><code>scenes</code></td><td>场景选择（预留）</td></tr>
-<tr><td><code>special</code></td><td>特别内容（预留）</td></tr>
-<tr><td><code>music</code></td><td>音乐鉴赏（预留）</td></tr>
-<tr><td><code>gallery</code></td><td>CG 鉴赏（预留）</td></tr>
-<tr><td><code>settings</code></td><td>系统设置（预留）</td></tr>
-<tr><td><code>exit</code></td><td>退出游戏</td></tr>
+<tr><th>选项</th><th>状态</th><th>行为</th></tr>
+<tr><td><code>continue</code></td><td>已实现</td><td>加载时间戳最新的存档；无存档时回退开始新游戏 <code>nbook001.nb</code></td></tr>
+<tr><td><code>load</code></td><td>已实现</td><td>保住当前现场（临时存档）后跳转读档场景 <code>loadscene.nb</code>（详见 <a href="sc05-saveload.html">sc05</a>）</td></tr>
+<tr><td><code>start</code></td><td>已实现</td><td>开始新游戏 → <code>nbook001.nb</code></td></tr>
+<tr><td><code>scenes</code></td><td>预留</td><td>场景选择尚未实现</td></tr>
+<tr><td><code>special</code></td><td>预留</td><td>特别内容尚未实现</td></tr>
+<tr><td><code>music</code></td><td>预留</td><td>音乐鉴赏尚未实现</td></tr>
+<tr><td><code>gallery</code></td><td>已实现</td><td>跳转 CG 画廊场景 <code>cgview.nb</code>（详见 <a href="sc06-gallery.html">sc06</a>）</td></tr>
+<tr><td><code>settings</code></td><td>预留</td><td>系统设置见 <code>startsetting()</code>（<a href="sc13-startsetting.html">sc13</a>）；主菜单入口尚未接入</td></tr>
+<tr><td><code>exit</code></td><td>已实现</td><td>退出游戏</td></tr>
 </table>
 
 <h2>3. 示例</h2>

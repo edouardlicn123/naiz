@@ -99,3 +99,34 @@ void vram_write(const uint8_t *buf, int x, int y, int w, int h)
         }
     }
 }
+
+/* Blit a RAM buffer rectangle to VRAM, skipping pixels equal to
+ * transparent_idx (sprite-blit transparency semantics).  (x,y,w,h) are in
+ * buffer coordinates; the rect is written at screen (offx+x, offy+y).
+ * Per-pixel skip test means no rep movsb bulk path — acceptable because the
+ * menu layer content is sparse (buttons/labels over a static base). */
+void render_blit_transparent(const uint8_t *buf, int stride,
+                             int x, int y, int w, int h,
+                             int offx, int offy, uint8_t transparent_idx)
+{
+    int py, px, cur_bank = -1, vx, vy;
+    volatile uint8_t *win = hal_vram_get_window();
+    if (w <= 0 || h <= 0) return;
+    vx = offx + x;
+    vy = offy + y;
+    for (py = 0; py < h; py++) {
+        int sy = vy + py;
+        int rowoff;
+        if (sy < 0 || sy >= LAYER_SCREEN_H) continue;
+        rowoff = (y + py) * stride + x;
+        for (px = 0; px < w; px++) {
+            int sx = vx + px;
+            int addr;
+            if (sx < 0 || sx >= LAYER_SCREEN_W) continue;
+            if (buf[rowoff + px] == transparent_idx) continue;
+            addr = sy * LAYER_SCREEN_W + sx;
+            VRAM_SET_BANK(addr, cur_bank);
+            win[addr & (VRAM_BANK_SZ - 1)] = buf[rowoff + px];
+        }
+    }
+}

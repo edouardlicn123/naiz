@@ -13,19 +13,28 @@
 
 <h1>cgvmenu / musicmenu 鉴赏模式</h1>
 <hr>
-<blockquote><strong>创建</strong>：2026-07-27</blockquote>
-<p><code>cgvmenu()</code> 和 <code>musicmenu()</code> 命令当前为预留 stub，暂无实际效果。</p>
+<blockquote><strong>创建</strong>：2026-07-27<br><strong>最后更新</strong>：2026-09-11</blockquote>
+<p><code>cgvmenu()</code> 打开 CG 鉴赏画廊；<code>musicmenu()</code> 为音乐鉴赏——当前仍是预留 stub，暂无实际效果。</p>
 
 <h2>1. 语法</h2>
 <pre><code>cgvmenu()
 musicmenu()</code></pre>
-<p>均无参数。</p>
+<p>均无参数，调用时跳转 CG 画廊场景。</p>
 
-<h2>2. 状态</h2>
+<h2>2. CG 画廊（cgvmenu，已实现）</h2>
+<ul>
+<li><strong>网格</strong>：全屏黑底 + 标题，每页 <code>4×2</code> 个缩略格；上方「&lt; / &gt; / 页码」翻页，右下「Back」返回</li>
+<li><strong>解锁位图</strong>：未解锁的 CG 以灰色占位显示，解锁状态读自存档（进入时缓存一次）</li>
+<li><strong>预览</strong>：选中已解锁格子按回车/点击进入全屏预览；预览在图库背景之上展示（返回后回到网格原位置）</li>
+<li><strong>渲染</strong>：网格绘制进独立的菜单复合缓冲（<code>menu_layer</code>，0.2.093），焦点移动走增量局部发布，退出时整底还原</li>
+<li><strong>收藏进度</strong>：展示于网格上方，随解锁同步更新</li>
+</ul>
+
+<h2>3. 状态</h2>
 <table>
-<tr><th>命令</th><th>功能（待实现）</th></tr>
-<tr><td><code>cgvmenu()</code></td><td>CG 鉴赏模式</td></tr>
-<tr><td><code>musicmenu()</code></td><td>音乐鉴赏模式</td></tr>
+<tr><th>命令</th><th>状态</th></tr>
+<tr><td><code>cgvmenu()</code></td><td><strong>已实现</strong>（见上节）</td></tr>
+<tr><td><code>musicmenu()</code></td><td>预留 stub（未实现）</td></tr>
 </table>
 
 </main>

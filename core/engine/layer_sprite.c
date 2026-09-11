@@ -137,6 +137,18 @@ static int calc_sprite_clip_h(int y, int img_h)
     return 0;
 }
 
+/* Load a sprite image and draw it to VRAM at full body (clip 0; an open
+ * dialog recomposes over the sprite in z-order, R20).  Missing assets are
+ * skipped silently — image_load already logs the failure. */
+static void sprite_blit_full(int asset_id, int x, int y, int mirror)
+{
+    MagImage *img = image_load((unsigned short)asset_id);
+    if (img) {
+        vram_blit_sprite(img, x, y, PAL_TRANSPARENT, mirror, 0);
+        mag_release(img);
+    }
+}
+
 /*=== Sprite operations ===================================================*/
 
 /* Show a sprite (full body) — first-time display or full replacement.
@@ -146,15 +158,10 @@ static int calc_sprite_clip_h(int y, int img_h)
 static void layer_sprite_show(int sprite_id, int asset_id, int x, int y, int mirror)
 {
     SpriteEntry *se;
-    MagImage *img;
 
     hal_mouse_invalidate_cursor();
 
-    img = image_load((unsigned short)asset_id);
-    if (img) {
-        vram_blit_sprite(img, x, y, PAL_TRANSPARENT, mirror, 0);
-        mag_release(img);
-    }
+    sprite_blit_full(asset_id, x, y, mirror);
 
     se = alloc_sprite(sprite_id);
     if (se) {
@@ -237,18 +244,8 @@ void layer_sprite_face(int sprite_id, int asset_id, int x, int y, int mirror)
         mag_release(img);
     }
 
-    if (se) {
-        sprite_entry_update(se, sprite_id, asset_id, x, y, mirror);
-    } else {
-        se = alloc_sprite(sprite_id);
-        if (se) {
-            se->id = sprite_id;
-            se->asset_id = asset_id;
-            se->x = x;
-            se->y = y;
-            se->mirror = mirror;
-        }
-    }
+    if (!se) se = alloc_sprite(sprite_id);
+    if (se) sprite_entry_update(se, sprite_id, asset_id, x, y, mirror);
 }
 
 /* Replace a sprite (full body): restore the background under the old sprite
@@ -258,7 +255,6 @@ void layer_sprite_face(int sprite_id, int asset_id, int x, int y, int mirror)
 static void layer_sprite_replace(int sprite_id, int asset_id, int x, int y, int mirror)
 {
     SpriteEntry *se;
-    MagImage *img;
     int ux1, uy1, ux2, uy2;
 
     hal_mouse_invalidate_cursor();
@@ -285,24 +281,10 @@ static void layer_sprite_replace(int sprite_id, int asset_id, int x, int y, int 
 
     layer_bg_restore_rect(ux1, uy1, ux2 - ux1, uy2 - uy1, 1);
 
-    img = image_load((unsigned short)asset_id);
-    if (img) {
-        vram_blit_sprite(img, x, y, PAL_TRANSPARENT, mirror, 0);
-        mag_release(img);
-    }
+    sprite_blit_full(asset_id, x, y, mirror);
 
-    if (se) {
-        sprite_entry_update(se, sprite_id, asset_id, x, y, mirror);
-    } else {
-        se = alloc_sprite(sprite_id);
-        if (se) {
-            se->id = sprite_id;
-            se->asset_id = asset_id;
-            se->x = x;
-            se->y = y;
-            se->mirror = mirror;
-        }
-    }
+    if (!se) se = alloc_sprite(sprite_id);
+    if (se) sprite_entry_update(se, sprite_id, asset_id, x, y, mirror);
     layer_sprite_sync_dialog_base();
 }
 
@@ -314,9 +296,7 @@ static void layer_sprite_hide(int id)
     SpriteEntry *se = find_sprite(id);
     if (!se) return;
     hal_mouse_invalidate_cursor();
-    if (layer_bg_snapshot_valid() && layer_bg_snapshot()) {
-        layer_bg_restore_rect(se->x, se->y, LAYER_SPRITE_W, LAYER_SPRITE_H, 1);
-    }
+    layer_bg_restore_rect(se->x, se->y, LAYER_SPRITE_W, LAYER_SPRITE_H, 1);
     se->active = 0;
     layer_sprite_sync_dialog_base();
 }
@@ -348,12 +328,7 @@ void layer_redraw_sprites(void)
     for (i = 0; i < LAYER_MAX_SPRITES; i++) {
         SpriteEntry *se = &sprite_table[i];
         if (se->active) {
-            MagImage *img;
-            img = image_load((unsigned short)se->asset_id);
-            if (img) {
-                vram_blit_sprite(img, se->x, se->y, PAL_TRANSPARENT, se->mirror, 0);
-                mag_release(img);
-            }
+            sprite_blit_full(se->asset_id, se->x, se->y, se->mirror);
         }
     }
     layer_sprite_sync_dialog_base();

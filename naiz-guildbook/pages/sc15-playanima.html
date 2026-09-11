@@ -28,7 +28,7 @@ playanima(loop[,sec]){name}</code></pre>
 </table>
 
 <h2>2. 示例</h2>
-<pre><code>playanima(opening)
+<pre><code>playanima(){opening}
 playanima(loop,8){rain}</code></pre>
 
 <div class="note-box"><p>时长 <code>sec</code> 向上取整为 tick 预算（<code>sec*60+0.999999</code>）；带 <code>sec</code> 时到期一律结束（<code>loop</code> 仅表示帧序列回绕，不续期）。详见 <code>devdocs/80</code>。</p></div>

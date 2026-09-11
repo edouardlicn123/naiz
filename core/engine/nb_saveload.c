@@ -40,6 +40,43 @@ static void show_error_msg(const char *msg, int x, int y)
     hal_kbd_drain_advance();
 }
 
+/*=== Page slot cache ======================================================*/
+
+/* Slot text labels + existence flags for the current page, so focus/confirm
+ * redraws never re-read the save headers from disk (slot_info does file I/O).
+ * Rebuilt only when page changes (or invalidated after a save writes a slot).
+ * 4 rows of "%.31s — %.63s — %.19s" (max 119 chars) fit in 128 bytes. */
+static char slot_label_cache[4][128];
+static char slot_exists_cache[4];
+static int  slot_cache_page = -1;
+
+/* Rebuild the label/existence cache for the given page. */
+static void save_load_cache_build(int page)
+{
+    int i;
+    for (i = 0; i < 4; i++) {
+        slot_label_cache[i][0] = '\0';
+        slot_exists_cache[i] = 0;
+    }
+    for (i = 0; i < 4; i++) {
+        int si_idx = page * 4 + i;
+        SlotInfo si;
+        if (si_idx >= SAVE_SLOTS) break;
+        slot_info(si_idx, &si);
+        slot_exists_cache[i] = si.exists;
+        if (si.exists) {
+            const char *chapter = si.chapter_title[0] ? si.chapter_title : si.filename;
+            snprintf(slot_label_cache[i], sizeof(slot_label_cache[i]),
+                     "%.31s \xe2\x80\x94 %.63s \xe2\x80\x94 %.19s",
+                     si.slot_name, chapter, si.timestamp);
+        } else {
+            snprintf(slot_label_cache[i], sizeof(slot_label_cache[i]),
+                     "%s \xe2\x80\x94 (Empty)", si.slot_name);
+        }
+    }
+    slot_cache_page = page;
+}
+
 /* Draw save/load menu UI.  If full=1, draw all background elements (emboss
  * slots, page nav, Back button).  Always draws text labels (cheap text-only). */
 static void save_load_draw(int is_load, int page, int slot_idx, int focus_on_back,
@@ -47,8 +84,17 @@ static void save_load_draw(int is_load, int page, int slot_idx, int focus_on_bac
 {
     int i;
     char buf[128];
-    SlotInfo si;
     static const int slot_y[4] = { 90, 146, 202, 258 };
+
+    /* Draw into the menu layer composite (see save_load_menu for open);
+     * commit + full-region blit publishes every state change atomically.
+     * Degrades to direct VRAM drawing when the layer is not open. */
+    menu_layer_begin_draw();
+
+    /* Page slot text is cached; only re-read the save headers on page
+     * change (focus/confirm redraws reuse the cached labels, no disk I/O). */
+    if (page != slot_cache_page)
+        save_load_cache_build(page);
 
     if (full) {
         vblank_wait();
@@ -59,7 +105,7 @@ static void save_load_draw(int is_load, int page, int slot_idx, int focus_on_bac
                 /* Center the blackletter title over the old title spot. */
                 int bx = (LAYER_SCREEN_W - m->width) / 2;
                 int by = 28 + (32 - m->height) / 2;
-                vram_blit_sprite(m, bx, by, PAL_TRANSPARENT, 0, 0);
+                menu_layer_blit_sprite(m, bx, by, PAL_TRANSPARENT);
                 mag_release(m);
             } else {
                 draw_title_large(is_load ? "LOAD" : "SAVE", 282, 28, 4, PAL_WHITE);
@@ -87,23 +133,16 @@ static void save_load_draw(int is_load, int page, int slot_idx, int focus_on_bac
         }
     }
 
-    /* Slot text (always drawn — cheap text-only) */
+    /* Slot text (reuse cached labels; relabel + refocus only) */
     for (i = 0; i < 4; i++) {
         int si_idx = page * 4 + i, y = slot_y[i];
         if (si_idx >= SAVE_SLOTS) break;
-        slot_info(si_idx, &si);
         fill_rect(86, y + 2, 12, 40, BTN_FILL_IDX);
-        if (si.exists) {
-            const char *chapter = si.chapter_title[0] ? si.chapter_title : si.filename;
-            snprintf(buf, sizeof(buf), "%.31s \xe2\x80\x94 %.63s \xe2\x80\x94 %.19s", si.slot_name, chapter, si.timestamp);
-        } else {
-            snprintf(buf, sizeof(buf), "%s \xe2\x80\x94 (Empty)", si.slot_name);
-        }
         if (!focus_on_back && i == slot_idx) {
             draw_text(">", 0, 86, y + 14, 98, y + 36, 1, MENU_PAL_YELLOW);
-            draw_text(buf, 0, 100, y + 14, 570, y + 36, 1, MENU_PAL_YELLOW);
+            draw_text(slot_label_cache[i], 0, 100, y + 14, 570, y + 36, 1, MENU_PAL_YELLOW);
         } else {
-            draw_text(buf, 0, 100, y + 14, 570, y + 36, 0, PAL_WHITE);
+            draw_text(slot_label_cache[i], 0, 100, y + 14, 570, y + 36, 0, PAL_WHITE);
         }
     }
 
@@ -121,6 +160,10 @@ static void save_load_draw(int is_load, int page, int slot_idx, int focus_on_bac
         draw_text("No", 0, 346, 373, 390, 392, 0,
                   confirm_yes ? PAL_WHITE : MENU_PAL_YELLOW);
     }
+
+    /* Publish the composite to VRAM (full and incremental draws alike). */
+    menu_layer_commit();
+    menu_layer_blit();
 }
 
 static void save_load_menu(int is_load, int from_mainmenu)
@@ -144,6 +187,10 @@ static void save_load_menu(int is_load, int from_mainmenu)
     hal_kbd_drain_advance();
 
     hal_mouse_erase_cursor();
+    /* All save/load UI drawing routes into the menu layer composite; each
+     * save_load_draw call commits + blits.  On OOM the layer stays closed
+     * and drawing degrades to direct VRAM (legacy behavior). */
+    menu_layer_open(0, 0, LAYER_SCREEN_W, LAYER_SCREEN_H, 0);
     save_load_draw(is_load, page, slot_idx, focus_on_back, confirm, confirm_yes, total_pages, 1);
     hal_mouse_set_pos(LAYER_SCREEN_W / 2, LAYER_SCREEN_H / 2);
     hal_mouse_draw_cursor_force();
@@ -172,6 +219,7 @@ static void save_load_menu(int is_load, int from_mainmenu)
                         running = 0; break;
                     } else {
                         save_game_slot(abs_slot);
+                        slot_cache_page = -1;   /* slot data changed */
                     }
                 }
                 confirm = 0; confirm_yes = 1; focus_on_back = 0;
@@ -273,6 +321,7 @@ static void save_load_menu(int is_load, int from_mainmenu)
                                 running = 0; break;
                             } else {
                                 save_game_slot(page * 4 + slot_idx);
+                                slot_cache_page = -1;   /* slot data changed */
                             }
                         }
                         confirm = 0; confirm_yes = 1; focus_on_back = 0;
@@ -343,6 +392,7 @@ static void save_load_menu(int is_load, int from_mainmenu)
 
         hal_mouse_draw_cursor();
     }
+    menu_layer_close(1);
     menu_restore_item_palette();
 }
 

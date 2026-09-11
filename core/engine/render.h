@@ -57,6 +57,20 @@ void text_set_blackletter(int on);
 void text_set_target(uint8_t *buf, int w, int h, int stride, int offx, int offy);
 /* Restore the default VRAM glyph target. */
 void text_set_target_vram(void);
+/* Set the rect/pattern/pset write target: when buf != NULL,
+ * fill_rect/fill_rect_pattern/vram_pset_addr draw into
+ * buf[(y-offy)*stride + (x-offx)] (screen coords, clipped to the w x h
+ * buffer) instead of VRAM.  Used by the menu layer composite. */
+void render_set_target(uint8_t *buf, int w, int h, int stride, int offx, int offy);
+/* Restore the default VRAM draw target. */
+void render_set_target_vram(void);
+/* Blit a RAM buffer rectangle to VRAM, skipping pixels equal to
+ * transparent_idx (same transparency semantics as vram_blit_sprite).
+ * (x,y,w,h) are in buffer coordinates; the rect lands at screen
+ * (offx+x, offy+y).  'stride' is the buffer row stride in bytes. */
+void render_blit_transparent(const uint8_t *buf, int stride,
+                             int x, int y, int w, int h,
+                             int offx, int offy, uint8_t transparent_idx);
 /* 绘制文本，返回下一字符字节偏移 */
 int  draw_text(const char *s, int byte_start, int x, int y,
                int max_width, int max_y, int bold, uint8_t color);

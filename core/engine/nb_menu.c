@@ -92,7 +92,12 @@ static void menu_label_draw(int mx, int my, int cols, int btn_w, int btn_h,
 {
     int px, py, tx, ty;
     btn_pos(mx, my, cols, i, text, btn_w, btn_h, &px, &py, &tx, &ty);
+    /* Incremental refresh session: redraw into the menu layer composite,
+     * then publish the affected button rect back to VRAM. */
+    menu_layer_begin_draw();
     draw_text(tr(text), 0, tx, ty, btn_w, py + btn_h, 1, fg);
+    menu_layer_commit();
+    menu_layer_blit_rect(px, py, btn_w, btn_h);
 }
 
 /*=== Hit testing ==========================================================*/
@@ -132,9 +137,15 @@ int menu_show(int mx, int my, int cols, int argc, const char **argv)
 
     hal_kbd_drain_advance();
     hal_mouse_erase_cursor();
+    /* Open the menu layer: all drawing below (menu_draw + version) routes
+     * into the composite; commit+blit publishes it atomically.  On OOM the
+     * layer stays closed and the draws fall back to plain VRAM. */
+    menu_layer_open(0, 0, LAYER_SCREEN_W, LAYER_SCREEN_H, 0);
     menu_draw(mx, my, cols, btn_w, btn_h, argc, argv, sel);
     if (settings_get_version()[0])
         draw_text(settings_get_version(), 0, 544, 2, 96, 16, 0, PAL_RED);
+    menu_layer_commit();
+    menu_layer_blit();
     hal_mouse_set_pos(LAYER_SCREEN_W / 2, LAYER_SCREEN_H / 2);
     hal_mouse_flush();
 
@@ -149,6 +160,7 @@ int menu_show(int mx, int my, int cols, int argc, const char **argv)
                     NB_DEBUG("menu: mouse sel=%d (%s)\r\n", hit, argv[hit]);
                     menu_restore_item_palette();
                     hal_mouse_flush();
+                    menu_layer_close(1);
                     return hit;
                 }
             }
@@ -225,6 +237,7 @@ int menu_show(int mx, int my, int cols, int argc, const char **argv)
                 NB_DEBUG("menu: keyboard sel=%d (%s)\r\n", sel, argv[sel]);
                 menu_restore_item_palette();
                 hal_mouse_flush();
+                menu_layer_close(1);
                 return sel;
             }
 

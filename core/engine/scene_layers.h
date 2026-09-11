@@ -39,20 +39,18 @@
 
 /*==== Layer Z-order (lower = drawn first, covered by higher) ==============*/
 #define LAYER_Z_BG        0   /* 背景层：全屏640x400 */
-#define LAYER_Z_SPRITE    1   /* 立绘层：最多16个精灵，clip_h保护对话框 */
-#define LAYER_Z_ANIM      2   /* 动画层：clip_h限制在y<LAYER_DIALOG_Y */
+#define LAYER_Z_SPRITE    1   /* 立绘层：最多16个精灵，全高绘制（R20 撤销 Option X 裁剪），对话框合成在其上 */
+#define LAYER_Z_ANIM      2   /* 动画层：clip_h 限制在 y<LAYER_DIALOG_Y，不触对话框区 */
 #define LAYER_Z_DIALOG    3   /* 对话框层：(80,280) 480x115 */
 #define LAYER_Z_TEXT      4   /* 文字层：在对话框内绘制文字 */
 #define LAYER_Z_CURSOR    5   /* 光标层：最顶层，最后绘制 */
 #define LAYER_Z_COUNT     6   /* 层总数 */
 
-/* 层边界矩形 */
-typedef struct {
-    int x, y, w, h;
-} LayerBounds;
-
 /* Scene transition API lives in transition.h (transition.c). */
 #include "transition.h"
+
+/* Reusable menu overlay layer (draw / blit / restore). */
+#include "menu_layer.h"
 
 /* Button system constants */
 #define BTN_W           100
@@ -140,7 +138,5 @@ void layer_dialog_show(void);
 int  layer_is_active(int z_order);
 /* 标记某层活跃/非活跃 */
 void layer_set_active(int z_order, int active);
-/* 获取某层的可写区域 */
-LayerBounds layer_get_bounds(int z_order);
 
 #endif

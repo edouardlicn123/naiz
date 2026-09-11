@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>cg — Naiz Guildbook</title>
+<link rel="stylesheet" href="../style.css">
+</head>
+<body>
+<nav class="sidebar" id="sidebar-nav"></nav>
+<script src="../sidebar-scripts.js"></script>
+<main class="main">
+
+<h1>cg 全屏 CG 展示</h1>
+<hr>
+<blockquote><strong>创建</strong>：2026-09-11</blockquote>
+<p><code>cg()</code> 命令用于整屏展示 CG，或关闭对话框还原背景区域。与 <code>bg(){key}</code>（<a href="sc02-bg.html">sc02</a>）同为"对象在花括号负载、括号=参数±keyword"约定。</p>
+
+<h2>1. 语法</h2>
+<pre><code>cg(){key}
+cg(hidedialog)</code></pre>
+<table>
+<tr><th>参数</th><th>类型</th><th>说明</th></tr>
+<tr><td><code>key</code></td><td>string</td><td>CG 资源名称，对应 <code>asset_map.name</code>（<code>CG</code> 类型），写在花括号负载</td></tr>
+<tr><td><code>hidedialog</code></td><td>keyword</td><td>只收起对话框并还原背景区域，不加载新图</td></tr>
+</table>
+
+<h2>2. 行为</h2>
+<ul>
+<li><strong>全屏事件</strong>：<code>cg(){key}</code> 把整屏覆盖为 CG，并<strong>自动收起对话框、清空当前台词</strong>——下一句台词会重新弹出新框</li>
+<li><strong>永久解锁</strong>：展示过的 CG 记入解锁状态（画廊 <code>cgvmenu()</code> 可见，见 <a href="sc06-gallery.html">sc06</a>）</li>
+<li><strong>与 bg 的差异</strong>：<code>bg(){key}</code> 换背景后对话框<strong>跨图存活</strong>（框+当前页文字保留）；<code>cg(){key}</code> 是"全屏事件"，主动收起对话框——如需显式收起用 <code>cg(hidedialog)</code></li>
+</ul>
+
+<h2>3. 示例</h2>
+<pre><code>cg(){cg01}        # 整屏展示 CG、自动收起对话框、清空台词
+cg(hidedialog)    # 只收起对话框还原背景</code></pre>
+<div class="note-box"><p><strong>注意</strong>：<code>cg(key)</code>（key 写在括号里）的形态已废止，会被引擎与脚本校验器拒绝——CG key 必须写进花括号。括号位预留给将来参数。</p></div>
+
+</main>
+</body>
+</html>

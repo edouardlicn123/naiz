@@ -11,7 +11,7 @@
 <script src="../sidebar-reference.js"></script>
 <main class="main">
 <h1>引擎基本概念</h1>
-<blockquote><strong>创建</strong>：2026-06-09<br><strong>最后更新</strong>：2026-07-28</blockquote>
+<blockquote><strong>创建</strong>：2026-06-09<br><strong>最后更新</strong>：2026-09-11</blockquote>
 <p>本文是 Naiz 引擎制作者手册的第一篇。从制作者视角介绍引擎的核心概念——不涉及源码路径、工具链命令或内部实现细节。</p>
 <p>标有 <strong>【预留】</strong> 的概念尚未实现，不可实际使用；此处仅说明设计意图，供参考。</p>
 <hr>
@@ -62,7 +62,7 @@
 <tr><td><strong>Text Plane</strong></td><td>独立硬件文字层（字符发生器 + 属性内存）</td><td>❌ 不使用。DOS/4GW 保护模式下不可见，文字经 <code>draw_text()</code> 位图绘制到图像 VRAM</td></tr>
 </tbody>
 </table>
-<p>引擎的所有「软件图层」（背景、精灵、对话框、文字）均在单层图像 VRAM 上通过<strong>多趟绘制顺序</strong>实现叠加，不存在硬件合成。这就是引擎使用 <code>fill_rect</code>/<code>vram_blit</code> 等像素操作而非 <code>printf</code> 的原因。</p>
+<p>引擎的所有「软件图层」（背景、精灵、对话框、文字）均在单层图像 VRAM 上通过<strong>多趟绘制顺序</strong>实现叠加，不存在硬件合成。菜单覆盖层（<code>menu_layer</code>）例外：先在其 RAM 复合缓冲中合成，再整屏 blit 到 VRAM。这就是引擎使用 <code>fill_rect</code>/<code>vram_blit</code> 等像素操作而非 <code>printf</code> 的原因。</p>
 <p>详见 <a href="mc03-图层渲染与换装机制.html">mc03-图层渲染与换装机制 §1</a>。</p>
 <hr>
 <h2>2. 对白（Dialog）</h2>
@@ -142,7 +142,7 @@
 <tr><td><strong>位置固定</strong></td><td>所有对白在同一位置显示——不能设置"第一句在上、第二句在下"</td></tr>
 <tr><td><strong>原地替换</strong></td><td>每次显示新对白会清除之前的文字（palette 248），画上新文字；不存在"文字滚动"或"历史回溯"</td></tr>
 <tr><td><strong>单句单位</strong></td><td>一次显示一段完整的文字；对话框高度不支持多行文本同时存在</td></tr>
-<tr><td><strong>无角色名栏</strong></td><td>当前对话框不区分说话角色——角色名显示功能<strong>预留</strong></td></tr>
+<tr><td><strong>角色名栏</strong></td><td>对话框顶部可显示说话角色名：<code>fei</code>/<code>ira</code>/<code>neon</code> 等对白命令自动带角色名，<code>host</code> 旁白不带</td></tr>
 <tr><td><strong>无文字特效</strong></td><td>文字不消失、不渐显、不变色——所有对白以同一颜色和位置出现</td></tr>
 <tr><td><strong>256 色限制</strong></td><td>对话框色彩受 256 色调色板约束，UI 保护色为索引 7（白）、15（透明）、248（对话框底色）</td></tr>
 </tbody>

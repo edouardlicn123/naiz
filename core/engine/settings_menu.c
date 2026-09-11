@@ -66,16 +66,18 @@ static const char *LANG_CODES[] = {
 #define START_X      MENU_X                             /* 30, aligned with Language */
 #define START_BY     (LAYER_SCREEN_H - 68)
 
-/* Snapshot dimensions (1x glyph: 8x16, outline ±1px → drawn 10x18) */
+/* Dynamic-content erase regions (matching the old snapshot rectangles).
+ * The menu layer's base snapshot doubles as the clean background for these,
+ * so no per-widget save buffers are needed (menu_layer_erase_to_base). */
 #define IND_SAVE_W   12
 #define IND_SAVE_H   18
 #define LANG_NAME_SAVE_W 110
 #define LANG_NAME_SAVE_H 18
-
-/* Saved background snapshots */
-static uint8_t bg_lang_name[LANG_NAME_SAVE_H * LANG_NAME_SAVE_W];
-static uint8_t bg_lang_ind[IND_SAVE_H * IND_SAVE_W];
-static uint8_t bg_start_ind[IND_SAVE_H * IND_SAVE_W];
+#define IND_CLEAR_X  (INDICATOR_X - 2)
+#define IND_CLEAR_Y_FIELD  (SEL_Y - 1)    /* language indicator row */
+#define IND_CLEAR_Y_START  (START_BY - 1) /* start indicator row */
+#define LANG_CLEAR_X (LABEL_CX - LANG_NAME_SAVE_W / 2)
+#define LANG_CLEAR_Y (SEL_Y - 1)
 
 /* Draw text with 1px black outline glow (8-direction offset). */
 static void draw_text_outlined(const char *s, int byte_start,
@@ -121,26 +123,21 @@ static int menu_hittest(int mx, int my)
     return -1;
 }
 
-/* Draw menu.  full=1: initial full draw + save clean snapshots.
- *            full=2: language change — restore + redraw lang name + indicators.
- *            full=0: focus change — restore + redraw indicators only.
- * Snapshots are saved BEFORE dynamic text to capture clean background. */
+/* Draw menu.  full=1: initial full draw — the background is already blitted
+ * to VRAM (settings_menu_run, before menu_layer_open) so it lands in the
+ * layer's base snapshot; title/static/dynamic content goes into the
+ * composite.  full=2: language change — erase the dynamic areas back to the
+ * base then redraw.  full=0: focus change — erase + redraw indicators only.
+ * Every change commits and blits the whole region. */
 static void settings_menu_draw(int lang_idx, int focus, int full)
 {
     int tw;
 
+    /* All drawing below routes into the menu layer composite; the base
+     * snapshot provides the clean background for the erase step. */
+    menu_layer_begin_draw();
+
     if (full == 1) {
-        vblank_wait();
-        /* Background */
-        {
-            MagImage *bg_img = image_load(13);
-            if (bg_img) {
-                vram_blit(bg_img, 0, 0);
-                mag_release(bg_img);
-            } else {
-                fill_rect(0, 0, LAYER_SCREEN_W, LAYER_SCREEN_H, 0);
-            }
-        }
         /* Title: 1x, top-left */
         draw_text_outlined("Naiz Settings", 0, 20, 10, 1, PAL_WHITE);
         /* Version: 1x, top-right */
@@ -149,20 +146,14 @@ static void settings_menu_draw(int lang_idx, int focus, int full)
             if (ver && *ver)
                 draw_text_outlined(ver, 0, 580, 10, 0, PAL_WHITE);
         }
-        /* Static menu text (does NOT overlap snapshot areas) */
+        /* Static menu text (does NOT overlap the dynamic erase areas) */
         draw_text_outlined("Language", 0, MENU_X, SEL_Y, 0, PAL_WHITE);
         draw_text_outlined("<", 0, SEL_LX + 10, SEL_Y, 0, PAL_WHITE);
         draw_text_outlined(">", 0,
                            LABEL_X + LABEL_AREA_W + GAP + 10, SEL_Y, 0, PAL_WHITE);
         draw_text_outlined("Start Game", 0, START_X, START_BY, 0, PAL_WHITE);
 
-        /* Save CLEAN snapshots BEFORE drawing dynamic content */
-        vram_read(LABEL_CX - LANG_NAME_SAVE_W / 2, SEL_Y - 1,
-                  LANG_NAME_SAVE_W, LANG_NAME_SAVE_H, bg_lang_name);
-        vram_read(INDICATOR_X - 2, SEL_Y - 1, IND_SAVE_W, IND_SAVE_H, bg_lang_ind);
-        vram_read(INDICATOR_X - 2, START_BY - 1, IND_SAVE_W, IND_SAVE_H, bg_start_ind);
-
-        /* Draw dynamic content (language name + focus indicator) */
+        /* Dynamic content (language name + focus indicator) */
         tw = text_width(LANG_NAMES[lang_idx], 0);
         draw_text_outlined(LANG_NAMES[lang_idx], 0,
                            LABEL_CX - tw / 2, SEL_Y, 0, PAL_WHITE);
@@ -173,11 +164,12 @@ static void settings_menu_draw(int lang_idx, int focus, int full)
     }
 
     if (full == 2) {
-        /* Language change: restore CLEAN snapshots, redraw dynamic content */
-        vram_write(bg_lang_name, LABEL_CX - LANG_NAME_SAVE_W / 2, SEL_Y - 1,
-                   LANG_NAME_SAVE_W, LANG_NAME_SAVE_H);
-        vram_write(bg_lang_ind, INDICATOR_X - 2, SEL_Y - 1, IND_SAVE_W, IND_SAVE_H);
-        vram_write(bg_start_ind, INDICATOR_X - 2, START_BY - 1, IND_SAVE_W, IND_SAVE_H);
+        /* Language change: erase the dynamic areas plus both indicators,
+         * then redraw the language name with the current focus indicator. */
+        menu_layer_erase_to_base(LANG_CLEAR_X, LANG_CLEAR_Y,
+                                 LANG_NAME_SAVE_W, LANG_NAME_SAVE_H);
+        menu_layer_erase_to_base(IND_CLEAR_X, IND_CLEAR_Y_FIELD, IND_SAVE_W, IND_SAVE_H);
+        menu_layer_erase_to_base(IND_CLEAR_X, IND_CLEAR_Y_START, IND_SAVE_W, IND_SAVE_H);
         tw = text_width(LANG_NAMES[lang_idx], 0);
         draw_text_outlined(LANG_NAMES[lang_idx], 0,
                            LABEL_CX - tw / 2, SEL_Y, 0, PAL_WHITE);
@@ -188,14 +180,17 @@ static void settings_menu_draw(int lang_idx, int focus, int full)
     }
 
     if (full == 0) {
-        /* Focus change: restore indicator snapshots, redraw indicator */
-        vram_write(bg_lang_ind, INDICATOR_X - 2, SEL_Y - 1, IND_SAVE_W, IND_SAVE_H);
-        vram_write(bg_start_ind, INDICATOR_X - 2, START_BY - 1, IND_SAVE_W, IND_SAVE_H);
+        /* Focus change: erase both indicators, redraw the focused one. */
+        menu_layer_erase_to_base(IND_CLEAR_X, IND_CLEAR_Y_FIELD, IND_SAVE_W, IND_SAVE_H);
+        menu_layer_erase_to_base(IND_CLEAR_X, IND_CLEAR_Y_START, IND_SAVE_W, IND_SAVE_H);
         if (focus == FOCUS_LANG)
             draw_text_outlined(">", 0, INDICATOR_X, SEL_Y, 0, PAL_WHITE);
         else if (focus == FOCUS_START)
             draw_text_outlined(">", 0, INDICATOR_X, START_BY, 0, PAL_WHITE);
     }
+
+    menu_layer_commit();
+    menu_layer_blit();
 }
 
 void settings_menu_run(void)
@@ -209,6 +204,20 @@ void settings_menu_run(void)
     hal_kbd_drain_advance();
     hal_mouse_set_pos(LAYER_SCREEN_W / 2, LAYER_SCREEN_H / 2);
     hal_mouse_flush();
+
+    /* Background onto VRAM first, so the menu layer's base snapshot captures
+     * it (menu widget drawing then composites above the clean background). */
+    vblank_wait();
+    {
+        MagImage *bg_img = image_load(13);
+        if (bg_img) {
+            vram_blit(bg_img, 0, 0);
+            mag_release(bg_img);
+        } else {
+            fill_rect(0, 0, LAYER_SCREEN_W, LAYER_SCREEN_H, 0);
+        }
+    }
+    menu_layer_open(0, 0, LAYER_SCREEN_W, LAYER_SCREEN_H, 0);
 
     /* Initial full draw */
     settings_menu_draw(lang_idx, focus, 1);
@@ -268,6 +277,7 @@ void settings_menu_run(void)
     }
 
     settings_set_lang(LANG_CODES[lang_idx]);
+    menu_layer_close(1);
     NB_DEBUG("settings_menu: selected lang=%s (%s)\r\n",
              LANG_NAMES[lang_idx], LANG_CODES[lang_idx]);
 }

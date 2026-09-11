@@ -46,6 +46,18 @@
 
 enum { GAL_VIEW_GRID = 0, GAL_VIEW_CG = 1 };
 
+/* Unlock state cache: rebuilt once per gallery entry so cell drawing never
+ * re-reads SYSTEM.SAV on every frame / cell (file I/O).  Rebuilt at
+ * cmd_cgvmenu entry so CGs unlocked earlier in the session show instantly. */
+static unsigned char gal_unlock_cache[CG_COUNT];
+
+static void gallery_cache_unlocks(void)
+{
+    int i;
+    for (i = 0; i < CG_COUNT; i++)
+        gal_unlock_cache[i] = sys_save_is_cg_unlocked(i + 1) ? 1 : 0;
+}
+
 /* Map in-cell-index (0..11) to screen coordinates. */
 static void gallery_cell_xy(int i, int *px, int *py)
 {
@@ -58,7 +70,7 @@ static void gallery_cell_xy(int i, int *px, int *py)
 static void gallery_draw_cell(int abs_idx, int x, int y, int is_sel)
 {
     char label[16];
-    int unlocked = sys_save_is_cg_unlocked(abs_idx + 1);
+    int unlocked = gal_unlock_cache[abs_idx];
 
     if (unlocked) {
         fill_rect(x, y, GAL_CELL_W, GAL_CELL_H, GAL_BG_UNLOCKED);
@@ -82,6 +94,11 @@ static void gallery_draw_grid(int page, int sel, int focus_on_back)
     char buf[32];
     int i;
 
+    /* Draw into the menu layer composite (opened by cmd_cgvmenu); commit +
+     * blit at the end publishes the grid.  Degrades to direct VRAM when the
+     * layer is not open (e.g. blank preview exit path). */
+    menu_layer_begin_draw();
+
     vblank_wait();
     fill_rect(0, 0, LAYER_SCREEN_W, LAYER_SCREEN_H, 0);
     draw_title_large("CG GALLERY", 20, 12, 3, PAL_WHITE);
@@ -101,6 +118,9 @@ static void gallery_draw_grid(int page, int sel, int focus_on_back)
     if (page < total_pages - 1) draw_text(">", 0, 576, 370, 592, 386, 0, PAL_WHITE);
     snprintf(buf, sizeof(buf), "%d/%d", page + 1, total_pages);
     draw_text(buf, 0, 308, 370, 332, 386, 0, PAL_WHITE);
+
+    menu_layer_commit();
+    menu_layer_blit();
 }
 
 /* Incremental redraw: only the two cells whose focus changed (old de-emphasised,
@@ -108,6 +128,8 @@ static void gallery_draw_grid(int page, int sel, int focus_on_back)
 static void gallery_draw_cells_range(int page, int from_sel, int to_sel, int focus_on_back)
 {
     int x, y, abs_idx;
+
+    menu_layer_begin_draw();
 
     if (!focus_on_back) {
         /* Back loses focus (was possibly highlighted): repaint white. */
@@ -132,6 +154,9 @@ static void gallery_draw_cells_range(int page, int from_sel, int to_sel, int foc
             gallery_draw_cell(abs_idx, x, y, 0);
         draw_text("Back", 0, 76, 363, 136, 379, 1, MENU_PAL_YELLOW);
     }
+
+    menu_layer_commit();
+    menu_layer_blit();
 }
 
 /* Fullscreen preview of one CG. Returns 1 on success (with focus held). */
@@ -139,7 +164,7 @@ static int gallery_preview(int abs_idx)
 {
     MagImage *img;
 
-    if (!sys_save_is_cg_unlocked(abs_idx + 1)) {
+    if (!gal_unlock_cache[abs_idx]) {
         NB_DEBUG("[CGALLERY] cg_id=%d locked, preview blocked\r\n", abs_idx + 1);
         return 0;
     }
@@ -150,6 +175,9 @@ static int gallery_preview(int abs_idx)
     }
     NB_DEBUG("[CGALLERY] preview cg_id=%d\r\n", abs_idx + 1);
     hal_mouse_erase_cursor();
+    /* The fullscreen CG replaces the grid: drop the menu layer (no restore —
+     * the CG paints over everything) before swapping the background. */
+    menu_layer_close(0);
     layer_bg_change(img);
     mag_release(img);          /* snapshot already captured by layer_bg_change */
     hal_mouse_draw_cursor_force();
@@ -167,6 +195,9 @@ static void gallery_exit_preview(int page, int sel, int focus_on_back)
     } else {
         fill_rect(0, 0, LAYER_SCREEN_W, LAYER_SCREEN_H, 0);
     }
+    /* Re-open the grid menu layer over the restored background, then redraw
+     * and publish the grid. */
+    menu_layer_open(0, 0, LAYER_SCREEN_W, LAYER_SCREEN_H, 0);
     gallery_draw_grid(page, sel, focus_on_back);
     hal_mouse_draw_cursor_force();
 }
@@ -202,6 +233,8 @@ void cmd_cgvmenu(int argc, const char **argv, const char *cmd_name)
     hal_kbd_drain_advance();
     hal_mouse_erase_cursor();
     menu_save_item_palette();
+    gallery_cache_unlocks();
+    menu_layer_open(0, 0, LAYER_SCREEN_W, LAYER_SCREEN_H, 0);
     gallery_draw_grid(page, sel, focus_on_back);
     hal_mouse_set_pos(LAYER_SCREEN_W / 2, LAYER_SCREEN_H / 2);
     hal_mouse_draw_cursor_force();
@@ -288,6 +321,7 @@ void cmd_cgvmenu(int argc, const char **argv, const char *cmd_name)
     }
 
     menu_restore_item_palette();
+    menu_layer_close(1);
     hal_mouse_flush();
     nb_load("mainmenu.nb");
 }

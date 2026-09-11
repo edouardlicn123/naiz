@@ -17,6 +17,36 @@
  */
 #include "render.h"
 #include "render_internal.h"
+#include <string.h>
+
+/* Rect/pattern/pset write target for RAM compositing (menu layer).  NULL =
+ * VRAM mode (default for every pre-existing caller).  When set, the
+ * rectangle/pattern/pset primitives write into a caller buffer instead,
+ * mirroring the glyph write target in render_text.c (devdoc 96 phase A
+ * pattern extended to fills). */
+static uint8_t *render_tgt_buf = NULL;
+static int      render_tgt_w = 0;
+static int      render_tgt_h = 0;
+static int      render_tgt_stride = 0;
+static int      render_tgt_offx = 0;
+static int      render_tgt_offy = 0;
+
+void render_set_target(uint8_t *buf, int w, int h, int stride, int offx, int offy)
+{
+    render_tgt_buf = buf;
+    render_tgt_w = w;
+    render_tgt_h = h;
+    render_tgt_stride = stride;
+    render_tgt_offx = offx;
+    render_tgt_offy = offy;
+}
+
+void render_set_target_vram(void)
+{
+    render_tgt_buf = NULL;
+    render_tgt_w = render_tgt_h = render_tgt_stride = 0;
+    render_tgt_offx = render_tgt_offy = 0;
+}
 
 /* Set a single pixel at a linear pixel address (y * LAYER_SCREEN_W + x).
  * Selects the correct bank and writes to the VRAM window.
@@ -24,7 +54,20 @@
 void vram_pset_addr(int addr, uint8_t color)
 {
     volatile uint8_t *win = hal_vram_get_window();
+    int sx, sy, bx, by;
     if (addr < 0 || addr >= LAYER_SCREEN_W * LAYER_SCREEN_H) return;
+    if (render_tgt_buf) {
+        /* RAM target: map absolute screen coords into the buffer, clipped
+         * to the buffer w x h (C6 boundary guard). */
+        sx = addr % LAYER_SCREEN_W;
+        sy = addr / LAYER_SCREEN_W;
+        bx = sx - render_tgt_offx;
+        by = sy - render_tgt_offy;
+        if (bx < 0 || bx >= render_tgt_w) return;
+        if (by < 0 || by >= render_tgt_h) return;
+        render_tgt_buf[by * render_tgt_stride + bx] = color;
+        return;
+    }
     hal_vram_bank_select(addr >> 15);
     win[addr & (VRAM_BANK_SZ - 1)] = color;
 }
@@ -37,6 +80,17 @@ void fill_rect(int x, int y, int w, int h, uint8_t color)
     int py, addr, remain, bank, off, seg;
     int cur_bank = -1;
     volatile uint8_t *win = hal_vram_get_window();
+    if (render_tgt_buf) {
+        /* RAM target: map screen coords into the buffer, double-clipped to
+         * the screen and the buffer (C6). */
+        if (!clip_rect(&x, &y, &w, &h, LAYER_SCREEN_W, LAYER_SCREEN_H)) return;
+        x -= render_tgt_offx;
+        y -= render_tgt_offy;
+        if (!clip_rect(&x, &y, &w, &h, render_tgt_w, render_tgt_h)) return;
+        for (py = 0; py < h; py++)
+            memset(render_tgt_buf + (y + py) * render_tgt_stride + x, color, (size_t)w);
+        return;
+    }
     if (!clip_rect(&x, &y, &w, &h, LAYER_SCREEN_W, LAYER_SCREEN_H)) return;
     for (py = 0; py < h; py++) {
         addr = (y + py) * LAYER_SCREEN_W + x;
@@ -131,6 +185,22 @@ void fill_rect_pattern(int x, int y, int w, int h,
     int px, py, addr, cur_bank = -1;
     uint8_t byte;
     volatile uint8_t *win = hal_vram_get_window();
+    if (render_tgt_buf) {
+        /* RAM target: only the masked pixels are written (dither semantics). */
+        if (!clip_rect(&x, &y, &w, &h, LAYER_SCREEN_W, LAYER_SCREEN_H)) return;
+        x -= render_tgt_offx;
+        y -= render_tgt_offy;
+        if (!clip_rect(&x, &y, &w, &h, render_tgt_w, render_tgt_h)) return;
+        for (py = 0; py < h; py++) {
+            uint8_t *dst = render_tgt_buf + (y + py) * render_tgt_stride + x;
+            byte = pattern[(y + py + render_tgt_offy) & 7];
+            for (px = 0; px < w; px++) {
+                if (byte & (0x80 >> (px & 7)))
+                    dst[px] = color;
+            }
+        }
+        return;
+    }
     if (!clip_rect(&x, &y, &w, &h, LAYER_SCREEN_W, LAYER_SCREEN_H)) return;
     for (py = 0; py < h; py++) {
         byte = pattern[(y + py) & 7];

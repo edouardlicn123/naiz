@@ -12,7 +12,7 @@
 <main class="main">
 
 <h1>MAG 图片机制</h1>
-<blockquote><strong>创建</strong>：2026-08-29<br><strong>最后更新</strong>：2026-08-29</blockquote>
+<blockquote><strong>创建</strong>：2026-08-29<br><strong>最后更新</strong>：2026-09-11</blockquote>
 <p>本文从<strong>制作者</strong>视角说明 Naiz 引擎的图像格式 MAG、归档存储、共享调色板与透明色约定——即所有背景与立绘在引擎侧的加载与显示机制。更低层的字节规范见仓库内 <code>docs/B11-MAG图片加载与显示规范.md</code>。</p>
 <hr>
 
@@ -76,7 +76,7 @@ makegame.sh build &lt;game&gt;  注入 HDI</code></pre>
 
 <h2>7. 与脚本命令的关系</h2>
 <ul>
-<li><code>bg</code> 命令：加载背景 MAG → 设调色板 → 整屏 blit → 重绘精灵 → 恢复对话框底色(248) → 保存背景快照。调色板必须先于像素写入，否则闪烁。</li>
+<li><code>bg</code> 命令：加载背景 MAG → 设调色板 → 整屏 blit → 重绘精灵 → 恢复对话框底色(248) → 重建对话框活动底（<code>dialog_occluder</code>，供伪透明与隐藏还原）。调色板必须先于像素写入，否则闪烁。</li>
 <li><code>char</code> 命令：加载精灵 MAG → 只写像素（共享背景调色板）→ 透明索引 15 跳过。</li>
 </ul>
 <p>命令语法详见 <a href="sc02-bg.html">sc02-bg 背景切换</a> 与 <a href="sc03-char.html">sc03-char 立绘与对话</a>。</p>

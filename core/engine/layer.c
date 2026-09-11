@@ -73,32 +73,3 @@ void layer_set_active(int z_order, int active)
     if (z_order >= 0 && z_order < LAYER_Z_COUNT)
         g_layer_active[z_order] = active;
 }
-
-LayerBounds layer_get_bounds(int z_order)
-{
-    LayerBounds b = {0, 0, LAYER_SCREEN_W, LAYER_SCREEN_H};
-    switch (z_order) {
-    case LAYER_Z_BG:
-        break;  /* full screen */
-    case LAYER_Z_SPRITE:
-    case LAYER_Z_ANIM:
-        if (layer_is_active(LAYER_Z_DIALOG))
-            b.h = LAYER_DIALOG_Y;  /* clip above dialog */
-        break;
-    case LAYER_Z_DIALOG:
-        b.x = LAYER_DIALOG_X;
-        b.y = LAYER_DIALOG_Y;
-        b.w = LAYER_DIALOG_W;
-        b.h = LAYER_DIALOG_H;
-        break;
-    case LAYER_Z_TEXT:
-        b.x = LAYER_DIALOG_X + 16;
-        b.y = LAYER_DIALOG_Y + 16;
-        b.w = LAYER_DIALOG_W - 32;
-        b.h = LAYER_DIALOG_H - 32;
-        break;
-    case LAYER_Z_CURSOR:
-        break;  /* full screen */
-    }
-    return b;
-}

@@ -45,6 +45,23 @@ static void question_draw_opt(const char *label, int i, int y, int mw, int highl
               mw - 8, opt_y + MENU_ITEM_H, 1, pal);
 }
 
+/* Apply a chosen option's variable operation: '=' assign, '-' subtract
+ * (INT_MIN-safe, clamped by nb_var_add), anything else adds. */
+static void apply_option(int idx, char (*vars)[32], char (*ops)[4], const int *deltas)
+{
+    int var_idx = nb_var_lookup(vars[idx]);
+    if (var_idx < 0) return;
+    if (ops[idx][0] == '=')
+        nb_var_set(var_idx, deltas[idx]);
+    else if (ops[idx][0] == '-') {
+        /* -(INT_MIN) is UB; pass INT_MIN through and let nb_var_add clamp
+         * with 64-bit arithmetic. */
+        int d = (deltas[idx] == INT_MIN) ? INT_MIN : -deltas[idx];
+        nb_var_add(var_idx, d);
+    } else
+        nb_var_add(var_idx, deltas[idx]);
+}
+
 void cmd_question(int argc, const char **argv, const char *cmd_name)
 {
     int sel = 0;
@@ -131,26 +148,14 @@ void cmd_question(int argc, const char **argv, const char *cmd_name)
             hal_mouse_recenter_if_idle();
 
             if (hal_mouse_was_clicked(HAL_MOUSE_LBUTTON)) {
-                int hit, var_idx;
+                int hit;
                 hit = question_hittest(hal_mouse_get_x(), hal_mouse_get_y(), display_opts);
                 if (hit >= 0) {
                     NB_DEBUG("question: mouse sel=%d\r\n", hit);
                     menu_restore_item_palette();
                     hal_mouse_flush();
                     nb_set_last_choice(hit);
-                    var_idx = nb_var_lookup(opt_vars[hit]);
-                    if (var_idx >= 0) {
-                        if (opt_ops[hit][0] == '=')
-                            nb_var_set(var_idx, opt_deltas[hit]);
-                        else if (opt_ops[hit][0] == '-') {
-                            /* -(INT_MIN) is UB; pass INT_MIN through and let
-                             * nb_var_add clamp with 64-bit arithmetic. */
-                            int d = (opt_deltas[hit] == INT_MIN)
-                                        ? INT_MIN : -opt_deltas[hit];
-                            nb_var_add(var_idx, d);
-                        } else
-                            nb_var_add(var_idx, opt_deltas[hit]);
-                    }
+                    apply_option(hit, opt_vars, opt_ops, opt_deltas);
                     return;
                 }
             }
@@ -168,24 +173,11 @@ void cmd_question(int argc, const char **argv, const char *cmd_name)
                 menu_consume_key(KC_DOWN);
             }
             if (hal_kbd_is_down(KC_SPACE) || hal_kbd_is_down(KC_ENTER) || hal_kbd_is_down(KC_XFER)) {
-                int var_idx;
                 NB_DEBUG("question: keyboard sel=%d\r\n", sel);
                 menu_restore_item_palette();
                 hal_mouse_flush();
                 nb_set_last_choice(sel);
-                var_idx = nb_var_lookup(opt_vars[sel]);
-                if (var_idx >= 0) {
-                    if (opt_ops[sel][0] == '=')
-                        nb_var_set(var_idx, opt_deltas[sel]);
-                    else if (opt_ops[sel][0] == '-') {
-                        /* -(INT_MIN) is UB; pass INT_MIN through and let
-                         * nb_var_add clamp with 64-bit arithmetic. */
-                        int d = (opt_deltas[sel] == INT_MIN)
-                                    ? INT_MIN : -opt_deltas[sel];
-                        nb_var_add(var_idx, d);
-                    } else
-                        nb_var_add(var_idx, opt_deltas[sel]);
-                }
+                apply_option(sel, opt_vars, opt_ops, opt_deltas);
                 return;
             }
 
