@@ -1,9 +1,9 @@
-# B12 — VRAM 渲染策略：背景/精灵/对话框/文字四趟叠加与局部裁剪
+# B12 — VRAM 渲染策略：背景/精灵/对话框/文字分层与 blit 发布
 
 > **状态**：活跃维护
 > **创建**：2026-06-10
-> **最后更新**：2026-06-12（四趟渲染顺序、200×400 立绘、bg_snapshot 裁剪策略、B15 换装机制引用）
-> **依赖**：`B02-显示管线规范.md`（VRAM 布局、图元函数）、`B11-MAG图片加载与显示规范.md`（背景/立绘 loading）、`C01-引擎基本概念.md`（对白概念）、`C02-对话框样式方案.md`（对话框方案）、`C03-立绘与角色.md`（200×400 立绘约束）、`B15-图层渲染与换装机制.md`（换装决策表）
+> **最后更新**：2026-09-11（R19-R23 图层化：对话框/菜单改为 RAM 复合缓冲合成 + blit 发布，见 B93）
+> **依赖**：`B02-显示管线规范.md`（VRAM 布局、图元函数）、`B11-MAG图片加载与显示规范.md`（背景/立绘 loading）、`B93-图层渲染与菜单图层规范.md`（当前图层范式）、`B15-图层渲染与换装机制.md`（换装决策表、对话框复合缓冲）
 
 本文定义 Naiz 引擎的 VRAM 渲染策略——背景加载、立绘叠加、对话框覆盖、文字局部刷新的完整顺序与约束。
 
@@ -20,30 +20,35 @@
 
 图形层无硬件 overlay（叠加）——所有像素共享同一组 packed-pixel VRAM。视觉上的"背景 + 立绘 + 对话框"分层效果**完全由软件写入顺序实现**。
 
+> **R19/R23 更新**：对话框与菜单是反复重绘的覆盖层，已改为 **RAM 复合缓冲离屏合成 + 整框/整屏 blit 发布**（`dialog_layer` / `menu_layer`，见 `B93` §3-§4）。绘制先在 RAM 完成（无中间态可见帧），再一次性写 VRAM；z 序仍唯一由 VRAM 写入顺序决定——背景 → 精灵 → 对话框 → 文字 → 菜单。
+
 > **注意**：GDC 支持两个显示页（page 0 / page 1），通过 `outb(0xA4, page)` 切换。这是 page flipping（双缓冲），不是硬件叠加——任何时候屏幕上只有一个页面可见。
 
 ---
 
-## 2. 四趟渲染顺序
+## 2. 分层渲染顺序
 
-引擎的完整渲染流程分为四个阶段，按时间先后执行。核心变化：**对话框不在 `bgload` 时绘制，延迟到首次 `text` 时**，确保精灵在对话框之下。
+引擎的完整渲染流程按时间先后执行。核心不变：**对话框不在 `bgload` 时绘制，延迟到首次 `text` 时**，确保精灵在对话框之下。R19 起对话框/菜单先合成为 RAM 复合缓冲再整块发布（虚线为 RAM 阶段）。
 
-### 2.1 第一趟：背景层（全屏 + 快照）
+### 2.1 第一层：背景层（全屏 + 快照）
 
 ```
-bg(id) 命令触发时执行一次
+bg(){key} 命令触发时执行一次（layer_bg_change 统一入口）
 ─────────────────────────────────────────
   image_load(id)                    ← 从 IMAGE.DAT 解压 MAG
-  image_set_palette(img)            ← 更新调色板（跳过索引 7、15、≥248）
-  vram_blit(img, 0, 0)             ← PEGC bank 窗口写入全屏 640×400
+  image_set_palette(img)            ← 更新调色板（跳过 ≥248 保护位）
+  vram_blit(img, 0, 0)             ← 全屏 640×400
+  ── 快照（源图直拷，零 VRAM 回读）──
+    layer_capture_bg_from_image(img→bg_snapshot)       (static)
+    layer_capture_bg_dialog_from_image(img→under_dialog)
+  layer_redraw_sprites()           ← 全身重绘；尾部 sync_dialog_base
+  dlg_update_palette() / btn_update_palette()
   mag_free(img)                     ← 释放解压后的临时内存
-  layer_capture_bg()               ← 保存全屏 256KB 快照到 bg_snapshot
-  dialog_drawn = 0                 ← 对话框尚未绘制
 ```
 
-**效果**：VRAM 被背景完全覆盖。同时 `bg_snapshot` 保存纯背景用于后续精灵恢复。
+**效果**：VRAM 被背景完全覆盖。`bg_snapshot`（全屏）+ `under_dialog`（对话框区纯背景）均来自源图像素缓冲——**内存直拷，绝无 VRAM 回读**（R19）。对话框若已打开，`layer_redraw_sprites` 尾部重建 `dialog_occluder` 并 `layer_dialog_recompose` 重绘框+当前页文字——**跨图存活**（见 §2.3）。
 
-### 2.2 第二趟：立绘 / 精灵层（指定位置）
+### 2.2 第二层：立绘 / 精灵层（指定位置）
 
 ```
 char <name> <l|c|r> [expr] 命令触发时执行
@@ -54,63 +59,73 @@ char <name> <l|c|r> [expr] 命令触发时执行
   mag_free(img)
 ```
 
-**效果**：在背景之上绘制角色。精灵全幅 200×400 绘制，此时对话框尚未出现，精灵可以自由延伸到屏幕底部。
+**效果**：在背景之上绘制角色。R20 起精灵**全幅 200×400 绘制，对话框开启时也不再裁剪**（取消旧 Option X 的 y<280 裁剪），对话框合成在其上；face 仅上半身 clip 沿用（§4.3）。精灵变更尾部 `layer_sprite_sync_dialog_base()` 重建活动底，保证伪透明孔洞透出立绘。
 
-### 2.3 第三趟：对话框层（首次 dialog_show 触发）
+### 2.3 第三层：对话框层（RAM 复合缓冲，首次 dialog_show 触发）
 
 ```
 首次 dialog_show() 触发时执行一次
 ─────────────────────────────────────────
-  layer_dialog_open():
-    scene_draw_dialog():                 ← 整体对话框
-      fill_rect(80, 280, 480, 115, 248)    ← 底色（palette 248，黑或蓝）
-      draw_rect(80, 280, 480, 115, 2, 7)   ← 白边 2px（palette 7）
-  dialog_drawn = 1
-  draw_text("对白内容…", 104, 308, 7)      ← 写新文字
+  layer_dialog_show():                    ← 确保缓冲持有框
+    alloc dialog_layer + dialog_occluder（OOM→直绘 VRAM 降级）
+    set_active(DIALOG,TEXT)；sync_dialog_base()   ← 建活动底
+    dialog_paint_box(dialog_layer)        ← 框（PAT75 孔洞保留已种底）
+
+  layer_dialog_render_page(name,text,off):  ← 一页合入 RAM 缓冲
+    dialog_seed_base()  →  dialog_paint_box()（擦上一页文字）
+    text_set_target(缓冲) + draw_text(角色名/正文) + text_set_target_vram()
+
+  dialog_layer_store_render(name,text,off)  ← 记录投影（换图重绘用）
+  dialog_layer_blit()                     ← 整框原子发布：vram_write 55KB
 ```
 
-**效果**：对话框在精灵**之上**。精灵延伸入 `[80,280,480,115]` 区域的像素被对话框覆盖。背景快照不受影响。
+**效果**：对话框合成覆盖精灵。精灵延伸入 `[80,280,480,115]` 区域的像素在 RAM 合成时覆盖（dither 孔洞透出活动底，伪透明）。背景快照不受影响。
 
-### 2.4 第四趟：文字层（翻页）
+### 2.4 第四层：文字层（翻页）
 
 ```
 后续 dialog_show() 翻页时执行
 ─────────────────────────────────────────
-  layer_dialog_restore()                 ← 从快照恢复对话框
-  draw_text("对白内容…", 104, 308, 7)     ← 写新文字
-  → 边框、对话框底色不重绘
+  layer_dialog_render_page(name,text,next_off)  ← 重画框 + 新文字进缓冲
+  dialog_layer_store_render(...)
+  dialog_layer_blit()                     ← 整框再发布
+  → 无 VRAM 中间态：旧文字与边框底色在 RAM 内一次清除+重画
 ```
 
 ---
 
-## 3. 图层的可逆性（基于快照的局部恢复）
+## 3. 图层的可逆性（基于快照/复合缓冲的恢复）
 
 ### 3.1 关键约束
 
 ```
 VRAM 是"画布"而非"图层"。一旦被对话框/精灵覆盖，原像素永久丢失。
-但 bg_snapshot 提供了"时间机器"——可以从内存快照恢复任意矩形区域。
+bg_snapshot 提供"时间机器"——可从内存快照恢复任意矩形区域。
+对话框/菜单层已是 RAM 复合缓冲（程序化生成），其清除/重绘不消耗 VRAM 读。
 ```
 
 | 场景 | 恢复方法 |
 |------|----------|
-| 加载新背景 | `bg` → 全屏 `vram_blit` → `layer_capture_bg()` 新快照 |
-| 切换对白行 | `layer_dialog_snap()` + `layer_dialog_restore()` → 新文字 |
-| 换表情 | `bg_restore_rect(x, y, 200, DIALOG_Y-y, clip=1)` 恢复背景 |
-| 换装/换位置 | `bg_restore_rect(union_bbox, clip=0)` + `layer_dialog_refresh()` |
-| 隐藏精灵 | `bg_restore_rect(old_rect, clip=0)` + 若覆对话框则 `dialog_refresh()` |
+| 加载新背景 | `layer_bg_change` → 全屏 blit + 源图直拷双快照 |
+| 切换对白行 | `layer_dialog_render_page(新页)` → `dialog_layer_blit()`（RAM 重合成 + 整框发布） |
+| 换表情 | `layer_bg_restore_rect(x, y, 200, DIALOG_Y-y, clip=1)` 恢复背景 |
+| 换装/换位置 | `layer_bg_restore_rect(union_bbox, clip=1)` + 全幅 blit + `sync_dialog_base` |
+| 隐藏精灵 | `layer_bg_restore_rect(old_rect, clip=1)` + `sync_dialog_base` |
+
+> R20 起精灵恢复一律 `clip_dialog=1`（跳过对话框矩形）——对话框合成在立绘之上，恢复路径不得盖框（Revoked Option X）。
 
 ### 3.2 场景转换的处理
 
 当场景脚本触发新 `bg`：
 
 ```
-顺序（固定）：
+顺序（固定，layer_bg_change 收口）：
 1. vram_blit(new_mag, 0, 0)                ← 全屏新背景（覆盖一切）
-2. layer_capture_bg()                       ← 新快照（覆盖旧快照）
-3. dialog_drawn = 0                         ← 对话框未绘
-4. char <name> <l|c|r> [expr]               ← 精灵全幅（对话框尚未出现）
-5. dialog_show() → layer_dialog_open()      ← 首次 dialog_show 画对话框
+2. 双快照（源图直拷 → bg_snapshot / under_dialog）
+3. layer_redraw_sprites()                  ← 精灵全身重绘（尾部 sync_dialog_base）
+4. dlg/btn 调色板刷新
+5. 若对话框已开 → layer_dialog_recompose（投影重绘框+文字）+ blit
+6. char <name> <l|c|r> [expr]              ← 后续立绘全身
 ```
 
 ---
@@ -119,18 +134,22 @@ VRAM 是"画布"而非"图层"。一旦被对话框/精灵覆盖，原像素永�
 
 ### 4.1 原则
 
-**只重绘变化的区域，不动不变的区域。** 通过 `bg_snapshot` 快照实现非全屏的精灵恢复。
+**只重绘变化的区域，不动不变的区域。** 全屏/立绘恢复通过 `bg_snapshot` 快照实现；对话框与菜单层在 RAM 复合缓冲中增量合成，只对变化矩形做 VRAM 发布。
 
 ### 4.2 各操作刷新范围
 
 | 触发事件 | 刷新区域 | 像素操作数 | 耗时估算 |
 |----------|----------|-----------|---------|
-| 场景切换（新 `bg`） | 全屏 640×400 | 256,000 vram_blit | ~15ms |
-| 对话框初始化 | 480×115 fill + 边 | ~55,000 fill | ~3ms |
-| 对白翻行（`dialog_show`） | dialog_snapshot restore + text | ~55,000 + text | ~3.5ms |
+| 场景切换（新 `bg`） | 全屏 640×400 | 256,000 vram_blit + 快照 RAM 拷 | ~15ms |
+| 对话框初始化 | RAM 合成 55KB×2 + 55KB blit | ~55,000 blit | ~3ms |
+| 对白翻行（`dialog_show`） | RAM 重合成 + 55KB blit | ~55,000 blit | ~3.5ms |
 | **换表情（`face`）** | 200×280 恢复 + blit | ~22,000 restore + ~12,000 blit | **~1.5ms** |
-| **换装/换位置（`replace`）** | ~400×400 恢复 + 200×400 blit + 对话框 | ~40,000 restore + ~40,000 blit + 55,000 dialog | **~5.5ms** |
-| **隐藏精灵（`hide`）** | ~400×400 恢复 | ~40,000 restore | **~1.2ms** |
+| **换装/换位置（`replace`）** | ~400×400 恢复 + 200×400 blit + occluder 重建 | ~40,000 restore + ~40,000 blit + RAM 55KB | **~5.5ms** |
+| **隐藏精灵（`hide`）** | ~400×400 恢复 + occluder 重建 | ~40,000 restore | **~1.2ms** |
+| **菜单全量（R23）** | 全屏 opaque 合成 + 全屏 blit | 256KB RAM + 256KB blit | **~2-4ms** |
+| **菜单增量（R23）** | `menu_layer_blit_rect` 局部矩形 | 局部 vram_write | **≪1ms** |
+
+> 对话框翻行的"恢复"成本已从 VRAM 读-写转移到 RAM 重合成（单次整框 blit）——中间态不可见，bank 端口写降到逐行。
 
 ### 4.3 换表情的裁剪优化
 
@@ -142,7 +161,7 @@ VRAM 是"画布"而非"图层"。一旦被对话框/精灵覆盖，原像素永�
 对话框区域内像素完全不变                ✅
 ```
 
-`replace` 操作不裁剪（全幅恢复+全幅绘制），最后 `layer_dialog_refresh()` 重绘对话框。
+`replace` 操作不裁剪（全幅恢复+全幅绘制），`layer_sprite_replace` 尾部重建活动底让对话框合成盖回（R20）。
 
 更详细的决策表和性能分析见 `B15-图层渲染与换装机制.md` §5（决策表）和 §8（性能分析）。
 
@@ -157,34 +176,33 @@ VRAM 是"画布"而非"图层"。一旦被对话框/精灵覆盖，原像素永�
 | 操作 | API | 恢复背景 | 绘制精灵 | 重绘对话框 |
 |------|-----|---------|---------|-----------|
 | 初始化（`dialog_drawn==0`） | `layer_sprite_show()` | 不恢复 | 全幅 | 不适用 |
-| 换表情（同角色不同表情） | `layer_sprite_face()` | 裁剪至 `[0, DIALOG_Y)` | 裁剪至 `[0, DIALOG_Y)` | **不重绘** |
-| 换装/换位置 | `layer_sprite_replace()` | 全幅 union bbox | 全幅 | 重绘 |
-| 隐藏 | `layer_sprite_hide()` | 全幅旧位 | 不绘制 | 若需则重绘 |
+| 换表情（同角色不同表情） | `layer_sprite_face()` | 裁剪至 `[0, DIALOG_Y)` | 裁剪至 `[0, DIALOG_Y)` | **不重绘**（clip=1） |
+| 换装/换位置 | `layer_sprite_replace()` | 全幅 union bbox（clip=1） | 全幅 | sync_dialog_base + recompose（缓冲层重画） |
+| 隐藏 | `layer_sprite_hide()` | 全幅旧位（clip=1） | 不绘制 | sync_dialog_base（若覆盖框区） |
+
+> R20 起 `layer_sprite_replace/hide` 的对话框重绘由"活动底重建 + 缓冲内重画 + 整框 blit"完成（不再是 `layer_dialog_refresh` 直写 VRAM）。
 
 ### 5.2 与 bg_snapshot 的关系
 
 ```
-bg_snapshot (256KB, 640×400)
+bg_snapshot (256KB, 640×400，源图直取)
      │
-     ├── restore_rect(x, y, w, h, clip_dialog=1)
+     ├── layer_bg_restore_rect(x, y, w, h, clip_dialog=1)
      │     用于 face：仅恢复 y<DIALOG_Y 的区域，不碰对话框
      │
-     └── restore_rect(x, y, w, h, clip_dialog=0)
-           用于 replace/hide：全幅恢复，之后由 dialog_refresh 修补
+     └── layer_bg_restore_rect(x, y, w, h, clip_dialog=1)
+           用于 replace/hide：全幅恢复但跳过对话框矩形，由 occluder 重建补回
+
+under_dialog (55KB, 480×115)  ← 对话框区纯背景（源图直取），hide 时 vram_write 还原
+dialog_occluder (55KB, 480×115) ← 纯背景+立绘框内像素，复合缓冲种底、伪透明孔
 ```
 
 ### 5.3 调试输出
 
-引擎通过串口输出每次图层操作的阶段标记：
+- 图层状态/图像导出：`layer_debug.c`（`dump bg|sprite|dialog|anim|all|status`，写宿主文件 `layer_debug:*` 日志，`layer_dialog_snapshot()` 供 dump 读取对话框复合缓冲）
+- OOM 诊断：dialog/menu 复合缓冲与 `bg_snapshot` 分配失败均打 `hal_log("OOM: ...")`（C14 强制）
 
-| 标记 | 含义 |
-|------|------|
-| `BGSNAP` | `layer_capture_bg()` 完成 |
-| `DLGOPEN` | `layer_dialog_open()` 完成 |
-| `DLGREFR` | `layer_dialog_refresh()` 完成 |
-| `FACE` | `layer_sprite_face()` 完成 |
-| `REPLACE` | `layer_sprite_replace()` 完成 |
-| `HIDE` | `layer_sprite_hide()` 完成 |
+> 旧版本每图层操作的 `BGSNAP/DLGOPEN/DLGREFR/FACE/REPLACE/HIDE` 阶段标记已随 R19 图层化移除。
 
 ---
 
@@ -197,10 +215,9 @@ bg_snapshot (256KB, 640×400)
 | `B11-MAG图片加载与显示规范.md` §5.2 | 调色板保护 |
 | `B11-MAG图片加载与显示规范.md` §6 | `vram_blit()` / `vram_blit_sprite()` 算法 |
 | `B11-MAG图片加载与显示规范.md` §11 | Sprite/立绘加载流程 |
-| `C01-引擎基本概念.md` §3 | 制作者视角的 UI 概念 |
-| `C02-对话框样式方案.md` | 6 种预设样式 |
-| `C03-立绘与角色.md` | 200×400 立绘标准、跨表情制图约束 |
-| `B15-图层渲染与换装机制.md` | `scene_layers` 模块 API、决策表、操作码 |
+| `B92-NB脚本命令参考.md` §2.2 | `g_dialog_style` 对话框样式表 |
+| `B93-图层渲染与菜单图层规范.md` | 对话框/菜单复合缓冲、`render_set_target` 目标分流、`menu_layer` |
+| `B15-图层渲染与换装机制.md` | 图层 API、决策表、操作码 |
 
 ---
 
@@ -210,7 +227,7 @@ bg_snapshot (256KB, 640×400)
 
 基本渲染策略（背景 → 覆盖）支持不同对话框视觉效果，核心差异在于覆盖区域是**实心填充**还是**图案点阵**。
 
-10 种预设样式（见 `C02-对话框样式方案.md` §1）：
+10 种预设样式（见 `B92-NB脚本命令参考.md` §2.2 `g_dialog_style` 表）：
 
 | 索引 | 枚举名 | 类型 | 覆盖色 | 密度 |
 |------|--------|------|--------|------|
@@ -308,66 +325,62 @@ static const uint8_t pattern_75[8] = {
 - `pattern_75`：48 bit / 64 bit = 75%（对角错位空隙，`0xEE/0x77/0xBB/0xDD` 循环）
 - 实心（100%）不使用图案表，直接调现有的 `fill_rect()`
 
-### 7.4 `scene_draw_dialog()` — 对话框绘制
+### 7.4 `dialog_paint_box()` — 对话框框体绘制
 
-所有样式使用 palette **248** 作为底色（由 `C02-对话框样式方案.md` 定义的 2 位编码：`style & 1` 控制是否使用抖动，`style >> 1` 表示颜色索引）。`draw_rect` 统一画白边：
+所有样式使用 palette **248** 作为底色（`style & 1` 控制是否使用抖动，`style >> 1` 表示颜色索引；样式编号见 `B92-NB脚本命令参考.md` §2.2）。`draw_rect` 统一画白边：
 
 ```c
-void scene_draw_dialog(void)
+/* layer_dialog.c static；目标为 dialog_layer RAM 复合缓冲（stride=LAYER_DIALOG_W），
+   先种底（保住 PAT75 洞孔下背景/立绘）再画框+白边；buf==NULL 直绘 VRAM（OOM 降级） */
+static void dialog_paint_box(uint8_t *buf, int stride)
 {
-    if (g_dialog_style & 1)
-        fill_rect_pattern(DIALOG_X, DIALOG_Y, DIALOG_W, DIALOG_H, PAT75, 248);
-    else
-        fill_rect(DIALOG_X, DIALOG_Y, DIALOG_W, DIALOG_H, 248);
-    draw_rect(DIALOG_X, DIALOG_Y, DIALOG_W, DIALOG_H, DIALOG_BORDER, 7);
+    if (!buf) {
+        fill_dialog_bg(LAYER_DIALOG_X, LAYER_DIALOG_Y, LAYER_DIALOG_W, LAYER_DIALOG_H);
+        draw_rect(LAYER_DIALOG_X, LAYER_DIALOG_Y, LAYER_DIALOG_W, LAYER_DIALOG_H,
+                  LAYER_DIALOG_BORDER, PAL_WHITE);
+        return;
+    }
+    /* 逐行：PAT75 孔洞透出已种底像素，其余写底色与边框 */
+    for (y = 0; y < LAYER_DIALOG_H; y++)
+        write_box_row(buf, stride, y);
 }
 ```
 
-**注意**：实际实现采用 `if (g_dialog_style & 1)` 的简洁形式，支持所有 10 种样式（5 色 × 2 密度）。`draw_rect` 在 if/else 之后统一执行。对话框由 `layer_dialog_open()`、`layer_dialog_refresh()` 或 `layer_dialog_rebuild()` 调用。
+**注意**：实际实现采用 `if (g_dialog_style & 1)` 的简洁形式，支持所有 10 种样式（5 色 × 2 密度）；框体绘制到复合缓冲（非 VRAM，`render_set_target` 分流）。R19 起由 `layer_dialog_show()`/`layer_dialog_render_page()` 内部调用，每页重画（清上一页文字）。
 
-### 7.5 `dialog_show()` — 文字区清除与绘制
+### 7.5 `dialog_show()` — RAM 复合 + blit 发布
 
-旧文字区清除使用与对话框背景**相同的图案和 palette 248**——不留文字的残留像素，同时保持区域的半透明视觉效果：
+旧文字区清除改在 RAM 复合缓冲内完成（`dialog_paint_box` 重画框体，不留文字残留同时保持半透明视觉效果）：
 
 ```c
-void dialog_show(const char *charname, const char *text)
+int dialog_show(const char *charname, const char *text)
 {
-    int mw = DIALOG_W - DIALOG_INDENT - DIALOG_RIGHT_INDENT;
+    int mw = LAYER_DIALOG_W - LAYER_DIALOG_INDENT - LAYER_DIALOG_RIGHT_INDENT;
 
     if (dialog_state.text_offset < 0) {
         dialog_state.charname = charname;
-        strncpy(dialog_text_buf, text, sizeof(dialog_text_buf) - 1);
-        dialog_text_buf[sizeof(dialog_text_buf) - 1] = '\0';
-        dialog_state.text = dialog_text_buf;
-        dialog_state.text_offset = 0;
+        /* strncpy → 截断中文 UTF-8 尾字节修复 → text_offset = 0 */
     }
 
-    if (!layer_dialog_drawn()) {
-        layer_dialog_open();
-    } else {
-        layer_dialog_snap();
-    }
-    layer_dialog_restore();
+    layer_dialog_show();                       /* 首次：建立 dialog_layer/dialog_occluder */
 
-    if (dialog_state.charname)
-        draw_text(dialog_state.charname, 0,
-                  DIALOG_X + DIALOG_INDENT, DIALOG_Y + DIALOG_HEADER_Y,
-                  mw, DIALOG_BOTTOM, 1, PAL_WHITE);
+    int next = layer_dialog_render_page(dialog_state.charname,
+                                        dialog_state.text,
+                                        dialog_state.text_offset);   /* RAM 合成整页 */
+    dialog_layer_store_render(dialog_state.charname,
+                              dialog_state.text,
+                              dialog_state.text_offset);             /* 记录投影（换图重绘用） */
+    dialog_layer_blit();                       /* 整框发布 */
 
-    int next = draw_text(dialog_state.text, dialog_state.text_offset,
-                         DIALOG_X + DIALOG_INDENT, DIALOG_Y + DIALOG_TEXT_Y,
-                         mw, DIALOG_Y + DIALOG_TEXT_Y + 60, 0, PAL_WHITE);
-    if (next >= 0) {
+    if (next >= 0)                             /* 分页：未显示完 */
         dialog_state.text_offset = next;
-        /* 暂停等待翻页 */
-    } else {
+    else
         dialog_state.text_offset = -1;
-        dialog_state.text = NULL;
-    }
+    return next;
 }
 ```
 
-**关键**：所有样式统一使用 palette 248。`draw_text` 第 6 个参数 `max_y = DIALOG_Y + DIALOG_TEXT_Y + 60` 限制每页 3 行，超出的文字返回字节偏移，`dialog_show()` 据此通知 VM 暂停等待翻页。角色名头部以粗体（`bold=1`）绘制于对话框顶部，不参与翻页。`dlg_update_palette()` 在 `dlgstyle` 切换时动态改色。
+**关键**：文字进入 `dialog_layer` RAM 缓冲（`text_set_target` 分流），整框 `dialog_layer_blit` 一次性发布；`draw_text` 的 `max_y = DIALOG_Y + DIALOG_TEXT_Y + 60` 限制每页 3 行，超出的文字由 `layer_dialog_render_page` 返回字节偏移供分页续印。角色名头部以粗体（`bold=1`）绘制于对话框顶部，不参与翻页。`dlg_update_palette()` 在 `dlgstyle` 切换时动态改色（重绘框体回缓冲）。
 
 ### 7.6 性能
 
@@ -399,35 +412,36 @@ void dialog_show(const char *charname, const char *text)
 
 精灵由场景脚本指定左上角坐标 `(x, y)`。标准立绘尺寸 200×400，y=0 对齐屏幕顶，底部接触屏幕底。
 
-### 9.2 重叠处理（四趟顺序）
+### 9.2 重叠处理（分层顺序）
 
 ```
-趟次          写入内容                  覆盖关系
-────────────────────────────────────────────────
-第一趟(bg)     背景全屏 640×400          地基
-第二趟(char)   立绘 200×400             在背景之上
-第三趟(dialog) 对话框 480×115           在立绘之上（覆盖重叠区）
-第四趟(text)   文字行                    在对话框之上
+次序          写入内容                  覆盖关系
+───────────────────────────────────────────────
+(1) bg         背景全屏 640×400          地基
+(2) char       立绘 200×400（全高）      在背景之上
+(3) dialog     对话框 480×115           在立绘之上——RAM 合成后整框发布
+(4) text       文字行                    合入 dialog 复合缓冲
+(5) menu       menu_layer 全屏 opaque    在对话框之上（独立复合缓冲）
 ```
 
-结果：对话框白字和边框始终在最前。精灵延伸入对话框区域的像素被对话框底色覆盖。
+结果：对话框白字和边框始终在最前。精灵延伸入对话框区域的像素被对话框合成覆盖（R20 立绘全高绘制，不复建"底部一致"前提）。
 
-### 9.3 精灵恢复（基于 bg_snapshot）
+### 9.3 精灵恢复（基于 bg_snapshot / occluder）
 
-PC-98 的单层 VRAM 中，修改后的精灵像素可通过 `bg_snapshot` 恢复：
+PC-98 的单层 VRAM 中，修改后的精灵像素可通过 `bg_snapshot` 恢复；覆盖对话框区的改动由 occluder 重建补回（R20）：
 
 | 操作 | 恢复方法 |
 |------|----------|
-| 移动精灵 | `sprite_replace(id, nx, ny)` → `bg_restore_rect` union + blit 新位 + `dialog_refresh` |
-| 隐藏精灵 | `sprite_hide(id)` → `bg_restore_rect` 旧位 + 对话框修补 |
-| 切换精灵（表情） | `sprite_face(id, x, y)` → 裁剪至 `y<280` 恢复 + blit，**不碰对话框** |
-| 切换精灵（换装） | `sprite_replace(id, x, y)` → 全幅恢复 + blit + `dialog_refresh` |
+| 移动精灵 | `layer_sprite_replace(nx,ny)` → `layer_bg_restore_rect` union + blit 新位 + sync_dialog_base |
+| 隐藏精灵 | `layer_sprite_hide` → `layer_bg_restore_rect` 旧位（clip=1）+ sync_dialog_base |
+| 切换精灵（表情） | `layer_sprite_face` → 裁剪至 `y<280` 恢复 + blit，**不碰对话框** |
+| 切换精灵（换装） | `layer_sprite_replace` → 全幅恢复 + blit + recompose（缓冲内重画） |
 
 ### 9.4 精灵尺寸标准
 
 - **标准尺寸**：200×400（接触屏幕底部）
 - 精灵必须 ≤ 640×400（越界部分被 `vram_blit_sprite` 裁剪）
-- 同角色跨表情：**底部 120px（y≥280）必须像素级一致** —— 见 `C03-立绘与角色.md` §3.5
+- R20 起精灵**全高绘制**（撤销旧 Option X 的 y<280 裁剪）；跨表情底部一致性仅保留为美术侧约定，不再作为引擎剪裁前提
 
 ### 9.5 性能
 
@@ -440,36 +454,35 @@ PC-98 的单层 VRAM 中，修改后的精灵像素可通过 `bg_snapshot` 恢�
 
 ### 9.6 调色板共享
 
-精灵不设自己的调色板（共享背景调色板），约束同前。
-
-详见 `C03-立绘与角色.md` §6。
+精灵不设自己的调色板（共享背景调色板），约束见 `B11-MAG图片加载与显示规范.md` §5。
 
 ---
 
 ## 10. 菜单渲染策略
 
-### 10.1 菜单即增量覆盖层
+### 10.1 菜单即覆盖层（R23：menu_layer RAM 复合缓冲）
 
-菜单在渲染层面等价于"位于屏幕中部的另一个对话框"：
+菜单在渲染层面是"位于对话框之上的独立覆盖层"——R23 起为**全屏菜单复合缓冲**（`menu_layer_open`），opaque 模式内嵌整个屏幕快照极简底，选中切换在缓冲内增量合成后 `blit_rect` 发布：
 
 ```
-趟次          写入内容                      覆盖关系
+次序          写入内容                      覆盖关系
 ────────────────────────────────────────────────
-第一趟(bg)     背景全屏 640×400              地基
-第二趟(char)   立绘 200×400                 在背景之上
-第三趟(dialog) 对话框 480×115               在立绘之上
-第四趟(text)   文字行                       在对话框之上
-第五趟(menu)   菜单背景 + 选项文字 + 选中色   在对话框之上（位置不同）
+(1) bg         背景全屏 640×400              地基
+(2) char       立绘 200×400                 在背景之上
+(3) dialog     对话框 480×115（复合缓冲）    在立绘之上
+(4) menu_layer 全屏复合（opaque 含底）       在对话框之上，整屏 blit 发布
 ```
 
-背景样式与对话框一致：`fill_rect(248) + fill_rect_pattern(PAT40, 248) + draw_rect(thick=2, 7)`。
+背景样式与对话框一致：`fill_rect(248) + fill_rect_pattern(PAT40, 248) + draw_rect(thick=2, 7)`（绘制进菜单缓冲）。
 
-### 10.2 菜单渲染架构（增量式）
+### 10.2 菜单渲染架构（复合缓冲 + 增量发布）
 
-菜单重新渲染时**不清全屏，只重写菜单区域内的 VRAM 像素**。每次键盘输入方向键（`KBD_UP`/`KBD_DOWN`）触发：
+`menu_open` 全量绘制一次进缓冲区 → `menu_blit` 整屏发布。随后每次键盘输入方向键（`KBD_UP`/`KBD_DOWN`）触发 `begin_draw → 增量改色 → commit → blit_rect`：
 
-1. **选中移动到新 item**（`menu_highlight` / `menu_unhighlight` 成对）
+1. **选中移动到新 item**（`menu_highlight` / `menu_unhighlight` 成对，缓冲内改色）
 2. **文字区无条件重绘**（`menu_draw_item` 每帧调用，即使选中无变化）
+
+> 会话期间的中间态只存在于 RAM 缓冲，VRAM 上永远只有已发布结果——闪烁窗口被整体消除（§10.3 的根源分析仍适用，但"全部重绘开销聚集"一项已不再可见）。
 
 ### 10.3 闪烁原因分析
 
@@ -532,3 +545,4 @@ if (selected_changed) {
 | 2.0 | 2026-06-12 | PEGC 256c 全线更新 |
 | 3.0 | 2026-06-12 | **三趟→四趟**：对话框延迟到首次 text 触发；新增 `bg_snapshot` 快照恢复机制；精灵操作决策表；`layer_dialog_open/refresh`；裁剪策略；删除 F1:help；200×400 立绘；480×115 对话框；引用 B15 换装机制文档 |
 | 3.1 | 2026-06-13 | op_text 翻页实现：`max_y = DIALOG_Y + DIALOG_TEXT_Y + 60`（3 行限制），draw_text 返回字节偏移用于翻页续印；新增 header_table 角色名头部；50% 图案→75%；DIALOG_INDENT=24→12 |
+| 4.0 | 2026-09-11 | **R19-R23 图层化重述**：对话框改为 RAM 复合缓冲合成 + 整框 blit 发布（`dialog_layer`/`dialog_occluder`、`layer_dialog_render_page`）；背景收口 `layer_bg_change`（源图直拷双快照、跨图存活）；R20 撤销立绘裁剪（全高绘制+伪透明活动底）；`render_set_target`/`text_set_target` 目标分流；菜单章节改 `menu_layer` 复合缓冲（R23）；§4.2 刷新表换复合缓冲版本；§5.3 调试输出按 `layer_debug.c` 实况重写；删除失效 C0x 文档引用 |

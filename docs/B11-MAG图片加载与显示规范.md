@@ -126,7 +126,7 @@ SQL
 # 角色定义在 characters.yaml 中直接编辑
 ```
 
-`pack_images.py` 读取 `img_map` 将列出的文件打包为 `IMAGE.DAT`，同时对 `characters.yaml` 中每个角色的多套表情自动做 **y≥280 一致性校验**（见 `C03-立绘与角色.md §3.5`）。
+`pack_images.py` 读取 `img_map` 将列出的文件打包为 `IMAGE.DAT`。立绘为 200×400 全高图（R20 起引擎不再裁剪 y≥280）；跨表情底部像素一致为美术侧约定，工具链不再强制校验。
 
 ---
 
@@ -230,15 +230,15 @@ void image_set_palette(const MagImage *img)
 
 ### 5.4 bg 调色板时序（强制执行）
 
-场景切换或 `bg` 命令加载新背景时，执行顺序**必须严格遵循**：
+场景切换或 `bg` 命令加载新背景时，执行顺序**必须严格遵循**（R19 起收口在 `layer_bg_change()` 内统一执行）：
 
 ```
-image_set_palette(img)    ← 第1步：应用 palette
-vram_blit(img, 0, 0)      ← 第2步：写入像素
-layer_redraw_sprites()     ← 第3步：用新 palette 重绘所有精灵
-/* 恢复对话框底色 */
-hal_set_palette(248, ...)  ← 第4步：因步骤1覆盖了 248，需恢复
-layer_capture_bg()         ← 第5步：保存背景快照
+image_set_palette(img)      ← 第1步：应用 palette（跳过保护位 7/15/≥248）
+vram_blit(img, 0, 0)        ← 第2步：写入像素
+双快照（源图直拷，零 VRAM 回读）   ← 第2.5步：bg_snapshot / under_dialog
+layer_redraw_sprites()       ← 第3步：用新 palette 重绘所有精灵
+dlg_update_palette()         ← 第4步：因步骤1覆盖了 248，需恢复
+layer_dialog_recompose()     ← 第5步：对话框已开时按投影重绘框+字并以 blit 发布
 ```
 
 **为什么 palette 先于像素（第1步→第2步）**：
@@ -331,7 +331,7 @@ void vram_blit_sprite(const MagImage *img, int x, int y,
 - 对于 16 色 sprite，15 个实际颜色（索引 0–14）+ 1 个透明色（索引 15）
 - 精灵可在任意位置 (`dst_x`, `dst_y`) 绘制
 
-详见 `C03-立绘与角色.md` 的制作者透明色约定。
+精灵透明色约定：索引 15 为透明色（`vram_blit_sprite` 跳过），全仓库自 Sprite 导出沿用（见 §11.7 `mag_convert` 精灵转换）。
 
 ---
 
@@ -344,32 +344,29 @@ void vram_blit_sprite(const MagImage *img, int x, int y,
 | Opcode | `0x30` |
 | 字节数 | **3**（1 字节 opcode + 2 字节 operand） |
 | Operand | `uint16 LE` — IMAGE.DAT 中的 logical_id |
-| 行为 | 加载 ID 对应的 MAG → 设调色板（`image_set_palette`）→ blit 全屏 → 重绘精灵 → 恢复对话框底色 → 保存背景快照 |
+| 行为 | 加载 ID 对应的 MAG → `layer_bg_change` 七步收口（palette → blit → 双快照 → 精灵重绘 → 恢复对话框底色 → 开框时 recompose） |
 
 ### 7.2 实现
 
-实际引擎中，背景加载由 NB 脚本的 `bg` 命令触发（`core/engine/nb.c:cmd_bg`）：
+实际引擎中，背景加载由 NB 脚本的 `bg` 命令触发（`core/engine/nb_commands.c:cmd_bg`），统一收口到 `layer_bg_change()`：
 
 ```c
 static void cmd_bg(int argc, const char **argv, const char *cmd_name)
 {
-    int id = resolve_asset(argv[0]);
-    MagImage *img = image_load(id);
-    if (!img) return;
-    /* Apply palette FIRST to avoid color flash */
-    image_set_palette(img);
-    vram_blit(img, 0, 0);
-    layer_redraw_sprites();
-    mag_free(img);
-    /* Restore dialog palette index 248 */
-    dlg_update_palette();
-    layer_capture_bg();
+    ...
+    anim_stop();                /* 隐式停止动画 */
+    img = image_load(id);
+    ...
+    hal_mouse_invalidate_cursor();
+    palette_reset_reserved();   /* 保护 7/15/248-255 固定色 */
+    layer_bg_change(img);       /* 七步收口：palette → blit → 双快照 → 精灵 → 调色板 → recompose */
+    mag_release(img);
 }
 ```
 
-`bg` 命令不再自动绘制对话框。背景加载后调用 `layer_capture_bg()` 保存 256KB VRAM 快照。
-对话框延迟到首次 `dialog_show()` 时通过 `layer_dialog_open()` 绘制，**确保立绘在对话框之下**。
-完整渲染顺序：背景 → 立绘 → 对话框 → 文字（五趟，含菜单为第六趟）。详见 `B12-VRAM渲染策略.md`。
+`bg` 命令不再自动绘制对话框。`layer_bg_change()`（layer_bg.c）内部完成 §5.4 的 palette→pixels→sprites 顺序与**源图直拷双快照**（`bg_snapshot`/`under_dialog`，零 VRAM 回读），并在对话框已打开时重绘复合投影——`bg(){x}` 换图后对话框与当前页文字**跨图存活**（R19）；`bg(hidedialog)` 显式收起。
+对话框延迟到首次 `dialog_show()` 时通过 `layer_dialog_show()` 建立复合缓冲，**确保立绘在对话框之下**。
+完整渲染顺序：背景 → 立绘 → 对话框 → 文字（对话框/菜单为 RAM 复合缓冲 + blit 发布）。详见 `B93-图层渲染与菜单图层规范.md`。
 
 ### 7.3 旧 MHVN98 兼容性
 
@@ -393,7 +390,7 @@ opcode `0x30` 是 MHVN98 规范中的背景加载指令，当前 NB 引擎通过
 | 8 | `nb_init()`（NB 脚本引擎初始化，加载 logo.nb） | Scene OK |
 | 9 | `nb_process()` 循环 | — |
 
-> **注意**：当前引擎启动调色板设 0=黑, 1=蓝, 2=绿, 3=红, 7=白, 15=白, 248=黑；全屏填充为黑底而非蓝底。`image_init()` 时会做 palette 一致性校验（`mag_read_palette()` 遍历全部 TOC 条目）。`bg` 命令不自动绘制对话框，对话框由首次 `dialog_show()` 通过 `layer_dialog_open()` 触发（见 `B15-图层渲染与换装机制.md` §3.1）。
+> **注意**：当前引擎启动调色板设 0=黑, 1=蓝, 2=绿, 3=红, 7=白, 15=白, 248=黑；全屏填充为黑底而非蓝底。`image_init()` 时会做 palette 一致性校验（`mag_read_palette()` 遍历全部 TOC 条目）。`bg` 命令不自动绘制对话框，对话框由首次 `dialog_show()` 通过 `layer_dialog_show()` 建立复合缓冲后 `blit` 发布（见 `B93-图层渲染与菜单图层规范.md` §4）。
 
 ---
 
@@ -447,10 +444,9 @@ def pack_images(project_dir):
 |------|------|
 | `B02-显示管线规范.md` | VRAM 平面地址（B/R/G/E）、调色板端口（0xA8-0xAE）、像素图元（`fill_rect`, `vram_blit` 等） |
 | `B10-键盘交互与文本表设计.md` | 对白调色板保护：索引 7（白）= 文字+提示、索引 8（灰）= Ctrl 提示 |
-| `C01-引擎基本概念.md` | 制作者视角的对白/背景概念 |
+| `B93-图层渲染与菜单图层规范.md` | 对话框/菜单复合缓冲、blit 发布、立绘 z 序与透明约定 |
 | `devdocs/0.1版开发文档总结.html#doc-01` | MAG 格式完整技术规范 |
 | `devdocs/0.1版开发文档总结.html#doc-12` | 实施计划、测试步骤 |
-| `C03-立绘与角色.md` | 立绘制作与透明色约定 |
 
 ---
 
@@ -522,20 +518,21 @@ char(hideall)       # 隐藏全部立绘
 
 引擎内部由 `cmd_char()` → `layer_sprite_show()` / `layer_sprite_face()` / `layer_sprite_replace()` 处理。
 精灵水平镜像由 `char` 命令的位置参数（`l`/`c`/`r`）隐式决定（左位镜像），无需独立 `mirror` 指令。
-详见 `docs/C03-立绘与角色.md`。
+立绘 200×400 全高绘制与 z 序（R20 撤销 Option X）见 `B93-图层渲染与菜单图层规范.md` §4.4。
 
-### 11.6 渲染顺序（四趟）
+### 11.6 渲染顺序（分层 + blit 发布）
 
 ```
-1. vram_blit(bg, 0, 0)                ← 背景全屏（bg）
-2. vram_blit_sprite(sprite, x, y, 15) ← 立绘（char）
-3. scene_draw_dialog()                 ← 对话框（首次 dialog_show → layer_dialog_open）
-4. draw_text()                         ← 文字（dialog_show 翻页）
+1. vram_blit(bg, 0, 0)                      ← 背景全屏（bg → layer_bg_change；RAM 双快照）
+2. vram_blit_sprite(sprite, x, y, 15)       ← 立绘全高（char；R20 撤销 y<280 裁剪）
+3a. dialog_paint_box + draw_text（RAM 合成）  ← 对话框 + 文字合入 dialog_layer
+3b. dialog_layer_blit()                      ← 整框发布（首次 dialog_show → layer_dialog_show）
+4. menu_layer 全屏复合 + blit                ← 菜单覆盖层（R23，独立缓冲）
 ```
 
-立绘在对话框之下，文字始终在最前面。对话框延迟到首次 `dialog_show()` 时绘制。
-精灵更换（`face`/`replace`/`hide`）通过 `bg_snapshot` 恢复背景，避免全屏重绘。
-详见 `B15-图层渲染与换装机制.md`。
+立绘在对话框之下，文字/菜单始终在最前面。对话框延迟到首次 `dialog_show()` 时建立复合缓冲。
+精灵更换（`face`/`replace`/`hide`）通过 `bg_snapshot` 恢复背景 + `sync_dialog_base` 重建活动底，避免全屏重绘。
+详见 `B93-图层渲染与菜单图层规范.md` / `B15-图层渲染与换装机制.md`。
 
 ### 11.7 mag_convert.py 精灵转换
 
@@ -803,3 +800,4 @@ VRAM 批量 blit 算法参考 love es×××× 引擎 `vram.c:VramDrawGrayscale()
 | 2.0 | 2026-06-12 | 全线更新到 PEGC 256c |
 | 2.1 | 2026-06-12 | 渲染顺序更新（背景→立绘→对话框→文字）；op_bgload 不再调用 scene_draw_dialog；新增 layer_capture_bg() 和 B15 引用 |
 | 3.0 | 2026-06-18 | **共享调色板**：pack_images 从全部图像构建 256 色共享调色板（而非仅 id=0），所有 MAG 统一 remap。新增 `mag_read_palette()` 轻量 palette 读取。新增三重验证：构建时 `verify_shared_palette()`、诊断 `check_palette.py`、引擎启动时 palette 一致性校验 |
+| 4.0 | 2026-09-11 | **R19/R20 图层化**：§5.4 bg 时序收口到 `layer_bg_change`（源图直拷双快照、开框 recompose 跨图存活）；§7.2 `cmd_bg` 代码块更新（`anim_stop`+`layer_bg_change`+`mag_release`）；§11.6 渲染顺序改"分层 + blit 发布"；删除失效 C03 引用 |

@@ -35,6 +35,10 @@ from naiz_lib.palette_utils import validate_skin_palette, VALIDATE_DE_MAX
 from naiz_lib.mag_codec import decode_mag_palette
 from naiz_build.project_config import ProjectConfig
 from naiz_conv.i18n_gen import generate as i18n_gen
+from naiz_font.gen_cjk_font import (
+    RUNTIME_LANGS, collect_cps, generate_cjk_file,
+    load_sources, merge_glyph_sources, merge_ranges,
+)
 
 PROTECTED_IDX_NO15 = PROTECTED_IDX_ALL - {15}
 
@@ -217,9 +221,10 @@ def pack_images(proj_dir: Path, game_dir: Path):
 
 def deploy_runtime(proj_dir: Path, game_dir: Path):
     """Deploy fonts, settings, scripts, and DOS extender"""
-    # 字库: base + per-language CJK files
+    # 字库: fonts are base ASCII/data files; per-language CJK fonts are
+    # generated from project corpus by deploy_cjk_fonts() (after deploy_i18n).
     font_dir = ROOT / "tools" / "naiz_font"
-    for font_name in ("FONT.DAT", "CJK.DAT", "BLACK.DAT"):
+    for font_name in ("FONT.DAT", "BLACK.DAT"):
         src = font_dir / font_name
         dst = game_dir / font_name
         if src.exists():
@@ -227,16 +232,13 @@ def deploy_runtime(proj_dir: Path, game_dir: Path):
                 safe_copy2(src, dst)
                 print(f"  {font_name} 已部署")
 
-    # Deploy per-language CJK files (CJK_EN.DAT, CJK_JP.DAT, etc.)
-    lang_codes = ("EN", "FR", "DE", "IT", "ES", "PT", "JP", "CN", "CT", "KR")
-    for lang in lang_codes:
-        cjk_name = f"CJK_{lang}.DAT"
-        src = font_dir / cjk_name
-        dst = game_dir / cjk_name
-        if src.exists():
-            if not dst.exists() or src.stat().st_mtime > dst.stat().st_mtime:
-                safe_copy2(src, dst)
-                print(f"  {cjk_name} 已部署")
+    # Remove a stale full CJK.DAT from previous builds: only the per-language
+    # CJK_<lang>.DAT fonts are valid now, and a stale fallback file would mask
+    # a missing per-language font at runtime.
+    stale_cjk = game_dir / "CJK.DAT"
+    if stale_cjk.exists():
+        stale_cjk.unlink()
+        print("  移除过时 CJK.DAT（字库已按语言拆分）")
 
     # settings.txt
     settings_src = proj_dir / "scene" / "settings.txt"
@@ -292,13 +294,9 @@ def deploy_runtime(proj_dir: Path, game_dir: Path):
             required_runtime.append(dst)
         else:
             print(f"  WARNING: {name} not found in tools_commercial/dos_system/")
-    for name in ("FONT.DAT", "CJK.DAT"):
+    for name in ("FONT.DAT", "BLACK.DAT"):
         if not (game_dir / name).exists():
             print(f"  WARNING: {name} not deployed to game directory")
-    # Warn if no per-language CJK files (engine will fallback to CJK.DAT)
-    has_lang_cjk = any((game_dir / f"CJK_{lang}.DAT").exists() for lang in lang_codes)
-    if not has_lang_cjk:
-        print("  INFO: no per-language CJK files; engine will use CJK.DAT fallback")
 
     # Verify critical runtime files
     for f in required_runtime:
@@ -319,6 +317,39 @@ def deploy_i18n(proj_dir: Path, game_dir: Path):
     for txt in sorted(i18n_src.glob("*.txt")):
         safe_copy2(txt, i18n_dst / txt.name)
         print(f"  i18n/{txt.name} 已部署")
+
+
+def deploy_cjk_fonts(proj_dir: Path, game_dir: Path):
+    """Generate per-language CJK fonts (CJK_<lang>.DAT) from project corpus.
+
+    Corpus = scene/*.nb text + i18n/*_<lang>.txt values + the language-family
+    base block (U+3000-303F for CJK family, U+00A0-00FF for Latin family).
+    Glyph sources in priority order: GNU Unifont hex (P1), CJKF atlas (P2).
+    Must run after deploy_i18n so freshly refreshed translation templates are
+    part of the corpus on the first build.  Ships all 10 runtime-lang files so
+    the engine fallback chain (cjk.c) never fires; any missing file is an ERROR.
+    """
+    font_dir = ROOT / "tools" / "naiz_font"
+    hex_path = font_dir / "unifont-17.0.05.hex"
+    atlas_path = font_dir / "CJK.DAT"
+    sources = load_sources(
+        str(hex_path) if hex_path.exists() else None,
+        str(atlas_path) if atlas_path.exists() else None,
+    )
+    if not sources:
+        print("  ERROR: no CJK glyph source (need unifont hex or CJK.DAT atlas)")
+        sys.exit(1)
+    print("  [cjk] 按语言语料生成字库（scene/*.nb + i18n + family base block）")
+    for lang in RUNTIME_LANGS:
+        cps = collect_cps(proj_dir, lang, with_base=True)
+        ranges = merge_ranges(cps)
+        glyphs = merge_glyph_sources(sources, cps)
+        generate_cjk_file(glyphs, ranges, game_dir / f"CJK_{lang.upper()}.DAT")
+    missing = [lang for lang in RUNTIME_LANGS
+               if not (game_dir / f"CJK_{lang.upper()}.DAT").exists()]
+    if missing:
+        print(f"  ERROR: missing per-language CJK files: {', '.join(missing)}")
+        sys.exit(1)
 
 
 def build_game(game_name: str):
@@ -419,6 +450,7 @@ def build_game(game_name: str):
         print("  [i18n] 刷新翻译模板...")
         i18n_gen(proj_dir, force=False)
     deploy_i18n(proj_dir, game_dir)
+    deploy_cjk_fonts(proj_dir, game_dir)
 
     print(f"完成: {game_name}")
 

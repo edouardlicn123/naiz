@@ -105,6 +105,7 @@ const char *nb_get_buffer(void)
 int nb_lang_is_cjk(void)
 {
     return strcmp(nb.lang, "chi") == 0
+        || strcmp(nb.lang, "cht") == 0
         || strcmp(nb.lang, "jpn") == 0
         || strcmp(nb.lang, "kor") == 0;
 }

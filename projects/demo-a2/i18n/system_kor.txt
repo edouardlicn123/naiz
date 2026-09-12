@@ -1,0 +1,9 @@
+continue=계속
+exit=나가기
+gallery=갤러리
+load=불러오기
+music=음악
+scenes=장면
+settings=설정
+special=특별
+start=시작

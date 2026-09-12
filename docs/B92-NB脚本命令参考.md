@@ -1,7 +1,7 @@
 # B92 — NB 脚本命令参考 & 关键常量
 
 > **状态**：活跃维护
-> **最后更新**：2026-08-07（从 AGENTS.md §15.4/15.3 聚合）
+> **最后更新**：2026-09-11（补 startsetting 行；整表处理函数源文件位置校正）
 >
 > 本文是 NB 脚本命令的**唯一集中参考源**，并收录引擎关键常量速查。
 > 命令处理函数的 C 实现索引见 `docs/B90-参考-函数索引.md`。
@@ -10,34 +10,35 @@
 
 ## 1. NB 脚本命令参考
 
-命令表 `cmd_table[]` 定义位置：`core/engine/nb.c`
+命令表 `cmd_table[]` 定义位置：`core/engine/nb_commands.c:385`（命中 `nb_commands_dispatch`）
 
 | 命令 | 处理函数 | 签名 | 说明 |
 |---|---|---|---|
-| `bg` | `cmd_bg` (nb.c) | `bg(effect[,transition]){<asset_key>}` | 加载背景：**资产 key 必须在花括号负载**，括号位留给 effect/transition 参数（现为占位不作效）；capture_bg；**跨图对话框存活**——换图后对话框框/当前页保留，需收起请显式 `bg(hidedialog)`（devdoc 96 保留 R17 自动复位的回退） |
+| `bg` | `cmd_bg` (nb_commands.c) | `bg(effect[,transition]){<asset_key>}` | 加载背景：**资产 key 必须在花括号负载**，括号位留给 effect/transition 参数（现为占位不作效）；经 `layer_bg_change()` 收口（blit→双快照源图直拷→全身重绘→调色板→开框则 recompose↔blit）；**跨图对话框存活**——换图后对话框框/当前页保留，需收起请显式 `bg(hidedialog)` |
 | | | `bg(hidedialog)` | 关闭对话框，还原背景区域（show 不自动收起；需要"不换图只收起对话"时显式调用） |
-| `char` | `cmd_char` (nb.c) | `char(pos[,expr[,type]]){<name>}` | 显示/替换立绘：**角色名在花括号负载**，括号承载 pos(l\|c\|r)/expr/body\|face 参数；auto-detect body/face |
+| `char` | `cmd_char` (nb_commands.c) | `char(pos[,expr[,type]]){<name>}` | 显示/替换立绘：**角色名在花括号负载**，括号承载 pos(l\|c\|r)/expr/body\|face 参数；auto-detect body/face；R20 起全高绘制不再裁剪，对话框活动底经 `layer_sprite_sync_dialog_base` 重建 |
 | | | `char(hideall)` | 隐藏所有立绘 + clean reset |
-| `scene` | `cmd_scene` (nb.c) | `scene <id\|"end">` / `scene <var,op,val,target;...;default>` | 无条件/条件链跳转，id → nbook{id}.nb。默认值约定：最后一段无逗号→显式默认；无显式默认→fallback 到第一段 target |
-| `sceneconf` | `cmd_sceneconf` (nb.c) | `sceneconf(){<title>[,type]}` | 场景配置：章节标题 + 类型（normal/cg/menu，默认 normal）。**仅花括号形态**（paren 别名已废止），随存档记录标题，type=menu 时禁用存档热键 |
-| `mainmenu` | `cmd_mainmenu` (nb.c) | `mainmenu <x> <y> <w> <h> <opt1> <opt2> ...` | 主菜单，"start"→game, "exit"→end |
-| `question` | `cmd_question` (nb.c) | `question <text;opt,var,op,delta;...>` | 选项+变量操作(+/-/=)，结果存 nb.last_choice |
-| `var` | `cmd_var` (nb.c) | `var <id> <=/+|/-> <value>` | 变量读写（赋值/加减），需在 variables.json 定义 |
-| `settingmenu` | `cmd_settingmenu` (nb.c) | — | 设置菜单（TODO） |
-| `cg` | `cmd_cg` (nb_cg.c) | `cg(){<asset_key>}` | 展示 CG（type='CG' 资产）：资产 key 必须写在花括号负载中——括号位预留给未来的参数设置，**不再承载资产描述**（`cg(key)` 括号形态被硬性拒绝）；绘制后永久解锁该 CG 至 SYSTEM.SAV；**换图同时自动收起对话框并清空当前对白**（R20 回退 R19 的"跨图存活"），下一句台词在其上重新开框；无需对话时用 `cg(hidedialog)` 语义一致 |
+| `scene` | `cmd_scene` (nb_scene.c) | `scene <id\|"end">` / `scene <var,op,val,target;...;default>` | 无条件/条件链跳转，id → nbook{id}.nb。默认值约定：最后一段无逗号→显式默认；无显式默认→fallback 到第一段 target |
+| `sceneconf` | `cmd_sceneconf` (nb_commands.c) | `sceneconf(){<title>[,type]}` | 场景配置：章节标题 + 类型（normal/cg/menu，默认 normal）。**仅花括号形态**（paren 别名已废止），随存档记录标题，type=menu 时禁用存档热键 |
+| `mainmenu` | `cmd_mainmenu` (nb_mainmenu.c) | `mainmenu <x> <y> <w> <h> <opt1> <opt2> ...` | 主菜单，"start"→game, "continue"→最新槽位, "load"→读档, "gallery"→cgview, "exit"→end；scenes/special/music/settings 为 TODO 桩 |
+| `question` | `cmd_question` (nb_question.c) | `question <text;opt,var,op,delta;...>` | 选项+变量操作(+/-/=)，结果存 nb.last_choice；鼠标/键盘两路经 `apply_option()` 合一（R21，含 INT_MIN 守卫 C22） |
+| `var` | `cmd_var` (nb_commands.c) | `var <id> <=/+|/-> <value>` | 变量读写（赋值/加减），需在 variables.json 定义 |
+| `settingmenu` | `cmd_settingmenu` (nb_mainmenu.c) | — | 设置菜单（TODO 桩，见 STUBS）；**已实现的是 `startsetting`** |
+| `startsetting` | `cmd_startsetting` (nb_mainmenu.c:89) | `startsetting()` | **设置菜单（已实现）**：`settings_menu_run()` + `settings_save()`，语言变更时重载 CJK 字库/翻译表并按黑花体设置刷新 |
+| `musicmenu` | `cmd_musicmenu` (nb_mainmenu.c) | — | 音乐菜单（TODO 桩，见 STUBS） |
+| `cg` | `cmd_cg` (nb_cg.c) | `cg(){<asset_key>}` | 展示 CG（type='CG' 资产）：资产 key 必须写在花括号负载中——括号位预留给未来的参数设置，**不再承载资产描述**（`cg(key)` 括号形态被硬性拒绝）；绘制后永久解锁该 CG 至 SYSTEM.SAV；**换图同时自动收起对话框并清空当前对白**（R20 全屏事件语义），下一句台词在其上重新开框 |
 | | | `cg(hidedialog)` | 关闭对话框，还原背景区域（与 `bg(hidedialog)` 平行；`cg(){key}` 已自动收起对话框，此指令用于显式收口，见 R20） |
-| `cgvmenu` | `cmd_cgvmenu` (nb_mainmenu.c) | — | 打开 CG 画廊（由 cgview.nb 调用）：网格浏览 + 锁定占位 + 翻页 + 全屏预览，ESC/Back 回主菜单 |
-| `musicmenu` | `cmd_musicmenu` (nb.c) | — | 音乐菜单（TODO） |
-| `host` | `cmd_host` (nb.c) | `host <text>` | 系统旁白（无角色名） |
-| `loadscene` | `cmd_loadscene` (nb.c) | — | 打开读档选单（由 loadscene.nb 调用） |
-| `fei` / `ira` / `neon` | `cmd_dialogue` (nb.c) | `<name>{<text>}` 或 `<name>(<text>)` | 角色台词 |
-| `bgm` | `cmd_bgm` (nb_commands.c) | `bgm(){<key>}` / `bgm(stop)` | BGM 播放（key 在花括号负载；`bgm(stop)` keyword 停止） |
-| `sound` | `cmd_sound` (nb_commands.c) | `sound(){<key>}` | SE 播放（key 在花括号负载） |
-| `voice` | `cmd_voice` (nb_commands.c) | `voice(){<key>}` | 语音播放（key 在花括号负载） |
+| `cgvmenu` | `cmd_cgvmenu` (nb_cggallery.c:206) | — | 打开 CG 画廊（由 cgview.nb 调用）：网格浏览 + 锁定占位 + 翻页 + 全屏预览 + 解锁位图缓存（R22）；ESC/Back 回主菜单；0.2.079 自 nb_mainmenu.c 拆出，0.2.092 起 menu_layer 渲染 |
+| `host` | `cmd_host` (nb_commands.c) | `host <text>` | 系统旁白（无角色名） |
+| `loadscene` | `cmd_loadscene` (nb_saveload.c:400) | — | 打开读档选单（由 loadscene.nb 调用），经 `save_load_menu(is_load=1, from_mainmenu=0)` 进入两阶段渲染菜单 |
+| `fei` / `ira` / `neon` | `cmd_dialogue` (nb_commands.c) | `<name>{<text>}` 或 `<name>(<text>)` | 角色台词（自动带角色名） |
+| `bgm` | `cmd_bgm` (nb_audio.c:17) | `bgm(){<key>}` / `bgm(stop)` | BGM 播放（key 在花括号负载；`bgm(stop)` keyword 停止） |
+| `sound` | `cmd_sound` (nb_audio.c:32) | `sound(){<key>}` | SE 播放（key 在花括号负载） |
+| `voice` | `cmd_voice` (nb_audio.c:43) | `voice(){<key>}` | 语音播放（key 在花括号负载） |
 | `playanima` | `cmd_playanima` (nb_anim.c) | `playanima{name}` / `playanima(once\|loop[,sec]){name}` | 播放 .ANI 动画；省略修饰=once；sec 为总时长秒数（覆盖容器 tick 表），loop 时到期重置 | 
 | `waitanima` | `cmd_waitanima` (nb_anim.c) | `waitanima{}` | 暂停剧本推进直至动画播完 |
 | `stopanima` | `cmd_stopanima` (nb_anim.c) | `stopanima{}` | 立即停止当前动画并唤醒剧本 |
-| `delay` | `cmd_delay` (nb_commands.c) | `delay(seconds)` | 暂停剧本推进指定秒数（60Hz 帧计数，最长60秒） |
+| `delay` | `cmd_delay` (nb_commands.c:353) | `delay(seconds)` | 暂停剧本推进指定秒数（60Hz 帧计数，最长60秒） |
 
 ### 命令格式
 
@@ -104,7 +105,7 @@ Bank 索引   = addr / 32768
 MAG       → core/lib/mag.c/h            MAKI02 图像，透明色=15
 FONT.DAT  → core/lib/font.c/h           8×16 ASCII 字形
 BLACK.DAT → core/lib/font.c/h           黑花体 16×16 ASCII 字形（FONT.DAT 版式，备选表 font_load_alt）
-CJK.DAT   → core/lib/cjk.c/h            16×16 CJK 字形
+CJK_<lang>.DAT → core/lib/cjk.c/h       16×16 CJK 字形，**10 个按语言字库**（lang = 运行时码 eng/jpn/chi/cht/kor/fre/ger/ita/spa/por，大写文件名）；构建时按项目语料现场生成（见 §3.0），无全量 CJK.DAT 产物
 IMAGE.DAT → core/engine/image.c/h       图片归档（pack_images.py 打包；image_raw_blob 供 ANI 直读）
 .ANI      → tools/naiz_lib/anim_container.py  动画容器 v1（制作+播放侧已落地，devdoc 77/78/80）
 .nb       → core/engine/nb.c/h          纯文本脚本（直接加载执行）
@@ -119,6 +120,26 @@ assets + .nb → naiz_build/build_game.py → games/<game>/
 games/<game>/ → naiz_img/inject.py → disks/<game>.hdi
 animation/projects/<项目名>/scripts/<名>.na + animation/projects/<项目名>/db/<项目名>.db → anima.sh build <项目>/<脚本>（naiz_build/anim_import.py）→ animation/output/<NAME>.ANI
 ```
+
+### 3.0 CJK 字库生成管线（按语言语料精简）
+
+引擎装载顺序为 `CJK_<lang>.DAT → CJK_EN.DAT → CJK.DAT`（`cjk.c:105-118`）。构建产物**不再包含全量 CJK.DAT**，而是按 10 个运行时语言码各生成一个 `CJK_<lang>.DAT`（`deploy_cjk_fonts()`），每次构建都固定齐集 —— 回退链永不触发。
+
+```
+projects/<game>/scene/*.nb  ──┐  语料（多字节码位 ≥0x80）
+projects/<game>/i18n/*_<lang>.txt ──┤   值列（'=' 右侧，跳 # 注释/# ORPHANED:/空值）
+语言族基座区块 ───────────────────┘   CJK 族 U+3000–303F 全块 / 拉丁族 U+00A0–00FF 全块
+        │  collect_cps() + merge_ranges()（升序合并，引擎二分前提）
+        ▼
+tools/naiz_font/unifont-17.0.05.hex（P1）→  glyphs 优先取源；缺源零填 + 逐码位 WARN
+tools/naiz_font/CJK.DAT（P2 CJKF 图集，保留作字源）
+        ▼   generate_cjk_file()  CJKF v1 格式，首区间 glyph_offset = 头大小（引擎硬校验）
+games/<game>/CJK_<lang>.DAT（10 个；ASCII 归 FONT.DAT，不入 CJK 字库）
+```
+
+- 生成工具：`python -m tools.naiz_font.gen_cjk_font`（`--collect-dir <项目> --collect-lang <码> --atlas ... -o ...` 按语料收集；`--lang`/`--all-langs` 按预设全集；`--range` 旧用法向后兼容；`--list-ranges` 查看预设）
+- 引擎上限 `MAX_CJK_RANGES` 2048（`cjk.c`），0 区间空字库合法（`cjk_range_count=0`，查字形恒 NULL）
+- **运维约定**：改台词/译文后须重建（`./makegame.sh build <game>`），构建期缺字形以 WARN 暴露；未重建则 i18n 新字符无字形（运行期空白，不崩溃）
 
 ### 3.1 .ANI 容器 v1（制作侧）
 

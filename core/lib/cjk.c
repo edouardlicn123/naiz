@@ -20,8 +20,9 @@
 #include "naiz_file.h"
 #include "endian.h"
 
-/* Maximum number of CJK Unicode ranges. */
-#define MAX_CJK_RANGES 128
+/* Maximum number of CJK Unicode ranges.  Raised to 2048 for the corpus-driven
+ * per-language fonts: Hangul run packing alone can reach a few hundred ranges. */
+#define MAX_CJK_RANGES 2048
 /* Maximum safe offset value for range bounds check. */
 #define CJK_OFFSET_MAX 0xFFFFFFFFUL
 

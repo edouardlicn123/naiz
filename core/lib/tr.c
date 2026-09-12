@@ -12,9 +12,11 @@
  */
 #include "tr.h"
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 
-#define TR_MAX_ENTRIES 1024  /* 最大翻译条目数 */
+#define TR_MAX_ENTRIES 1024  /* hard cap; load_file stops at this (as before) */
+#define TR_INIT_CAP     64   /* first block 64 x 384 B = 24 KB; realloc x2 when full */
 #define TR_KEY_LEN     128   /* 键最大长度（含 NUL） */
 #define TR_VAL_LEN     256   /* 值最大长度（含 NUL） */
 
@@ -24,10 +26,27 @@ typedef struct {
     char val[TR_VAL_LEN];  /* Translated text (lookup value) */
 } TrEntry;
 
-/* Statically allocated translation table. */
-static TrEntry tr_table[TR_MAX_ENTRIES];
+/* Heap-allocated translation table, grown on demand (no static 384 KB block). */
+static TrEntry *tr_table;
 /* Number of loaded translation entries. */
 static int tr_count;
+/* Allocated capacity of tr_table (0 = nothing allocated yet). */
+static int tr_cap;
+
+/* Grow tr_table capacity (doubling from TR_INIT_CAP, capped at TR_MAX_ENTRIES).
+ * @return 0 on success, -1 on allocation failure (existing entries preserved) */
+static int tr_grow(void)
+{
+    int new_cap = tr_cap ? tr_cap * 2 : TR_INIT_CAP;
+    TrEntry *p;
+    if (new_cap > TR_MAX_ENTRIES) new_cap = TR_MAX_ENTRIES;
+    if (new_cap <= tr_cap) return 0;
+    p = (TrEntry *)realloc(tr_table, (size_t)new_cap * sizeof(TrEntry));
+    if (!p) return -1;
+    tr_table = p;
+    tr_cap = new_cap;
+    return 0;
+}
 
 /* Load a translation file, parsing key=value lines (skips empty lines and # comments).
  * @param path  Path to translation file; silently skips if file does not exist */
@@ -58,6 +77,7 @@ static void load_file(const char *path)
         if (!eq) continue;
 
         if (tr_count >= TR_MAX_ENTRIES) break;
+        if (tr_count >= tr_cap && tr_grow() != 0) break;  /* OOM: stop loading */
 
         /* key = everything before first '='. */
         klen = (int)(eq - line);
@@ -84,7 +104,12 @@ int tr_init(const char *lang)
 {
     char path[TR_PATH_BUF_SIZE];
 
+    /* Release any previously allocated table before rebuilding (language
+     * switch reloads the whole table; old entries must not leak or dangle). */
+    free(tr_table);
+    tr_table = NULL;
     tr_count = 0;
+    tr_cap = 0;
 
     if (!lang) return -1;
 
