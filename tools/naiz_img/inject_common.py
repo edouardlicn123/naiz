@@ -212,9 +212,16 @@ def inject_into_hdi(hdi_path, game_name, game_dir,
         for j, key, _attr in NAIZFatFS.iter_dir_entries(dir_data):
             existing_sub[key] = j
 
-        # Original scan left dir_end at the end of the cluster-chain data
-        # (len is a multiple of 32, so the scan always consumes the whole buffer).
+        # Start appending new entries at the first free (0x00/0xE5) slot.
+        # Using len(dir_data) would place the entry after the whole cluster
+        # buffer; for a fresh directory that is the start of the second
+        # cluster, preceded by a 0x00 terminator in the first cluster, which
+        # makes FAT directory scans stop early and hide the injected files.
         dir_end = len(dir_data)
+        for _k in range(0, len(dir_data), 32):
+            if dir_data[_k] == 0 or dir_data[_k] == 0xE5:
+                dir_end = _k
+                break
 
         sub_files = [f for f in sorted(os.listdir(dpath)) if os.path.isfile(os.path.join(dpath, f))]
         print(f"  Injecting {len(sub_files)} file(s) into {dir_name}/:")
