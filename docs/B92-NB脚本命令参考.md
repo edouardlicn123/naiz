@@ -140,6 +140,7 @@ games/<game>/CJK_<lang>.DAT（10 个；ASCII 归 FONT.DAT，不入 CJK 字库）
 - 生成工具：`python -m tools.naiz_font.gen_cjk_font`（`--collect-dir <项目> --collect-lang <码> --atlas ... -o ...` 按语料收集；`--lang`/`--all-langs` 按预设全集；`--range` 旧用法向后兼容；`--list-ranges` 查看预设）
 - 引擎上限 `MAX_CJK_RANGES` 2048（`cjk.c`），0 区间空字库合法（`cjk_range_count=0`，查字形恒 NULL）
 - **运维约定**：改台词/译文后须重建（`./makegame.sh build <game>`），构建期缺字形以 WARN 暴露；未重建则 i18n 新字符无字形（运行期空白，不崩溃）
+- **系统界面 key 约定**：`system_<lang>.txt` 除 mainmenu 提取的按钮键外，还包含引擎硬编码 UI 字符串（`Back`/`Yes`/`LOAD`/`CG GALLERY` 等，源在 `i18n_gen.py` `SYSTEM_UI_KEYS`）。新增引擎 UI 字面量须登记 `SYSTEM_UI_KEYS` + 补各目标语言译文，否则重生成被 `# ORPHANED` 失效（见 AGENTS.md「系统界面 i18n（强制翻译）」）；角色名/剧情原文跟随项目设定，翻译经 `role_`/`game_<lang>.txt` 提供
 
 ### 3.1 .ANI 容器 v1（制作侧）
 

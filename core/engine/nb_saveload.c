@@ -18,6 +18,7 @@
 #include "image.h"
 #include "mag.h"
 #include "save.h"
+#include "tr.h"
 
 /* Debug logging — shared macro in debug.h */
 #include "debug.h"
@@ -71,7 +72,7 @@ static void save_load_cache_build(int page)
                      si.slot_name, chapter, si.timestamp);
         } else {
             snprintf(slot_label_cache[i], sizeof(slot_label_cache[i]),
-                     "%s \xe2\x80\x94 (Empty)", si.slot_name);
+                     "Slot %d \xe2\x80\x94 (%s)", si_idx + 1, tr("Empty"));
         }
     }
     slot_cache_page = page;
@@ -108,10 +109,10 @@ static void save_load_draw(int is_load, int page, int slot_idx, int focus_on_bac
                 menu_layer_blit_sprite(m, bx, by, PAL_TRANSPARENT);
                 mag_release(m);
             } else {
-                draw_title_large(is_load ? "LOAD" : "SAVE", 282, 28, 4, PAL_WHITE);
+                draw_title_large(tr(is_load ? "LOAD" : "SAVE"), 282, 28, 4, PAL_WHITE);
             }
         } else {
-            draw_title_large(is_load ? "LOAD" : "SAVE", 282, 28, 4, PAL_WHITE);
+            draw_title_large(tr(is_load ? "LOAD" : "SAVE"), 282, 28, 4, PAL_WHITE);
         }
         for (i = 0; i < 4; i++) {
             int si_idx = page * 4 + i;
@@ -147,17 +148,17 @@ static void save_load_draw(int is_load, int page, int slot_idx, int focus_on_bac
     }
 
     /* Back button */
-    draw_text("Back", 0, 90, 359, 80, 382, 1,
+    draw_text(tr("Back"), 0, 90, 359, 80, 382, 1,
               focus_on_back ? MENU_PAL_YELLOW : PAL_WHITE);
 
     /* Confirm dialog */
     if (confirm) {
-        snprintf(buf, sizeof(buf), "%s to Slot %d?",
-                 is_load ? "Load" : "Save", page * 4 + slot_idx + 1);
+        snprintf(buf, sizeof(buf), tr(is_load ? "Load to Slot %d?" : "Save to Slot %d?"),
+                 page * 4 + slot_idx + 1);
         draw_text(buf, 0, 260, 314, 420, 330, 1, PAL_WHITE);
-        draw_text("Yes", 0, 266, 373, 310, 392, 0,
+        draw_text(tr("Yes"), 0, 266, 373, 310, 392, 0,
                   confirm_yes ? MENU_PAL_YELLOW : PAL_WHITE);
-        draw_text("No", 0, 346, 373, 390, 392, 0,
+        draw_text(tr("No"), 0, 346, 373, 390, 392, 0,
                   confirm_yes ? PAL_WHITE : MENU_PAL_YELLOW);
     }
 

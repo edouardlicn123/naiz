@@ -19,9 +19,24 @@ from naiz_build.project_config import ProjectConfig
 from naiz_lib.nb_line import parse_nb_line as naiz_parse_nb_line
 
 
+# Runtime language codes — must match engine (settings_menu LANG_CODES),
+# tr_init("i18n/system_<lang>.txt") and gen_cjk_font RUNTIME_LANGS.
 VALID_LANGS = {
-    'eng', 'chi', 'cht', 'jpn', 'kor', 'fra', 'deu', 'esp',
-    'ptp', 'ptb', 'ita', 'rus', 'pol',
+    'eng', 'jpn', 'chi', 'cht', 'kor',
+    'fre', 'ger', 'ita', 'spa', 'por',
+}
+
+# Hardcoded system-UI strings rendered through tr() by the engine (settings,
+# save/load menus, CG gallery).  Kept OUT of # ORPHANED on regeneration: these
+# live in C source, not in .nb, so they never appear in mainmenu-arg extraction.
+# Any new engine-side UI literal wrapped in tr() MUST be registered here too
+# (see AGENTS.md "系统界面 i18n（强制翻译）").
+SYSTEM_UI_KEYS = {
+    "Back", "Yes", "No", "[Yes]", "[No]",
+    "LOAD", "SAVE", "Empty",
+    "Load to Slot %d?", "Save to Slot %d?", "Overwrite Slot %d?",
+    "Naiz Settings", "Language", "Start Game",
+    "CG GALLERY", "No CGs available.",
 }
 
 
@@ -236,7 +251,7 @@ def generate(proj_dir, force=False):
 
         sys_path = i18n_dir / f'system_{lang}.txt'
         sys_entries, _ = load_existing_translations(sys_path)
-        sys_lines = merge_translations(sys_entries, menu_options)
+        sys_lines = merge_translations(sys_entries, menu_options | SYSTEM_UI_KEYS)
         with open(sys_path, 'w', encoding='utf-8') as f:
             f.write('\n'.join(sys_lines) + '\n' if sys_lines else '')
 

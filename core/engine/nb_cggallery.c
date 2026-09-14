@@ -23,6 +23,7 @@
 #include "ui.h"
 #include "debug.h"
 #include "nb_asset_table.h"
+#include "tr.h"
 
 /* Cell grid geometry */
 #define GAL_COLS        4
@@ -79,7 +80,7 @@ static void gallery_draw_cell(int abs_idx, int x, int y, int is_sel)
         draw_rect(x, y, GAL_CELL_W, GAL_CELL_H, 1, GAL_GRID_BORDER);
     } else {
         fill_rect(x, y, GAL_CELL_W, GAL_CELL_H, 0);
-        draw_text("[LOCKED]", 0, x + 30, y + 42, x + GAL_CELL_W - 30, y + 58, 0,
+        draw_text(tr("[LOCKED]"), 0, x + 30, y + 42, x + GAL_CELL_W - 30, y + 58, 0,
                   is_sel ? GAL_LOCK_FG_SEL : GAL_LOCK_FG_IDLE);
         draw_rect(x, y, GAL_CELL_W, GAL_CELL_H, 1,
                   is_sel ? GAL_LOCK_BORDER_SEL : GAL_LOCK_BORDER_IDLE);
@@ -101,7 +102,7 @@ static void gallery_draw_grid(int page, int sel, int focus_on_back)
 
     vblank_wait();
     fill_rect(0, 0, LAYER_SCREEN_W, LAYER_SCREEN_H, 0);
-    draw_title_large("CG GALLERY", 20, 12, 3, PAL_WHITE);
+    draw_title_large(tr("CG GALLERY"), 20, 12, 3, PAL_WHITE);
 
     for (i = 0; i < GAL_CELLS; i++) {
         int abs_idx = page_start + i;
@@ -112,7 +113,7 @@ static void gallery_draw_grid(int page, int sel, int focus_on_back)
     }
 
     draw_rounded_emboss(66, 356, 80, 30, 4, BTN_FILL_IDX, BTN_HIGHLIGHT_IDX, BTN_SHADOW_IDX);
-    draw_text("Back", 0, 76, 363, 136, 379, 1, focus_on_back ? MENU_PAL_YELLOW : PAL_WHITE);
+    draw_text(tr("Back"), 0, 76, 363, 136, 379, 1, focus_on_back ? MENU_PAL_YELLOW : PAL_WHITE);
 
     if (page > 0)              draw_text("<", 0, 56, 370, 72, 386, 0, PAL_WHITE);
     if (page < total_pages - 1) draw_text(">", 0, 576, 370, 592, 386, 0, PAL_WHITE);
@@ -133,7 +134,7 @@ static void gallery_draw_cells_range(int page, int from_sel, int to_sel, int foc
 
     if (!focus_on_back) {
         /* Back loses focus (was possibly highlighted): repaint white. */
-        draw_text("Back", 0, 76, 363, 136, 379, 1, PAL_WHITE);
+        draw_text(tr("Back"), 0, 76, 363, 136, 379, 1, PAL_WHITE);
 
         /* Old cell loses focus */
         gallery_cell_xy(from_sel, &x, &y);
@@ -152,7 +153,7 @@ static void gallery_draw_cells_range(int page, int from_sel, int to_sel, int foc
         abs_idx = page * GAL_CELLS + from_sel;
         if (abs_idx < CG_COUNT)
             gallery_draw_cell(abs_idx, x, y, 0);
-        draw_text("Back", 0, 76, 363, 136, 379, 1, MENU_PAL_YELLOW);
+        draw_text(tr("Back"), 0, 76, 363, 136, 379, 1, MENU_PAL_YELLOW);
     }
 
     menu_layer_commit();
@@ -212,7 +213,7 @@ void cmd_cgvmenu(int argc, const char **argv, const char *cmd_name)
         NB_DEBUG("cgvmenu: CG_COUNT=0, empty gallery\r\n");
         hal_kbd_drain_advance();
         hal_mouse_erase_cursor();
-        draw_text("No CGs available.", 0, 200, 190, 440, 210, 1, PAL_WHITE);
+        draw_text(tr("No CGs available."), 0, 200, 190, 440, 210, 1, PAL_WHITE);
         hal_mouse_draw_cursor_force();
         for (;;) {
             hal_kbd_update();

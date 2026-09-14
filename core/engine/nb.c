@@ -228,12 +228,19 @@ void nb_get_state(char *filename, int fn_size,
 }
 
 /* Restore the runtime language from a saved snapshot.  Reloads the
- * translation table so the language switch takes effect immediately. */
+ * translation table so the language switch takes effect immediately.
+ * Mirrors the nb_init fallback: a language with no translation files at all
+ * degrades its lookup table to 'eng' (tr() falls back to source text either
+ * way). */
 void nb_set_lang(const char *lang)
 {
     strncpy(nb.lang, lang, sizeof(nb.lang) - 1);
     nb.lang[sizeof(nb.lang) - 1] = '\0';
     tr_init(nb.lang);
+    if (tr_get_count() == 0 && strcmp(nb.lang, "eng") != 0) {
+        NB_DEBUG("WARN: no translations for lang='%s', falling back to 'eng'\r\n", nb.lang);
+        tr_init("eng");
+    }
 }
 
 /*

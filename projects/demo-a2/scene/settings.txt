@@ -37,15 +37,17 @@ btnstyle=2
 
 ; --- 语言 ---
 ; lang: 界面语言
-;   由翻译系统 tr_init() 加载对应 .po 文件
-;   引擎本身预设 eng/chi 两组字符串
+;   由翻译系统 tr_init() 加载 i18n/{system,role,game}_<lang>.txt
+;   系统界面文字（system_*.txt）必须以英文为基准并附各目标语言译文；
+;   角色名/剧情原文跟随项目设定，其翻译经 role_/game_*.txt 提供
 ;
-;   可选值：eng | chi
+;   可选值：eng | jpn | chi | cht | kor | fre | ger | ita | spa | por
 ;
-;   eng — English 界面
-;   chi — 中文界面
+;   eng — English（默认，英文即基准文案）
+;   jpn — 日本語     chi — 简体中文  cht — 繁體中文  kor — 한국어
+;   fre — Français   ger — Deutsch   ita — Italiano  spa — Español  por — Português
 ;
-;   如需新增语言，需在 tools/po/ 下添加对应 .po 文件
+;   空值/缺文件的译文回退英文
 lang=eng
 
 

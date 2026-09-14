@@ -14,6 +14,7 @@
 #include "nb_saveload.h"
 #include "nb_dialog.h"
 #include "save.h"
+#include "tr.h"
 
 /* Save dialog menu: in-place UI within dialog area. */
 static void save_dlg_draw_slots(int row, int col);
@@ -62,7 +63,7 @@ void save_dialog_menu(void)
     {
         int content_x = LAYER_DIALOG_X + LAYER_DIALOG_INDENT;
         int content_w = LAYER_DIALOG_W - LAYER_DIALOG_INDENT - LAYER_DIALOG_RIGHT_INDENT;
-        draw_text("SAVE", 0, content_x, LAYER_DIALOG_Y + LAYER_DIALOG_HEADER_Y,
+        draw_text(tr("SAVE"), 0, content_x, LAYER_DIALOG_Y + LAYER_DIALOG_HEADER_Y,
                   content_x + content_w, LAYER_DIALOG_Y + LAYER_DIALOG_HEADER_Y + 20,
                   0, PAL_WHITE);
     }
@@ -219,7 +220,7 @@ static void save_dlg_draw_slots(int row, int col)
     {
         int by = content_y + 40;
         uint8_t clr = (row == 2) ? MENU_PAL_YELLOW : PAL_WHITE;
-        draw_text("Back", 0, content_x + 200, by, content_x + 256, by + 20, 0, clr);
+        draw_text(tr("Back"), 0, content_x + 200, by, content_x + 256, by + 20, 0, clr);
     }
 }
 
@@ -234,11 +235,11 @@ static void save_dlg_draw_confirm(int slot, int yes)
 
     hal_mouse_erase_cursor();
     layer_dialog_restore();
-    draw_text("SAVE", 0, content_x, LAYER_DIALOG_Y + LAYER_DIALOG_HEADER_Y,
+    draw_text(tr("SAVE"), 0, content_x, LAYER_DIALOG_Y + LAYER_DIALOG_HEADER_Y,
               content_x + content_w, LAYER_DIALOG_Y + LAYER_DIALOG_HEADER_Y + 20,
               0, PAL_WHITE);
 
-    snprintf(buf, sizeof(buf), "Overwrite Slot %d?", slot + 1);
+    snprintf(buf, sizeof(buf), tr("Overwrite Slot %d?"), slot + 1);
     draw_text(buf, 0, content_x + 4, content_y, content_x + content_w, content_y + 20, 0, PAL_WHITE);
 
     slot_info(slot, &si);
@@ -251,8 +252,8 @@ static void save_dlg_draw_confirm(int slot, int yes)
     }
 
     /* Yes / No */
-    draw_text("[Yes]", 0, content_x + 80, content_y + 60,
+    draw_text(tr("[Yes]"), 0, content_x + 80, content_y + 60,
               content_x + 140, content_y + 80, 0, yes ? MENU_PAL_YELLOW : PAL_WHITE);
-    draw_text("[No]", 0, content_x + 200, content_y + 60,
+    draw_text(tr("[No]"), 0, content_x + 200, content_y + 60,
               content_x + 260, content_y + 80, 0, yes ? PAL_WHITE : MENU_PAL_YELLOW);
 }

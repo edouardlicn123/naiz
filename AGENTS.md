@@ -188,6 +188,14 @@ naiz_midi / naiz_music 已作为独立项目移出到 `~/`。详见 `docs/B91-�
 4. 反例：循环内 `draw_rounded_emboss()` / `fill_rect(0,0,640,400,0)` / `slot_info()` 全量刷新
 5. 参考：`nb_menu.c: menu_show()`、`nb.c: save_load_menu()`
 
+### 系统界面 i18n（强制翻译）
+1. 系统界面文字（按钮/标题/确认框/画廊/存档界面等**硬编码字符串**）一律以**英文为基准文案**，并必须经 `tr()` 渲染
+2. 禁止硬编码英文直绘（`draw_text` / `draw_text_outlined` / `draw_title_large`）；例外仅限纯数字/格式串（`%d/%d`、`<` `>`、`CG %02d`）、语言自名、版本号
+3. 新增 UI 字符串必须同步登记 `tools/naiz_conv/i18n_gen.py` 的 `SYSTEM_UI_KEYS`，否则 `i18n_gen` 重生成时被标 `# ORPHANED` 使译文失效
+4. 必须为 `config.toml` `i18n.targets` 各语言在 `system_<lang>.txt` 提供对应译文；空值视为未完成（运行时回退英文）
+5. 含 `%d` 等格式串整句翻译（译文保留 `%d`），经 `snprintf(buf, tr(fmt), n)` 展开
+6. 角色名与剧情文案的**原文基准遵循项目设定**（脚本原文 / `char_map` 规范名 / `source_lang`），其翻译照常经 `role_<lang>.txt` / `game_<lang>.txt` 提供——本节强制范围仅限**系统界面文字**（`system_<lang>.txt`）
+
 ### 对话框文字清除
 - 标准方法：`layer_dialog_restore()`，禁止 `fill_rect` / `fill_rect_pattern` / `scene_draw_dialog()`
 - 原理：快照 `dialog_snapshot[]` 按 `g_dialog_style` 恢复，无 ghost 残留

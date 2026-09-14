@@ -35,6 +35,7 @@
 #include "hal.h"
 #include "debug.h"
 #include "image.h"
+#include "tr.h"
 
 /* Language list: display names and lang codes */
 static const char *LANG_NAMES[] = {
@@ -139,7 +140,7 @@ static void settings_menu_draw(int lang_idx, int focus, int full)
 
     if (full == 1) {
         /* Title: 1x, top-left */
-        draw_text_outlined("Naiz Settings", 0, 20, 10, 1, PAL_WHITE);
+        draw_text_outlined(tr("Naiz Settings"), 0, 20, 10, 1, PAL_WHITE);
         /* Version: 1x, top-right */
         {
             const char *ver = settings_get_version();
@@ -147,11 +148,11 @@ static void settings_menu_draw(int lang_idx, int focus, int full)
                 draw_text_outlined(ver, 0, 580, 10, 0, PAL_WHITE);
         }
         /* Static menu text (does NOT overlap the dynamic erase areas) */
-        draw_text_outlined("Language", 0, MENU_X, SEL_Y, 0, PAL_WHITE);
+        draw_text_outlined(tr("Language"), 0, MENU_X, SEL_Y, 0, PAL_WHITE);
         draw_text_outlined("<", 0, SEL_LX + 10, SEL_Y, 0, PAL_WHITE);
         draw_text_outlined(">", 0,
                            LABEL_X + LABEL_AREA_W + GAP + 10, SEL_Y, 0, PAL_WHITE);
-        draw_text_outlined("Start Game", 0, START_X, START_BY, 0, PAL_WHITE);
+        draw_text_outlined(tr("Start Game"), 0, START_X, START_BY, 0, PAL_WHITE);
 
         /* Dynamic content (language name + focus indicator) */
         tw = text_width(LANG_NAMES[lang_idx], 0);

@@ -1,7 +1,7 @@
 {
   "version": 2,
-  "git_head": "63f05ac",
-  "checked_at": "2026-09-14T08:53:15",
+  "git_head": "e5ec9b5",
+  "checked_at": "2026-09-14T15:23:09",
   "files": {
     "core/build.sh": {
       "sha256": "0e6bb3f41cae8f6c5a014a49767f93990ddd3e2c461a85ec991c01b40b66b11e",
@@ -168,7 +168,7 @@
       "findings": []
     },
     "core/engine/nb.c": {
-      "sha256": "efd0567564a394de5ce6f06b73a37695ab1c0739ba942caa75cff863050df676",
+      "sha256": "f789260f93071bbf7fc4a46358314ea942c8c40fd3802a7fe959aaa5d500947d",
       "violations": 0,
       "candidates": 0,
       "findings": []
@@ -216,7 +216,7 @@
       "findings": []
     },
     "core/engine/nb_cggallery.c": {
-      "sha256": "c855895a05e8beeae9b097bb9cf5e73ddd50fb1062651637b7e8bfc34f2c030d",
+      "sha256": "643e73027f72ab1fad8a6dc83e54e8502ed71da1daa94b7d8fcab8a501e7a640",
       "violations": 0,
       "candidates": 0,
       "findings": []
@@ -293,13 +293,13 @@
       "findings": []
     },
     "core/engine/nb_save_dialog.c": {
-      "sha256": "51aa265b0c5418abeaec560356357be0ca1f41ab7b059757a80876da577aeafe",
+      "sha256": "770f223ef3d916eef5eb53955db326ec9268599539ad96b27015b52853043f4f",
       "violations": 0,
       "candidates": 0,
       "findings": []
     },
     "core/engine/nb_saveload.c": {
-      "sha256": "5739be544322bc5fd619a0a2e2021d8ab81529f3cf6d2af6af637a649f5aa02e",
+      "sha256": "010fcfd102df29f6b8a4562b5ef004ef03b28d8bfb89ac1eab83744653bb36d7",
       "violations": 0,
       "candidates": 0,
       "findings": []
@@ -431,7 +431,7 @@
       "findings": []
     },
     "core/engine/settings_menu.c": {
-      "sha256": "84fc07020679f76242847b52db36094e0117de20b779db756eba91e9fea8c390",
+      "sha256": "0fc243316030dd0358c0c54e5ce2a8f140d5ba75a756ce04f19ecbc2591902ed",
       "violations": 0,
       "candidates": 0,
       "findings": []
@@ -916,7 +916,7 @@
       "findings": []
     },
     "tools/naiz_conv/i18n_gen.py": {
-      "sha256": "8a955988d362ab5fc3bcfa214ae0c717628f3f0035d44c44cba6be80e9756885",
+      "sha256": "2f5da01fe9001f208acd9982942ceb9933dddff940f5aa3dec3157c56a3bb9e0",
       "violations": 0,
       "candidates": 0,
       "findings": []
@@ -1194,8 +1194,8 @@
   },
   "summary": {
     "files": 169,
-    "changed": 0,
-    "skipped": 169,
+    "changed": 1,
+    "skipped": 168,
     "out_of_scope": 0,
     "violations": 0,
     "candidates": 30,
