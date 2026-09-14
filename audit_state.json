@@ -1,7 +1,7 @@
 {
   "version": 2,
-  "git_head": "bdb0b32",
-  "checked_at": "2026-09-12T17:53:50",
+  "git_head": "63f05ac",
+  "checked_at": "2026-09-14T08:53:15",
   "files": {
     "core/build.sh": {
       "sha256": "0e6bb3f41cae8f6c5a014a49767f93990ddd3e2c461a85ec991c01b40b66b11e",
@@ -1048,7 +1048,7 @@
       "findings": []
     },
     "tools/naiz_img/inject_common.py": {
-      "sha256": "47caf946efd024570a9731d59742706f07ae5997c69c61fbd26531d131213013",
+      "sha256": "430dbd7a027e1d81a64b174f7811cb314c46f99d5b26533b999925cf7f533377",
       "violations": 0,
       "candidates": 0,
       "findings": []
@@ -1194,15 +1194,15 @@
   },
   "summary": {
     "files": 169,
-    "changed": 5,
-    "skipped": 164,
+    "changed": 0,
+    "skipped": 169,
     "out_of_scope": 0,
     "violations": 0,
     "candidates": 30,
     "fresh_violations": 0,
-    "fresh_candidates": 2,
-    "verified": 20,
-    "stale": 1,
-    "open": 9
+    "fresh_candidates": 0,
+    "verified": 30,
+    "stale": 0,
+    "open": 0
   }
 }

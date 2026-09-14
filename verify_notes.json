@@ -42,6 +42,13 @@
       "sha256": "6035be9cfafedea13b157375f407a9ac61baf25ec72386e6f2da8841db662f83",
       "line": "    switch (z_order) {"
     },
+    "core/engine/layer_debug.c:33": {
+      "verdict": "ok",
+      "text": "fwrite diagnostic PPM export; short write only degrades debug snapshot, fclose still runs, no game-state impact (same as :35)",
+      "date": "2026-09-14T08:50:44",
+      "sha256": "36fb49daab2744b55961f25602464362b044e1dbd746eafabe28c64bda82b8f2",
+      "line": "    fwrite(rgb, 1, len, f);"
+    },
     "core/engine/layer_debug.c:35": {
       "verdict": "ok",
       "text": "diagnostic PPM export; short write only degrades debug snapshot, fclose still runs, no game-state impact",
@@ -56,11 +63,46 @@
       "sha256": "47bfc1eced6a86a850c3dd696144ad387976790fd6901d5a0ab22b9b15dff59b",
       "line": "        dialog_snapshot = (unsigned char *)malloc(LAYER_DIALOG_W * LAYER_DIALOG_H);"
     },
+    "core/engine/layer_dialog.c:177": {
+      "verdict": "ok",
+      "text": "memcpy dialog_occluder<-under_dialog, both layer_snapshot_alloc_dialog LAYER_DIALOG_W*LAYER_DIALOG_H same size",
+      "date": "2026-09-14T08:50:44",
+      "sha256": "4e851ae3d82fb9e244b5cb03f499d127022bd877b9c18842b4a5a9efcb594595",
+      "line": "        memcpy(dialog_occluder, under, LAYER_DIALOG_W * LAYER_DIALOG_H);"
+    },
+    "core/engine/layer_dialog.c:189": {
+      "verdict": "ok",
+      "text": "memcpy dialog_layer<-dialog_occluder, both 480x115 same-size buffers",
+      "date": "2026-09-14T08:50:44",
+      "sha256": "4e851ae3d82fb9e244b5cb03f499d127022bd877b9c18842b4a5a9efcb594595",
+      "line": "        memcpy(dialog_layer, dialog_occluder, LAYER_DIALOG_W * LAYER_DIALOG_H);"
+    },
+    "core/engine/layer_dialog.c:195": {
+      "verdict": "ok",
+      "text": "memcpy dialog_layer<-under, both 480x115 same-size buffers",
+      "date": "2026-09-14T08:50:44",
+      "sha256": "4e851ae3d82fb9e244b5cb03f499d127022bd877b9c18842b4a5a9efcb594595",
+      "line": "            memcpy(dialog_layer, under, LAYER_DIALOG_W * LAYER_DIALOG_H);"
+    },
     "core/engine/layer_dialog.c:43": {
       "verdict": "ok",
       "text": "malloc guarded by truthy check at :45 before deref;",
       "date": "2026-08-18T12:02:38",
       "sha256": "a36e6569b8ee56818d0e4c3c9858c84f4c91a32ff41e6ef53519d76770c77f03"
+    },
+    "core/engine/menu_layer.c:82": {
+      "verdict": "ok",
+      "text": "memcpy comp<-base, both malloc(area) same size",
+      "date": "2026-09-14T08:50:44",
+      "sha256": "52ae365bc62e0144c76bbb292119f3003e80d2c3e1ab78cb7c07c4b3f365b279",
+      "line": "        memcpy(comp, base, (size_t)area);"
+    },
+    "core/engine/nb_anim.c:442": {
+      "verdict": "ok",
+      "text": "decode_buf malloc guarded by if(a->decode_buf) at :443; OOM falls back to per-frame alloc with hal_log :447 (same as :477)",
+      "date": "2026-09-14T08:50:44",
+      "sha256": "d3985ab4269895a543a88b825d19065f2a871166a12671666ac5a1f5a1b07d4d",
+      "line": "        a->decode_buf = (uint8_t *)malloc(pool);"
     },
     "core/engine/nb_anim.c:477": {
       "verdict": "ok",
@@ -102,6 +144,13 @@
       "date": "2026-08-18T13:12:57",
       "sha256": "1c24886cfae9bf085a3df85c36694080be538481f5cb7a59342864588d9d3be7"
     },
+    "core/engine/nb_commands.c:345": {
+      "verdict": "ok",
+      "text": "INT_MIN-guard form identical to :320/:347 R8 fix",
+      "date": "2026-09-14T08:50:44",
+      "sha256": "fef88df83d5614266b2e4838d284835a93455823bea2ab1a6c90360634694a76",
+      "line": "        int d = (val == INT_MIN) ? INT_MIN : -val;"
+    },
     "core/engine/nb_commands.c:347": {
       "verdict": "ok",
       "text": "(\\-val) INT_MIN-guarded identical to nb_commands.c:320 R8 fix; nb_var_add clamps via 64-bit",
@@ -114,6 +163,13 @@
       "text": "memcpy into tr_table governed by table_len bounds check above",
       "date": "2026-08-18T13:12:57",
       "sha256": "8ec268384478a31a403ff39c1818fa7558c7317c5a4545f9d0e57371ce6c9121"
+    },
+    "core/lib/tr.c:85": {
+      "verdict": "ok",
+      "text": "memcpy key[128]; klen clamped to TR_KEY_LEN-1 at :84, source within line buffer; :91 val same clamp",
+      "date": "2026-09-14T08:50:44",
+      "sha256": "f6434276ad2df7a2984c912f1340af957f3bddc321abcf12d5ba9c736584c976",
+      "line": "        memcpy(tr_table[tr_count].key, line, klen);"
     },
     "makegame.sh:143": {
       "verdict": "ok",
@@ -129,9 +185,10 @@
     },
     "tools/diag/np2kai_serial.py:37": {
       "verdict": "ok",
-      "text": "lazy import of gen_com serialwrite generator",
-      "date": "2026-08-18T13:17:03",
-      "sha256": "eb55a8bf9eac69254c1b1a4a01aa8cbac8a1696d81d37a17a948378058e8c44c"
+      "text": "lazy import of gen_com serialwrite generator (re-verified, v2 line snapshot)",
+      "date": "2026-09-14T08:53:12",
+      "sha256": "f113ef6d3ea16675ae1a6c0016cd303efcff881ca477bf3aef60ff6d136fbc6f",
+      "line": "    from tools.diag.gen_com import make_serialwrite"
     },
     "tools/env_setup/env_test.py:250": {
       "verdict": "ok",
@@ -171,6 +228,13 @@
       "text": "lazy naiz_conv import avoids startup cost",
       "date": "2026-08-18T13:17:03",
       "sha256": "5e057942a14a84d1397bdedcd82e28d3e1c726875fdc354ec28a18f3df1392cf"
+    },
+    "tools/naiz_build/build_game.py:99": {
+      "verdict": "ok",
+      "text": "lazy naiz_conv.mag_convert import in convert_png_to_mag defers PIL converter chain (same as :95)",
+      "date": "2026-09-14T08:50:44",
+      "sha256": "aa5c88de2f95bb9928a96dee81c41f8299683216dbb2ef0a8d2e00d18b0491ce",
+      "line": "    from naiz_conv.mag_convert import convert_file"
     },
     "tools/naiz_build/mp4_to_ani.py:122": {
       "verdict": "ok",
