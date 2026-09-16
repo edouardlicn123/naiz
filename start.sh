@@ -95,12 +95,12 @@ run_fullaudit() {
     done
     if [ "$sn" -ne 0 ]; then overall=1; else echo "[✓] bash -n 通过" | tee -a "$out"; fi
 
-    echo "--- [5/6] symbol_audit (A 节: 未用 static/导出) ---" | tee -a "$out"
-    if ! "$VENV_PYTHON" -m tools.diag.symbol_audit -s A >> "$out" 2>&1; then
-        echo "[✗] symbol_audit 失败" | tee -a "$out"
+    echo "--- [5/6] symbol_audit (A/B 节: 未用 static/死导出, --gate) ---" | tee -a "$out"
+    if ! "$VENV_PYTHON" -m tools.diag.symbol_audit -s A,B --gate >> "$out" 2>&1; then
+        echo "[✗] symbol_audit 失败 (A/B 节非空)" | tee -a "$out"
         overall=1
     else
-        echo "[✓] symbol_audit 通过" | tee -a "$out"
+        echo "[✓] symbol_audit 通过 (A/B 节为空)" | tee -a "$out"
     fi
 
     if [ "$do_make" -eq 1 ]; then

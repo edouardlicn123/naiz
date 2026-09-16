@@ -83,10 +83,5 @@ void menu_layer_blit_sprite(const MagImage *img, int x, int y, uint8_t transpare
  * (opaque mode only; transparent mode never restores — the caller rebuilds
  * the screen).  Frees both buffers, resets targets, idempotent. */
 void menu_layer_close(int restore);
-/* Non-zero while a layer is open. */
-int  menu_layer_is_open(void);
-/* Current composite pixels (w*h bytes, row stride = region width) for
- * diagnostics/tests.  NULL when not open. */
-const uint8_t *menu_layer_pixels(void);
 
 #endif

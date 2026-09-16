@@ -16,13 +16,13 @@
 #include "save.h"
 #include "nb.h"
 #include "debug.h"
-#include "cjk.h"
 #include "settings.h"
 #include "tr.h"
 #include "image.h"
 #include "scene_layers.h"
 #include "ui.h"
 #include "nb_asset_table.h"
+#include "strutil.h"
 
 void cmd_mainmenu(int argc, const char **argv, const char *cmd_name)
 {
@@ -57,8 +57,7 @@ void cmd_mainmenu(int argc, const char **argv, const char *cmd_name)
             slot_info(slot, &si);
             if (si.exists && strcmp(si.timestamp, best_ts) > 0) {
                 best_slot = slot;
-                strncpy(best_ts, si.timestamp, sizeof(best_ts) - 1);
-                best_ts[sizeof(best_ts) - 1] = '\0';
+                str_copy(best_ts, sizeof(best_ts), si.timestamp);
             }
         }
         if (best_slot >= 0)
@@ -67,7 +66,7 @@ void cmd_mainmenu(int argc, const char **argv, const char *cmd_name)
             { nb_var_init(); nb_load("nbook001.nb"); }
     } else if (strcmp(argv[sel + 4], "load") == 0) {
         save_game_temp();
-        nb_load("loadscene.nb");
+        nb_load("loadscen.nb");
     } else if (strcmp(argv[sel + 4], "start") == 0) {
         nb_var_init();
         nb_load("nbook001.nb");
@@ -96,9 +95,9 @@ void cmd_startsetting(int argc, const char **argv, const char *cmd_name)
     settings_save();
 
     if (strcmp(old_lang, settings_get_lang()) != 0) {
-        cjk_load_for_lang(settings_get_lang());
+        /* nb_set_lang applies the full language-driven state (translation
+         * table, CJK glyph font, blackletter style). */
         nb_set_lang(settings_get_lang());
-        text_set_blackletter(settings_get_blackletter_dialog() && !nb_lang_is_cjk());
     }
 }
 

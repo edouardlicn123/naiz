@@ -10,6 +10,7 @@
 #include "scene_layers.h"
 #include "layer_internal.h"
 #include "hal.h"
+#include "strutil.h"
 
 /* Dialog composite buffer (480 x LAYER_DIALOG_H): box + current page text,
  * opaque.  The underneath pixels are seeded at open so dither holes stay
@@ -240,6 +241,15 @@ void layer_dialog_show(void)
     dialog_paint_box(dialog_layer, LAYER_DIALOG_W);
 }
 
+/* Publish a clean dialog box (no page text) as the current VRAM state.
+ * Re-paints the box and blits the composite once — menus/overlays use this
+ * as their backdrop instead of dialog_layer_blit() on a stale page. */
+void layer_dialog_clear(void)
+{
+    layer_dialog_show();
+    dialog_layer_blit();
+}
+
 /* Render one dialog page into the composite buffer: seed the underneath,
  * paint the box (erasing the previous page), then route the charname and
  * body text into the buffer via text_set_target.  Returns the body
@@ -247,7 +257,7 @@ void layer_dialog_show(void)
  * fully displayed; recompose ignores the return value.  Does not blit. */
 int layer_dialog_render_page(const char *name, const char *text, int off)
 {
-    int w = LAYER_DIALOG_W - LAYER_DIALOG_INDENT - LAYER_DIALOG_RIGHT_INDENT;
+    int w = LAYER_DIALOG_CONTENT_W;
     int next;
 
     if (!dialog_layer) {
@@ -255,11 +265,11 @@ int layer_dialog_render_page(const char *name, const char *text, int off)
          * VRAM (legacy), the box was already painted by layer_dialog_show. */
         if (name && name[0])
             draw_text(name, 0,
-                      LAYER_DIALOG_X + LAYER_DIALOG_INDENT, LAYER_DIALOG_Y + LAYER_DIALOG_HEADER_Y,
+                      LAYER_DIALOG_CONTENT_X, LAYER_DIALOG_Y + LAYER_DIALOG_HEADER_Y,
                       w, LAYER_DIALOG_BOTTOM, 1, PAL_WHITE);
         return draw_text(text ? text : "", off,
-                         LAYER_DIALOG_X + LAYER_DIALOG_INDENT, LAYER_DIALOG_Y + LAYER_DIALOG_TEXT_Y,
-                         w, LAYER_DIALOG_Y + LAYER_DIALOG_TEXT_Y + 60, 0, PAL_WHITE);
+                         LAYER_DIALOG_CONTENT_X, LAYER_DIALOG_CONTENT_Y,
+                         w, LAYER_DIALOG_CONTENT_Y + 60, 0, PAL_WHITE);
     }
     dialog_seed_base();
     dialog_paint_box(dialog_layer, LAYER_DIALOG_W);
@@ -267,11 +277,11 @@ int layer_dialog_render_page(const char *name, const char *text, int off)
                     LAYER_DIALOG_X, LAYER_DIALOG_Y);
     if (name && name[0])
         draw_text(name, 0,
-                  LAYER_DIALOG_X + LAYER_DIALOG_INDENT, LAYER_DIALOG_Y + LAYER_DIALOG_HEADER_Y,
+                  LAYER_DIALOG_CONTENT_X, LAYER_DIALOG_Y + LAYER_DIALOG_HEADER_Y,
                   w, LAYER_DIALOG_BOTTOM, 1, PAL_WHITE);
     next = draw_text(text ? text : "", off,
-                     LAYER_DIALOG_X + LAYER_DIALOG_INDENT, LAYER_DIALOG_Y + LAYER_DIALOG_TEXT_Y,
-                     w, LAYER_DIALOG_Y + LAYER_DIALOG_TEXT_Y + 60, 0, PAL_WHITE);
+                     LAYER_DIALOG_CONTENT_X, LAYER_DIALOG_CONTENT_Y,
+                     w, LAYER_DIALOG_CONTENT_Y + 60, 0, PAL_WHITE);
     text_set_target_vram();
     return next;
 }
@@ -282,25 +292,17 @@ int layer_dialog_render_page(const char *name, const char *text, int off)
 void dialog_layer_store_render(const char *name, const char *text, int off)
 {
     if (name) {
-        strncpy(dialog_render_name, name, sizeof(dialog_render_name) - 1);
-        dialog_render_name[sizeof(dialog_render_name) - 1] = '\0';
+        str_copy(dialog_render_name, sizeof(dialog_render_name), name);
     } else {
         dialog_render_name[0] = '\0';
     }
     if (text) {
-        strncpy(dialog_render_text, text, sizeof(dialog_render_text) - 1);
-        dialog_render_text[sizeof(dialog_render_text) - 1] = '\0';
+        str_copy(dialog_render_text, sizeof(dialog_render_text), text);
     } else {
         dialog_render_text[0] = '\0';
     }
     dialog_render_off = off;
     dialog_render_valid = 1;
-}
-
-/* Restore the dialog composite to VRAM (covers a menu overlay under it). */
-void layer_dialog_restore(void)
-{
-    dialog_layer_blit();
 }
 
 /* Hide the dialog: restore the pristine underneath pixels over the rect,

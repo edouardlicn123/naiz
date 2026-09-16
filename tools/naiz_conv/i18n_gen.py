@@ -6,7 +6,9 @@ Usage:
     python -m tools.naiz_conv.i18n_gen <project_dir> [--force]
 
 Scans scene/*.nb, extracts text by command type, generates/merges translation
-files in i18n/system_<lang>.txt, role_<lang>.txt, game_<lang>.txt.
+files in i18n/sys_<lang>.txt, role_<lang>.txt, game_<lang>.txt.
+(system_<lang>.txt was dropped: its base truncates to the same DOS 8.3
+short name for chi and cht, silently clobbering one file on the HDI.)
 """
 import json
 import os
@@ -20,7 +22,7 @@ from naiz_lib.nb_line import parse_nb_line as naiz_parse_nb_line
 
 
 # Runtime language codes — must match engine (settings_menu LANG_CODES),
-# tr_init("i18n/system_<lang>.txt") and gen_cjk_font RUNTIME_LANGS.
+# tr_init("i18n/sys_<lang>.txt") and gen_cjk_font RUNTIME_LANGS.
 VALID_LANGS = {
     'eng', 'jpn', 'chi', 'cht', 'kor',
     'fre', 'ger', 'ita', 'spa', 'por',
@@ -37,6 +39,7 @@ SYSTEM_UI_KEYS = {
     "Load to Slot %d?", "Save to Slot %d?", "Overwrite Slot %d?",
     "Naiz Settings", "Language", "Start Game",
     "CG GALLERY", "No CGs available.",
+    "No save data.", "Load failed.",
 }
 
 
@@ -244,12 +247,12 @@ def generate(proj_dir, force=False):
 
     for lang in targets:
         if force:
-            for prefix in ('system', 'role', 'game'):
+            for prefix in ('sys', 'role', 'game'):
                 fp = i18n_dir / f'{prefix}_{lang}.txt'
                 if fp.exists():
                     fp.unlink()
 
-        sys_path = i18n_dir / f'system_{lang}.txt'
+        sys_path = i18n_dir / f'sys_{lang}.txt'
         sys_entries, _ = load_existing_translations(sys_path)
         sys_lines = merge_translations(sys_entries, menu_options | SYSTEM_UI_KEYS)
         with open(sys_path, 'w', encoding='utf-8') as f:
@@ -267,7 +270,7 @@ def generate(proj_dir, force=False):
         with open(game_path, 'w', encoding='utf-8') as f:
             f.write('\n'.join(game_lines) + '\n' if game_lines else '')
 
-        print(f'  {lang}: system={len(sys_lines)} role={len(role_lines)} game={len(game_lines)}')
+        print(f'  {lang}: sys={len(sys_lines)} role={len(role_lines)} game={len(game_lines)}')
 
     return 0
 

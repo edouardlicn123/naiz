@@ -23,3 +23,5 @@ Start Game=게임 시작
 Yes=예
 [No]=[아니오]
 [Yes]=[예]
+No save data.=저장된 데이터가 없습니다
+Load failed.=로드 실패

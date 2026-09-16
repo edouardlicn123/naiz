@@ -172,22 +172,28 @@ def sprint(path, lineno, desc):
 
 def section_a(defs, sources, declared):
     """Static candidates: public functions with zero external callers."""
+    count = 0
     print("=== A. STATIC CANDIDATES (no external .c caller) ===")
     for name, (path, lineno) in sorted(defs.items()):
         if external_users(name, sources, path):
             continue
         flag = " [hdr]" if name in declared else ""
         sprint(path, lineno, f"{name}() public but used only here{flag}")
+        count += 1
     print()
+    return count
 
 
 def section_b(defs, sources, declared):
     """Dead exports: header-declared functions with no external callers."""
+    count = 0
     print("=== B. DEAD EXPORTS (declared in header, called from no other .c) ===")
     for name, (path, lineno) in sorted(defs.items()):
         if name in declared and not external_users(name, sources, path):
             sprint(path, lineno, f"{name}() header decl has no external callers")
+            count += 1
     print()
+    return count
 
 
 def section_c(defs, sources, line_cache):
@@ -282,6 +288,10 @@ def main():
         "-s", "--sections", default="A,B,C,D,E",
         help="comma-separated sections to print (default A,B,C,D,E)",
     )
+    parser.add_argument(
+        "--gate", action="store_true",
+        help="exit 1 when section A or B reported any entry (CI gate)",
+    )
     args = parser.parse_args()
 
     sources = collect_sources()
@@ -296,16 +306,20 @@ def main():
           f"{len(defs)} public funcs, {len(globals_)} file-scope globals\n")
 
     wanted = {chunk.strip().upper() for chunk in args.sections.split(",") if chunk.strip()}
+    gate_findings = 0
     if "A" in wanted:
-        section_a(defs, sources, declared)
+        gate_findings += section_a(defs, sources, declared)
     if "B" in wanted:
-        section_b(defs, sources, declared)
+        gate_findings += section_b(defs, sources, declared)
     if "C" in wanted:
         section_c(defs, sources, line_cache)
     if "D" in wanted:
         section_d(defs, globals_, declared)
     if "E" in wanted:
         section_e(defs, sources, line_cache)
+
+    if args.gate and gate_findings:
+        sys.exit(1)
 
 
 if __name__ == "__main__":

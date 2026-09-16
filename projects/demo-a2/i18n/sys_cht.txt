@@ -23,3 +23,5 @@ Start Game=開始遊戲
 Yes=是
 [No]=[否]
 [Yes]=[是]
+No save data.=暫無存檔資料
+Load failed.=載入失敗

@@ -9,7 +9,8 @@ from tools.audit import audit, state, verify
 from tools.audit.rules_c import (check_c1, check_c4, check_c5, check_c11,
                                  check_c14, check_c21, check_c22, check_c23,
                                  check_c24, check_c25, check_c26, check_c27,
-                                 check_c28, check_c29)
+                                 check_c28, check_c29, check_c32, check_c33,
+                                 check_c34, check_c35)
 from tools.audit.rules_p import (check_p1, check_p2, check_p3, check_p5,
                                  check_p6, check_p7, check_p8, check_p9,
                                  check_p10, check_p14)
@@ -554,3 +555,51 @@ def test_reset_reruns_everything(tmp_path):
     # Same content but forced reset -> full re-run again.
     audit.run_audit(root=tmp_path, reset=True, save_state=True, manual=False)
     assert state.load(tmp_path)["summary"]["changed"] == 4
+
+
+# ---------------------------------------------------------------------------
+# R29 integrate-results anti-regression: C32/C33/C34/C35
+# ---------------------------------------------------------------------------
+
+def test_c32_strncpy_banned_outside_strutil():
+    text = 'void f(){ char b[16]; strncpy(b, "hi", 15); b[15] = 0; }'
+    assert len(check_c32(text, "core/engine/other.c")) == 1
+    assert check_c32(text, "core/lib/strutil.c") == []
+    assert check_c32('void f(){ char b[16]; snprintf(b,16,"x"); }',
+                     "core/engine/other.c") == []
+
+
+def test_c33_adjacent_show_blit_detected_clear_excluded():
+    pair = 'void x(void){ layer_dialog_show();\n    dialog_layer_blit(); }'
+    assert len(check_c33(pair, "<mem>")) == 1
+    # The defined helper itself (show+blit form) is the permitted instance.
+    helper = ('void layer_dialog_clear(void){ layer_dialog_show(); '
+              'dialog_layer_blit(); }')
+    assert check_c33(helper, "<mem>") == []
+    # Non-adjacent (intervening statement) is not flagged.
+    scattered = ('void x(void){ layer_dialog_show(); int a = 1; '
+                 'dialog_layer_blit(); }')
+    assert check_c33(scattered, "<mem>") == []
+
+
+def test_c34_duplicate_array_initializer_detected():
+    dup = ('static int slot_y[4] = { 90, 146, 202, 258 };\n'
+           'static int slot_ys[4] = { 90, 146, 202, 258 };')
+    hits = check_c34(dup, "<mem>")
+    assert len(hits) == 1 and "identical" in hits[0][1]
+    distinct = ('static int a[2] = {1, 2};\nstatic int b[2] = {3, 4};')
+    assert check_c34(distinct, "<mem>") == []
+
+
+def test_c35_repeated_constant_expression_detected():
+    text = ('void f(void){ int a = LAYER_DIALOG_X + LAYER_DIALOG_INDENT;\n'
+            ' int b = LAYER_DIALOG_X+LAYER_DIALOG_INDENT;\n'
+            ' int c = LAYER_DIALOG_X+LAYER_DIALOG_INDENT; }')
+    hits = check_c35(text, "<mem>")
+    assert len(hits) == 1
+    assert "LAYER_DIALOG_X+LAYER_DIALOG_INDENT" in hits[0][1]
+    # Three different expressions and macro definition must not fire.
+    text2 = ('void f(void){ int a = X + Y; int b = X + Z; int c = Y + Z; }\n'
+             '#define M  (LAYER_DIALOG_X + LAYER_DIALOG_INDENT)\n'
+             '#define N  (LAYER_DIALOG_X + LAYER_DIALOG_INDENT)')
+    assert check_c35(text2, "<mem>") == []

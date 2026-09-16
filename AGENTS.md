@@ -1,9 +1,16 @@
 # Naiz — AI 编程规则
 
-> **当前版本**: `0.2.093`（`projects/demo-a2/config.toml`）
+> **当前版本**: `0.2.108`（`projects/demo-a2/config.toml`）
 >
-> **Bug 修复状态**: 已完成 7 轮穷举静态分析 + 针对性修复（R1–R7），另完成整合修复（Bug-1/Bug-2/i18n 管线/工具链去重）与**查 bug 系统升级**（Tier1 + Tier2，R8）与**拆分整合重构**（R9）与**日志/审计范围增强**（R10）与**cg 双形态语法**（R11）与**对象/参数括号规范化**（R12）与**全项目查 bug（R13）**与**再次全项目查 bug（R14）**与**针对漏网 bug 的 Tier3 规则扩充（R15）**与**拆分/封装机会落库（R16）**与**背景CG换图自动复位对话框（R17）**与**运行目检修复：伪透明恢复+cg 换图自动关框（R20）**与**layer_sprite 小封装（R21）**与**菜单 P0 改进（R22）**与**菜单 UI 图层化 menu_layer（R23）**。
+> **Bug 修复状态**: 已完成 7 轮穷举静态分析 + 针对性修复（R1–R7），另完成整合修复（Bug-1/Bug-2/i18n 管线/工具链去重）与**查 bug 系统升级**（Tier1 + Tier2，R8）与**拆分整合重构**（R9）与**日志/审计范围增强**（R10）与**cg 双形态语法**（R11）与**对象/参数括号规范化**（R12）与**全项目查 bug（R13）**与**再次全项目查 bug（R14）**与**针对漏网 bug 的 Tier3 规则扩充（R15）**与**拆分/封装机会落库（R16）**与**背景CG换图自动复位对话框（R17）**与**运行目检修复：伪透明恢复+cg 换图自动关框（R20）**与**layer_sprite 小封装（R21）**与**菜单 P0 改进（R22）**与**菜单 UI 图层化 menu_layer（R23）**与**语言全路径收口 nb_set_lang（R24）**与**i18n 8.3 短名化（R25）**与**存档/读档错误提示 i18n+可读性（R26）**与**菜单标题字模 RAM 目标修正（R27）**与**对话框内保存菜单剧情字残留（R28）**与**全项目整合机会审计与落地（R29）**与**整合机会规则落地（R30）**。
+> - R30（整合机会规则落地，0.2.108）: R29 §8.3 建议落地——①**新增 4 条 C 规则**（39→43）：**C32**（AUTO）`strncpy()` 仅允许在 `core/lib/strutil.c` 内出现（R29④ str_copy 单一事实源回归守卫）；**C33**（HEUR）相邻 `layer_dialog_show();`+`dialog_layer_blit();` 对（`layer_dialog_clear()` 函数体内除外）→ 改用 `layer_dialog_clear()`；**C34**（HEUR）同文件重复静态数组初始化表（归一化内容 ≥2 处）→ 并单一事实源（slot_y/slot_ys 类）；**C35**（HEUR）同文件常量算术表达式重复（≥1 操作数为宏、≥3 处）→ 建议具名宏/常量（LAYER_DIALOG_CONTENT_* 类）②**symbol_audit `--gate`**：A/B 节任一输出即 exit 1（tools/diag/symbol_audit.py main 增 `--gate`，section_a/b 返回计数），`start.sh` fullaudit 第 5 步改 `-s A,B --gate`（此前只 `-s A` 且恒 exit 0、B 节死导出从未纳入判据）；`start.sh audit` 本色不带 gate ③规则基线登记：C35 首扫 10 候选全部核实为良性（缓冲尺寸/右边缘/掩码，layer_debug/layer_dialog/layer_sprite/nb_cggallery/nb_save_dialog/render/render_text/render_vram/settings_menu/keyboard），预存 C8/C9 5 候选核实良性，`--note` verify=ok 清零 open；pytest 362 passed、make 0 err/0 warn、fullaudit 全绿
+> - R29（全项目整合机会审计与落地，0.2.107）: devdocs/99 全量整合审计——按"重复必须收敛单一事实源、惯用式必须收口、死代码必须删净"三原则落地 7 组改动：①**死导出清零**（`symbol_audit` A/B 归零）：删 `layer_dialog_restore`（R28 后 0 调用方，R28 记账"保留供外部"裁定作废）、`menu_layer_is_open`/`menu_layer_pixels`（menu_layer.c，内部无依赖）、`layer_bg_snapshot_valid`（layer_internal.h，内部 :41 用静态 `snapshot_valid` 不经过函数）②**内容几何单一事实源**：scene_layers.h 新增 `LAYER_DIALOG_CONTENT_X/W/Y/H` 宏，替换 13+7 处 `X+INDENT`/`W-INDENT-RIGHT` 表达式（nb_save_dialog×6、nb_question×4、layer_dialog×4、nb_saveload+1）+ nb_save_dialog 两处 content_x/y/w/h 四元组 ③**nb_saveload 槽位内聚**：`slot_y[4]`(:98) 与 `slot_ys[4]`(:315) 并一份文件级 `slot_y[SLOTS_PER_PAGE]`；新增 `SLOTS_PER_PAGE`/`slot_abs(page,row)` helper 替换 9 处 `page*4+…` 与 `(SAVE_SLOTS+3)/4`、缓存数组维数 ④**干净盒正式收口**：`dlg_clean_box` static helper（R28）→ 提升为公共 `layer_dialog_clear()`（=show+blit，layer_dialog.c），nb_question:116-117 两行合一并顺带消 2 行 ⑤**标题双分支去重**（nb_saveload:112-126 if/else 尾段相同 `draw_title_large` → `drawn` 标志单调用）⑥**`str_copy(dst,n,src)` 新 lib 封装**（core/lib/strutil.c/h）：收口 26 处 `strncpy+NUL` 惯用式（11 文件）；行为差异=不零填充余量字节，逐站核过无依赖；⑦**菜单退出序列统一**：nb_menu 两处与 nb_cggallery 退出改为 `close(1)→flush→restore_palette`（对齐 nb_saveload），三个菜单出口补契约注释（settings 不触碰——palette 未改属正常差异）；B90/B93 同步；pytest 358 passed、make 0 err/0 warn、fullaudit 6/6 全绿、HDI 引擎 md5 一致；检讨：可整合内容大多不属 39 条"单点错误"型规则能力范围（见 devdocs/99 §8，建议"高重复表达式阈值"HEUR 规则 + symbol_audit A/B 纳入 fullaudit 判据）
+> - R28（对话框内保存菜单剧情字残留，0.2.106）: 目检对话框内 12 槽保存菜单（`save_dialog_menu`，nb_save_dialog.c）——打开与进入 confirm 时**剧情文字（角色名行+正文）透出、悬留**。根因=**`layer_dialog_restore()` 语义误用**：它只是 `dialog_layer_blit()`（把**含当前页剧情文字**的 480×115 合成原样盖回 VRAM，layer_dialog.c:301-304），被保存菜单当成"清空"用；`save_dlg_draw_slots` 的 `fill_dialog_bg` 只覆盖 `TEXT_Y`(28) 起的正文区（y308+），**角色名行 y286-300 从未被覆盖而残留**；`save_dlg_draw_confirm` 再 restore 把剧情文字全量盖回后 Prompt/槽位信息/Yes-No 直接叠画其上**不垫背景**→剧情正文从菜单字下透出。修复：抽静态 helper `dlg_clean_box()`= `layer_dialog_show()`+`dialog_layer_blit()`（合成重画干净框、无文字，即 nb_dialog.c:54,68 / nb_question.c:116,117 既有"新开一页"模式）替换两处 `layer_dialog_restore()`（入口 :58 与 confirm 入口 :237）；菜单进出两态底子均为干净盒，出口重建剧情页逻辑零改动；HDI 注入引擎 md5 与构建一致、fullaudit 6/6 全绿（续：R29 将 `layer_dialog_restore` 删除、static helper 提升为公共 `layer_dialog_clear`）
+> - R26（存档/读档错误提示 i18n+可读性，0.2.104）: 目检发现 `show_error_msg` 4 处硬编码英文（`nb_saveload.c:280/376` "No save data."、`:217/319` "Load failed."）未走 `tr()` 且不在 `SYSTEM_UI_KEYS`——i18n 管线不感知、CJK 语料缺字，同时以菜单「聚焦选中」黄（MENU_PAL_YELLOW）绘在自以为黑的盒上辨识度差、盒顶端 4px 压到页面指示器 `1/5` 与第三槽行。修复：①`show_error_msg` 文案改 `tr(msg)`、绘白底黑字（`fill_rect` 用 `PAL_WHITE`）；**文字黑必须用保留索引 `PAL_CURSOR_BLACK`(254)**——目检反证过两轮：先用调色板索引 0 误以为黑，但菜单/背景图调色板中 0 实际是白，白底白字不可读；`palette_reset_reserved` 仅保证 7/15/254 三色，黑字只能取 254（palette.c:54 断言驱动）；②三处 `(260,298)` toast 下移至 `(260,346)`——彻底避开槽行文本(≤294)/页面指示器(≤344)/Back(x 区间不含)/确认键(仅在 confirm 态)；confirm-fail 处（`LAYER_DIALOG_X+INDENT+168, TEXT_Y-10`，对话框白底内 toast）保持原位；③`SYSTEM_UI_KEYS` 增补 "No save data."/"Load failed."（对齐 "No CGs available." 先例），9 语言 `sys_<lang>.txt` 提供译文（简 暂无存档数据/加载失败、繁 暫無存檔資料/載入失敗、日 セーブデータがありません/ロードに失敗しました、韩 저장된 데이터가 없습니다/로드 실패、法/德/意/西/葡各一）；④**盒宽动态化**——固定 120px 盒裁掉超长译文（白日文 224px/韩 192/西 184/德意 152-160/法 144/葡 136，仅简繁 96 装得下），`show_error_msg` 改 `text_width()`（render.h:78 已导出、UTF-8 感知、CJK16/ASCII8）+ `tw+24` 内边距 + 最小 120 + `LAYER_SCREEN_W` 越屏左移 clamp + `draw_text` 裁窗同步 `x+w-12`；HDI 复读确认 4 语言 CJK 字库新字形齐备（CHI 106→112、CHT 106→111、JPN 117→122、KOR 211→216 codepoints）；pytest 358 passed、make 0 err/0 warn、fullaudit 全绿
 > - R23（菜单 UI 图层化 menu_layer，0.2.093）: 菜单按键 UI 图层化为**自包含可复用封装 `menu_layer`**（新 `menu_layer.c/.h`，`scene_layers.h` 引入；头部契约注释含最小接入示例）——①**渲染目标化**：`render_set_target(buf,w,h,stride,offx,offy)`/`render_set_target_vram()` 全局切换，`render.c` fill_rect/fill_rect_pattern/vram_pset_addr 增 RAM 分支（屏幕 clip+buffer 双重 C6 钳制），ui.c emboss 零改动自动跟随；②**透明 blit 原语** `render_blit_transparent()`（逐像素跳透明索引，VRAM_SET_BANK 宏分段）；③**menu_layer API 全套**：`open(x,y,w,h,transparent)`（clamp 屏幕、重复 open=重建、OOM 返 -1 调用方降级直绘 VRAM+C14 日志）/`begin_draw`（重接双 target）/`commit`/`blit`/`blit_rect`（自动求交幂等）/`close(restore)`（幂等置 NULL）/`is_open`/`pixels`/`erase_to_base`/`blit_sprite`（RAM 直拷，层未开降级 vram_blit_sprite）；**opaque**=base 快照（vram_read×2）+blit 含底+close(1) 整底还原，**transparent**=composite 填 PAL_TRANSPARENT 镂空、无 base、close 恒不还原；④**四菜单全部接入**（均全屏 opaque）：主菜单 menu_show（open→全量→blit，焦点移动增量会话 begin_draw→commit→blit_rect）、加载 nb_saveload（draw 包裹层化+标题 sprite 走 blit_sprite）、设置 settings_menu（删 bg_lang_name/ind/start_ind 三快照数组改 erase_to_base 语义）、画廊 nb_cggallery（preview 进出 close(0)→layer_bg_change 全屏→重新 open+draw_grid）；内容禁用调色板索引 15；pytest 334 passed、make 0 err/0 warn、fullaudit 全绿
+> - R27（菜单标题字模 RAM 目标修正，0.2.105）: 目检「读取」菜单标题异常——R23 菜单图层化（全屏 opaque `menu_layer_open(0,0,640,400,0)`）后帧内容入层缓冲、commit 整块 `vram_write` 盖回，但 **`draw_title_large` 的 2x 缩放字模路径（`draw_glyph_scaled`/`draw_cjk_scaled`，render_text.c）只直写 VRAM、无 `text_tgt_buf` RAM 分支**（R19 阶段 A 仅给 `draw_glyph_internal` 分流，1x 与 2x 路径分叉泄漏）→ 标题先直绘 VRAM、紧接 opaque blit 用缓冲（标题区=基底背景像素）整块覆盖 → 标题被抹、显示异常。西文黑体标题走 `menu_layer_blit_sprite` 入缓冲故无征兆，**CJK 语言 100% 触发**（读/存 LOAD/SAVE 文字标题 + CG 画廊 "CG GALLERY" 同为文字路径同样中招）。修复：两缩放函数位循环前经新 helper `title_pset(px,py,color)` 落点——`text_tgt_buf` 非空时屏幕坐标→缓冲坐标（`-offx/-offy`）越界剪裁后写缓冲、返回 1；否则返回 0 走原 VRAM 路径（层退化直绘/VN 场景零行为变化）；2×2 块四像素统一经 helper。pytest 358 passed、make 0 err/0 warn、fullaudit 全绿
+> - R25（i18n 8.3 短名化，0.2.100）: 「繁体字占空位」最后一根实锤——**HDI 注入 8.3 截名相撞**：`system_chi.txt`/`system_cht.txt` 基名 10 字符，`to_dos_name` 双截成 `SYSTEM_C.TXT`，注入时后写覆盖先写者，幸存内容与运行语言脱钩→简体字库配繁体文案，「開/載」空位、「始/入」正常（与 R24 的语言→字形路径无关，是部署管线文件命名缺陷）。修复：①系统表文件名全链路 `system_<lang>.txt`→`sys_<lang>.txt`（基名≤7 互异）：tr.c `i18n/sys_%s.txt`、i18n_gen 输出基名、gen_cjk_font.collect_cps 前缀 `("sys","role","game")`、项目与 games 部署 i18n 9 文件重命名、settings.txt/B92 注释同步（role_*/game_* 基名恰 8 字符不受截断影响）②**防呆**：`inject_common` 抽 `_check_dos_collision()` 覆盖**根目录+子目录**整批校验（此前子目录循环漏检，正是故障通道），碰撞即 RuntimeError 硬失败③**新测试** `tools/tests/test_dos_shortname.py`：注入校验函数、每项目 i18n 短名互异/基名≤8、system_ 遗留清零、scene 脚本 8.3（引擎启动文件 `startsetting`→`startset.nb`、`loadscene`→`loadscen.nb` 并同步 main.c/nb_mainmenu.c 字面量，validator 命令名不变）；AGENTS.md §十一 新增「游戏运行文件命名（8.3 强制）」硬性规则；pytest 358 passed、make 0 err/0 warn、fullaudit 全绿
+> - R24（语言全路径收口 nb_set_lang，0.2.099）: 简体修复后繁体仍报"部分文字缺失（占空位）"——静态穷举确认非字库覆盖（4 CJK system 译文 100% 命中各 CJK_*.DAT）非绘制路径（draw_text/draw_title_large 均已 CJK 化）；根因=**语言→字形脱钩**：CJK 字库仅 `cmd_startsetting`（nb_mainmenu.c）一条路径跟随语言变更，而**读档路径 `save_apply`（save.c）调 `nb_set_lang(s->lang)` 只重载翻译表不重载字库**，存档语言与当前字库部分重叠即"有的可见、有的占空位"（continue/读档可达）。修复：`nb_set_lang()` 收口为语言驱动渲染态**唯一事实源**（strncpy→tr_init+eng 回退→`cjk_load_for_lang(nb.lang)`→`text_set_blackletter(settings_blackdialog && !nb_lang_is_cjk())`），`nb_init` 手写语言块替换为 `nb_set_lang(settings_get_lang())`、`cmd_startsetting` 语言变更分支删冗余 cjk+blackletter 行（nb.c 增 #include "cjk.h"，nb_mainmenu.c 删未用 cjk.h）——启动/书内设置/continue/读档四条路径全部收敛；pytest 351 passed、make 0 err/0 warn、fullaudit 全绿
 > - R22（菜单 P0 改进，0.2.092）: 多图层落地后的菜单清点（plans/menu-p0-improvements.md），4 项行为等价改动——①**删死代码 `layer_get_bounds`+`LayerBounds`**（0 调用方，SPRITE/ANIM 分支残留 Option X 的 clip y<280 语义，与 R20 全高绘制冲突，误导维护；连带修 scene_layers.h 两处过时注释）②**`nb_saveload.c` 页级槽位缓存**：`slot_label_cache[4][128]`+`slot_exists_cache[4]` 按 `slot_cache_page` 键翻页失效，焦点/confirm 每帧不再 4×`slot_info` 读盘解析，save_game_slot 后失效重建 ③**`nb_cggallery.c` 解锁位图缓存**：`gal_unlock_cache[CG_COUNT]` 每次进入 cmd_cgvmenu 重建一次，cell/preview 不再每帧读 SYSTEM.SAV ④**`nb_question.c` 抽 `apply_option()`**：鼠标/键盘两路变量应用（lookup+`=`/`-`/`+`+INT_MIN 守卫）合一，-18 行；pytest 334 passed、make 0 err/0 warn、fullaudit 全绿
 > - R21（layer_sprite 小封装，0.2.091）: 最新 symbol_audit（20260910）A/B 节全空、E 节大簇裁决不拆（layer_dialog 内聚单模块/hal_mouse HAL 薄接口/accessor 簇平坦/bg·sprite·vars 已是拆分产物，与 R9/R16 先例一致）——仅执行 3 项行为等价微重构：①抽 `sprite_blit_full()` 收口 show/replace/redraw 三处 `image_load→vram_blit_sprite→mag_release` 重复；②face/replace 的 alloc 分支改走既有 `sprite_entry_update`（删手写 4 字段赋值）；③`layer_sprite_hide` 删与 `layer_bg_restore_rect` 内部快照守卫重复的外层预查；face/clip/NAIZ_DEBUG 探针逻辑零改动；pytest 334 passed、make 0 err/0 warn、fullaudit 全绿
 > - R20（运行目检修复：伪透明恢复 + cg 换图自动关框，0.2.090）: 目检推翻 devdoc 96 两项裁定——①**撤销 Option X 立绘裁剪**（对话框开启时精灵不再整层剪到 y<280；show/replace/redraw 恢复全高绘制、与对话框矩形相交，z 序=立绘在下、对话框合成在上）；伪透明经新**活动底 `dialog_occluder`**（480×115=under_dialog 纯底+立绘框内像素，与 dialog_layer 同生灭）恢复：`dialog_seed_base()`/recompose 改从 occluder 取底，PAT75 dither 孔透出立绘腿；`layer_sprite_sync_dialog_base()` 于每次精灵变更（show/replace/redraw/hide/hide_all）与开框时重建 occluder（reset 纯底→逐 active 精灵 RAM 落底→recompose 框+当前页盖回）；face 保留上半身 clip 不碰腿；replace/hide 的背景还原仍 clip_dialog=1 不盖框；`layer_bg_change` 经 redraw 尾 sync 自动重建底；动画帧不触对话框区无需复位；menu/option/save overlay 退出后洞仍透立绘。②**反转裁决 A 对 cg**——`cmd_cg` 资产分支恢复 `layer_dialog_hide()`+`nb_dialog_reset()`（`cg(){key}`=全屏事件并自动收起对话框、清空当前对白，下一句台词重新开框；`bg{}` 仍跨图存活，`cg(hidedialog)` 保留为显式收口指令）；`docs/B92` cg 两行语义更新、`docs/B90` 登记 occluder 三接口；pytest 334 passed、make 0 err/0 warn、fullaudit 全绿
@@ -48,7 +55,8 @@
 ```bash
 make -C core               # 引擎编译（0 errors / 0 warnings）
 tools/env_setup/venv/bin/python -m pytest tools/tests/   # Python 单元测试
-./makegame.sh build <game>  # 数据构建 + HDI 注入全流程
+./makegame.sh build <game>  # 数据构建（games/<game> 部署树，含字库/i18n）
+./makegame.sh make <game>    # HDI 注入（承接 build 产物）
 ```
 
 ## 四、运行时约束
@@ -142,9 +150,22 @@ for(;;)                  → idle 死循环
 - `layer_sprite_face()` **不得写入 y ≥ LAYER_DIALOG_Y (280) 的 VRAM 区域**。如需写入对话框区域（全身替换），必须用 `layer_sprite_replace()` 并主动调 `layer_dialog_refresh()`。
 - `vram_blit_sprite()` 的 `clip_h` 参数（>0 时限定绘制行数）是保证此约束的架构级手段。新增 sprite blit 调用时必须传入正确的 `clip_h`。
 
+### 游戏运行文件命名（8.3 强制）
+
+**凡引擎运行期读取、注入 HDI 的文件（`projects/<game>/scene` 与 `projects/<game>/i18n` 源文件、`games/<game>` 部署产物、引擎启动帧文件等）必须满足 DOS 8.3 约束**：
+
+- 文件名基名 ≤8 字符、扩展名 ≤3 字符；
+- 同一目录下所有文件的 `to_dos_name()` 短名结果**互异**——杜绝截断同名的静默覆盖。
+
+反例（本规则诞生的直接事故）：`system_chi.txt` 与 `system_cht.txt` 基名 10 字符，`to_dos_name` 双双截成 `SYSTEM_C.TXT`，HDI 注入后写者覆盖先写者，运行语言与幸存译文内容脱钩 → 简体字库渲染繁体文案，「開/載」占空位（R25 已改 `sys_<lang>.txt` 修复）。
+
+**防呆**：`tools/naiz_img/inject_common._check_dos_collision()` 在根目录与子目录注入前整批校验，发现碰撞即 `RuntimeError` 硬失败（不得静默覆盖）；`tools/tests/test_dos_shortname.py` 对全部项目 i18n/scene 文件做 8.3 与短名互异回归。
+
+**新增文件/改名的规则**：运行相关文件名一律直接取 8.3 安全基名（如 `sys_*`/`role_*`/`game_*`、`nbook*.nb`），不得依赖注入层截断来"擦边"。
+
 ### 变更规则
 
-对以上三节（显示管线、初始化顺序、启动方式）的任何修改，必须先提问、得到明确许可后再执行。
+对以上四节（显示管线、初始化顺序、启动方式、游戏运行文件命名）的任何修改，必须先提问、得到明确许可后再执行。
 
 ## 十二、独立项目说明
 
@@ -161,7 +182,7 @@ naiz_midi / naiz_music 已作为独立项目移出到 `~/`。详见 `docs/B91-�
 - 封装/拆分审计（**替代**逐个 grep 手查 public/static 与跨文件引用，单次扫描 39 源 + 36 头输出 A/B/C/D/E 五节报表）：
   `python -m tools.diag.symbol_audit`（A=static 候选，B=死导出，C=耦合/拆分视图，D=符号清单，E=拆分簇；`-s A,E` 只出指定节）
 - 封装工作流：用户运行 `start.sh audit` → 审计日志存 `logs/symbol_audit_<时间戳>.log` 并同步输出终端 → AI 读取最新日志的 A/B/E 节 → 核实后执行封装/拆分
-- **规则审计工作流**（§十七 固化）：用户运行 `start.sh fullaudit [--no-make]` → 6 步流水线（规则增量审计/`start.sh audit` 同款 `./start.sh fullaudit`/pytest/py_compile/`bash -n`/symbol_audit/make）整体复用 `tools.audit.audit` 引擎（sha256 增量，状态存 `audit_state.json`，文件哈希不变则 SKIP；扫描范围 `core/*/*.c` + `core/**/*.h` + `tools/**/*.py` + shell，头文件对 C13/C14 门控排除）与 `start.sh audit` 的 symbol_audit 步骤，仅 `--no-make` 跳过 make 节；全部通过后按 `pytest`/`py_compile`/`bash -n`/`symbol_audit`/`make` 顺序输出 `[✓]`。AI 修改源码后应主动运行 `./start.sh fullaudit` 验证无回归。AI 核验启发式候选后应主动 `--note REL:LINENO:VERDICT[:TEXT]` 登记到独立 `verify_notes.json`（带**行级**快照，被核行文本未变则无关编辑不 STALE；v1 整文件 sha8 快照兼容加载；单条也可用 `--note rel:line --verdict ok/fixed/todo`）；新代码审查用 `--since <git-ref>`（仅审计变更行，新增违规 exit 1，未变更文件保留既往记录）
+- **规则审计工作流**（§十七 固化）：用户运行 `start.sh fullaudit [--no-make]` → 6 步流水线（规则增量审计/`start.sh audit` 同款 `./start.sh fullaudit`/pytest/py_compile/`bash -n`/symbol_audit/make）整体复用 `tools.audit.audit` 引擎（sha256 增量，状态存 `audit_state.json`，文件哈希不变则 SKIP；扫描范围 `core/*/*.c` + `core/**/*.h` + `tools/**/*.py` + shell，头文件对 C13/C14 门控排除）与 `start.sh audit` 的 symbol_audit 步骤，仅 `--no-make` 跳过 make 节；全部通过后按 `pytest`/`py_compile`/`bash -n`/`symbol_audit`/`make` 顺序输出 `[✓]`。**symbol_audit 第 5 步带 `-s A,B --gate`**：A（未用 static 候选）/B（死导出）节任一输出即 exit 1 判失败（R30），`start.sh audit` 本色保持信息用途不带 gate。AI 修改源码后应主动运行 `./start.sh fullaudit` 验证无回归。AI 核验启发式候选后应主动 `--note REL:LINENO:VERDICT[:TEXT]` 登记到独立 `verify_notes.json`（带**行级**快照，被核行文本未变则无关编辑不 STALE；v1 整文件 sha8 快照兼容加载；单条也可用 `--note rel:line --verdict ok/fixed/todo`）；新代码审查用 `--since <git-ref>`（仅审计变更行，新增违规 exit 1，未变更文件保留既往记录）
 
 ### 变更后更新规约
 
@@ -192,9 +213,9 @@ naiz_midi / naiz_music 已作为独立项目移出到 `~/`。详见 `docs/B91-�
 1. 系统界面文字（按钮/标题/确认框/画廊/存档界面等**硬编码字符串**）一律以**英文为基准文案**，并必须经 `tr()` 渲染
 2. 禁止硬编码英文直绘（`draw_text` / `draw_text_outlined` / `draw_title_large`）；例外仅限纯数字/格式串（`%d/%d`、`<` `>`、`CG %02d`）、语言自名、版本号
 3. 新增 UI 字符串必须同步登记 `tools/naiz_conv/i18n_gen.py` 的 `SYSTEM_UI_KEYS`，否则 `i18n_gen` 重生成时被标 `# ORPHANED` 使译文失效
-4. 必须为 `config.toml` `i18n.targets` 各语言在 `system_<lang>.txt` 提供对应译文；空值视为未完成（运行时回退英文）
+4. 必须为 `config.toml` `i18n.targets` 各语言在 `sys_<lang>.txt` 提供对应译文；空值视为未完成（运行时回退英文）
 5. 含 `%d` 等格式串整句翻译（译文保留 `%d`），经 `snprintf(buf, tr(fmt), n)` 展开
-6. 角色名与剧情文案的**原文基准遵循项目设定**（脚本原文 / `char_map` 规范名 / `source_lang`），其翻译照常经 `role_<lang>.txt` / `game_<lang>.txt` 提供——本节强制范围仅限**系统界面文字**（`system_<lang>.txt`）
+6. 角色名与剧情文案的**原文基准遵循项目设定**（脚本原文 / `char_map` 规范名 / `source_lang`），其翻译照常经 `role_<lang>.txt` / `game_<lang>.txt` 提供——本节强制范围仅限**系统界面文字**（`sys_<lang>.txt`，8.3 安全基名）
 
 ### 对话框文字清除
 - 标准方法：`layer_dialog_restore()`，禁止 `fill_rect` / `fill_rect_pattern` / `scene_draw_dialog()`
@@ -273,6 +294,10 @@ make -C core && python -m py_compile tools/...file.py ...
 | C27 | 计数派生负下标：`arr[count - K]` 之前的守卫须覆盖 `count < K`（`if (argc < 1)` / `argc == 0`），缺则越界读 | HEUR 规则 | R15 新增（R13 `argv[argc-1]`） |
 | C28 | 行跨距读无高度边界：函数含 `width` 类跨距乘法（如 `row * img_w`）但作用域内无任何 height 提及（参/局部/宏）→ 行索引未对图像自身高度夹逼 | HEUR 规则（只认小写 height 名，`LAYER_DIALOG_H` 等全大写宏不误判） | R15 新增（R14 cine 对话框 OOB） |
 | C29 | 结构体指针仅起始越界检查：guarded `(T *)(buf + off)` 的守卫只有 `off > size`、缺 `off + sizeof(T)` 项，struct 尾部可溢出 | HEUR 规则 | R15 新增（R13/R14 mag `off_img`） |
+| C32 | `strncpy()` 仅允许在 `core/lib/strutil.c` 内使用（R29 收口后），其余文件一律 `str_copy()` | AUTO 规则 | R29 后续新增（str_copy 单一事实源回归守卫） |
+| C33 | 相邻 `layer_dialog_show();`+`dialog_layer_blit();` 对（`layer_dialog_clear()` 函数体内除外）→ 改用 `layer_dialog_clear()` | HEUR 规则 | R29 后续新增（干净盒惯用式回归守卫） |
+| C34 | 同一文件内重复的静态数组初始化表（内容归一化完全相同，≥2 处）→ 并单一事实源 | HEUR 规则 | R29 后续新增（slot_y/slot_ys 类回归守卫） |
+| C35 | 同一文件内常量算术表达式重复（≥1 操作数为宏、≥3 处）→ 建议具名宏/常量 | HEUR 规则 | R29 后续新增（LAYER_DIALOG_CONTENT_* 类回归守卫） |
 
 ### Python 代码
 

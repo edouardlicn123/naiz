@@ -321,8 +321,11 @@ void cmd_cgvmenu(int argc, const char **argv, const char *cmd_name)
         hal_mouse_draw_cursor();
     }
 
-    menu_restore_item_palette();
+    /* Exit contract (shared by all menu UIs): close the layer (base snapshot
+     * back to VRAM) first, then flush the mouse and restore the shared menu
+     * palette. */
     menu_layer_close(1);
     hal_mouse_flush();
+    menu_restore_item_palette();
     nb_load("mainmenu.nb");
 }

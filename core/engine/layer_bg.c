@@ -136,12 +136,6 @@ void layer_bg_reset(void)
 
 /*=== Background accessors (layer_internal.h) =============================*/
 
-/* Non-zero when the background snapshot holds valid data. */
-int layer_bg_snapshot_valid(void)
-{
-    return snapshot_valid;
-}
-
 /* Full-screen pristine background snapshot (640x400). NULL when not captured. */
 const unsigned char *layer_bg_snapshot(void)
 {

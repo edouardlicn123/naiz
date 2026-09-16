@@ -23,3 +23,5 @@ Start Game=Neues Spiel
 Yes=Ja
 [No]=[Nein]
 [Yes]=[Ja]
+No save data.=Keine Speicherdaten.
+Load failed.=Laden fehlgeschlagen.

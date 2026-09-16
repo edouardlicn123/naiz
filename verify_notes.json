@@ -56,6 +56,13 @@
       "sha256": "9cb1aad8dae15e99c4ac0cbd52da776104b1dcb6a3e0233cbf7da1a9903512e0",
       "line": "    fwrite(rgb, 1, len, f);"
     },
+    "core/engine/layer_debug.c:68": {
+      "verdict": "ok",
+      "text": "buffer-size expr",
+      "date": "2026-09-16T11:04:33",
+      "sha256": "36fb49daab2744b55961f25602464362b044e1dbd746eafabe28c64bda82b8f2",
+      "line": "    size = LAYER_SCREEN_W * LAYER_SCREEN_H;"
+    },
     "core/engine/layer_dialog.c:137": {
       "verdict": "ok",
       "text": "malloc result guarded by truthy check below; OOM degrades gracefully via dialog_drawn=0",
@@ -70,11 +77,25 @@
       "sha256": "4e851ae3d82fb9e244b5cb03f499d127022bd877b9c18842b4a5a9efcb594595",
       "line": "        memcpy(dialog_occluder, under, LAYER_DIALOG_W * LAYER_DIALOG_H);"
     },
+    "core/engine/layer_dialog.c:178": {
+      "verdict": "ok",
+      "text": "occluder buffer size",
+      "date": "2026-09-16T11:04:33",
+      "sha256": "7560068edaf6e9b88d522521ae3aa83d0059e5fed7c50c9771fc81c1e51b6151",
+      "line": "        memcpy(dialog_occluder, under, LAYER_DIALOG_W * LAYER_DIALOG_H);"
+    },
     "core/engine/layer_dialog.c:189": {
       "verdict": "ok",
       "text": "memcpy dialog_layer<-dialog_occluder, both 480x115 same-size buffers",
       "date": "2026-09-14T08:50:44",
       "sha256": "4e851ae3d82fb9e244b5cb03f499d127022bd877b9c18842b4a5a9efcb594595",
+      "line": "        memcpy(dialog_layer, dialog_occluder, LAYER_DIALOG_W * LAYER_DIALOG_H);"
+    },
+    "core/engine/layer_dialog.c:190": {
+      "verdict": "ok",
+      "text": "occluder size == composite size",
+      "date": "2026-09-16T11:05:24",
+      "sha256": "7560068edaf6e9b88d522521ae3aa83d0059e5fed7c50c9771fc81c1e51b6151",
       "line": "        memcpy(dialog_layer, dialog_occluder, LAYER_DIALOG_W * LAYER_DIALOG_H);"
     },
     "core/engine/layer_dialog.c:195": {
@@ -84,11 +105,32 @@
       "sha256": "4e851ae3d82fb9e244b5cb03f499d127022bd877b9c18842b4a5a9efcb594595",
       "line": "            memcpy(dialog_layer, under, LAYER_DIALOG_W * LAYER_DIALOG_H);"
     },
+    "core/engine/layer_dialog.c:196": {
+      "verdict": "ok",
+      "text": "under_dialog == composite size",
+      "date": "2026-09-16T11:05:24",
+      "sha256": "7560068edaf6e9b88d522521ae3aa83d0059e5fed7c50c9771fc81c1e51b6151",
+      "line": "            memcpy(dialog_layer, under, LAYER_DIALOG_W * LAYER_DIALOG_H);"
+    },
     "core/engine/layer_dialog.c:43": {
       "verdict": "ok",
       "text": "malloc guarded by truthy check at :45 before deref;",
       "date": "2026-08-18T12:02:38",
       "sha256": "a36e6569b8ee56818d0e4c3c9858c84f4c91a32ff41e6ef53519d76770c77f03"
+    },
+    "core/engine/layer_sprite.c:85": {
+      "verdict": "ok",
+      "text": "right-edge coords",
+      "date": "2026-09-16T11:04:33",
+      "sha256": "14efdac0a60fe3fe905c19c18f9ee3333cf0f1cdece89643119f086656ea0322",
+      "line": "    if (x + img->width <= LAYER_DIALOG_X || x >= LAYER_DIALOG_X + LAYER_DIALOG_W) return;"
+    },
+    "core/engine/menu_layer.c:72": {
+      "verdict": "ok",
+      "text": "comp sized to area",
+      "date": "2026-09-16T11:05:24",
+      "sha256": "e62343ae6eb0b7cd57b2951e69bff5beb3bb5c91c0c817ab50e77739c10d576b",
+      "line": "        memcpy(comp, base, (size_t)area);"
     },
     "core/engine/menu_layer.c:82": {
       "verdict": "ok",
@@ -118,6 +160,13 @@
       "sha256": "bfb6c4e490056b96485769cab7d05f87d66a49d50a0a7aba2320c2142decde9e",
       "line": "    a->type = atype;"
     },
+    "core/engine/nb_cggallery.c:228": {
+      "verdict": "ok",
+      "text": "grid last index",
+      "date": "2026-09-16T11:04:33",
+      "sha256": "d7140d5cbf57dd31d5e87e53cea239b5e27dc2ee87d043dcb979b41dd30ad625",
+      "line": "        nb_load(\"mainmenu.nb\");"
+    },
     "core/engine/nb_commands.c:131": {
       "verdict": "ok",
       "text": "memcpy into buf sized sizeof(buf); source fixed struct member",
@@ -129,6 +178,13 @@
       "text": "memcpy 前 if(len>=bufsz) len=bufsz-1 钳位，目标 buf[bufsz] 足够",
       "date": "2026-09-07T12:30:46",
       "sha256": "6993f8ce92a076030e1507d14cd4c7eaa90abafc4b213ae9ad00e39f9876934d",
+      "line": "    memcpy(buf, p, len);"
+    },
+    "core/engine/nb_commands.c:135": {
+      "verdict": "ok",
+      "text": "len clamped before memcpy",
+      "date": "2026-09-16T11:05:24",
+      "sha256": "7452e1b0b343691d684b87931c45d6090608ed17ed6eb9c7990c09feee719aae",
       "line": "    memcpy(buf, p, len);"
     },
     "core/engine/nb_commands.c:320": {
@@ -144,6 +200,13 @@
       "date": "2026-08-18T13:12:57",
       "sha256": "1c24886cfae9bf085a3df85c36694080be538481f5cb7a59342864588d9d3be7"
     },
+    "core/engine/nb_commands.c:344": {
+      "verdict": "ok",
+      "text": "INT_MIN guarded",
+      "date": "2026-09-16T11:05:24",
+      "sha256": "7452e1b0b343691d684b87931c45d6090608ed17ed6eb9c7990c09feee719aae",
+      "line": "        int d = (val == INT_MIN) ? INT_MIN : -val;"
+    },
     "core/engine/nb_commands.c:345": {
       "verdict": "ok",
       "text": "INT_MIN-guard form identical to :320/:347 R8 fix",
@@ -158,6 +221,41 @@
       "sha256": "246712ddb7b45dd00d57ad21fa6f10ff94d3f413d7d23738dd23bad66cc24aea",
       "line": "        int d = (val == INT_MIN) ? INT_MIN : -val;"
     },
+    "core/engine/nb_save_dialog.c:65": {
+      "verdict": "ok",
+      "text": "content-y base",
+      "date": "2026-09-16T11:04:33",
+      "sha256": "7b0a016bafd5f2cf7acb74b95faa94ca3307ceb4bb0bb7c6269dcf2ed12661f8",
+      "line": "        draw_text(tr(\"SAVE\"), 0, content_x, LAYER_DIALOG_Y + LAYER_DIALOG_HEADER_Y,"
+    },
+    "core/engine/render.c:72": {
+      "verdict": "ok",
+      "text": "vram bank mask",
+      "date": "2026-09-16T11:04:33",
+      "sha256": "34a11af509d248cbb8b1f4e79bd334c3c7a74e3c38b2a2426e0090e360d83c9d",
+      "line": "    win[addr & (VRAM_BANK_SZ - 1)] = color;"
+    },
+    "core/engine/render_text.c:95": {
+      "verdict": "ok",
+      "text": "vram bank mask",
+      "date": "2026-09-16T11:04:33",
+      "sha256": "f6c62a5d66d51166b92f600b11e7a3caf96aa480dd35d07dc1e80d4bb099d928",
+      "line": "                win[addr & (VRAM_BANK_SZ - 1)] = color;"
+    },
+    "core/engine/render_vram.c:57": {
+      "verdict": "ok",
+      "text": "vram bank mask",
+      "date": "2026-09-16T11:04:33",
+      "sha256": "61386edb822e2a0ebb80884efef7e3e75c11add903ef236ce5c3442f3ae03fb2",
+      "line": "                off = addr & (VRAM_BANK_SZ - 1);"
+    },
+    "core/engine/settings_menu.c:58": {
+      "verdict": "ok",
+      "text": "label right edge",
+      "date": "2026-09-16T11:04:33",
+      "sha256": "0fc243316030dd0358c0c54e5ce2a8f140d5ba75a756ce04f19ecbc2591902ed",
+      "line": "#define SEL_Y        122    /* language selector row y (1x, 16px tall) */"
+    },
     "core/lib/tr.c:65": {
       "verdict": "ok",
       "text": "memcpy into tr_table governed by table_len bounds check above",
@@ -170,6 +268,13 @@
       "date": "2026-09-14T08:50:44",
       "sha256": "f6434276ad2df7a2984c912f1340af957f3bddc321abcf12d5ba9c736584c976",
       "line": "        memcpy(tr_table[tr_count].key, line, klen);"
+    },
+    "core/plat/keyboard.c:48": {
+      "verdict": "ok",
+      "text": "scancode offset",
+      "date": "2026-09-16T11:04:33",
+      "sha256": "f6d97e5066ecbd39e75408878ac4d9a72c63be5f17fde858ddeb30fa100686fe",
+      "line": "#define BIOS_TAIL        0x0526UL   /* word: 下一个写入偏移 */"
     },
     "makegame.sh:143": {
       "verdict": "ok",

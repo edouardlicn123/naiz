@@ -35,9 +35,6 @@ void layer_bg_reset(void);
  * dialog area are skipped (face sprites must not overwrite the dialog). */
 void layer_bg_restore_rect(int x, int y, int w, int h, int clip_dialog);
 
-/* Non-zero when the background snapshot holds valid data. */
-int layer_bg_snapshot_valid(void);
-
 /* Full-screen background snapshot (640x400). NULL when not captured. */
 const unsigned char *layer_bg_snapshot(void);
 

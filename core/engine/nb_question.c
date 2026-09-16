@@ -22,8 +22,8 @@
 static int question_hittest(int mx, int my, int num_opts)
 {
     int i;
-    int base_x = LAYER_DIALOG_X + LAYER_DIALOG_INDENT + QUESTION_INDENT;
-    int base_y = LAYER_DIALOG_Y + LAYER_DIALOG_TEXT_Y;
+    int base_x = LAYER_DIALOG_CONTENT_X + QUESTION_INDENT;
+    int base_y = LAYER_DIALOG_CONTENT_Y;
     for (i = 0; i < num_opts; i++) {
         int y0 = base_y + i * MENU_ITEM_H;
         if (mx >= base_x && mx < base_x + 448 &&
@@ -36,7 +36,7 @@ static int question_hittest(int mx, int my, int num_opts)
 static void question_draw_opt(const char *label, int i, int y, int mw, int highlighted)
 {
     int pal = highlighted ? MENU_PAL_YELLOW : MENU_PAL_WHITE;
-    int x = LAYER_DIALOG_X + LAYER_DIALOG_INDENT + QUESTION_INDENT;
+    int x = LAYER_DIALOG_CONTENT_X + QUESTION_INDENT;
     int opt_y = y + i * MENU_ITEM_H;
     draw_rounded_emboss_outline(x - 2, opt_y - 1, mw + 4, MENU_ITEM_H, 2,
                                 BTN_HIGHLIGHT_IDX, BTN_SHADOW_IDX);
@@ -110,20 +110,19 @@ void cmd_question(int argc, const char **argv, const char *cmd_name)
         display_opts = 4;
     }
 
-    mw = LAYER_DIALOG_W - LAYER_DIALOG_INDENT - LAYER_DIALOG_RIGHT_INDENT;
+    mw = LAYER_DIALOG_CONTENT_W;
     NB_DEBUG("question: %s (%d valid, %d displayed)\r\n", argv[0], total_opts, display_opts);
 
-    layer_dialog_show();
-    dialog_layer_blit();
+    layer_dialog_clear();
     hal_mouse_erase_cursor();
 
     menu_save_item_palette();
 
     draw_text(tr(argv[0]), 0,
-              LAYER_DIALOG_X + LAYER_DIALOG_INDENT, LAYER_DIALOG_Y + LAYER_DIALOG_HEADER_Y,
-              mw, LAYER_DIALOG_Y + LAYER_DIALOG_TEXT_Y, 1, MENU_PAL_WHITE);
+              LAYER_DIALOG_CONTENT_X, LAYER_DIALOG_Y + LAYER_DIALOG_HEADER_Y,
+              mw, LAYER_DIALOG_CONTENT_Y, 1, MENU_PAL_WHITE);
 
-    y = LAYER_DIALOG_Y + LAYER_DIALOG_TEXT_Y;
+    y = LAYER_DIALOG_CONTENT_Y;
     for (i = 0; i < display_opts; i++)
         question_draw_opt(opt_labels[i], i, y, mw, i == sel);
 

@@ -23,6 +23,7 @@
 #include "nb_anim.h"
 #include "nb_commands.h"
 #include "vm.h"
+#include "strutil.h"
 
 /*=== Asset lookup helpers ==================================================*/
 
@@ -297,13 +298,11 @@ static void cmd_sceneconf(int argc, const char **argv, const char *cmd_name)
     if (nb_next_field(&p, title, sizeof(title))) {
         /* title read; p points to type (may be empty). */
         if (*p) {
-            strncpy(type, p, sizeof(type) - 1);
-            type[sizeof(type) - 1] = '\0';
+            str_copy(type, sizeof(type), p);
         }
     } else {
         /* No comma: entire arg is the title, type defaults to NULL. */
-        strncpy(title, argv[0], sizeof(title) - 1);
-        title[sizeof(title) - 1] = '\0';
+        str_copy(title, sizeof(title), argv[0]);
     }
 
     nb_set_scene_conf(tr(title), type[0] ? type : NULL);

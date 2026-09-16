@@ -14,9 +14,11 @@
 #include "tr.h"
 #include "nb_internal.h"
 #include "nb_dialog.h"
+#include "cjk.h"
 #include "nb_vars.h"
 #include "nb_anim.h"   /* ANI animation support */
 #include "save.h"
+#include "strutil.h"
 
 /* Known unimplemented menu commands: continue, load, scenes,
  * special, music, cg, settings. Their handlers log and return. */
@@ -61,8 +63,7 @@ int nb_get_last_brace_arg(void)
 /* Set the chapter title string (metadata, saved to save files). */
 static void nb_set_chapter_title(const char *title)
 {
-    strncpy(nb.chapter_title, title, sizeof(nb.chapter_title) - 1);
-    nb.chapter_title[sizeof(nb.chapter_title) - 1] = '\0';
+    str_copy(nb.chapter_title, sizeof(nb.chapter_title), title);
 }
 
 /* Set scene configuration (chapter title + scene type).
@@ -76,10 +77,9 @@ void nb_set_scene_conf(const char *title, const char *type)
         type = "normal";
     }
     if (type)
-        strncpy(nb.scene_type, type, sizeof(nb.scene_type) - 1);
+        str_copy(nb.scene_type, sizeof(nb.scene_type), type);
     else
         nb.scene_type[0] = '\0';
-    nb.scene_type[sizeof(nb.scene_type) - 1] = '\0';
 }
 
 /* Remember the last question choice (or -1 when unanswered). */
@@ -127,19 +127,11 @@ int nb_init(void)
     nb_dialog_reset();
 
     settings_load();
-    /* Sync the language into the NB state (owned here), then inject the
-     * blackletter dialog style into the render layer. Blackletter is
-     * Latin-only, so it applies only for non-CJK languages. */
-    strncpy(nb.lang, settings_get_lang(), sizeof(nb.lang) - 1);
-    nb.lang[sizeof(nb.lang) - 1] = '\0';
-    text_set_blackletter(settings_get_blackletter_dialog() && !nb_lang_is_cjk());
-    tr_init(nb.lang);
-
-    /* Fallback: if chosen language loaded no translations, revert to 'eng'. */
-    if (tr_get_count() == 0 && strcmp(nb.lang, "eng") != 0) {
-        NB_DEBUG("WARN: no translations for lang='%s', falling back to 'eng'\r\n", nb.lang);
-        tr_init("eng");
-    }
+    /* Sync the language into the NB state (owned here). nb_set_lang then
+     * applies the full language-driven rendering state: translation table,
+     * CJK glyph font, and blackletter dialog style (Latin-only, so it
+     * applies only for non-CJK languages). */
+    nb_set_lang(settings_get_lang());
 
     nb_var_init();
 
@@ -175,8 +167,7 @@ void nb_load(const char *filename)
     nb.num_lines = 0;
     nb.pc = 0;
     nb_old_skip = (strcmp(nb.filename, "logo.nb") == 0 || strcmp(nb.filename, "op.nb") == 0);
-    strncpy(nb.filename, filename, NB_FILENAME_MAX - 1);
-    nb.filename[NB_FILENAME_MAX - 1] = '\0';
+    str_copy(nb.filename, NB_FILENAME_MAX, filename);
     {
         int incomplete = 0, n;
         while (pos < NB_BUF_SIZE - 1 && fgets(nb.buf + pos, NB_BUF_SIZE - pos, f)) {
@@ -219,28 +210,29 @@ void nb_get_state(char *filename, int fn_size,
                   char *lang, int lang_size,
                   char *title, int title_size)
 {
-    strncpy(filename, nb.filename, fn_size - 1);
-    filename[fn_size - 1] = '\0';
-    strncpy(lang, nb.lang, lang_size - 1);
-    lang[lang_size - 1] = '\0';
-    strncpy(title, nb.chapter_title, title_size - 1);
-    title[title_size - 1] = '\0';
+    str_copy(filename, fn_size, nb.filename);
+    str_copy(lang, lang_size, nb.lang);
+    str_copy(title, title_size, nb.chapter_title);
 }
 
 /* Restore the runtime language from a saved snapshot.  Reloads the
- * translation table so the language switch takes effect immediately.
+ * translation table so the language switch takes effect immediately, then
+ * syncs the CJK glyph font and blackletter dialog style to the new language
+ * (single source of truth for language-driven rendering state: covers boot,
+ * in-game settings, and save/load applies alike).
  * Mirrors the nb_init fallback: a language with no translation files at all
  * degrades its lookup table to 'eng' (tr() falls back to source text either
  * way). */
 void nb_set_lang(const char *lang)
 {
-    strncpy(nb.lang, lang, sizeof(nb.lang) - 1);
-    nb.lang[sizeof(nb.lang) - 1] = '\0';
+    str_copy(nb.lang, sizeof(nb.lang), lang);
     tr_init(nb.lang);
     if (tr_get_count() == 0 && strcmp(nb.lang, "eng") != 0) {
         NB_DEBUG("WARN: no translations for lang='%s', falling back to 'eng'\r\n", nb.lang);
         tr_init("eng");
     }
+    cjk_load_for_lang(nb.lang);
+    text_set_blackletter(settings_get_blackletter_dialog() && !nb_lang_is_cjk());
 }
 
 /*
@@ -328,8 +320,7 @@ int nb_process(void)
         /* Save raw line before parse_line (commas/semicolons still intact). */
         {
             char line_copy[NB_LINE_MAX];
-            strncpy(line_copy, line, sizeof(line_copy) - 1);
-            line_copy[sizeof(line_copy) - 1] = '\0';
+            str_copy(line_copy, sizeof(line_copy), line);
 
             /* Parse command and arguments (comma-separated). */
             argc = nb_parse_line(line, cmd_name, sizeof(cmd_name),

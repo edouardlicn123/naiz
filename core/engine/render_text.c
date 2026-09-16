@@ -250,6 +250,23 @@ int text_width(const char *s, int bold)
 }
 
 /* Draw a glyph at 2x scale (16x32 from 8x16 source). */
+/* Write a 2x-scale title pixel to the current glyph target.  In RAM compose
+ * mode (menu layer composite) the pixel lands in the buffer so the title
+ * survives the opaque layer blit; otherwise it falls back to direct VRAM.
+ * Returns 1 when handled (RAM: written or clipped), 0 when VRAM mode. */
+static int title_pset(int px, int py, uint8_t color)
+{
+    int bx, by;
+    if (!text_tgt_buf)
+        return 0;
+    bx = px - text_tgt_offx;
+    by = py - text_tgt_offy;
+    if (bx < 0 || bx >= text_tgt_w || by < 0 || by >= text_tgt_h)
+        return 1;
+    text_tgt_buf[by * text_tgt_stride + bx] = color;
+    return 1;
+}
+
 static void draw_glyph_scaled(const uint8_t *g, int x, int y, uint8_t color)
 {
     int row, col, bit, px, py, addr, addr2, cur_bank = -1;
@@ -265,6 +282,11 @@ static void draw_glyph_scaled(const uint8_t *g, int x, int y, uint8_t color)
             py = y + row * 2;
             if (px < 0 || py < 0) continue;
             if (px >= LAYER_SCREEN_W || py >= LAYER_SCREEN_H) continue;
+            if (title_pset(px, py, color) &&
+                title_pset(px + 1, py, color) &&
+                title_pset(px, py + 1, color) &&
+                title_pset(px + 1, py + 1, color))
+                continue;
             addr = py * LAYER_SCREEN_W + px;
             VRAM_SET_BANK(addr, cur_bank);
             win[addr & (VRAM_BANK_SZ - 1)] = color;
@@ -285,24 +307,89 @@ static void draw_glyph_scaled(const uint8_t *g, int x, int y, uint8_t color)
     }
 }
 
-/* Draw text at 2x scale (16x32 per char) with black outline glow.
- * Each char is 16px wide, 32px tall. Outline uses PAL_CURSOR_BLACK (254). */
+/* Draw a CJK glyph at 2x scale (32x32 from 16x16 source). */
+static void draw_cjk_scaled(const uint8_t *g, int x, int y, uint8_t color)
+{
+    int row, col, bit, px, py, addr, addr2, cur_bank = -1;
+    unsigned short word;
+    volatile uint8_t *win = hal_vram_get_window();
+    if (x >= LAYER_SCREEN_W || y >= LAYER_SCREEN_H) return;
+    for (row = 0; row < CJK_GLYPH_H; row++) {
+        word = (unsigned short)(g[row * 2] << 8) | g[row * 2 + 1];
+        for (col = 0; col < CJK_GLYPH_W; col++) {
+            bit = 15 - col;
+            if (!(word & (1u << bit))) continue;
+            px = x + col * 2;
+            py = y + row * 2;
+            if (px < 0 || py < 0) continue;
+            if (px >= LAYER_SCREEN_W || py >= LAYER_SCREEN_H) continue;
+            if (title_pset(px, py, color) &&
+                title_pset(px + 1, py, color) &&
+                title_pset(px, py + 1, color) &&
+                title_pset(px + 1, py + 1, color))
+                continue;
+            addr = py * LAYER_SCREEN_W + px;
+            VRAM_SET_BANK(addr, cur_bank);
+            win[addr & (VRAM_BANK_SZ - 1)] = color;
+            if (px + 1 < LAYER_SCREEN_W) {
+                VRAM_SET_BANK(addr + 1, cur_bank);
+                win[(addr + 1) & (VRAM_BANK_SZ - 1)] = color;
+            }
+            if (py + 1 < LAYER_SCREEN_H) {
+                addr2 = addr + LAYER_SCREEN_W;
+                VRAM_SET_BANK(addr2, cur_bank);
+                win[addr2 & (VRAM_BANK_SZ - 1)] = color;
+                if (px + 1 < LAYER_SCREEN_W) {
+                    VRAM_SET_BANK(addr2 + 1, cur_bank);
+                    win[(addr2 + 1) & (VRAM_BANK_SZ - 1)] = color;
+                }
+            }
+        }
+    }
+}
+
+/* Draw text at 2x scale (16x32 per ASCII char, 32x32 per CJK glyph) with a
+ * black outline glow. Mixed ASCII/CJK titles are supported; the per-glyph
+ * advance is 2x the glyph width plus spacing. Outline uses PAL_CURSOR_BLACK. */
 void draw_title_large(const char *s, int x, int y, int spacing, uint8_t color)
 {
-    int i, cx;
-    const uint8_t *g;
-    for (i = 0; s[i]; i++) {
-        g = font_get_glyph((uint8_t)s[i]);
-        if (!g) continue;
-        cx = x + i * (FONT_GLYPH_W * 2 + spacing);
-        draw_glyph_scaled(g, cx - 2, y - 2, PAL_CURSOR_BLACK);
-        draw_glyph_scaled(g, cx    , y - 2, PAL_CURSOR_BLACK);
-        draw_glyph_scaled(g, cx + 2, y - 2, PAL_CURSOR_BLACK);
-        draw_glyph_scaled(g, cx - 2, y    , PAL_CURSOR_BLACK);
-        draw_glyph_scaled(g, cx + 2, y    , PAL_CURSOR_BLACK);
-        draw_glyph_scaled(g, cx - 2, y + 2, PAL_CURSOR_BLACK);
-        draw_glyph_scaled(g, cx    , y + 2, PAL_CURSOR_BLACK);
-        draw_glyph_scaled(g, cx + 2, y + 2, PAL_CURSOR_BLACK);
-        draw_glyph_scaled(g, cx, y, color);
+    int cx = x, ox, oy;
+    const uint8_t *g, *p = (const uint8_t *)s;
+    while (*p) {
+        if ((*p & 0x80) == 0) {
+            g = font_get_glyph(*p);
+            if (g) {
+                for (oy = -2; oy <= 2; oy += 2)
+                    for (ox = -2; ox <= 2; ox += 2)
+                        draw_glyph_scaled(g, cx + ox, y + oy, PAL_CURSOR_BLACK);
+                draw_glyph_scaled(g, cx, y, color);
+            }
+            cx += FONT_GLYPH_W * 2 + spacing;
+            p++;
+        } else {
+            int clen = utf8_clen(p);
+            int cp;
+            if (clen == 2) {
+                cp = (*p & 0x1F) << 6;
+                cp |= p[1] & 0x3F;
+            } else if (clen == 3) {
+                cp = (*p & 0x0F) << 12;
+                cp |= (p[1] & 0x3F) << 6;
+                cp |= p[2] & 0x3F;
+            } else {
+                p++;
+                cx += FONT_GLYPH_W * 2 + spacing;
+                continue;
+            }
+            g = cjk_get_glyph(cp);
+            if (g) {
+                for (oy = -2; oy <= 2; oy += 2)
+                    for (ox = -2; ox <= 2; ox += 2)
+                        draw_cjk_scaled(g, cx + ox, y + oy, PAL_CURSOR_BLACK);
+                draw_cjk_scaled(g, cx, y, color);
+            }
+            cx += CJK_GLYPH_W * 2 + spacing;
+            p += clen;
+        }
     }
 }

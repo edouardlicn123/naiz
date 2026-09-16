@@ -30,16 +30,6 @@ static int menu_layer_h = 0;
 static int menu_layer_transparent = 0;
 static int menu_layer_open_flag = 0;
 
-int menu_layer_is_open(void)
-{
-    return menu_layer_open_flag;
-}
-
-const uint8_t *menu_layer_pixels(void)
-{
-    return menu_layer_buf;
-}
-
 int menu_layer_open(int x, int y, int w, int h, int transparent)
 {
     int area;

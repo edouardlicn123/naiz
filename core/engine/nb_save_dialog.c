@@ -15,6 +15,7 @@
 #include "nb_dialog.h"
 #include "save.h"
 #include "tr.h"
+#include "strutil.h"
 
 /* Save dialog menu: in-place UI within dialog area. */
 static void save_dlg_draw_slots(int row, int col);
@@ -29,23 +30,21 @@ void save_dialog_menu(void)
     int row = 0, col = 0;
     int confirm = 0, confirm_yes = 1, running = 1;
     int sel_slot = 0;
-    int slot_start_x = LAYER_DIALOG_X + LAYER_DIALOG_INDENT;
+    int slot_start_x = LAYER_DIALOG_CONTENT_X;
     int prev_row, prev_col, prev_cyes;
     SlotInfo si;
     char buf[128];
 
     /* Save dialog text state */
     if (nb_dialog_get_charname()) {
-        strncpy(saved_charname, nb_dialog_get_charname(), sizeof(saved_charname) - 1);
-        saved_charname[sizeof(saved_charname) - 1] = '\0';
+        str_copy(saved_charname, sizeof(saved_charname), nb_dialog_get_charname());
     } else {
         saved_charname[0] = '\0';
     }
     {
         const char *txt = nb_dialog_get_text();
         if (txt && txt[0]) {
-            strncpy(saved_text, txt, sizeof(saved_text) - 1);
-            saved_text[sizeof(saved_text) - 1] = '\0';
+            str_copy(saved_text, sizeof(saved_text), txt);
             has_text = 1;
         } else {
             saved_text[0] = '\0';
@@ -53,16 +52,16 @@ void save_dialog_menu(void)
     }
     saved_offset = nb_dialog_get_offset();
 
-    /* Restore clean dialog snapshot (no text, correct pattern/solid style) */
+    /* Use a clean dialog box (no story text) as the menu backdrop. */
     hal_mouse_erase_cursor();
-    layer_dialog_restore();
+    layer_dialog_clear();
 
     menu_save_item_palette();
     hal_kbd_drain_advance();
 
     {
-        int content_x = LAYER_DIALOG_X + LAYER_DIALOG_INDENT;
-        int content_w = LAYER_DIALOG_W - LAYER_DIALOG_INDENT - LAYER_DIALOG_RIGHT_INDENT;
+        int content_x = LAYER_DIALOG_CONTENT_X;
+        int content_w = LAYER_DIALOG_CONTENT_W;
         draw_text(tr("SAVE"), 0, content_x, LAYER_DIALOG_Y + LAYER_DIALOG_HEADER_Y,
                   content_x + content_w, LAYER_DIALOG_Y + LAYER_DIALOG_HEADER_Y + 20,
                   0, PAL_WHITE);
@@ -126,16 +125,16 @@ void save_dialog_menu(void)
             if (hal_mouse_was_clicked(HAL_MOUSE_LBUTTON)) {
                 mx = hal_mouse_get_x();
                 my = hal_mouse_get_y();
-                if (my >= LAYER_DIALOG_Y + LAYER_DIALOG_TEXT_Y && my < LAYER_DIALOG_Y + LAYER_DIALOG_H - LAYER_DIALOG_BORDER &&
+                if (my >= LAYER_DIALOG_CONTENT_Y && my < LAYER_DIALOG_Y + LAYER_DIALOG_H - LAYER_DIALOG_BORDER &&
                     mx >= slot_start_x && mx < LAYER_DIALOG_X + LAYER_DIALOG_W - LAYER_DIALOG_RIGHT_INDENT) {
-                    int rel_y = my - (LAYER_DIALOG_Y + LAYER_DIALOG_TEXT_Y);
+                    int rel_y = my - LAYER_DIALOG_CONTENT_Y;
                     int click_row = rel_y / 20;
-                    int click_col = (mx - slot_start_x) / ((LAYER_DIALOG_W - LAYER_DIALOG_INDENT - LAYER_DIALOG_RIGHT_INDENT) / 6);
+                    int click_col = (mx - slot_start_x) / (LAYER_DIALOG_CONTENT_W / 6);
                     if (click_col < 0) click_col = 0;
                     if (click_col > 5) click_col = 5;
                     if (confirm) {
-                        int dlg_cx = LAYER_DIALOG_X + LAYER_DIALOG_INDENT;
-                        int dlg_cy = LAYER_DIALOG_Y + LAYER_DIALOG_TEXT_Y;
+                        int dlg_cx = LAYER_DIALOG_CONTENT_X;
+                        int dlg_cy = LAYER_DIALOG_CONTENT_Y;
                         int btn_y0 = dlg_cy + 60;
                         int btn_y1 = dlg_cy + 80;
                         if (my >= btn_y0 && my < btn_y1) {
@@ -199,10 +198,10 @@ void save_dialog_menu(void)
 static void save_dlg_draw_slots(int row, int col)
 {
     int r, c;
-    int content_x = LAYER_DIALOG_X + LAYER_DIALOG_INDENT;
-    int content_y = LAYER_DIALOG_Y + LAYER_DIALOG_TEXT_Y;
-    int content_w = LAYER_DIALOG_W - LAYER_DIALOG_INDENT - LAYER_DIALOG_RIGHT_INDENT;
-    int content_h = LAYER_DIALOG_H - LAYER_DIALOG_TEXT_Y - LAYER_DIALOG_BORDER;
+    int content_x = LAYER_DIALOG_CONTENT_X;
+    int content_y = LAYER_DIALOG_CONTENT_Y;
+    int content_w = LAYER_DIALOG_CONTENT_W;
+    int content_h = LAYER_DIALOG_CONTENT_H;
     int slot_w = content_w / 6;
     char buf[16];
 
@@ -228,13 +227,13 @@ static void save_dlg_draw_confirm(int slot, int yes)
 {
     char buf[128];
     SlotInfo si;
-    int content_x = LAYER_DIALOG_X + LAYER_DIALOG_INDENT;
-    int content_y = LAYER_DIALOG_Y + LAYER_DIALOG_TEXT_Y;
-    int content_w = LAYER_DIALOG_W - LAYER_DIALOG_INDENT - LAYER_DIALOG_RIGHT_INDENT;
-    int content_h = LAYER_DIALOG_H - LAYER_DIALOG_TEXT_Y - LAYER_DIALOG_BORDER;
+    int content_x = LAYER_DIALOG_CONTENT_X;
+    int content_y = LAYER_DIALOG_CONTENT_Y;
+    int content_w = LAYER_DIALOG_CONTENT_W;
+    int content_h = LAYER_DIALOG_CONTENT_H;
 
     hal_mouse_erase_cursor();
-    layer_dialog_restore();
+    layer_dialog_clear();
     draw_text(tr("SAVE"), 0, content_x, LAYER_DIALOG_Y + LAYER_DIALOG_HEADER_Y,
               content_x + content_w, LAYER_DIALOG_Y + LAYER_DIALOG_HEADER_Y + 20,
               0, PAL_WHITE);

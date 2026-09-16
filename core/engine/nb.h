@@ -29,7 +29,7 @@ int  nb_process(void);
 void nb_load(const char *filename);
 
 /*
- * 当前场景是否为菜单场景（mainmenu/loadscene/scenes/setting/logo/op）。
+ * 当前场景是否为菜单场景（mainmenu/loadscen/scenes/setting/logo/op）。
  * 菜单场景中禁用 F5/F6 存档热键。
  * 返回值: 1=菜单场景
  */

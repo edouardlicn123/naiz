@@ -163,7 +163,7 @@ int main(void)
                     if (hal_kbd_is_down(KC_F6) && !nb_is_menu_scene() && !anim_waiting()) {
                         hal_log("[INPUT] F6 -> load scene\r\n");
                         if (save_game_temp() != 0) break;
-                        nb_load("loadscene.nb");
+                        nb_load("loadscen.nb");
                         break;
                     }
                     if (hal_kbd_is_down(KC_ESC) && !anim_waiting()) {

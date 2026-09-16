@@ -10,6 +10,7 @@
 #include "scene_layers.h"
 #include "hal.h"
 #include "nb_dialog.h"
+#include "strutil.h"
 
 /* Debug logging — shared macro in debug.h */
 #include "debug.h"
@@ -38,8 +39,7 @@ void dialog_show(const char *charname, const char *text)
             NB_DEBUG("WARN: dialog text truncated at %d bytes\r\n", (int)sizeof(dialog_text_buf) - 1);
             hal_log("WARN: dialog text truncated\r\n");
         }
-        strncpy(dialog_text_buf, text, sizeof(dialog_text_buf) - 1);
-        dialog_text_buf[sizeof(dialog_text_buf) - 1] = '\0';
+        str_copy(dialog_text_buf, sizeof(dialog_text_buf), text);
         {
             int slen = (int)strlen(dialog_text_buf);
             while (slen > 0 && ((unsigned char)dialog_text_buf[slen - 1] & 0xC0) == 0x80)

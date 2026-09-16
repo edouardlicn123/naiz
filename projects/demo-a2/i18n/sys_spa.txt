@@ -23,3 +23,5 @@ Start Game=Nueva partida
 Yes=Sí
 [No]=[No]
 [Yes]=[Sí]
+No save data.=No hay datos guardados.
+Load failed.=Error al cargar.

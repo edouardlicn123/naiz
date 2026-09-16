@@ -42,6 +42,25 @@ def generate_autoexec(game_name):
     return content
 
 
+def _check_dos_collision(files, where):
+    """Abort before writing if two source files map to the same DOS 8.3
+    short name (to_dos_name truncates bases to 8 chars, so e.g. system_chi
+    and system_cht collide).  Silent clobbering on the HDI breaks the game;
+    fail loudly instead."""
+    dos_names = {}
+    for f in sorted(files):
+        ffn8, ffe3 = to_dos_name(f)
+        ddos = (ffn8.ljust(8, b' '), ffe3.ljust(3, b' '))
+        if ddos in dos_names:
+            raise RuntimeError(
+                f"8.3 name collision in {where}: '{f}' and "
+                f"'{dos_names[ddos]}' both map to "
+                f"'{ddos[0].decode()}.{ddos[1].decode()}'. "
+                f"Rename one of the source files."
+            )
+        dos_names[ddos] = f
+
+
 def inject_into_hdi(hdi_path, game_name, game_dir,
                     no_config=False, no_autoexec=False):
     if os.path.realpath(hdi_path) == os.path.realpath(DEFAULT_BASE):
@@ -131,17 +150,7 @@ def inject_into_hdi(hdi_path, game_name, game_dir,
             subdirs.append(f)
 
     # Detect 8.3 name collision BEFORE writing — abort to prevent data loss
-    dos_names = {}
-    for ff in game_files:
-        ffn8, ffe3 = to_dos_name(ff)
-        ddos = (ffn8.ljust(8, b' '), ffe3.ljust(3, b' '))
-        if ddos in dos_names:
-            raise RuntimeError(
-                f"8.3 name collision: '{ff}' and '{dos_names[ddos]}' "
-                f"both map to '{ddos[0].decode()}.{ddos[1].decode()}'. "
-                f"Rename one of the source files."
-            )
-        dos_names[ddos] = ff
+    _check_dos_collision(game_files, "root")
 
     print(f"\nInjecting {len(game_files)} game file(s) into root:")
     for f in game_files:
@@ -224,6 +233,7 @@ def inject_into_hdi(hdi_path, game_name, game_dir,
                 break
 
         sub_files = [f for f in sorted(os.listdir(dpath)) if os.path.isfile(os.path.join(dpath, f))]
+        _check_dos_collision(sub_files, f"{dir_name}/")
         print(f"  Injecting {len(sub_files)} file(s) into {dir_name}/:")
 
         for f in sub_files:

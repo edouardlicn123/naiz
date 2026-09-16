@@ -176,7 +176,7 @@ def collect_cps(proj_dir, lang, with_base=True):
             cps |= collect_nb_cps(nb)
     i18n = proj / "i18n"
     if i18n.is_dir():
-        for prefix in ("system", "role", "game"):
+        for prefix in ("sys", "role", "game"):
             f = i18n / f"{prefix}_{lang}.txt"
             if f.exists():
                 cps |= collect_i18n_cps(f)

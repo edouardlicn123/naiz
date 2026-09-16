@@ -703,6 +703,118 @@ def check_c29(text, _path):
 
 
 # ---------------------------------------------------------------------------
+# Three-in-one single source-of-truth guards (C32/C33/C34) and repeated
+# constant arithmetic (C35) -- integrate-results anti-regression (R29)
+# ---------------------------------------------------------------------------
+
+
+def check_c32(text, path):
+    """strncpy() allowed only inside core/lib/strutil.c (AUTO).
+
+    R29 deleted 26 hand-rolled ``strncpy + manual NUL`` idioms and
+    introduced str_copy() as the single fact source.  strncpy() must not
+    reappear at call sites: beyond strutil.c any strncpy() use is a
+    deterministic violation telling the author to use str_copy() (which also
+    guarantees the trailing NUL).
+    """
+    p = str(path)
+    if p.endswith("core/lib/strutil.c"):
+        return []
+    clean = _strip_c_comments(text)
+    return [(_line(clean, m.start()), "strncpy() outside core/lib/strutil.c; "
+                                      "use str_copy() from strutil.h")
+            for m in re.finditer(r"\bstrncpy\s*\(", clean)]
+
+
+def check_c33(text, _path):
+    """Adjacent layer_dialog_show()+dialog_layer_blit() pair (HEUR).
+
+    R29 promoted the two-call 'clean box' idiom to the public
+    layer_dialog_clear() and the pair must not be re-inlined.  A
+    consecutive (or comment-only-separated) show() + blit() outside the
+    body of layer_dialog_clear() itself is a candidate.
+    """
+    out = []
+    clean = _strip_c_comments(text)
+    funcs = _find_functions(clean)
+    for m in re.finditer(
+            r"\blayer_dialog_show\s*\(\s*\)\s*;[^A-Za-z0-9_]{0,60}"
+            r"\bdialog_layer_blit\s*\(\s*\)\s*;", clean):
+        span = _func_span(funcs, m.start())
+        if span is not None and span[0] == "layer_dialog_clear":
+            continue
+        out.append((_line(clean, m.start()),
+                    "adjacent layer_dialog_show()+dialog_layer_blit(); "
+                    "use layer_dialog_clear() instead"))
+    return out
+
+
+def check_c34(text, _path):
+    """Identical static array initializer repeated in one file (HEUR).
+
+    R29 merged a duplicated 4-element slot-position array (slot_y/slot_ys)
+    into a single file-level table.  Two static arrays of the same element
+    count whose initializer token stream is identical are a single
+    source-of-truth candidate.
+    """
+    out = []
+    clean = _strip_c_comments(text)
+    seen = {}
+    for m in re.finditer(
+            r"\b(?:static\s+)?(?:const\s+)?\w+(?:[^=;{}]*?\w)?\s*\["
+            r"[^\]]*\]\s*=\s*\{([^{}]*)\}", clean):
+        body = re.sub(r"\s+|/\*.*?\*/", "", m.group(1))
+        if not body or not re.fullmatch(r"(?:[A-Za-z0-9_+\-*/(),.\"]+)*", body):
+            continue
+        if not body or len(re.findall(r"[A-Za-z0-9_]\s*[,}]", body)) < 1:
+            continue
+        if body in seen:
+            first = seen[body]
+            out.append((_line(clean, m.start()),
+                        f"static array initializer identical to one at "
+                        f"line {first}; share a single table"))
+        else:
+            seen[body] = _line(clean, m.start())
+    return out
+
+
+RE_C32_EXPR = re.compile(
+    r"(?<![A-Za-z0-9_])([A-Z][A-Z0-9_]+|\d+)\s*[+\-*]\s*"
+    r"([A-Z][A-Z0-9_]+|\d+)(?![A-Za-z0-9_])")
+
+
+def check_c35(text, path):
+    """Same constant arithmetic expression repeated in one file (HEUR).
+
+    R29 consolidated 13+7 hand-written dialog-content geometry expressions
+    into LAYER_DIALOG_CONTENT_* macros.  A binary arithmetic expression of
+    macros / integer literals that appears three or more times in one file
+    (macro definitions excluded) is a candidate for a named constant/macro.
+    At least one operand must be a real macro (2+ char UPPER_SNAKE) so that
+    pure integer arithmetic like '1+2' does not produce noise.
+    """
+    out = []
+    clean = _strip_c_comments(text)
+    for m in re.finditer(r"#define[^\n]*", clean):
+        clean = clean[:m.start()] + "\n" * m.group(0).count("\n") + \
+            clean[m.end():]
+    counts = {}
+    for m in RE_C32_EXPR.finditer(clean):
+        lhs, rhs = m.group(1), m.group(2)
+        if not (lhs[0].isalpha() or rhs[0].isalpha()):
+            continue
+        expr = re.sub(r"\s+", "", m.group(0))
+        counts.setdefault(expr, []).append(m.start())
+    for expr, positions in counts.items():
+        if len(positions) >= 3:
+            out.append((_line(clean, positions[0]),
+                        f"constant expression '{expr}' repeated "
+                        f"{len(positions)}x in this file; consider a "
+                        "named macro/constant"))
+    return out
+
+
+# ---------------------------------------------------------------------------
 # lifecycle / logic (C16-C20) -- MANUAL review hints only
 # ---------------------------------------------------------------------------
 
@@ -760,4 +872,8 @@ def registry():
         "C27": (check_c27, "HEUR", "count-derived negative subscript"),
         "C28": (check_c28, "HEUR", "row-stride read without height extent"),
         "C29": (check_c29, "HEUR", "struct ptr start-only bound"),
+        "C32": (check_c32, "AUTO", "strncpy only in core/lib/strutil.c"),
+        "C33": (check_c33, "HEUR", "adjacent show+blit; use layer_dialog_clear"),
+        "C34": (check_c34, "HEUR", "duplicated static array initializer"),
+        "C35": (check_c35, "HEUR", "repeated constant arithmetic expression"),
     }

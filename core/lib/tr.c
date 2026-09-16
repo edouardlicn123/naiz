@@ -116,8 +116,10 @@ int tr_init(const char *lang)
     /* Guard against lang longer than available path space (max 47 chars). */
     if (strlen(lang) > 47) return -1;
 
-    /* Load system-level translations (UI elements, generic text). */
-    snprintf(path, sizeof(path), "i18n/system_%s.txt", lang);
+    /* Load system-level translations (UI elements, generic text).
+     * sys_<lang>.txt: short 8.3-safe base (system_* would truncate to the
+     * same DOS short name for chi and cht, clobbering one another on HDI). */
+    snprintf(path, sizeof(path), "i18n/sys_%s.txt", lang);
     load_file(path);
 
     /* Load role name translations. */

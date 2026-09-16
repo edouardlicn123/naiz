@@ -23,3 +23,5 @@ Start Game=Nova partida
 Yes=Sim
 [No]=[Não]
 [Yes]=[Sim]
+No save data.=Sem dados salvos.
+Load failed.=Falha ao carregar.

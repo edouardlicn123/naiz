@@ -33,6 +33,11 @@
 #define LAYER_DIALOG_TEXT_Y  28                     /* 文本起始 Y */
 #define LAYER_DIALOG_HEADER_Y 6                     /* 角色名起始 Y */
 #define LAYER_DIALOG_BOTTOM  (LAYER_DIALOG_Y + LAYER_DIALOG_H - LAYER_DIALOG_BORDER)
+/* 对话框内容区（文本/菜单内容）几何（单一事实源） */
+#define LAYER_DIALOG_CONTENT_X  (LAYER_DIALOG_X + LAYER_DIALOG_INDENT)
+#define LAYER_DIALOG_CONTENT_W  (LAYER_DIALOG_W - LAYER_DIALOG_INDENT - LAYER_DIALOG_RIGHT_INDENT)
+#define LAYER_DIALOG_CONTENT_Y  (LAYER_DIALOG_Y + LAYER_DIALOG_TEXT_Y)
+#define LAYER_DIALOG_CONTENT_H  (LAYER_DIALOG_H - LAYER_DIALOG_TEXT_Y - LAYER_DIALOG_BORDER)
 /* 颜色方案数量（对话框/按钮背景色） */
 #define COLOR_SCHEME_COUNT  5
 /* screen dimensions in render.h (LAYER_SCREEN_W, LAYER_SCREEN_H) */
@@ -101,8 +106,6 @@ void scene_end(int skip_transition);
 void layer_capture_bg_dialog_from_image(const uint8_t *pixels, int img_w, int img_h,
                                         int src_x, int src_y);
 /* 还原对话框区域的背景 */
-void layer_dialog_restore(void);
-/* 隐藏对话框 */
 void layer_dialog_hide(void);
 /* 对话框是否已绘制 */
 int  layer_dialog_drawn(void);
@@ -131,6 +134,8 @@ void layer_bg_change(MagImage *img);
 void layer_sprite_update(int sprite_id, int asset_id, int x, int y, int mirror);
 /* 统一对话框显示操作（内部自动选择 open/snap + restore） */
 void layer_dialog_show(void);
+/* 发布干净对话框盒（重画框 + 合成一次 blit），供菜单覆盖层作底 */
+void layer_dialog_clear(void);
 
 /*==== Layer Z-order state query ===========================================*/
 

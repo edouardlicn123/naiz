@@ -12,6 +12,7 @@
 #include <stddef.h>
 #include "save.h"
 #include "hal.h"
+#include "strutil.h"
 
 /*
  * save_checksum — Sum all bytes of the buffer (used for save file checksum).
@@ -164,10 +165,8 @@ int save_read_header(const char *path, SaveHeader *h)
     }
 
     fclose(f);
-    strncpy(h->slot_name, slot_name, sizeof(h->slot_name) - 1);
-    h->slot_name[sizeof(h->slot_name) - 1] = '\0';
-    strncpy(h->timestamp, timestamp, sizeof(h->timestamp) - 1);
-    h->timestamp[sizeof(h->timestamp) - 1] = '\0';
+    str_copy(h->slot_name, sizeof(h->slot_name), slot_name);
+    str_copy(h->timestamp, sizeof(h->timestamp), timestamp);
     h->filename[sizeof(h->filename) - 1] = '\0';
     h->chapter_title[sizeof(h->chapter_title) - 1] = '\0';
     return 0;

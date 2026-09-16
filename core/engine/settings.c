@@ -11,6 +11,7 @@
 #include <string.h>
 #include "settings.h"
 #include "scene_layers.h"
+#include "strutil.h"
 
 static GameSettings g_settings;
 
@@ -86,12 +87,10 @@ int settings_load(void)
                 g_settings.button_style = (unsigned char)bs;
         } else if (strcmp(line, "lang") == 0) {
             known = 1;
-            strncpy(g_settings.lang, val, sizeof(g_settings.lang) - 1);
-            g_settings.lang[sizeof(g_settings.lang) - 1] = '\0';
+            str_copy(g_settings.lang, sizeof(g_settings.lang), val);
         } else if (strcmp(line, "version") == 0) {
             known = 1;
-            strncpy(g_settings.version, val, sizeof(g_settings.version) - 1);
-            g_settings.version[sizeof(g_settings.version) - 1] = '\0';
+            str_copy(g_settings.version, sizeof(g_settings.version), val);
         } else if (strcmp(line, "blacktitle") == 0) {
             known = 1;
             g_settings.blackletter_title = (atoi(val) != 0);
@@ -130,6 +129,5 @@ int settings_save(void)
 void settings_set_lang(const char *lang)
 {
     if (!lang) lang = "eng";
-    strncpy(g_settings.lang, lang, sizeof(g_settings.lang) - 1);
-    g_settings.lang[sizeof(g_settings.lang) - 1] = '\0';
+    str_copy(g_settings.lang, sizeof(g_settings.lang), lang);
 }

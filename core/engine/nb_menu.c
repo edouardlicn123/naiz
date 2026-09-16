@@ -158,9 +158,12 @@ int menu_show(int mx, int my, int cols, int argc, const char **argv)
                                       hal_mouse_get_x(), hal_mouse_get_y());
                 if (hit >= 0) {
                     NB_DEBUG("menu: mouse sel=%d (%s)\r\n", hit, argv[hit]);
-                    menu_restore_item_palette();
-                    hal_mouse_flush();
+                    /* Exit contract (shared by all menu UIs): close the
+                     * layer (base snapshot back to VRAM) first, then flush
+                     * the mouse and restore the shared menu palette. */
                     menu_layer_close(1);
+                    hal_mouse_flush();
+                    menu_restore_item_palette();
                     return hit;
                 }
             }
@@ -235,9 +238,9 @@ int menu_show(int mx, int my, int cols, int argc, const char **argv)
             }
             if (hal_kbd_is_down(KC_SPACE) || hal_kbd_is_down(KC_ENTER) || hal_kbd_is_down(KC_XFER)) {
                 NB_DEBUG("menu: keyboard sel=%d (%s)\r\n", sel, argv[sel]);
-                menu_restore_item_palette();
-                hal_mouse_flush();
                 menu_layer_close(1);
+                hal_mouse_flush();
+                menu_restore_item_palette();
                 return sel;
             }
 

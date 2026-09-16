@@ -37,8 +37,8 @@ btnstyle=2
 
 ; --- 语言 ---
 ; lang: 界面语言
-;   由翻译系统 tr_init() 加载 i18n/{system,role,game}_<lang>.txt
-;   系统界面文字（system_*.txt）必须以英文为基准并附各目标语言译文；
+;   由翻译系统 tr_init() 加载 i18n/{sys,role,game}_<lang>.txt
+;   系统界面文字（sys_*.txt）必须以英文为基准并附各目标语言译文；
 ;   角色名/剧情原文跟随项目设定，其翻译经 role_/game_*.txt 提供
 ;
 ;   可选值：eng | jpn | chi | cht | kor | fre | ger | ita | spa | por

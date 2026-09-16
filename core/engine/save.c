@@ -8,6 +8,7 @@
 #include <string.h>
 #include <stddef.h>
 #include <time.h>
+#include "strutil.h"
 
 static SaveData *sd = NULL;
 
@@ -168,7 +169,7 @@ int slot_info(int slot, SlotInfo *info)
     if (slot < 0 || slot >= SAVE_SLOTS) return 0;
     info->exists = 0;
     info->version = 0;
-    snprintf(info->slot_name, sizeof(info->slot_name), "Slot %d — (Empty)", slot + 1);
+    snprintf(info->slot_name, sizeof(info->slot_name), "Slot %d - (Empty)", slot + 1);
     info->timestamp[0] = '\0';
     info->filename[0] = '\0';
     info->chapter_title[0] = '\0';
@@ -179,14 +180,10 @@ int slot_info(int slot, SlotInfo *info)
 
     info->exists = 1;
     info->version = h.version;
-    strncpy(info->slot_name, h.slot_name, sizeof(info->slot_name) - 1);
-    info->slot_name[sizeof(info->slot_name) - 1] = '\0';
-    strncpy(info->timestamp, h.timestamp, sizeof(info->timestamp) - 1);
-    info->timestamp[sizeof(info->timestamp) - 1] = '\0';
-    strncpy(info->filename, h.filename, sizeof(info->filename) - 1);
-    info->filename[sizeof(info->filename) - 1] = '\0';
-    strncpy(info->chapter_title, h.chapter_title, sizeof(info->chapter_title) - 1);
-    info->chapter_title[sizeof(info->chapter_title) - 1] = '\0';
+    str_copy(info->slot_name, sizeof(info->slot_name), h.slot_name);
+    str_copy(info->timestamp, sizeof(info->timestamp), h.timestamp);
+    str_copy(info->filename, sizeof(info->filename), h.filename);
+    str_copy(info->chapter_title, sizeof(info->chapter_title), h.chapter_title);
     return 1;
 }
 
