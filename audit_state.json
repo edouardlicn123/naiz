@@ -1,7 +1,7 @@
 {
   "version": 2,
-  "git_head": "7337210",
-  "checked_at": "2026-09-16T11:07:54",
+  "git_head": "ca52a71",
+  "checked_at": "2026-09-16T15:11:44",
   "files": {
     "core/build.sh": {
       "sha256": "0e6bb3f41cae8f6c5a014a49767f93990ddd3e2c461a85ec991c01b40b66b11e",
@@ -214,7 +214,7 @@
       "findings": []
     },
     "core/engine/nb_asset_table.h": {
-      "sha256": "bb7e80904c8d4a337052d731aea5b1c786241bd54b2e54998981090bd9f00122",
+      "sha256": "878280dc2577c7b0f7c782d0d9d7b1ca6764bf01b13e7e529e50bb91ad951205",
       "violations": 0,
       "candidates": 0,
       "findings": []
@@ -232,12 +232,12 @@
       "findings": []
     },
     "core/engine/nb_cggallery.c": {
-      "sha256": "d7140d5cbf57dd31d5e87e53cea239b5e27dc2ee87d043dcb979b41dd30ad625",
+      "sha256": "ac449cf659eef168ebc4cc64b8fda3de10f832afd0ebd1667434e192226aba24",
       "violations": 0,
       "candidates": 1,
       "findings": [
         {
-          "line": 228,
+          "line": 275,
           "rule": "C35",
           "level": "HEUR"
         }
@@ -902,7 +902,7 @@
       "findings": []
     },
     "tools/naiz_build/build_game.py": {
-      "sha256": "aa5c88de2f95bb9928a96dee81c41f8299683216dbb2ef0a8d2e00d18b0491ce",
+      "sha256": "142bee022677dd920ad3c358cd66c5f68ab2ce45d4e0c697939f8e1c1d629caf",
       "violations": 0,
       "candidates": 1,
       "findings": [
@@ -992,7 +992,7 @@
       "findings": []
     },
     "tools/naiz_conv/mag_convert.py": {
-      "sha256": "f92fca3a1979707ee405de4043814d64fd3132b7b4a09642342be7ffc978004a",
+      "sha256": "052ebf9f6a0f92241471a0f1f61556519fd6ad5bc3f5fc84020ae95d5031fa71",
       "violations": 0,
       "candidates": 1,
       "findings": [
@@ -1264,15 +1264,15 @@
   },
   "summary": {
     "files": 171,
-    "changed": 0,
-    "skipped": 171,
+    "changed": 2,
+    "skipped": 169,
     "out_of_scope": 0,
     "violations": 0,
     "candidates": 40,
     "fresh_violations": 0,
-    "fresh_candidates": 0,
-    "verified": 40,
+    "fresh_candidates": 2,
+    "verified": 39,
     "stale": 0,
-    "open": 0
+    "open": 1
   }
 }

@@ -30,20 +30,26 @@
 #define GAL_ROWS        3
 #define GAL_CELLS       (GAL_COLS * GAL_ROWS)      /* 12 per page */
 #define GAL_ORIGIN_X    20
-#define GAL_ORIGIN_Y    32
+#define GAL_ORIGIN_Y    44
 #define GAL_CELL_W      144
 #define GAL_CELL_H      100
 #define GAL_STEP_X      148     /* cell 144 + 4 gap */
 #define GAL_STEP_Y      104     /* cell 100 + 4 gap */
+#define GAL_GRID_BOTTOM (GAL_ORIGIN_Y + (GAL_ROWS - 1) * GAL_STEP_Y + GAL_CELL_H)
 
-/* Gallery main-menu color indexes */
-#define GAL_GRID_BORDER_SEL  7        /* PAL_WHITE: focused unlocked border */
-#define GAL_GRID_BORDER      7        /* unlocked idle border */
-#define GAL_BG_UNLOCKED      PAL_BLUE /* cell background when unlocked */
-#define GAL_LOCK_FG_IDLE     7        /* [LOCKED] idle text */
-#define GAL_LOCK_FG_SEL      15       /* [LOCKED] focused text */
-#define GAL_LOCK_BORDER_IDLE 12       /* locked idle border */
-#define GAL_LOCK_BORDER_SEL  15       /* locked focused border */
+/* Gallery widget colors.  All drawn with engine-reserved high palette
+ * indices (248-255) so they stay correct regardless of which background
+ * image palette (entries 0..ncol-1) is currently loaded behind the grid.
+ *   GAL_FILL_UNLOCKED (255): never rewritten by image/dialog/button
+ *     palettes (PAL_NO_TRANSPARENCY is a blit sentinel, not a palette
+ *     owner); its value is saved/restored by the helpers below.
+ *   GAL_FILL_LOCKED: PAL_CURSOR_BLACK (engine-reserved black, forced by
+ *     palette_reset_reserved).  Also the page/footer text color — visible
+ *     on the light gallery artwork.
+ *   GAL_FG: MENU_PAL_WHITE (menu palette, set by menu_save_item_palette). */
+#define GAL_FILL_UNLOCKED   255
+#define GAL_FILL_LOCKED     PAL_CURSOR_BLACK
+#define GAL_FG              MENU_PAL_WHITE
 
 enum { GAL_VIEW_GRID = 0, GAL_VIEW_CG = 1 };
 
@@ -57,6 +63,37 @@ static void gallery_cache_unlocks(void)
     int i;
     for (i = 0; i < CG_COUNT; i++)
         gal_unlock_cache[i] = sys_save_is_cg_unlocked(i + 1) ? 1 : 0;
+}
+
+/* Saved value of the 255 slot (unlocked-cell blue fill), restored on exit. */
+static uint8_t gal_blue_save[3];
+
+static void gallery_palette_save(void)
+{
+    hal_read_palette(GAL_FILL_UNLOCKED, &gal_blue_save[0], &gal_blue_save[1], &gal_blue_save[2]);
+    hal_set_palette(GAL_FILL_UNLOCKED, 0x00, 0x00, 0xFF);
+}
+
+static void gallery_palette_restore(void)
+{
+    hal_set_palette(GAL_FILL_UNLOCKED, gal_blue_save[0], gal_blue_save[1], gal_blue_save[2]);
+}
+
+/* Compute the total pixel width of a draw_title_large string at 2x scale.
+ * text_width() gives the 1x width; advance = 2*glyph + spacing, so the
+ * full 2x width = 2*width + (char_count-1)*spacing. */
+static int gallery_title_width(const char *s, int spacing)
+{
+    const uint8_t *p = (const uint8_t *)s;
+    int n = 0;
+    while (*p) {
+        if ((*p & 0x80) == 0)
+            p++;
+        else
+            p += ((*p & 0xE0) == 0xC0) ? 2 : 3;
+        n++;
+    }
+    return n ? 2 * text_width(s, 0) + (n - 1) * spacing : 0;
 }
 
 /* Map in-cell-index (0..11) to screen coordinates. */
@@ -73,17 +110,16 @@ static void gallery_draw_cell(int abs_idx, int x, int y, int is_sel)
     char label[16];
     int unlocked = gal_unlock_cache[abs_idx];
 
+    (void)is_sel;
     if (unlocked) {
-        fill_rect(x, y, GAL_CELL_W, GAL_CELL_H, GAL_BG_UNLOCKED);
+        fill_rect(x, y, GAL_CELL_W, GAL_CELL_H, GAL_FILL_UNLOCKED);
         snprintf(label, sizeof(label), "CG %02d", abs_idx + 1);
-        draw_text(label, 0, x + 12, y + 10, x + GAL_CELL_W - 12, y + 26, 1, PAL_WHITE);
-        draw_rect(x, y, GAL_CELL_W, GAL_CELL_H, 1, GAL_GRID_BORDER);
+        draw_text(label, 0, x + 12, y + 10, x + GAL_CELL_W - 12, y + 26, 1, GAL_FG);
+        draw_rect(x, y, GAL_CELL_W, GAL_CELL_H, 1, GAL_FG);
     } else {
-        fill_rect(x, y, GAL_CELL_W, GAL_CELL_H, 0);
-        draw_text(tr("[LOCKED]"), 0, x + 30, y + 42, x + GAL_CELL_W - 30, y + 58, 0,
-                  is_sel ? GAL_LOCK_FG_SEL : GAL_LOCK_FG_IDLE);
-        draw_rect(x, y, GAL_CELL_W, GAL_CELL_H, 1,
-                  is_sel ? GAL_LOCK_BORDER_SEL : GAL_LOCK_BORDER_IDLE);
+        fill_rect(x, y, GAL_CELL_W, GAL_CELL_H, GAL_FILL_LOCKED);
+        draw_text(tr("[LOCKED]"), 0, x + 30, y + 42, x + GAL_CELL_W - 30, y + 58, 0, GAL_FG);
+        draw_rect(x, y, GAL_CELL_W, GAL_CELL_H, 1, GAL_FG);
     }
 }
 
@@ -93,6 +129,7 @@ static void gallery_draw_grid(int page, int sel, int focus_on_back)
     int total_pages = (CG_COUNT + GAL_CELLS - 1) / GAL_CELLS;
     int page_start = page * GAL_CELLS;
     char buf[32];
+    int tw;
     int i;
 
     /* Draw into the menu layer composite (opened by cmd_cgvmenu); commit +
@@ -101,8 +138,19 @@ static void gallery_draw_grid(int page, int sel, int focus_on_back)
     menu_layer_begin_draw();
 
     vblank_wait();
-    fill_rect(0, 0, LAYER_SCREEN_W, LAYER_SCREEN_H, 0);
-    draw_title_large(tr("CG GALLERY"), 20, 12, 3, PAL_WHITE);
+    /* No full black wash: the composite holds the gallery artwork base
+     * snapshot, so only the three widget bands need clearing back to base
+     * (title / grid / footer) before they are redrawn.  The backdrop stays
+     * visible for the whole visit — the original whole-page black mask was
+     * why the artwork only appeared after leaving the gallery. */
+    menu_layer_erase_to_base(0, 0, LAYER_SCREEN_W, GAL_ORIGIN_Y);
+    menu_layer_erase_to_base(0, GAL_ORIGIN_Y, LAYER_SCREEN_W,
+                             GAL_GRID_BOTTOM - GAL_ORIGIN_Y);
+    menu_layer_erase_to_base(0, GAL_GRID_BOTTOM, LAYER_SCREEN_W,
+                             LAYER_SCREEN_H - GAL_GRID_BOTTOM);
+
+    tw = gallery_title_width(tr("CG GALLERY"), 3);
+    draw_title_large(tr("CG GALLERY"), (LAYER_SCREEN_W - tw) / 2, 4, 3, GAL_FG);
 
     for (i = 0; i < GAL_CELLS; i++) {
         int abs_idx = page_start + i;
@@ -113,12 +161,12 @@ static void gallery_draw_grid(int page, int sel, int focus_on_back)
     }
 
     draw_rounded_emboss(66, 356, 80, 30, 4, BTN_FILL_IDX, BTN_HIGHLIGHT_IDX, BTN_SHADOW_IDX);
-    draw_text(tr("Back"), 0, 76, 363, 136, 379, 1, focus_on_back ? MENU_PAL_YELLOW : PAL_WHITE);
+    draw_text(tr("Back"), 0, 76, 363, 136, 379, 1, focus_on_back ? MENU_PAL_YELLOW : GAL_FG);
 
-    if (page > 0)              draw_text("<", 0, 56, 370, 72, 386, 0, PAL_WHITE);
-    if (page < total_pages - 1) draw_text(">", 0, 576, 370, 592, 386, 0, PAL_WHITE);
+    if (page > 0)               draw_text("<", 0, 56, 370, 72, 386, 0, GAL_FILL_LOCKED);
+    if (page < total_pages - 1) draw_text(">", 0, 576, 370, 592, 386, 0, GAL_FILL_LOCKED);
     snprintf(buf, sizeof(buf), "%d/%d", page + 1, total_pages);
-    draw_text(buf, 0, 308, 370, 332, 386, 0, PAL_WHITE);
+    draw_text(buf, 0, 308, 370, 332, 386, 0, GAL_FILL_LOCKED);
 
     menu_layer_commit();
     menu_layer_blit();
@@ -133,8 +181,8 @@ static void gallery_draw_cells_range(int page, int from_sel, int to_sel, int foc
     menu_layer_begin_draw();
 
     if (!focus_on_back) {
-        /* Back loses focus (was possibly highlighted): repaint white. */
-        draw_text(tr("Back"), 0, 76, 363, 136, 379, 1, PAL_WHITE);
+        /* Back loses focus (was possibly highlighted): repaint idle color. */
+        draw_text(tr("Back"), 0, 76, 363, 136, 379, 1, GAL_FG);
 
         /* Old cell loses focus */
         gallery_cell_xy(from_sel, &x, &y);
@@ -188,7 +236,7 @@ static int gallery_preview(int abs_idx)
 /* Exit preview: restore bg asset then redraw the grid. */
 static void gallery_exit_preview(int page, int sel, int focus_on_back)
 {
-    MagImage *bg = image_load((unsigned short)nb_asset_id("yellow_grid"));
+    MagImage *bg = image_load((unsigned short)nb_asset_id("gallery"));
     hal_mouse_erase_cursor();
     if (bg) {
         layer_bg_change(bg);
@@ -213,7 +261,7 @@ void cmd_cgvmenu(int argc, const char **argv, const char *cmd_name)
         NB_DEBUG("cgvmenu: CG_COUNT=0, empty gallery\r\n");
         hal_kbd_drain_advance();
         hal_mouse_erase_cursor();
-        draw_text(tr("No CGs available."), 0, 200, 190, 440, 210, 1, PAL_WHITE);
+        draw_text(tr("No CGs available."), 0, 200, 190, 440, 210, 1, GAL_FG);
         hal_mouse_draw_cursor_force();
         for (;;) {
             hal_kbd_update();
@@ -234,6 +282,7 @@ void cmd_cgvmenu(int argc, const char **argv, const char *cmd_name)
     hal_kbd_drain_advance();
     hal_mouse_erase_cursor();
     menu_save_item_palette();
+    gallery_palette_save();          /* force slot 255 to the unlock-blue */
     gallery_cache_unlocks();
     menu_layer_open(0, 0, LAYER_SCREEN_W, LAYER_SCREEN_H, 0);
     gallery_draw_grid(page, sel, focus_on_back);
@@ -322,10 +371,11 @@ void cmd_cgvmenu(int argc, const char **argv, const char *cmd_name)
     }
 
     /* Exit contract (shared by all menu UIs): close the layer (base snapshot
-     * back to VRAM) first, then flush the mouse and restore the shared menu
-     * palette. */
+     * back to VRAM) first, then flush the mouse, restore the shared menu
+     * palette and the saved 255 slot. */
     menu_layer_close(1);
     hal_mouse_flush();
     menu_restore_item_palette();
+    gallery_palette_restore();
     nb_load("mainmenu.nb");
 }

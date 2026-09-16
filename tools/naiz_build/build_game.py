@@ -170,6 +170,8 @@ def convert_png_to_mag(assets_dir: Path, proj_dir: Path):
                 kwargs['dither'] = True
             elif o == '--no-resize':
                 kwargs['no_resize'] = True
+            elif o == '--cover':
+                kwargs['cover'] = True
 
         convert_file(str(png_src), str(mag_dst), **kwargs)
         converted += 1

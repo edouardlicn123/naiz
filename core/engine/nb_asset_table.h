@@ -13,6 +13,7 @@ static const struct { const char *key; int id; } asset_map[] = {
     {"seasidebg", 7},
     {"yellow_grid", 13},
     {"pink_grid", 14},
+    {"gallery", 15},
     {NULL, 0}
 };
 

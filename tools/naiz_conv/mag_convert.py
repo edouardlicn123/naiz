@@ -60,17 +60,26 @@ def _hex_color(s):
 # Image processing
 # ---------------------------------------------------------------------------
 
-def resize_to_screen(img, width=MAG_WIDTH, height=MAG_HEIGHT):
+def resize_to_screen(img, width=MAG_WIDTH, height=MAG_HEIGHT, cover=False):
     from PIL import Image as PIL_Image
     src_w, src_h = img.size
-    scale = min(width / src_w, height / src_h)
+    if cover:
+        scale = max(width / src_w, height / src_h)
+    else:
+        scale = min(width / src_w, height / src_h)
     new_w = int(src_w * scale)
     new_h = int(src_h * scale)
     resized = img.resize((new_w, new_h), PIL_Image.LANCZOS)
-    canvas = PIL_Image.new("RGB", (width, height), (0, 0, 0))
-    ox = (width - new_w) // 2
-    oy = (height - new_h) // 2
-    canvas.paste(resized, (ox, oy))
+    if cover:
+        # Center-crop: trim the overflow edges after scale-to-fill
+        left   = (new_w - width)  // 2
+        top    = (new_h - height) // 2
+        canvas = resized.crop((left, top, left + width, top + height))
+    else:
+        canvas = PIL_Image.new("RGB", (width, height), (0, 0, 0))
+        ox = (width - new_w) // 2
+        oy = (height - new_h) // 2
+        canvas.paste(resized, (ox, oy))
     return canvas
 
 
@@ -333,7 +342,7 @@ def quantize_to_palette(img_rgba, master_palette, key_color=None,
 def convert_image(pil_img, *,
                   sprite=False, sprite_key=None,
                   num_colors=256, bpp=8,
-                  dither=False, no_resize=False,
+                  dither=False, no_resize=False, cover=False,
                   master_mag_path=None,
                   reserved=None, filter_white=False,
                   user_string=None):
@@ -399,7 +408,7 @@ def convert_image(pil_img, *,
             print("WARN: alpha channel flattened")
 
         if not no_resize:
-            pil_img = resize_to_screen(pil_img)
+            pil_img = resize_to_screen(pil_img, cover=cover)
 
         if not master_pal:
             indexed = quantize_image(pil_img, num_colors=num_colors, dither=dither)
@@ -469,6 +478,8 @@ def main():
                         help="Floyd-Steinberg dither (background only)")
     parser.add_argument("--no-resize", action="store_true",
                         help="Skip auto-resize to 640x400 (background only)")
+    parser.add_argument("--cover", action="store_true",
+                        help="Cover mode: scale to fill screen, center-crop overflow (no bars)")
     parser.add_argument("--master-mag", type=str, default=None,
                         help="Shared palette from another MAG file")
     parser.add_argument("--reserved", type=str, default=None,
@@ -494,6 +505,8 @@ def main():
         kwargs['dither'] = True
     if args.no_resize:
         kwargs['no_resize'] = True
+    if args.cover:
+        kwargs['cover'] = True
     if args.master_mag:
         kwargs['master_mag_path'] = args.master_mag
     if args.reserved:
