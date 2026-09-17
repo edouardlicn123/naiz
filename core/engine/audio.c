@@ -174,8 +174,9 @@ static void pcm_play(const AudioAssetMap *map, const char *key)
     }
 
     /* Replace current stream.  hal_pcm_play rebinds its borrow instantly,
-     * so the old buffer is free to release straight after. */
-    hal_pcm_play(raw + PCM_HDR_SIZE, (uint32_t)(size - PCM_HDR_SIZE), rate);
+     * so the old buffer is free to release straight after.  One-shot:
+     * SE/voice never loop (loop=0), per devdoc 101 §4.3 caller semantics. */
+    hal_pcm_play(raw + PCM_HDR_SIZE, (uint32_t)(size - PCM_HDR_SIZE), rate, 0);
     free(g_pcm_buf);
     g_pcm_buf = raw;
     hal_logf("PCM start '%s' (%ld B, rate %u)\r\n", key, size - PCM_HDR_SIZE, rate);

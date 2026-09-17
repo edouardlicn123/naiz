@@ -138,12 +138,13 @@ unsigned long hal_wallclock_ms(void);
  *
  * hal_pcm_*():
  *   86 板 PCM。hal_pcm_play 配置速率/8bit mono 并启用输出；hal_pcm_tick
- *   每帧泵 FIFO（A466 bit7=full 时停泵），数据耗尽自动停；hal_pcm_stop
+ *   每帧泵 FIFO（A466 bit7=full 时停泵）；loop=1 时数据耗尽自动回绕
+ *   pos 至 0（素材表语义决定调用方传入），否则耗尽自动停；hal_pcm_stop
  *   停输出清缓冲。data 由调用方持有（HAL 借用至 play/stop），不自 free。
  */
 int  hal_audio_detect(void);
 void hal_midi_out(uint8_t b);
-void hal_pcm_play(const uint8_t *data, uint32_t len, int rate);
+void hal_pcm_play(const uint8_t *data, uint32_t len, int rate, int loop);
 void hal_pcm_tick(void);
 void hal_pcm_stop(void);
 int  hal_pcm_active(void);

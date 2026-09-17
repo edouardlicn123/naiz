@@ -94,6 +94,7 @@ struct pcm_state {
     uint32_t len;
     uint32_t pos;
     int      rate;         /* 0-7 rate code */
+    int      loop;         /* 1: rewind pos at EOF (caller-decided) */
     int      active;
 };
 
@@ -104,7 +105,7 @@ int hal_pcm_active(void)
     return g_pcm.active;
 }
 
-void hal_pcm_play(const uint8_t *data, uint32_t len, int rate)
+void hal_pcm_play(const uint8_t *data, uint32_t len, int rate, int loop)
 {
     uint8_t rate_code;
 
@@ -133,6 +134,7 @@ void hal_pcm_play(const uint8_t *data, uint32_t len, int rate)
     g_pcm.len = len;
     g_pcm.pos = 0;
     g_pcm.rate = rate;
+    g_pcm.loop = loop ? 1 : 0;
     g_pcm.active = 1;
 }
 
@@ -157,6 +159,11 @@ void hal_pcm_tick(void)
     }
 
     if (g_pcm.pos >= g_pcm.len) {
+        if (g_pcm.loop) {
+            /* EOF with looping: rewind and keep pumping. */
+            g_pcm.pos = 0;
+            return;
+        }
         /* EOF: stop output, drop the buffer reference. */
         outb(PCM_CTRL_PORT, PCM_CTRL_BUF_RESET);
         g_pcm.data = NULL;

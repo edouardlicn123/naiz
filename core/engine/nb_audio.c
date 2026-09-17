@@ -2,7 +2,7 @@
  * nb_audio.c — NB audio commands (bgm/sound/voice).
  *
  * Split from nb_commands.c: audio commands depend only on hal.h, forming
- * a distinct feature track (backend implementation plan: devdocs doc-41).
+ * a distinct feature track (backend implementation plan: devdoc 101).
  * Registered in nb_commands.c cmd_table.
  * Grammar (mirrors cmd_cg): {key} is the brace payload; parens are reserved
  * for parameters.  bgm(stop) is a keyword directive.
