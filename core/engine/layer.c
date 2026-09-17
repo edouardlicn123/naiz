@@ -9,6 +9,7 @@
 #include "scene_layers.h"
 #include "layer_internal.h"
 #include "nb_anim.h"
+#include "audio.h"
 #include "hal.h"
 
 /*=== Lifecycle ===========================================================*/
@@ -25,9 +26,7 @@ static int g_layer_active[LAYER_Z_COUNT] = {0};
 void scene_end(int skip_transition)
 {
     hal_mouse_invalidate_cursor();
-    hal_bgm_stop();
-    hal_sound_stop();
-    hal_voice_stop();
+    audio_stop_all();     /* silence BGM (all-notes-off) + PCM (scene end) */
     anim_stop();          /* implicit stop: scene change ends any animation */
     layer_init();
     layer_sprite_hide_all();

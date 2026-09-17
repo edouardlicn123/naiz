@@ -21,6 +21,7 @@
 #include "layer_debug.h"
 #include "settings.h"
 #include "settings_menu.h"
+#include "audio.h"
 
 /* Debug logging — shared macro in debug.h */
 #include "debug.h"
@@ -81,6 +82,8 @@ int main(void)
     } else
         hal_log("Img OK\r\n");
 
+    audio_init();
+
     sys_save_load();
 
     /* Settings: load existing or show first-launch menu */
@@ -112,6 +115,7 @@ int main(void)
             hal_kbd_update();
             hal_mouse_update();
             anim_tick();  /* advance animation frame */
+            audio_tick();  /* advance BGM cursor + pump PCM FIFO */
             /* Headless build: keep processing each frame regardless of any
              * dialog/wait that cleared VMFLAG_PROCESS. */
             vm_request_process();
@@ -126,6 +130,7 @@ int main(void)
             hal_kbd_update();
             hal_mouse_update();
             anim_tick();  /* advance animation frame */
+            audio_tick();  /* advance BGM cursor + pump PCM FIFO */
             if (vm_delay_tick())
                 vm_request_process();
             if (!anim_waiting())
@@ -144,6 +149,7 @@ int main(void)
                     vblank_wait();  /* 60Hz heartbeat (same pace as outer loop) */
                     hal_kbd_update();
                     anim_tick();  /* keep any active animation playing while waiting */
+                    audio_tick();  /* keep BGM/PCM playing while waiting for input */
                     /* A pending waitanima hold ended on its own (once playback
                      * finished): leave immediately so the script resumes. */
                     if (wait_anim && !anim_waiting())

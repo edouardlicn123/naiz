@@ -32,9 +32,9 @@
 | `host` | `cmd_host` (nb_commands.c) | `host <text>` | 系统旁白（无角色名） |
 | `loadscene` | `cmd_loadscene` (nb_saveload.c:400) | — | 打开读档选单（由 loadscene.nb 调用），经 `save_load_menu(is_load=1, from_mainmenu=0)` 进入两阶段渲染菜单 |
 | `fei` / `ira` / `neon` | `cmd_dialogue` (nb_commands.c) | `<name>{<text>}` 或 `<name>(<text>)` | 角色台词（自动带角色名） |
-| `bgm` | `cmd_bgm` (nb_audio.c:17) | `bgm(){<key>}` / `bgm(stop)` | BGM 播放（key 在花括号负载；`bgm(stop)` keyword 停止） |
-| `sound` | `cmd_sound` (nb_audio.c:32) | `sound(){<key>}` | SE 播放（key 在花括号负载） |
-| `voice` | `cmd_voice` (nb_audio.c:43) | `voice(){<key>}` | 语音播放（key 在花括号负载） |
+| `bgm` | `cmd_bgm` (nb_audio.c:17) | `bgm(){<key>}` / `bgm(stop)` | BGM 播放（key 在花括号负载；`bgm(stop)` keyword 停止）。0.2.115 运行时 SMF 解析 + 时序调度写 MPU-401（16ch All-Notes-Off 停止；loop 回绕 EOF） |
+| `sound` | `cmd_sound` (nb_audio.c:32) | `sound(){<key>}` | SE 播放（key 在花括号负载；8bit mono PCM 泵 86 板，切音覆盖） |
+| `voice` | `cmd_voice` (nb_audio.c:43) | `voice(){<key>}` | 语音播放（key 在花括号负载；与 SE 共享单 PCM 通道，后到覆盖） |
 | `playanima` | `cmd_playanima` (nb_anim.c) | `playanima{name}` / `playanima(once\|loop[,sec]){name}` | 播放 .ANI 动画；省略修饰=once；sec 为总时长秒数（覆盖容器 tick 表），loop 时到期重置 | 
 | `waitanima` | `cmd_waitanima` (nb_anim.c) | `waitanima{}` | 暂停剧本推进直至动画播完 |
 | `stopanima` | `cmd_stopanima` (nb_anim.c) | `stopanima{}` | 立即停止当前动画并唤醒剧本 |
@@ -108,6 +108,9 @@ BLACK.DAT → core/lib/font.c/h           黑花体 16×16 ASCII 字形（FONT.D
 CJK_<lang>.DAT → core/lib/cjk.c/h       16×16 CJK 字形，**10 个按语言字库**（lang = 运行时码 eng/jpn/chi/cht/kor/fre/ger/ita/spa/por，大写文件名）；构建时按项目语料现场生成（见 §3.0），无全量 CJK.DAT 产物
 IMAGE.DAT → core/engine/image.c/h       图片归档（pack_images.py 打包；TOC 读取经 core/lib/farchive.c/h；image_raw_blob 供 ANI 直读）
 SCENE.DAT → core/lib/farchive.c/h       剧本归档（nb_load 归档优先/回退散文件：farchive_lookup_name 大小写不敏感 + read_buf 有界拷贝 ≤32 KiB；TOC 布局同 IMAGE.DAT）
+AUDIO.DAT → core/engine/audio.c/h       音频归档（naiz_audio/pack_audio.py 由 ASSETS.DB 打包；TOC 布局同 SCENE.DAT；条目=BGM MIDI 原始字节 / SE/voice `.pcm` 容器）
+.mid      → tools/naiz_audio/gen_test_midi.py  SMF format 0 测试曲生成
+.pcm      → tools/naiz_audio/wav_convert.py    8bit mono 容器（8B magic `NAIZPCM\x00` + rate 码 + flags + 6B 保留 + 数据；rate 码 0..7 = 44100/33075/22050/16537.5/11025/8268.75/5501.25/4134.375 Hz）
 .ANI      → tools/naiz_lib/anim_container.py  动画容器 v1（制作+播放侧已落地，devdoc 77/78/80）
 .nb       → core/engine/nb.c/h          纯文本脚本（直接加载执行）
 ```
@@ -117,7 +120,8 @@ SCENE.DAT → core/lib/farchive.c/h       剧本归档（nb_load 归档优先/�
 PNG → naiz_conv/mag_convert.py → MAG
 ASSETS.DB → naiz_build/pack_images.py → IMAGE.DAT
 scene/*.nb → naiz_build/build_game.py::pack_scenes → SCENE.DAT（8.3 短名 TOC；跳过 0 字节残留；单脚本 <32 KiB；增量写出；CRLF/CR 自动归一化 LF——引擎归档读取仅认 '\n' 分段）
-ASSETS.DB → naiz_build/export_asset_table.py → core/engine/nb_asset_table.h（asset/spr/char/expr/anim/cg_map 六表 + CG_COUNT 常量）
+ASSETS.DB → naiz_build/export_asset_table.py → core/engine/nb_asset_table.h（asset/spr/char/expr/anim/cg_map 六表 + CG_COUNT 常量 + bgm_map/snd_map/voice_map 三音频表）
+ASSETS.DB(bgm/snd/voice 行) → naiz_audio/pack_audio.py → AUDIO.DAT（8.3 短名 TOC 碰撞硬拒；BGM 直通 MIDI 原字节，SE/voice 校验 .pcm 头）
 assets + .nb → naiz_build/build_game.py → games/<game>/
 games/<game>/ → naiz_img/inject.py → disks/<game>.hdi
 animation/projects/<项目名>/scripts/<名>.na + animation/projects/<项目名>/db/<项目名>.db → anima.sh build <项目>/<脚本>（naiz_build/anim_import.py）→ animation/output/<NAME>.ANI

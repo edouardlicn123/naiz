@@ -36,6 +36,7 @@ from naiz_lib.palette_utils import validate_skin_palette, VALIDATE_DE_MAX
 from naiz_lib.mag_codec import decode_mag_palette
 from naiz_build.project_config import ProjectConfig
 from naiz_conv.i18n_gen import generate as i18n_gen
+from naiz_audio.pack_audio import pack_audio as _pack_audio
 from naiz_font.gen_cjk_font import (
     RUNTIME_LANGS, collect_cps, generate_cjk_file,
     load_sources, merge_glyph_sources, merge_ranges,
@@ -220,6 +221,11 @@ def pack_images(proj_dir: Path, game_dir: Path):
     if image_src.exists():
         safe_copy2(image_src, game_dir / "IMAGE.DAT")
         print("  IMAGE.DAT → games/{}/".format(game_dir.name))
+
+
+def pack_audio(proj_dir: Path, game_dir: Path):
+    """Pack registered BGM/SND/VC assets into games/<game>/AUDIO.DAT."""
+    _pack_audio(str(proj_dir), str(game_dir))
 
 
 def _prune_stale_scenes(game_dir: Path, deployed):
@@ -492,6 +498,9 @@ def build_game(game_name: str):
         sys.exit(1)
 
     pack_images(proj_dir, game_dir)
+
+    # ---- Pack registered audio assets (BGM/SND/VC) into AUDIO.DAT ----
+    pack_audio(proj_dir, game_dir)
 
     # ---- Palette validation: compare shared palette against source MAGs ----
     image_dat = proj_dir / "IMAGE.DAT"

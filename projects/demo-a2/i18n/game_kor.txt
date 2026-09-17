@@ -24,3 +24,7 @@ Yes=응
 Yes but I don't want to swim,I just want to stay at the beach.=응, 하지만 수영은 싫어, 그냥 해변에 있고 싶어.
 You again.=또 너구나.
 cg01=
+chime=
+ding=
+hi=
+test1=

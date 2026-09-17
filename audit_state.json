@@ -1,7 +1,7 @@
 {
   "version": 2,
-  "git_head": "5ff9119",
-  "checked_at": "2026-09-17T10:34:11",
+  "git_head": "8465a8a",
+  "checked_at": "2026-09-17T19:59:49",
   "files": {
     "core/build.sh": {
       "sha256": "0e6bb3f41cae8f6c5a014a49767f93990ddd3e2c461a85ec991c01b40b66b11e",
@@ -20,6 +20,18 @@
           "level": "HEUR"
         }
       ]
+    },
+    "core/engine/audio.c": {
+      "sha256": "9b805ebf75f3719f190449d28af64ec8a1559a15d12895bba2eb81b3951246d6",
+      "violations": 0,
+      "candidates": 0,
+      "findings": []
+    },
+    "core/engine/audio.h": {
+      "sha256": "fe83518a7a19f90259c6ff7f960b6b88af834e36372390888eba9a71bc2f4398",
+      "violations": 0,
+      "candidates": 0,
+      "findings": []
     },
     "core/engine/cursor.c": {
       "sha256": "778b91e319691c720fa02123c778af0b9b8d600e656dfd006ef14ff60d03c443",
@@ -80,7 +92,7 @@
       "findings": []
     },
     "core/engine/layer.c": {
-      "sha256": "884af79d7010e15c8f86ab95b5fd0b10a273860db6af32b989ff3bbd7e368c86",
+      "sha256": "e56fda2e8287a42f4a073445234194a449b3c5c8cab534701c010b0d7df68421",
       "violations": 0,
       "candidates": 0,
       "findings": []
@@ -160,7 +172,7 @@
       ]
     },
     "core/engine/main.c": {
-      "sha256": "f3f781081048a05278f43ad5859dd4ce010c7a5bef53414ce726e413cecca5a2",
+      "sha256": "10a928c4f179e6155b09eb6959042cbc9bb26ff1dba4ea688cf363f1b0d775d6",
       "violations": 0,
       "candidates": 0,
       "findings": []
@@ -214,13 +226,13 @@
       "findings": []
     },
     "core/engine/nb_asset_table.h": {
-      "sha256": "878280dc2577c7b0f7c782d0d9d7b1ca6764bf01b13e7e529e50bb91ad951205",
+      "sha256": "874415063f36bb7ed59ab6a7cebcf2abcc32997aa9100820ffd9542dcc4651fc",
       "violations": 0,
       "candidates": 0,
       "findings": []
     },
     "core/engine/nb_audio.c": {
-      "sha256": "edc515c7b44ddf40ea6d199fa387f0c3c4a3dfc29b491b2fbbd78eda02c3e060",
+      "sha256": "37d03c793785961bc5c16071ac25ebd268e2562c7f96f8ad132d4717bdb3149c",
       "violations": 0,
       "candidates": 0,
       "findings": []
@@ -567,7 +579,7 @@
       "findings": []
     },
     "core/lib/endian.h": {
-      "sha256": "45bbda6244e139b2ab40b50841265d1692a4ceda75cbaabf218fa6dee1751679",
+      "sha256": "2a95d39b04d8a00375b7ed377f7416372327762de81992c5acc1e9a434bb7a4d",
       "violations": 0,
       "candidates": 0,
       "findings": []
@@ -621,6 +633,18 @@
     },
     "core/lib/mag_format.h": {
       "sha256": "6dcf27bea5e15e4ab3328f0dbfc35fbb41bd6ec9e4f402c806fdf8451bb20719",
+      "violations": 0,
+      "candidates": 0,
+      "findings": []
+    },
+    "core/lib/midi.c": {
+      "sha256": "bc58e074895c8377bb42893676d535f1065a62da86285acd66338f7fc61c4996",
+      "violations": 0,
+      "candidates": 0,
+      "findings": []
+    },
+    "core/lib/midi.h": {
+      "sha256": "d1d48480351f316fd063ab167aa51307e0f63d687c6e2537894357aecade23d1",
       "violations": 0,
       "candidates": 0,
       "findings": []
@@ -680,7 +704,13 @@
       "findings": []
     },
     "core/plat/hal.h": {
-      "sha256": "b9a6e662efc88563109277fde461d648bd250e8dcf7ed7dc0d5dc1c12e56885c",
+      "sha256": "ed2ac6f1006012ff48e403e8a293e9c5feb9af17e8250b8f033b09ed64912bf5",
+      "violations": 0,
+      "candidates": 0,
+      "findings": []
+    },
+    "core/plat/hal_audio.c": {
+      "sha256": "96a8e225e808e286f0cf2bb652e969bbb701a061e0da9ed44e495cf886e62a68",
       "violations": 0,
       "candidates": 0,
       "findings": []
@@ -698,7 +728,7 @@
       "findings": []
     },
     "core/plat/hal_pc98.c": {
-      "sha256": "8061b3eafbbbf530f7a1a96513f8dbec5a33062d5fc4c5e7073ffa99189f1be2",
+      "sha256": "deda6885c7316234f6c2ec59f00821ce9b6615b967301b779a9e7bd91404fc6e",
       "violations": 0,
       "candidates": 0,
       "findings": []
@@ -888,6 +918,24 @@
       "candidates": 0,
       "findings": []
     },
+    "tools/naiz_audio/gen_test_midi.py": {
+      "sha256": "b0ecb8df32f672afe168e0e6ae6a892bcb28c9a9ca13d9404dbd32bc7fe8308e",
+      "violations": 0,
+      "candidates": 0,
+      "findings": []
+    },
+    "tools/naiz_audio/pack_audio.py": {
+      "sha256": "ee5f2d8c8ba5b550ec8bc6d38f5198135b7297542d583ade0e4fb527371935c1",
+      "violations": 0,
+      "candidates": 0,
+      "findings": []
+    },
+    "tools/naiz_audio/wav_convert.py": {
+      "sha256": "96d4b213479445abe3d2063d97af906bc94096c6d5253106c9209ff88ddb70fa",
+      "violations": 0,
+      "candidates": 0,
+      "findings": []
+    },
     "tools/naiz_build/__init__.py": {
       "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
       "violations": 0,
@@ -925,12 +973,12 @@
       "findings": []
     },
     "tools/naiz_build/build_game.py": {
-      "sha256": "a213933ff34e842f9a6300bdd793635577abb001c0a0de6d457aaf314e3d75be",
+      "sha256": "c8081d413eae16deed849fa79473f40b1f69f87e50cc931f896158fe060a6e5a",
       "violations": 0,
       "candidates": 1,
       "findings": [
         {
-          "line": 100,
+          "line": 101,
           "rule": "P8",
           "level": "HEUR"
         }
@@ -949,7 +997,7 @@
       "findings": []
     },
     "tools/naiz_build/export_asset_table.py": {
-      "sha256": "e9274051bd3a790b6668e49213a6215bff10b2d6d0c3680a4b239c22afc03b4d",
+      "sha256": "75419e36c6a9dac2a9384124b85651bd385802cd7a45981ead72f4c2ea24d3b3",
       "violations": 0,
       "candidates": 0,
       "findings": []
@@ -985,7 +1033,7 @@
       "findings": []
     },
     "tools/naiz_build/pack_images.py": {
-      "sha256": "72f9d0ab105cb4b7d98489d122baca63a45e092a48976fe7ba43b0792f56e51e",
+      "sha256": "6915bd945542c286b0710e85197d6b8c135b8da040bf9e2cf11e6f08677476ae",
       "violations": 0,
       "candidates": 1,
       "findings": [
@@ -1292,14 +1340,14 @@
     }
   },
   "summary": {
-    "files": 174,
-    "changed": 4,
-    "skipped": 170,
+    "files": 182,
+    "changed": 0,
+    "skipped": 182,
     "out_of_scope": 0,
     "violations": 0,
     "candidates": 42,
     "fresh_violations": 0,
-    "fresh_candidates": 3,
+    "fresh_candidates": 0,
     "verified": 35,
     "stale": 0,
     "open": 7

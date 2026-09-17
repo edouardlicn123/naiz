@@ -227,7 +227,9 @@ def pack_images(project_dir):
         return
 
     # ---- Step 1: load & decode all images ----
-    image_data = load_img_map_assets(project_dir)
+    # Restrict to IMAGE.DAT image types: BGM/SND/VC live in AUDIO.DAT and
+    # are packed by tools/naiz_audio/pack_audio.py (devdoc 101).
+    image_data = load_img_map_assets(project_dir, types=('IMG', 'SPR', 'ANI', 'CG'))
 
     if not image_data:
         print("ASSETS.DB is empty, creating empty IMAGE.DAT")

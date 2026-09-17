@@ -8,7 +8,8 @@
  *   - hal_read_palette()  → gdc_read_palette()   GDC 调色板读取
  *   - hal_vblank_wait()   → GDC 状态端口轮询     垂直同步等待
  *   - hal_vram_*()        → PEGC bank 窗口        VRAM 访问
- *   - hal_bgm/sound/voice → 音频 stub（hal_log 输出）
+ *
+ * 音频 HAL 实现拆分至 plat/hal_audio.c（MPU-401 MIDI + 86 板 PCM，devdoc 101）。
  *
  * 键盘/鼠标/视频转发分别拆至 hal_kbd.c / hal_mouse.c / hal_video.c。
  *
@@ -160,40 +161,4 @@ void hal_vram_bank_select(int bank)
 volatile uint8_t *hal_vram_get_window(void)
 {
     return (volatile uint8_t *)0xA8000L;
-}
-
-/*
- * Audio stubs — see devdocs/0.1版开发文档总结.html#doc-41 for backend implementation plan.
- */
-void hal_bgm_play(const char *key) {
-    (void)key;
-    hal_log("bgm: ");
-    hal_log(key);
-    hal_log("\r\n");
-}
-
-void hal_bgm_stop(void) {
-    hal_log("bgm: stop\r\n");
-}
-
-void hal_sound_play(const char *key) {
-    (void)key;
-    hal_log("sound: ");
-    hal_log(key);
-    hal_log("\r\n");
-}
-
-void hal_voice_play(const char *key) {
-    (void)key;
-    hal_log("voice: ");
-    hal_log(key);
-    hal_log("\r\n");
-}
-
-void hal_sound_stop(void) {
-    hal_log("sound: stop\r\n");
-}
-
-void hal_voice_stop(void) {
-    hal_log("voice: stop\r\n");
 }

@@ -32,9 +32,10 @@
  *   - hal_mouse_set_pos()   位置设置
  *   - hal_mouse_draw_cursor() 光标绘制
  *   音频:
- *   - hal_bgm_play/stop()   BGM 控制
- *   - hal_sound_play()      音效
- *   - hal_voice_play()      语音
+ *   - hal_audio_detect()   探测 MPU-401（BGM 后端）
+ *   - hal_midi_out()       MPU-401 UART 字节输出
+ *   - hal_pcm_play/tick/stop()  86 板 PCM FIFO（sound/voice）
+ *   - hal_wallclock_ms()   毫秒时钟（MIDI 时序调度 / PCM 泵节流）
  *
  * 约束（详见 AGENTS.md §5.1）：
  *   - core/engine/ 中的引擎代码只能通过此头文件访问硬件
@@ -121,17 +122,31 @@ void hal_vblank_wait(void);
 unsigned long hal_wallclock_ms(void);
 
 /*
- * 音频播放（stub）
+ * 音频（真实后端，devdoc 101）
  *
- * 当前为空实现，仅通过 hal_log() 输出命令和 key。
- * 后端实现计划见 devdocs/0.1版开发文档总结.html#doc-41。
+ * BGM = SMF 解析 + 时序调度，经 MPU-401 UART 直写 MIDI 字节流。
+ * sound/voice = .pcm(8bit mono) 直灌 86 板 YM3433B FIFO。
+ *
+ * hal_audio_detect():
+ *   探测 MPU-PC98（0xC0D0/0xC0D2）。发送 reset(0xFF)+UART(0x3F) 并等待
+ *   ACK 0xFE；失败返回 0（无卡/未使能时 NP2kai 状态口读回 0xFF）。检测
+ *   成功后即处于 UART 模式。实机无 MPU 卡时返回 0，引擎降级旧 stub 行为。
+ *
+ * hal_midi_out():
+ *   写前轮询状态口 bit6（MIDIOUT_BUSY=0x40）清 0，再写数据口一字节。
+ *   仅 detect 成功后调用。
+ *
+ * hal_pcm_*():
+ *   86 板 PCM。hal_pcm_play 配置速率/8bit mono 并启用输出；hal_pcm_tick
+ *   每帧泵 FIFO（A466 bit7=full 时停泵），数据耗尽自动停；hal_pcm_stop
+ *   停输出清缓冲。data 由调用方持有（HAL 借用至 play/stop），不自 free。
  */
-void hal_bgm_play(const char *key);
-void hal_bgm_stop(void);
-void hal_sound_play(const char *key);
-void hal_sound_stop(void);
-void hal_voice_play(const char *key);
-void hal_voice_stop(void);
+int  hal_audio_detect(void);
+void hal_midi_out(uint8_t b);
+void hal_pcm_play(const uint8_t *data, uint32_t len, int rate);
+void hal_pcm_tick(void);
+void hal_pcm_stop(void);
+int  hal_pcm_active(void);
 
 /*============================================================================
  * 键盘扫描码常量（PC-98 硬件标准）

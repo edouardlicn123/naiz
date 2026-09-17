@@ -68,5 +68,27 @@ static const struct { const char *key; int id; } cg_map[] = {
 /* Number of registered CG assets */
 #define CG_COUNT 2
 
+/* Shared type for registered audio assets */
+typedef struct { const char *name; int id; } AudioAssetMap;
+
+/* BGM asset key->ID lookup (for bgm command) */
+static const AudioAssetMap bgm_map[] = {
+    {"test1", 24},
+    {NULL, 0}
+};
+
+/* SE asset key->ID lookup (for sound command) */
+static const AudioAssetMap snd_map[] = {
+    {"chime", 21},
+    {"ding", 22},
+    {NULL, 0}
+};
+
+/* Voice asset key->ID lookup (for voice command) */
+static const AudioAssetMap voice_map[] = {
+    {"hi", 23},
+    {NULL, 0}
+};
+
 
 #endif /* NB_ASSET_TABLE_H */

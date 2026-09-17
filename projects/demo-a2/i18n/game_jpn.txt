@@ -24,3 +24,7 @@ You again.=
 Settings=
 CG Gallery=
 cg01=
+chime=
+ding=
+hi=
+test1=

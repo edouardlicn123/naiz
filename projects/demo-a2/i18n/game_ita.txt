@@ -24,3 +24,7 @@ Yes=
 Yes but I don't want to swim,I just want to stay at the beach.=
 You again.=
 cg01=
+chime=
+ding=
+hi=
+test1=

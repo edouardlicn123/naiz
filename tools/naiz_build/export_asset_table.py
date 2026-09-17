@@ -144,6 +144,51 @@ def generate(project_dir, output_path):
         lines.append('#define CG_COUNT %d' % len(cg_rows))
         lines.append('')
 
+        # -- audio asset maps: bgm/snd/voice (types BGM/SND/VC) --
+        lines.append('/* Shared type for registered audio assets */')
+        lines.append('typedef struct { const char *name; int id; } AudioAssetMap;')
+        lines.append('')
+        lines.append('/* BGM asset key->ID lookup (for bgm command) */')
+        lines.append('static const AudioAssetMap bgm_map[] = {')
+        bgm_rows = list(db.execute(
+            "SELECT id, name FROM img_map WHERE type='BGM' ORDER BY id"
+        ))
+        if not bgm_rows:
+            lines.append('    {"__dummy__", 0},')
+        for row in bgm_rows:
+            lines.append('    {"%s", %d},' % (escape(row[1]), row[0]))
+        lines.append('    {NULL, 0}')
+        lines.append('};')
+        lines.append('')
+
+        # -- snd_map: SE assets (type='SND') --
+        lines.append('/* SE asset key->ID lookup (for sound command) */')
+        lines.append('static const AudioAssetMap snd_map[] = {')
+        snd_rows = list(db.execute(
+            "SELECT id, name FROM img_map WHERE type='SND' ORDER BY id"
+        ))
+        if not snd_rows:
+            lines.append('    {"__dummy__", 0},')
+        for row in snd_rows:
+            lines.append('    {"%s", %d},' % (escape(row[1]), row[0]))
+        lines.append('    {NULL, 0}')
+        lines.append('};')
+        lines.append('')
+
+        # -- voice_map: voice assets (type='VC') --
+        lines.append('/* Voice asset key->ID lookup (for voice command) */')
+        lines.append('static const AudioAssetMap voice_map[] = {')
+        vc_rows = list(db.execute(
+            "SELECT id, name FROM img_map WHERE type='VC' ORDER BY id"
+        ))
+        if not vc_rows:
+            lines.append('    {"__dummy__", 0},')
+        for row in vc_rows:
+            lines.append('    {"%s", %d},' % (escape(row[1]), row[0]))
+        lines.append('    {NULL, 0}')
+        lines.append('};')
+        lines.append('')
+
         lines.extend(header_footer('NB_ASSET_TABLE_H'))
 
         try:
@@ -154,7 +199,8 @@ def generate(project_dir, output_path):
     finally:
         if db:
             db.close()
-    return len(img_rows), len(chars), len(exprs), len(spr_rows), len(cg_rows)
+    return len(img_rows), len(chars), len(exprs), len(spr_rows), len(cg_rows), \
+        len(bgm_rows), len(snd_rows), len(vc_rows)
 
 
 if __name__ == '__main__':
@@ -162,6 +208,6 @@ if __name__ == '__main__':
         print("Usage: export_asset_table.py <project_dir> <output_path>")
         sys.exit(1)
 
-    n_img, n_char, n_expr, n_spr, n_cg = generate(sys.argv[1], sys.argv[2])
-    print("export_asset_table: %d img, %d spr, %d cg, %d chars, %d expressions -> %s" % (
-        n_img, n_spr, n_cg, n_char, n_expr, sys.argv[2]))
+    n_img, n_char, n_expr, n_spr, n_cg, n_bgm, n_snd, n_vc = generate(sys.argv[1], sys.argv[2])
+    print("export_asset_table: %d img, %d spr, %d cg, %d bgm, %d snd, %d vc, %d chars, %d expressions -> %s" % (
+        n_img, n_spr, n_cg, n_bgm, n_snd, n_vc, n_char, n_expr, sys.argv[2]))
