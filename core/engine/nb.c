@@ -19,6 +19,7 @@
 #include "nb_anim.h"   /* ANI animation support */
 #include "save.h"
 #include "strutil.h"
+#include "farchive.h"
 
 /* Known unimplemented menu commands: continue, load, scenes,
  * special, music, cg, settings. Their handlers log and return. */
@@ -47,6 +48,41 @@ typedef struct {
 } NbState;
 
 static NbState nb;  /* Interpreter state — owned exclusively by nb.c */
+
+/* SCENE.DAT archive (devdoc 100): all scene scripts packed into one TOC
+ * archive.  Opened lazily at nb_init; when unavailable nb_load falls back
+ * to the loose-file path, so old HDI images keep working. */
+static FArchive g_scene_arc;
+static int      g_scene_arc_open = 0;
+
+/* Read a scene script `name` from the SCENE.DAT archive into `buf`
+ * (capacity `cap` bytes).  Returns the number of bytes copied (0 for an
+ * empty script), or -1 when the archive is closed or the name is not
+ * found — the caller then falls back to the loose-file path.  When the
+ * script is larger than cap-1 bytes, *truncated is set and only the first
+ * cap-1 bytes are copied, leaving room for the caller's NUL terminator. */
+static int nb_scene_archive_read(const char *name, char *buf, int cap,
+                                 int *truncated)
+{
+    long offset = 0, size = 0;
+    long n;
+
+    if (truncated)
+        *truncated = 0;
+    if (!g_scene_arc_open || !name || !buf || cap <= 0)
+        return -1;
+    if (farchive_lookup_name(&g_scene_arc, name, &offset, &size, NULL) != 0)
+        return -1;
+    if (size <= 0)
+        return 0;
+    if (truncated && size >= cap)
+        *truncated = 1;
+
+    n = farchive_read_buf(&g_scene_arc, offset, size, buf, cap - 1);
+    if (n < 0)
+        return -1;
+    return (int)n;
+}
 
 /* Argv index of the brace payload on the last parsed line, or -1 when that
  * line carried none.  Set by the line parser; consumed by commands (e.g. cg)
@@ -135,6 +171,14 @@ int nb_init(void)
 
     nb_var_init();
 
+    /* Open the SCENE.DAT archive (best-effort): on failure keep the
+     * loose-file path so old HDI images without the archive still run. */
+    if (farchive_open(&g_scene_arc, "SCENE.DAT", 8192) == 0) {
+        g_scene_arc_open = 1;
+    } else {
+        hal_log("WARN: no SCENE.DAT, falling back to loose scene files\r\n");
+    }
+
     nb_load("logo.nb");
     vm_request_process();
     vm_delay_reset();
@@ -152,15 +196,28 @@ int nb_init(void)
  */
 void nb_load(const char *filename)
 {
-    FILE *f;
+    FILE *f = NULL;
     int pos;
+    int n = 0;
     int nb_old_skip;
+    int from_arc = 0;
+    int truncated = 0;
 
-    f = fopen(filename, "r");
-    if (!f) {
-        hal_log("ERROR: cannot open file\r\n");
-        vm_set_error();
-        return;
+    /* Archive-first load: SCENE.DAT hit reads the whole script into
+     * nb.buf with a single bounded read; a miss falls back to the
+     * original loose-file path, preserving backward compatibility. */
+    if (g_scene_arc_open) {
+        n = nb_scene_archive_read(filename, nb.buf, NB_BUF_SIZE, &truncated);
+        if (n >= 0)
+            from_arc = 1;
+    }
+    if (!from_arc) {
+        f = fopen(filename, "r");
+        if (!f) {
+            hal_log("ERROR: cannot open file\r\n");
+            vm_set_error();
+            return;
+        }
     }
 
     pos = 0;
@@ -168,13 +225,28 @@ void nb_load(const char *filename)
     nb.pc = 0;
     nb_old_skip = (strcmp(nb.filename, "logo.nb") == 0 || strcmp(nb.filename, "op.nb") == 0);
     str_copy(nb.filename, NB_FILENAME_MAX, filename);
-    {
-        int incomplete = 0, n;
+
+    if (from_arc) {
+        int i, complete;
+
+        nb.buf[n] = '\0';
+        /* num_lines = '\n' count + trailing line without terminator
+         * (exactly equivalent to the fgets path: nb_get_line splits on
+         * '\n' and a final unterminated line still counts as one). */
+        complete = 0;
+        for (i = 0; i < n; i++) {
+            if (nb.buf[i] == '\n') complete++;
+        }
+        nb.num_lines = complete;
+        if (n > 0 && nb.buf[n - 1] != '\n')
+            nb.num_lines++;
+    } else {
+        int incomplete = 0, m;
         while (pos < NB_BUF_SIZE - 1 && fgets(nb.buf + pos, NB_BUF_SIZE - pos, f)) {
             if (!incomplete) nb.num_lines++;
-            n = (int)strlen(nb.buf + pos);
-            incomplete = (n > 0 && nb.buf[pos + n - 1] != '\n');
-            pos += n;
+            m = (int)strlen(nb.buf + pos);
+            incomplete = (m > 0 && nb.buf[pos + m - 1] != '\n');
+            pos += m;
             if (pos >= NB_BUF_SIZE - 1) {
                 /* Known limit: scripts must fit in NB_BUF_SIZE (32 KB).
                  * Any trailing lines beyond the buffer are dropped with a
@@ -185,8 +257,12 @@ void nb_load(const char *filename)
                 break;
             }
         }
+        fclose(f);
     }
-    fclose(f);
+    if (truncated) {
+        hal_logf("WARN: '%s' truncated at %d bytes (max %d)\r\n",
+                 filename, n, NB_BUF_SIZE);
+    }
 
     /* Full scene reset (skip transition for logo/op — both entering and exiting) */
     scene_end(nb_old_skip || strcmp(filename, "logo.nb") == 0 || strcmp(filename, "op.nb") == 0);

@@ -1,7 +1,7 @@
 {
   "version": 2,
-  "git_head": "ca52a71",
-  "checked_at": "2026-09-16T15:11:44",
+  "git_head": "5ff9119",
+  "checked_at": "2026-09-17T10:34:11",
   "files": {
     "core/build.sh": {
       "sha256": "0e6bb3f41cae8f6c5a014a49767f93990ddd3e2c461a85ec991c01b40b66b11e",
@@ -40,29 +40,29 @@
       "findings": []
     },
     "core/engine/image.c": {
-      "sha256": "966b5210bf0e670647d0422edcaee5827f5f68fd12c3c906c2d6e9512ba877bf",
+      "sha256": "615cb6d806aa2d74e1d34c05862571504ca5d58158f786f84a1dca9f9c90c8b0",
       "violations": 0,
       "candidates": 3,
       "findings": [
         {
-          "line": 109,
+          "line": 88,
           "rule": "C9",
           "level": "HEUR"
         },
         {
-          "line": 110,
+          "line": 89,
           "rule": "C9",
           "level": "HEUR"
         },
         {
-          "line": 111,
+          "line": 90,
           "rule": "C9",
           "level": "HEUR"
         }
       ]
     },
     "core/engine/image.h": {
-      "sha256": "39ae1a0bce5766854119434d19466bc7b3f120e9dd0a11e298344ffa2de73a07",
+      "sha256": "c6f2238d5a16c8c6f892c795857ed70833638c336550c4b6f17da1f69861c92d",
       "violations": 0,
       "candidates": 0,
       "findings": []
@@ -184,7 +184,7 @@
       "findings": []
     },
     "core/engine/nb.c": {
-      "sha256": "17451e397290f959e16751948164dfb6d0edf6a70cf5c48abf08136f25c36e78",
+      "sha256": "c0616994cfb1471b7f6bea4da2fa8d7565d23dad823a8b090300823a19b08f65",
       "violations": 0,
       "candidates": 0,
       "findings": []
@@ -572,6 +572,29 @@
       "candidates": 0,
       "findings": []
     },
+    "core/lib/farchive.c": {
+      "sha256": "c02fba20d844378c9e8fb0da322220fc069b0f08790d48d16c29fa486f64f345",
+      "violations": 0,
+      "candidates": 2,
+      "findings": [
+        {
+          "line": 72,
+          "rule": "C1",
+          "level": "HEUR"
+        },
+        {
+          "line": 48,
+          "rule": "C2",
+          "level": "HEUR"
+        }
+      ]
+    },
+    "core/lib/farchive.h": {
+      "sha256": "2956fbf31107c480d92b2ded8e7df9bc95f62cbb445d560d5e4c1682fe36a088",
+      "violations": 0,
+      "candidates": 0,
+      "findings": []
+    },
     "core/lib/font.c": {
       "sha256": "89824ac699ab2488a50c006264cd9c3723866558f19b6b3fc9fdf2a6c8b908fd",
       "violations": 0,
@@ -902,12 +925,12 @@
       "findings": []
     },
     "tools/naiz_build/build_game.py": {
-      "sha256": "142bee022677dd920ad3c358cd66c5f68ab2ce45d4e0c697939f8e1c1d629caf",
+      "sha256": "a213933ff34e842f9a6300bdd793635577abb001c0a0de6d457aaf314e3d75be",
       "violations": 0,
       "candidates": 1,
       "findings": [
         {
-          "line": 99,
+          "line": 100,
           "rule": "P8",
           "level": "HEUR"
         }
@@ -962,7 +985,7 @@
       "findings": []
     },
     "tools/naiz_build/pack_images.py": {
-      "sha256": "c3a4fe28d4c8d4021ab08df17030d6041f3a27ee03a489bf434e267066452890",
+      "sha256": "72f9d0ab105cb4b7d98489d122baca63a45e092a48976fe7ba43b0792f56e51e",
       "violations": 0,
       "candidates": 1,
       "findings": [
@@ -1207,6 +1230,12 @@
       "candidates": 0,
       "findings": []
     },
+    "tools/naiz_lib/toc_archive.py": {
+      "sha256": "4f31d67e8bb1e0febc0e2a18daac47f84c8c45e9723b45783ab6546a8fbc89fc",
+      "violations": 0,
+      "candidates": 0,
+      "findings": []
+    },
     "tools/naiz_screendig/__init__.py": {
       "sha256": "79161cda41137f9e2f7af10dcf8c1aa0b10d05b9a26d95a1516013a519b7c942",
       "violations": 0,
@@ -1263,16 +1292,16 @@
     }
   },
   "summary": {
-    "files": 171,
-    "changed": 2,
-    "skipped": 169,
+    "files": 174,
+    "changed": 4,
+    "skipped": 170,
     "out_of_scope": 0,
     "violations": 0,
-    "candidates": 40,
+    "candidates": 42,
     "fresh_violations": 0,
-    "fresh_candidates": 2,
-    "verified": 39,
+    "fresh_candidates": 3,
+    "verified": 35,
     "stale": 0,
-    "open": 1
+    "open": 7
   }
 }

@@ -256,6 +256,20 @@
       "sha256": "0fc243316030dd0358c0c54e5ce2a8f140d5ba75a756ce04f19ecbc2591902ed",
       "line": "#define SEL_Y        122    /* language selector row y (1x, 16px tall) */"
     },
+    "core/lib/farchive.c:27": {
+      "verdict": "ok",
+      "text": "c2-guarded-by-if-not-fp-return-fail",
+      "date": "2026-09-17T10:09:37",
+      "sha256": "ce17b5579e8921d8076d947a482d1071337edd5f98baa4484003c6ce6ce70189",
+      "line": "    a->fp = fopen(path, \"rb\");"
+    },
+    "core/lib/farchive.c:51": {
+      "verdict": "ok",
+      "text": "c1-guarded-by-if-not-toc-goto-fail",
+      "date": "2026-09-17T10:09:37",
+      "sha256": "ce17b5579e8921d8076d947a482d1071337edd5f98baa4484003c6ce6ce70189",
+      "line": "    a->toc = (uint8_t *)malloc((size_t)header_bytes);"
+    },
     "core/lib/tr.c:65": {
       "verdict": "ok",
       "text": "memcpy into tr_table governed by table_len bounds check above",

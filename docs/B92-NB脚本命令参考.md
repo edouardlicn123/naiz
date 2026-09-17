@@ -106,7 +106,8 @@ MAG       → core/lib/mag.c/h            MAKI02 图像，透明色=15
 FONT.DAT  → core/lib/font.c/h           8×16 ASCII 字形
 BLACK.DAT → core/lib/font.c/h           黑花体 16×16 ASCII 字形（FONT.DAT 版式，备选表 font_load_alt）
 CJK_<lang>.DAT → core/lib/cjk.c/h       16×16 CJK 字形，**10 个按语言字库**（lang = 运行时码 eng/jpn/chi/cht/kor/fre/ger/ita/spa/por，大写文件名）；构建时按项目语料现场生成（见 §3.0），无全量 CJK.DAT 产物
-IMAGE.DAT → core/engine/image.c/h       图片归档（pack_images.py 打包；image_raw_blob 供 ANI 直读）
+IMAGE.DAT → core/engine/image.c/h       图片归档（pack_images.py 打包；TOC 读取经 core/lib/farchive.c/h；image_raw_blob 供 ANI 直读）
+SCENE.DAT → core/lib/farchive.c/h       剧本归档（nb_load 归档优先/回退散文件：farchive_lookup_name 大小写不敏感 + read_buf 有界拷贝 ≤32 KiB；TOC 布局同 IMAGE.DAT）
 .ANI      → tools/naiz_lib/anim_container.py  动画容器 v1（制作+播放侧已落地，devdoc 77/78/80）
 .nb       → core/engine/nb.c/h          纯文本脚本（直接加载执行）
 ```
@@ -115,6 +116,7 @@ IMAGE.DAT → core/engine/image.c/h       图片归档（pack_images.py 打包�
 ```
 PNG → naiz_conv/mag_convert.py → MAG
 ASSETS.DB → naiz_build/pack_images.py → IMAGE.DAT
+scene/*.nb → naiz_build/build_game.py::pack_scenes → SCENE.DAT（8.3 短名 TOC；跳过 0 字节残留；单脚本 <32 KiB；增量写出；CRLF/CR 自动归一化 LF——引擎归档读取仅认 '\n' 分段）
 ASSETS.DB → naiz_build/export_asset_table.py → core/engine/nb_asset_table.h（asset/spr/char/expr/anim/cg_map 六表 + CG_COUNT 常量）
 assets + .nb → naiz_build/build_game.py → games/<game>/
 games/<game>/ → naiz_img/inject.py → disks/<game>.hdi
@@ -181,7 +183,7 @@ pal(<秒数>){<名>[,<名>...]}                            # palette 轨差异�
 
 - 命令：`playanima` / `waitanima` / `stopanima`，处理函数在 `core/engine/nb_anim.c`，注册于 `nb_commands.c` cmd_table
 - 名字解析：`nb_asset_table.h` `anim_map[]`（export_asset_table.py 从 ASSETS.DB `img_map WHERE type='ANI'` 生成）
-- 容器直读：`image_raw_blob(id, &len)` 零拷贝返回 IMAGE.DAT 内原始字节；引擎按权威布局解析头/tick 表/调色板表（L1–L4 复验 + 路线 S 尺寸复验：fullscreen 640×400、cine 640×280）
+- 容器直读：`image_raw_blob(id, &len)` 返回 IMAGE.DAT 条目原始字节（farchive 单槽缓冲，供 .ANI 容器直读，借用期至下次 `image_raw_blob`/`image_init`）；引擎按权威布局解析头/tick 表/调色板表（L1–L4 复验 + 路线 S 尺寸复验：fullscreen 640×400、cine 640×280）
 - 时长参数：`(int)(sec*60+0.999999)` 向上取整为 tick 预算；带 sec 时到期一律结束（loop 模式仅表示帧序列回绕，不续期）；无 sec 的 once 自然播完即停，无 sec 的 loop 持续至 stopanima/场景切换
 - 主循环节拍：vblank 心跳 60Hz（main.c 内外层循环顶部 `vblank_wait()`），`anim_tick`/`vm_delay`/输入轮询均按帧节拍推进
 - 调色板轨：底图 blit 一次，后续每帧 `hal_set_palette` ×256；pixel 轨逐帧 vram_blit

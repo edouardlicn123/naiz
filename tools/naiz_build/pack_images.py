@@ -302,18 +302,8 @@ def pack_images(project_dir):
             print(f"  id={i}: empty (no entry)")
 
     # ---- Write IMAGE.DAT ----
-    header_size = 4 + count * 20
-    buf = bytearray()
-    buf.extend(struct.pack('<I', count))
-
-    offset = header_size
-    for name, data in toc:
-        buf.extend(name)
-        buf.extend(struct.pack('<II', offset, len(data)))
-        offset += len(data)
-
-    for _, data in toc:
-        buf.extend(data)
+    from naiz_lib.toc_archive import make_toc_archive
+    buf = make_toc_archive(toc)
 
     out_path = os.path.join(project_dir, 'IMAGE.DAT')
     Path(out_path).write_bytes(buf)

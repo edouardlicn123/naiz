@@ -1,5 +1,5 @@
 /*
- * IMAGE.DAT loader — MMAP-style archive for MAG images.
+ * IMAGE.DAT loader — on-demand archive reader (devdoc 100).
  *
  * Format:
  *   uint32   count
@@ -20,8 +20,10 @@ int       image_init(const char *path);
 /* 按 ID 加载图片，返回引用计数 +1 的 MagImage（调用者负责 mag_release） */
 MagImage *image_load(unsigned short id);
 /* Fetch raw archive bytes of entry id without decoding (e.g. .ANI
- * containers). Pointer is valid until next image_init/image_close;
- * *out_size (optional) receives byte length. NULL on bad id/TOC. */
+ * containers). Contents live in an internal single-slot buffer; the
+ * pointer is valid only until the next image_raw_blob call or
+ * image_init/image_close. *out_size (optional) receives byte length.
+ * NULL on bad id/hole/TOC corruption. */
 const unsigned char *image_raw_blob(unsigned short id, long *out_size);
 
 #endif

@@ -1,14 +1,14 @@
 /*
- * IMAGE.DAT loader — MMAP-style archive for MAG images.
+ * IMAGE.DAT loader — on-demand archive reader (devdoc 100).
  *
- * Format:
- *   uint32   count        number of archived files
- *   N x {    TOC entry:
- *     char  name[12]      8.3 filename (debug)
- *     uint32 offset       byte offset to MAG data
- *     uint32 size         MAG data size in bytes
- *   }
- *   raw MAG concatenation
+ * Format (see farchive.h / tools/naiz_lib/toc_archive.py):
+ *   uint32   count
+ *   N x { char name[12], uint32 offset, uint32 size }
+ *   raw MAG data concatenated
+ *
+ * The TOC stays resident; payloads are read from the open stream on
+ * demand, so memory usage tracks the running decode set plus one raw
+ * blob slot instead of the whole archive.
  *
  * After image_load(id), if img->is_sprite == 0:
  *   image_set_palette(img) is called automatically.
@@ -19,65 +19,42 @@
 #include "mag.h"
 #include <stdlib.h>
 #include <string.h>
-#include "endian.h"
+#include "farchive.h"
 #include "hal.h"
-#include "naiz_file.h"
 #include "image_internal.h"
 
-/* MMAP buffer: entire IMAGE.DAT loaded into memory */
-static uint8_t *g_image_data = NULL;
-/* Total file size in bytes */
-static long     g_image_size = 0;
-/* Number of archived images */
-static int      g_image_count = 0;
-/* Offset to the first TOC entry (right after the 4-byte count) */
-static long     g_image_toc_off = 4;
+/* Open IMAGE.DAT archive with TOC resident and single-blob raw access */
+static FArchive g_image_arc;
+/* Raw blob slot (owned): the only payload kept resident outside the cache */
+static uint8_t *g_blob_buf = NULL;
+static long     g_blob_len = 0;
+/* Blob slot holds entry g_blob_id; -1 = empty */
+static int      g_blob_id = -1;
 
 static void image_set_palette(const MagImage *img);
 
-#define TOC_ENTRY_SIZE 20  /* name[12] + offset[4] + size[4] */
-
 /* Forward declarations */
-static int image_get_entry(long entry_off, long *out_offset, long *out_size);
 static void image_close(void);
 
 /*=== Public API ===========================================================*/
 
 /* Load and initialize the IMAGE.DAT archive.
- * Reads the entire file into g_image_data, parses the TOC count,
- * and validates palette consistency across all entries.
+ * Parses the TOC (kept resident via FArchive), verifies palette
+ * consistency across all entries, and primes the LRU cache slots.
  * Returns 0 on success, -1 on failure. */
 int image_init(const char *path)
 {
-    long fsize;
-    uint32_t tmp_count;
-
-    if (g_image_data) {
+    if (g_image_arc.fp) {
         image_close();
     }
 
-    g_image_data = (uint8_t *)file_read_all(path, &fsize);
-    if (!g_image_data) {
+    if (farchive_open(&g_image_arc, path, 8192) != 0) {
         hal_log("Img: no IMAGE.DAT\r\n");
         return -1;
     }
-
-    if (fsize < 4) {
-        hal_log("WARN: IMAGE.DAT too small\r\n");
-        free(g_image_data);
-        g_image_data = NULL;
-        return -1;
-    }
-    g_image_size = fsize;
-
-    /* Parse TOC */
-    tmp_count = read32_le(g_image_data);
-    if (tmp_count > 8192) {
-        tmp_count = 8192;
+    if (g_image_arc.truncated) {
         hal_log("WARN: IMAGE.DAT TOC truncated to 8192 entries\r\n");
     }
-    g_image_count = (int)tmp_count;
-    g_image_toc_off = 4;
 
     hal_log("Img OK\r\n");
 
@@ -91,17 +68,19 @@ int image_init(const char *path)
         int warned = 0;
         int j;
 
-        for (j = 0; j < g_image_count; j++) {
-            long eoff, eoffset, esize;
+        for (j = 0; j < g_image_arc.count; j++) {
+            long eoffset, esize;
+            uint8_t *raw;
             int nc;
             uint8_t pr[256], pg[256], pb[256];
 
-            eoff = g_image_toc_off + (long)j * TOC_ENTRY_SIZE;
-            if (image_get_entry(eoff, &eoffset, &esize) != 0) continue;
-            if (esize == 0) continue;
-            if (eoffset < 0 || (unsigned long)eoffset + (unsigned long)esize > (unsigned long)g_image_size) continue; /* bounds check */
+            if (farchive_lookup_id(&g_image_arc, j, &eoffset, &esize) != 0) continue;
+            if (esize <= 0) continue;
 
-            nc = mag_read_palette(g_image_data + eoffset, (int)esize, pr, pg, pb);
+            raw = farchive_read_alloc(&g_image_arc, eoffset, esize, NULL);
+            if (!raw) continue;
+            nc = mag_read_palette(raw, (int)esize, pr, pg, pb);
+            free(raw);
             if (nc < 0) continue;
 
             if (!have_ref) {
@@ -144,11 +123,11 @@ int image_init(const char *path)
  * returned pointer after use. */
 MagImage *image_load(unsigned short id)
 {
-    long offset, msize, entry_off;
+    long offset, msize;
     MagImage *img;
     uint8_t *raw;
 
-    if (!g_image_data || (int)id >= g_image_count)
+    if (!g_image_arc.fp || (int)id >= g_image_arc.count)
         return NULL;
 
     /* Check cache first */
@@ -162,17 +141,19 @@ MagImage *image_load(unsigned short id)
         }
     }
 
-    entry_off = g_image_toc_off + (long)id * TOC_ENTRY_SIZE;
-    if (image_get_entry(entry_off, &offset, &msize) != 0)
+    if (farchive_lookup_id(&g_image_arc, (int)id, &offset, &msize) != 0)
+        return NULL;
+    if (msize <= 0)
         return NULL;
 
-    if (offset < 0 || msize < 0) return NULL;
-    if ((unsigned long)offset + (unsigned long)msize > (unsigned long)g_image_size)
+    raw = farchive_read_alloc(&g_image_arc, offset, msize, NULL);
+    if (!raw)
         return NULL;
-
-    raw = g_image_data + offset;
-    if (mag_decode(raw, (int)msize, &img) != 0)
+    if (mag_decode(raw, (int)msize, &img) != 0) {
+        free(raw);
         return NULL;
+    }
+    free(raw);
 
     if (!img->is_sprite) {
         image_set_palette(img);
@@ -188,55 +169,55 @@ MagImage *image_load(unsigned short id)
 /*=== Raw blob access ======================================================*/
 
 /* Return a pointer to the raw archive bytes of entry id (no decode).
- * Valid until the next image_init/image_close; *out_size (optional)
- * receives the byte length. Returns NULL on bad id or TOC corruption. */
+ * Contents live in an internal single-slot buffer: the return value is
+ * valid only until the next image_raw_blob call or image_init/image_close.
+ * The sole consumer (nb_anim.c playanima) stops the current animation
+ * before fetching the next blob, so the borrow never dangles.  *out_size
+ * (optional) receives the byte length.  Returns NULL on bad id, hole or
+ * TOC corruption. */
 const unsigned char *image_raw_blob(unsigned short id, long *out_size)
 {
-    long entry_off;
     long offset = 0;
     long msize = 0;
+    uint8_t *buf;
 
     if (out_size)
         *out_size = 0;
-    if (!g_image_data || (int)id >= g_image_count)
+    if (!g_image_arc.fp || (int)id >= g_image_arc.count)
         return NULL;
 
-    entry_off = g_image_toc_off + (long)id * TOC_ENTRY_SIZE;
-    if (image_get_entry(entry_off, &offset, &msize) != 0)
+    if (farchive_lookup_id(&g_image_arc, (int)id, &offset, &msize) != 0)
         return NULL;
-    if (offset < 0 || msize <= 0)
+    if (msize <= 0)
         return NULL;
-    if ((unsigned long)offset + (unsigned long)msize > (unsigned long)g_image_size)
-        return NULL;
+
+    if (g_blob_id != (int)id) {
+        buf = farchive_read_alloc(&g_image_arc, offset, msize, NULL);
+        if (!buf)
+            return NULL;
+        if (g_blob_buf)
+            free(g_blob_buf);
+        g_blob_buf = buf;
+        g_blob_len = msize;
+        g_blob_id = (int)id;
+    }
 
     if (out_size)
-        *out_size = msize;
-    return g_image_data + offset;
+        *out_size = g_blob_len;
+    return g_blob_buf;
 }
 
 /* Free the IMAGE.DAT archive and reset all state. */
 static void image_close(void)
 {
-    if (g_image_data) {
-        free(g_image_data);
-        g_image_data = NULL;
+    if (g_blob_buf) {
+        free(g_blob_buf);
+        g_blob_buf = NULL;
     }
+    g_blob_len = 0;
+    g_blob_id = -1;
     image_cache_clear();
-    g_image_size = 0;
-    g_image_count = 0;
-    g_image_toc_off = 4;
-}
-
-/*=== Internal helpers ======================================================*/
-
-/* Read TOC entry offset and size at entry_off, return 0 on success. */
-static int image_get_entry(long entry_off, long *out_offset, long *out_size)
-{
-    if (entry_off < 0 || entry_off + TOC_ENTRY_SIZE > g_image_size)
-        return -1;
-    *out_offset = (long)read32_le(g_image_data + entry_off + 12);
-    *out_size   = (long)read32_le(g_image_data + entry_off + 16);
-    return 0;
+    farchive_close(&g_image_arc);
 }
 
 /*=== Internal palette helper ==============================================*/

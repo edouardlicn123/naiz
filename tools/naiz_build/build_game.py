@@ -30,7 +30,8 @@ if not VENV_PYTHON.exists():
 
 sys.path.insert(0, str(ROOT / "tools"))
 
-from naiz_lib import PROTECTED_IDX_ALL, COMMERCIAL_DOS_DIR
+from naiz_lib import PROTECTED_IDX_ALL, COMMERCIAL_DOS_DIR, to_dos_name
+from naiz_lib.toc_archive import make_toc_archive
 from naiz_lib.palette_utils import validate_skin_palette, VALIDATE_DE_MAX
 from naiz_lib.mag_codec import decode_mag_palette
 from naiz_build.project_config import ProjectConfig
@@ -221,6 +222,74 @@ def pack_images(proj_dir: Path, game_dir: Path):
         print("  IMAGE.DAT → games/{}/".format(game_dir.name))
 
 
+def _prune_stale_scenes(game_dir: Path, deployed):
+    """Remove game_dir/*.nb files outside the deployed scene set.
+
+    The deploy tree is the only source an fopen-based engine sees; scenes
+    that disappear from `scene/` (or were never real, such as historical
+    0-byte residue) would otherwise stay in `games/` forever and get injected
+    into every HDI.  Keeps games/*.nb == (non-empty scene/*.nb) exactly, so
+    the residue cannot recur.
+    """
+    for stale in sorted(game_dir.glob("*.nb")):
+        if stale.name not in deployed:
+            print(f"  清理过时脚本: {stale.name}")
+            stale.unlink()
+
+
+def pack_scenes(proj_dir: Path, game_dir: Path):
+    """Pack scene/*.nb into SCENE.DAT (IMAGE.DAT-compatible TOC layout).
+
+    Entry names are the upstream 8.3 uppercase short names of the source
+    filenames, truncated to 8 base chars BEFORE collision checking, so two
+    sources that would collide after truncation (nbook001.nb / nbook0012.nb
+    both -> NBOOK001.NB) are rejected instead of silently overwriting (R25
+    naming rule).  Zero-byte scripts (historical build residue such as
+    nbook005-020.nb / nopbook.nb) are skipped.  Writes are incremental:
+    an unchanged payload does not touch the output file.
+    """
+    scene_dir = proj_dir / "scene"
+    if not scene_dir.is_dir():
+        return
+
+    names = {}
+    entries = []
+    for nb in sorted(scene_dir.glob("*.nb")):
+        data = nb.read_bytes()
+        if not data:
+            continue  # 0-byte residue, never meaningful at runtime
+        if b"\r" in data:
+            # Engine SCENE.DAT reads are LF-only (nb_get_line splits on '\n').
+            # Normalize CRLF/CR to LF so an archived script behaves exactly
+            # like the loose-file path (DOS text mode strips CR there).
+            print(f"  WARN: scene {nb.name} has CRLF/CR line endings; "
+                  "normalizing to LF")
+            data = data.replace(b"\r\n", b"\n").replace(b"\r", b"\n")
+        base8, _ext3 = to_dos_name(nb.name)
+        base = base8.decode('ascii', errors='replace').strip()
+        name = f"{base}.NB"
+        if name in names:
+            raise RuntimeError(
+                f"SCENE.DAT name collision after 8.3 truncation: "
+                f"{names[name]} and {nb.name} both map to {name}")
+        names[name] = nb.name
+        if len(data) >= 32768:  # engine NB_BUF_SIZE
+            raise RuntimeError(
+                f"scene {nb.name}: {len(data)} bytes exceeds the 32 KiB buffer")
+        entries.append((name, data))
+
+    if not entries:
+        return
+
+    payload = make_toc_archive(entries)
+    out = game_dir / "SCENE.DAT"
+    if out.exists() and out.read_bytes() == payload:
+        print(f"  SCENE.DAT 未变化（{len(entries)} scenes）")
+        return
+    out.write_bytes(payload)
+    print(f"  SCENE.DAT: {len(payload)} bytes, {len(entries)} scenes → games/{game_dir.name}/")
+
+
 def deploy_runtime(proj_dir: Path, game_dir: Path):
     """Deploy fonts, settings, scripts, and DOS extender"""
     # 字库: fonts are base ASCII/data files; per-language CJK fonts are
@@ -276,12 +345,21 @@ def deploy_runtime(proj_dir: Path, game_dir: Path):
         except (ValueError, IOError) as e:
             print(f"  WARN: config.toml 读取失败: {e}")
 
-    # .nb 剧本文件
+    # .nb 剧本文件（散文件路径，引擎现用；SCENE.DAT 接入引擎后停发）
     scene_dir = proj_dir / "scene"
     if scene_dir.is_dir():
+        deployed = set()
         for nb in sorted(scene_dir.glob("*.nb")):
+            if nb.stat().st_size == 0:
+                print(f"  WARN: 跳过 0 字节脚本（残留）: {nb.name}")
+                continue
             safe_copy2(nb, game_dir / nb.name)
+            deployed.add(nb.name)
             print(f"  {nb.name} 已部署")
+        _prune_stale_scenes(game_dir, deployed)
+
+    # SCENE.DAT TOC 归档（共享 IMAGE.DAT 布局，新增数据管线）
+    pack_scenes(proj_dir, game_dir)
 
     # DOS extender + memory manager
     dos_dir = Path(COMMERCIAL_DOS_DIR)
