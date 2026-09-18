@@ -1,7 +1,7 @@
 {
   "version": 2,
-  "git_head": "8465a8a",
-  "checked_at": "2026-09-17T19:59:49",
+  "git_head": "ab423a5",
+  "checked_at": "2026-09-18T12:39:26",
   "files": {
     "core/build.sh": {
       "sha256": "0e6bb3f41cae8f6c5a014a49767f93990ddd3e2c461a85ec991c01b40b66b11e",
@@ -22,7 +22,7 @@
       ]
     },
     "core/engine/audio.c": {
-      "sha256": "9b805ebf75f3719f190449d28af64ec8a1559a15d12895bba2eb81b3951246d6",
+      "sha256": "b83c67d59ba72265ec5f02058a5b517ffffb411c941fd99987382e37591b4b1c",
       "violations": 0,
       "candidates": 0,
       "findings": []
@@ -226,13 +226,13 @@
       "findings": []
     },
     "core/engine/nb_asset_table.h": {
-      "sha256": "874415063f36bb7ed59ab6a7cebcf2abcc32997aa9100820ffd9542dcc4651fc",
+      "sha256": "15c69ddf48a1e7c9fa006b7949336b87dc4b6d732ca64c37b9e5e89a58e317a1",
       "violations": 0,
       "candidates": 0,
       "findings": []
     },
     "core/engine/nb_audio.c": {
-      "sha256": "37d03c793785961bc5c16071ac25ebd268e2562c7f96f8ad132d4717bdb3149c",
+      "sha256": "d648e4bcf163ba550c63ebc8afc92240a7fba8cd1e135814ea1a3785d8bedd1f",
       "violations": 0,
       "candidates": 0,
       "findings": []
@@ -339,7 +339,7 @@
       ]
     },
     "core/engine/nb_saveload.c": {
-      "sha256": "658312c85e24a594f54e4783878ad71fb8d03746acfa687d8ca1d2e4e1337bbf",
+      "sha256": "ddadd06046d534b35e4cc388d783874e7502cc0a7338056085930429eecedcff",
       "violations": 0,
       "candidates": 0,
       "findings": []
@@ -704,13 +704,13 @@
       "findings": []
     },
     "core/plat/hal.h": {
-      "sha256": "ed2ac6f1006012ff48e403e8a293e9c5feb9af17e8250b8f033b09ed64912bf5",
+      "sha256": "aaffdc0522a8a8f8570358687af5375cfe8f7cdfbd1fe0a63f58ffed6e27a04e",
       "violations": 0,
       "candidates": 0,
       "findings": []
     },
     "core/plat/hal_audio.c": {
-      "sha256": "96a8e225e808e286f0cf2bb652e969bbb701a061e0da9ed44e495cf886e62a68",
+      "sha256": "511ed496911be035daa6b0a5f3da1448487a5c7d8a1eaa6cf1573acab4de9e90",
       "violations": 0,
       "candidates": 0,
       "findings": []
@@ -1341,8 +1341,8 @@
   },
   "summary": {
     "files": 182,
-    "changed": 0,
-    "skipped": 182,
+    "changed": 1,
+    "skipped": 181,
     "out_of_scope": 0,
     "violations": 0,
     "candidates": 42,

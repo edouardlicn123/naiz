@@ -5,7 +5,6 @@
 
 png/bg/comlogo.png       images/comlogo.MAG   --256color
 png/bg/mainmenu.png       images/mainmenu.MAG   --256color
-png/bg/powed.png       images/powed.MAG   --256color
 png/bg/seasidebg.png       images/seasidebg.MAG   --256color
 png/bg/splbg.png       images/splbg.MAG   --256color
 png/char/fei-normal.png       images/fei-normal.MAG   --256color --sprite

@@ -140,12 +140,23 @@ static void save_load_draw(int is_load, int page, int slot_idx, int focus_on_bac
             draw_rounded_emboss(80, slot_y[i], 480, 44, SAVE_SLOT_R,
                                 BTN_FILL_IDX, BTN_HIGHLIGHT_IDX, BTN_SHADOW_IDX);
         }
+        /* Conditional UI elements (nav arrows, page counter) clear their
+         * strips back to the layer base first: the composite persists
+         * between redraws, so an arrow dropping out at the first/last page
+         * or digits changing width would otherwise linger as ghosts. */
+        menu_layer_erase_to_base(56, 318, 16, 16);
+        menu_layer_erase_to_base(576, 318, 16, 16);
+        menu_layer_erase_to_base(310, 330, 20, 14);
         if (page > 0) draw_text("<", 0, 56, 318, 72, 334, 0, PAL_WHITE);
         if (page < total_pages - 1) draw_text(">", 0, 576, 318, 592, 334, 0, PAL_WHITE);
         snprintf(buf, sizeof(buf), "%d/%d", page + 1, total_pages);
         draw_text(buf, 0, 310, 330, 330, 344, 0, PAL_WHITE);
         draw_rounded_emboss(66, 352, 80, 30, 4,
                             BTN_FILL_IDX, BTN_HIGHLIGHT_IDX, BTN_SHADOW_IDX);
+        /* The confirm layer (prompt + Yes/No buttons) is conditional too:
+         * erase its strips so leaving confirm mode does not leave ghosts. */
+        menu_layer_erase_to_base(260, 314, 160, 16);
+        menu_layer_erase_to_base(250, 370, 140, 22);
         if (confirm) {
             draw_rounded_emboss(250, 370, 60, 22, 2,
                                 BTN_FILL_IDX, BTN_HIGHLIGHT_IDX, BTN_SHADOW_IDX);
