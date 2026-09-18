@@ -19,14 +19,8 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
 
 from naiz_build.project_config import ProjectConfig
 from naiz_lib.nb_line import parse_nb_line as naiz_parse_nb_line
+from naiz_lib.langdefs import LANG_CODE_SET as VALID_LANGS
 
-
-# Runtime language codes — must match engine (settings_menu LANG_CODES),
-# tr_init("i18n/sys_<lang>.txt") and gen_cjk_font RUNTIME_LANGS.
-VALID_LANGS = {
-    'eng', 'jpn', 'chi', 'cht', 'kor',
-    'fre', 'ger', 'ita', 'spa', 'por',
-}
 
 # Hardcoded system-UI strings rendered through tr() by the engine (settings,
 # save/load menus, CG gallery).  Kept OUT of # ORPHANED on regeneration: these

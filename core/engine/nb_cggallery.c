@@ -36,6 +36,9 @@
 #define GAL_STEP_X      148     /* cell 144 + 4 gap */
 #define GAL_STEP_Y      104     /* cell 100 + 4 gap */
 #define GAL_GRID_BOTTOM (GAL_ORIGIN_Y + (GAL_ROWS - 1) * GAL_STEP_Y + GAL_CELL_H)
+/* Last in-grid cell index (0..GAL_CELLS-1); named to keep the repeated
+ * GAL_CELLS - 1 centering/pivot arithmetic a single source of truth. */
+#define GAL_LAST_CELL_IDX   (GAL_CELLS - 1)
 
 /* Gallery widget colors.  All drawn with engine-reserved high palette
  * indices (248-255) so they stay correct regardless of which background
@@ -79,23 +82,6 @@ static void gallery_palette_restore(void)
     hal_set_palette(GAL_FILL_UNLOCKED, gal_blue_save[0], gal_blue_save[1], gal_blue_save[2]);
 }
 
-/* Compute the total pixel width of a draw_title_large string at 2x scale.
- * text_width() gives the 1x width; advance = 2*glyph + spacing, so the
- * full 2x width = 2*width + (char_count-1)*spacing. */
-static int gallery_title_width(const char *s, int spacing)
-{
-    const uint8_t *p = (const uint8_t *)s;
-    int n = 0;
-    while (*p) {
-        if ((*p & 0x80) == 0)
-            p++;
-        else
-            p += ((*p & 0xE0) == 0xC0) ? 2 : 3;
-        n++;
-    }
-    return n ? 2 * text_width(s, 0) + (n - 1) * spacing : 0;
-}
-
 /* Map in-cell-index (0..11) to screen coordinates. */
 static void gallery_cell_xy(int i, int *px, int *py)
 {
@@ -126,9 +112,8 @@ static void gallery_draw_cell(int abs_idx, int x, int y, int is_sel)
 /* Full redraw of the grid screen (title + cells + back + paging). */
 static void gallery_draw_grid(int page, int sel, int focus_on_back)
 {
-    int total_pages = (CG_COUNT + GAL_CELLS - 1) / GAL_CELLS;
+    int total_pages = menu_pagecount(CG_COUNT, GAL_CELLS);
     int page_start = page * GAL_CELLS;
-    char buf[32];
     int tw;
     int i;
 
@@ -149,7 +134,7 @@ static void gallery_draw_grid(int page, int sel, int focus_on_back)
     menu_layer_erase_to_base(0, GAL_GRID_BOTTOM, LAYER_SCREEN_W,
                              LAYER_SCREEN_H - GAL_GRID_BOTTOM);
 
-    tw = gallery_title_width(tr("CG GALLERY"), 3);
+    tw = text_title_width(tr("CG GALLERY"), 3);
     draw_title_large(tr("CG GALLERY"), (LAYER_SCREEN_W - tw) / 2, 4, 3, GAL_FG);
 
     for (i = 0; i < GAL_CELLS; i++) {
@@ -160,13 +145,8 @@ static void gallery_draw_grid(int page, int sel, int focus_on_back)
         gallery_draw_cell(abs_idx, x, y, (i == sel) && !focus_on_back);
     }
 
-    draw_rounded_emboss(66, 356, 80, 30, 4, BTN_FILL_IDX, BTN_HIGHLIGHT_IDX, BTN_SHADOW_IDX);
-    draw_text(tr("Back"), 0, 76, 363, 136, 379, 1, focus_on_back ? MENU_PAL_YELLOW : GAL_FG);
-
-    if (page > 0)               draw_text("<", 0, 56, 370, 72, 386, 0, GAL_FILL_LOCKED);
-    if (page < total_pages - 1) draw_text(">", 0, 576, 370, 592, 386, 0, GAL_FILL_LOCKED);
-    snprintf(buf, sizeof(buf), "%d/%d", page + 1, total_pages);
-    draw_text(buf, 0, 308, 370, 332, 386, 0, GAL_FILL_LOCKED);
+    menu_back_draw(356, focus_on_back, 1, GAL_FG);
+    menu_pagenav_draw(370, 370, GAL_FILL_LOCKED, page, total_pages);
 
     menu_layer_commit();
     menu_layer_blit();
@@ -182,7 +162,7 @@ static void gallery_draw_cells_range(int page, int from_sel, int to_sel, int foc
 
     if (!focus_on_back) {
         /* Back loses focus (was possibly highlighted): repaint idle color. */
-        draw_text(tr("Back"), 0, 76, 363, 136, 379, 1, GAL_FG);
+        menu_back_draw(356, 0, 0, GAL_FG);
 
         /* Old cell loses focus */
         gallery_cell_xy(from_sel, &x, &y);
@@ -201,7 +181,7 @@ static void gallery_draw_cells_range(int page, int from_sel, int to_sel, int foc
         abs_idx = page * GAL_CELLS + from_sel;
         if (abs_idx < CG_COUNT)
             gallery_draw_cell(abs_idx, x, y, 0);
-        draw_text(tr("Back"), 0, 76, 363, 136, 379, 1, MENU_PAL_YELLOW);
+        menu_back_draw(356, 1, 0, GAL_FG);
     }
 
     menu_layer_commit();
@@ -277,7 +257,7 @@ void cmd_cgvmenu(int argc, const char **argv, const char *cmd_name)
         return;
     }
 
-    total_pages = (CG_COUNT + GAL_CELLS - 1) / GAL_CELLS;
+    total_pages = menu_pagecount(CG_COUNT, GAL_CELLS);
 
     hal_kbd_drain_advance();
     hal_mouse_erase_cursor();
@@ -301,7 +281,7 @@ void cmd_cgvmenu(int argc, const char **argv, const char *cmd_name)
             if (focus_on_back) {
                 if (hal_kbd_is_down(KC_UP)) {
                     focus_on_back = 0;
-                    sel = (last_idx < GAL_CELLS - 1) ? last_idx : GAL_CELLS - 1;
+                    sel = (last_idx < GAL_LAST_CELL_IDX) ? last_idx : GAL_LAST_CELL_IDX;
                 } else if (hal_kbd_is_down(KC_ENTER) || hal_kbd_is_down(KC_SPACE) ||
                            hal_kbd_is_down(KC_XFER)) {
                     running = 0;
@@ -336,11 +316,11 @@ void cmd_cgvmenu(int argc, const char **argv, const char *cmd_name)
             if (hal_mouse_was_clicked(HAL_MOUSE_LBUTTON)) {
                 int mx = hal_mouse_get_x(), my = hal_mouse_get_y(), i;
 
-                if (mx >= 66 && mx < 146 && my >= 356 && my < 386) { running = 0; continue; }
-                if (mx >= 56 && mx < 72 && my >= 370 && my < 386 && page > 0) {
+                if (menu_back_hit(356, mx, my)) { running = 0; continue; }
+                if (menu_page_hit(370, mx, my) == 1 && page > 0) {
                     page--; sel = 0; gallery_draw_grid(page, sel, focus_on_back); hal_mouse_draw_cursor_force(); continue;
                 }
-                if (mx >= 576 && mx < 592 && my >= 370 && my < 386 && page < total_pages - 1) {
+                if (menu_page_hit(370, mx, my) == 2 && page < total_pages - 1) {
                     page++; sel = 0; gallery_draw_grid(page, sel, focus_on_back); hal_mouse_draw_cursor_force(); continue;
                 }
                 for (i = 0; i < GAL_CELLS; i++) {
@@ -370,12 +350,7 @@ void cmd_cgvmenu(int argc, const char **argv, const char *cmd_name)
         hal_mouse_draw_cursor();
     }
 
-    /* Exit contract (shared by all menu UIs): close the layer (base snapshot
-     * back to VRAM) first, then flush the mouse, restore the shared menu
-     * palette and the saved 255 slot. */
-    menu_layer_close(1);
-    hal_mouse_flush();
-    menu_restore_item_palette();
+    menu_finish();
     gallery_palette_restore();
     nb_load("mainmenu.nb");
 }

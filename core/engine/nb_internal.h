@@ -6,6 +6,8 @@
 #ifndef NB_INTERNAL_H
 #define NB_INTERNAL_H
 
+#include <stdint.h>
+
 /* Public NB API (nb_load lives here) is visible to all sub-modules. */
 #include "nb.h"
 
@@ -76,5 +78,42 @@ int  menu_show(int mx, int my, int cols, int argc, const char **argv);
 void menu_save_item_palette(void);
 void menu_restore_item_palette(void);
 void menu_consume_key(unsigned char key);
+
+/* Shared menu-exit contract: close the menu layer (base snapshot back to
+ * VRAM), flush the mouse, restore the shared menu palette. */
+void menu_finish(void);
+
+/* Page navigation + Back-button chrome (shared by the paged save/load and
+ * CG-gallery menus).  Draw helpers must be called between
+ * menu_layer_begin_draw() and menu_layer_commit(); with the layer closed
+ * (OOM fallback) they degrade to direct VRAM. */
+int  menu_pagecount(int count, int per);
+void menu_pagenav_draw(int arrows_y, int count_y, uint8_t fg,
+                       int page, int total_pages);
+int  menu_page_hit(int arrows_y, int mx, int my);   /* 0 none / 1 prev / 2 next */
+void menu_back_draw(int y, int focus, int emboss, uint8_t idle_fg);
+int  menu_back_hit(int y, int mx, int my);
+
+/* Shared Yes/No confirm state machine.  Consumes one frame of confirm-mode
+ * input (keyboard Left/Right toggle + Enter/Space/XFER + Esc, mouse Yes/No
+ * button clicks).  cfg holds caller geometry + an action callback:
+ *   action(slot, &fail)  returns 1 = operation succeeded, menu should exit;
+ *                        0 = operation done, stay in the menu (refresh list);
+ *                        -1 = operation failed (MENU_CONFIRM_FAILED). */
+enum {
+    MENU_CONFIRM_NONE = 0,
+    MENU_CONFIRM_TOGGLE = 1,  /* Yes/No focus toggled — redraw confirm */
+    MENU_CONFIRM_CLOSED = 2,  /* confirm cancelled/answered-no — redraw list */
+    MENU_CONFIRM_EXIT = 3,    /* action succeeded and wants to leave the menu */
+    MENU_CONFIRM_FAILED = 4   /* action reported failure — redraw + error box */
+};
+typedef struct {
+    int yes_x0;                 /* Yes button rect (60 px wide from x0) */
+    int no_x0;                  /* No button rect (60 px wide from x0) */
+    int y0, y1;                 /* button band */
+    int mouse_yes_always;       /* mouse Yes click confirms regardless of focus */
+    int (*action)(int slot);    /* performs the confirmed operation */
+} MenuConfirmCfg;
+int menu_confirm_input(int *confirm_yes, int slot, const MenuConfirmCfg *cfg);
 
 #endif

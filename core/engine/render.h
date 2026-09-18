@@ -101,5 +101,7 @@ void fill_diag_sweep(int x, int y, int w, int h, uint8_t color,
 void vblank_wait(void);
 /* 绘制 2× 大标题（16×32 每字）带黑色外发光 */
 void draw_title_large(const char *s, int x, int y, int spacing, uint8_t color);
+/* Total pixel width of a draw_title_large (spacing) string — for centering. */
+int text_title_width(const char *s, int spacing);
 
 #endif

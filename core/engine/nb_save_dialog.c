@@ -21,6 +21,72 @@
 static void save_dlg_draw_slots(int row, int col);
 static void save_dlg_draw_confirm(int slot, int yes);
 
+/* Grid: 3 rows x 6 cols; row 2 is the Back out-row.  Wrap a 3-row hop in
+ * {-1, +1}, and a 6-col wrap (used only on the slot rows). */
+static int save_dlg_row_hop(int row, int inc)
+{
+    row += inc;
+    if (row >= 3) row = 0;
+    else if (row < 0) row = 2;
+    return row;
+}
+
+static int save_dlg_col_wrap(int col, int inc)
+{
+    int nc = (col + inc) % 6;
+    if (nc < 0) nc += 6;
+    return nc;
+}
+
+/* Hit-test the slot grid area from mouse coords.  Returns 1 when the click
+ * falls inside the dialog content band, filling the row (0..2+, row 2 = Back)
+ * and clamped col (0..5). */
+static int save_dlg_slot_hit(int mx, int my, int *row, int *col)
+{
+    int r, c;
+    if (my < LAYER_DIALOG_CONTENT_Y ||
+        my >= LAYER_DIALOG_Y + LAYER_DIALOG_H - LAYER_DIALOG_BORDER)
+        return 0;
+    if (mx < LAYER_DIALOG_CONTENT_X ||
+        mx >= LAYER_DIALOG_X + LAYER_DIALOG_W - LAYER_DIALOG_RIGHT_INDENT)
+        return 0;
+    r = (my - LAYER_DIALOG_CONTENT_Y) / 20;
+    c = (mx - LAYER_DIALOG_CONTENT_X) / (LAYER_DIALOG_CONTENT_W / 6);
+    if (c < 0) c = 0;
+    if (c > 5) c = 5;
+    *row = r;
+    *col = c;
+    return 1;
+}
+
+/* Confirm-mode action: overwrite the slot, then leave the dialog. */
+static int save_dlg_confirm_action(int slot)
+{
+    save_game_slot(slot);
+    return 1;
+}
+
+/* Confirm geometry for the in-dialog save prompt ([Yes]/[No] text buttons). */
+static const MenuConfirmCfg g_dlg_confirm_cfg = {
+    .yes_x0 = LAYER_DIALOG_CONTENT_X + 80,
+    .no_x0 = LAYER_DIALOG_CONTENT_X + 200,
+    .y0 = LAYER_DIALOG_CONTENT_Y + 60,
+    .y1 = LAYER_DIALOG_CONTENT_Y + 80,
+    .mouse_yes_always = 1,
+    .action = save_dlg_confirm_action
+};
+
+/* Draw the dialog "SAVE" header line (shared by the slot grid and the
+ * confirm overlay, which both repaint the full dialog content area). */
+static void save_dlg_draw_header(void)
+{
+    draw_text(tr("SAVE"), 0, LAYER_DIALOG_CONTENT_X,
+              LAYER_DIALOG_Y + LAYER_DIALOG_HEADER_Y,
+              LAYER_DIALOG_CONTENT_X + LAYER_DIALOG_CONTENT_W,
+              LAYER_DIALOG_Y + LAYER_DIALOG_HEADER_Y + 20,
+              0, PAL_WHITE);
+}
+
 void save_dialog_menu(void)
 {
     char saved_charname[64];
@@ -30,10 +96,7 @@ void save_dialog_menu(void)
     int row = 0, col = 0;
     int confirm = 0, confirm_yes = 1, running = 1;
     int sel_slot = 0;
-    int slot_start_x = LAYER_DIALOG_CONTENT_X;
-    int prev_row, prev_col, prev_cyes;
-    SlotInfo si;
-    char buf[128];
+    int prev_row, prev_col;
 
     /* Save dialog text state */
     if (nb_dialog_get_charname()) {
@@ -59,51 +122,40 @@ void save_dialog_menu(void)
     menu_save_item_palette();
     hal_kbd_drain_advance();
 
-    {
-        int content_x = LAYER_DIALOG_CONTENT_X;
-        int content_w = LAYER_DIALOG_CONTENT_W;
-        draw_text(tr("SAVE"), 0, content_x, LAYER_DIALOG_Y + LAYER_DIALOG_HEADER_Y,
-                  content_x + content_w, LAYER_DIALOG_Y + LAYER_DIALOG_HEADER_Y + 20,
-                  0, PAL_WHITE);
-    }
+    save_dlg_draw_header();
 
     save_dlg_draw_slots(row, col);
     hal_mouse_set_pos(LAYER_SCREEN_W / 2, LAYER_SCREEN_H / 2);
     hal_mouse_draw_cursor_force();
 
     while (running) {
-        prev_row = row; prev_col = col; prev_cyes = confirm_yes;
+        prev_row = row; prev_col = col;
 
         hal_kbd_update();
 
         if (confirm) {
-            if (hal_kbd_is_down(KC_LEFT) || hal_kbd_is_down(KC_RIGHT))
-                confirm_yes = !confirm_yes;
-            if (hal_kbd_is_down(KC_ENTER) || hal_kbd_is_down(KC_SPACE) || hal_kbd_is_down(KC_XFER)) {
-                if (confirm_yes) {
-                    save_game_slot(sel_slot);
-                    running = 0; break;
-                }
+            int r = menu_confirm_input(&confirm_yes, sel_slot, &g_dlg_confirm_cfg);
+            if (r == MENU_CONFIRM_TOGGLE) {
+                save_dlg_draw_confirm(sel_slot, confirm_yes);
+                hal_mouse_draw_cursor_force();
+            } else if (r == MENU_CONFIRM_CLOSED) {
                 confirm = 0; confirm_yes = 1;
                 save_dlg_draw_slots(row, col);
                 hal_mouse_draw_cursor_force();
-                continue;
+            } else if (r == MENU_CONFIRM_EXIT) {
+                running = 0; break;
             }
-            if (hal_kbd_is_down(KC_ESC)) {
-                confirm = 0; confirm_yes = 1;
-                save_dlg_draw_slots(row, col);
-                hal_mouse_draw_cursor_force();
-                continue;
-            }
+            hal_mouse_draw_cursor();
+            continue;
         } else {
             if (hal_kbd_is_down(KC_UP)) {
-                row = (row == 2) ? 1 : (row == 1 ? 0 : 2);
+                row = save_dlg_row_hop(row, -1);
             } else if (hal_kbd_is_down(KC_DOWN)) {
-                row = (row == 2) ? 0 : (row == 1 ? 2 : 1);
+                row = save_dlg_row_hop(row, 1);
             } else if (hal_kbd_is_down(KC_LEFT)) {
-                if (row < 2) col = (col + 5) % 6;
+                if (row < 2) col = save_dlg_col_wrap(col, -1);
             } else if (hal_kbd_is_down(KC_RIGHT)) {
-                if (row < 2) col = (col + 1) % 6;
+                if (row < 2) col = save_dlg_col_wrap(col, 1);
             } else if (hal_kbd_is_down(KC_ENTER) || hal_kbd_is_down(KC_SPACE) || hal_kbd_is_down(KC_XFER)) {
                 if (row == 2) { running = 0; break; }
                 sel_slot = row * 6 + col;
@@ -119,60 +171,25 @@ void save_dialog_menu(void)
         hal_mouse_update();
         hal_mouse_recenter_if_idle();
 
-        /* Mouse input */
-        {
-            int mx, my;
-            if (hal_mouse_was_clicked(HAL_MOUSE_LBUTTON)) {
-                mx = hal_mouse_get_x();
-                my = hal_mouse_get_y();
-                if (my >= LAYER_DIALOG_CONTENT_Y && my < LAYER_DIALOG_Y + LAYER_DIALOG_H - LAYER_DIALOG_BORDER &&
-                    mx >= slot_start_x && mx < LAYER_DIALOG_X + LAYER_DIALOG_W - LAYER_DIALOG_RIGHT_INDENT) {
-                    int rel_y = my - LAYER_DIALOG_CONTENT_Y;
-                    int click_row = rel_y / 20;
-                    int click_col = (mx - slot_start_x) / (LAYER_DIALOG_CONTENT_W / 6);
-                    if (click_col < 0) click_col = 0;
-                    if (click_col > 5) click_col = 5;
-                    if (confirm) {
-                        int dlg_cx = LAYER_DIALOG_CONTENT_X;
-                        int dlg_cy = LAYER_DIALOG_CONTENT_Y;
-                        int btn_y0 = dlg_cy + 60;
-                        int btn_y1 = dlg_cy + 80;
-                        if (my >= btn_y0 && my < btn_y1) {
-                            if (mx >= dlg_cx + 80 && mx < dlg_cx + 140) {
-                                save_game_slot(sel_slot);
-                                running = 0; break;
-                            }
-                            if (mx >= dlg_cx + 200 && mx < dlg_cx + 260) {
-                                confirm = 0; confirm_yes = 1;
-                                save_dlg_draw_slots(row, col);
-                                hal_mouse_draw_cursor_force();
-                                continue;
-                            }
-                        }
-                    } else {
-                        if (click_row == 2) { running = 0; break; }
-                        else if (click_row < 2) {
-                            row = click_row; col = click_col;
-                            sel_slot = row * 6 + col;
-                            confirm = 1; confirm_yes = 1;
-                            save_dlg_draw_confirm(sel_slot, confirm_yes);
-                            hal_mouse_draw_cursor_force();
-                            continue;
-                        }
-                    }
+        /* Mouse input (list mode only — confirm mode is handled above) */
+        if (hal_mouse_was_clicked(HAL_MOUSE_LBUTTON)) {
+            int mx = hal_mouse_get_x(), my = hal_mouse_get_y();
+            int click_row, click_col;
+            if (save_dlg_slot_hit(mx, my, &click_row, &click_col)) {
+                if (click_row == 2) { running = 0; break; }
+                else if (click_row < 2) {
+                    row = click_row; col = click_col;
+                    sel_slot = row * 6 + col;
+                    confirm = 1; confirm_yes = 1;
+                    save_dlg_draw_confirm(sel_slot, confirm_yes);
+                    hal_mouse_draw_cursor_force();
+                    continue;
                 }
             }
         }
 
-        if (confirm) {
-            if (confirm_yes != prev_cyes) {
-                save_dlg_draw_confirm(sel_slot, confirm_yes);
-            }
-        } else {
-            if (row != prev_row || col != prev_col) {
-                save_dlg_draw_slots(row, col);
-            }
-        }
+        if (row != prev_row || col != prev_col)
+            save_dlg_draw_slots(row, col);
 
         hal_mouse_draw_cursor();
     }
@@ -234,16 +251,14 @@ static void save_dlg_draw_confirm(int slot, int yes)
 
     hal_mouse_erase_cursor();
     layer_dialog_clear();
-    draw_text(tr("SAVE"), 0, content_x, LAYER_DIALOG_Y + LAYER_DIALOG_HEADER_Y,
-              content_x + content_w, LAYER_DIALOG_Y + LAYER_DIALOG_HEADER_Y + 20,
-              0, PAL_WHITE);
+    save_dlg_draw_header();
 
     snprintf(buf, sizeof(buf), tr("Overwrite Slot %d?"), slot + 1);
     draw_text(buf, 0, content_x + 4, content_y, content_x + content_w, content_y + 20, 0, PAL_WHITE);
 
     slot_info(slot, &si);
     if (si.exists) {
-        const char *label = si.chapter_title[0] ? si.chapter_title : si.filename;
+        const char *label = slot_chapter_label(&si);
         draw_text(label, 0, content_x + 4, content_y + 20,
                   content_x + content_w, content_y + 40, 0, PAL_WHITE);
         draw_text(si.timestamp, 0, content_x + 4, content_y + 40,

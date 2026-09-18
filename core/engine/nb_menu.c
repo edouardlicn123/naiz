@@ -38,6 +38,126 @@ void menu_restore_item_palette(void)
     hal_set_palette(MENU_PAL_YELLOW, menu_pal_save[3], menu_pal_save[4], menu_pal_save[5]);
 }
 
+/*=== Shared menu exit contract ============================================*/
+
+/* Close the menu layer (base snapshot back to VRAM), flush the mouse, then
+ * restore the shared menu palette.  menu_layer_close is a no-op when the
+ * layer is not open (OOM fallback), palette restore only touches the two
+ * reserved entries — safe in every menu UI. */
+void menu_finish(void)
+{
+    menu_layer_close(1);
+    hal_mouse_flush();
+    menu_restore_item_palette();
+}
+
+/*=== Page chrome (navigation bar + Back button) ==========================*/
+
+/* Number of pages needed to show 'count' items at 'per' per page. */
+int menu_pagecount(int count, int per)
+{
+    if (count <= 0 || per <= 0)
+        return 1;
+    return (count + per - 1) / per;
+}
+
+/* Draw the prev/next arrows and page counter into the layer composite.
+ * Erases its three strips back to base first so arrows and digit changes
+ * never ghost across redraws.  Counter x is normalized to 310. */
+void menu_pagenav_draw(int arrows_y, int count_y, uint8_t fg,
+                       int page, int total_pages)
+{
+    char buf[16];
+
+    menu_layer_erase_to_base(56, arrows_y, 16, 16);
+    menu_layer_erase_to_base(576, arrows_y, 16, 16);
+    menu_layer_erase_to_base(310, count_y, 20, 14);
+    if (page > 0)
+        draw_text("<", 0, 56, arrows_y, 72, arrows_y + 16, 0, fg);
+    if (page < total_pages - 1)
+        draw_text(">", 0, 576, arrows_y, 592, arrows_y + 16, 0, fg);
+    snprintf(buf, sizeof(buf), "%d/%d", page + 1, total_pages);
+    draw_text(buf, 0, 310, count_y, 330, count_y + 14, 0, fg);
+}
+
+/* Hit-test the prev/next arrows.  Returns 1 (prev) / 2 (next) / 0 (none);
+ * page-boundary checks stay with the caller. */
+int menu_page_hit(int arrows_y, int mx, int my)
+{
+    if (mx >= 56 && mx < 72 && my >= arrows_y && my < arrows_y + 16)
+        return 1;
+    if (mx >= 576 && mx < 592 && my >= arrows_y && my < arrows_y + 16)
+        return 2;
+    return 0;
+}
+
+/* Draw the Back button: emboss (66,y,80,30) + centered tr("Back") text.
+ * emboss=0 repaints only the label (incremental focus redraws). */
+void menu_back_draw(int y, int focus, int emboss, uint8_t idle_fg)
+{
+    int tw = text_width(tr("Back"), 1);
+    int tx = 66 + (int)((80L - tw) / 2L);   /* long math: no int overflow */
+    if (tx < 66) tx = 66;
+    if (emboss)
+        draw_rounded_emboss(66, y, 80, 30, 4,
+                            BTN_FILL_IDX, BTN_HIGHLIGHT_IDX, BTN_SHADOW_IDX);
+    draw_text(tr("Back"), 0, tx, y + 7, 80, 30, 1,
+              focus ? MENU_PAL_YELLOW : idle_fg);
+}
+
+/* Hit-test the Back button (66,y,80,30). */
+int menu_back_hit(int y, int mx, int my)
+{
+    return (mx >= 66 && mx < 146 && my >= y && my < y + 30);
+}
+
+/*=== Shared Yes/No confirm state machine =================================*/
+
+/* Handle one frame of confirm-mode input (keyboard + mouse).  Reverts the
+ * Yes/No focus to 'yes' on CLOSED/FAILED paths so the next confirm entry
+ * starts with Yes highlighted.  Returns one of the MENU_CONFIRM_* codes. */
+int menu_confirm_input(int *confirm_yes, int slot, const MenuConfirmCfg *cfg)
+{
+    if (hal_kbd_is_down(KC_LEFT) || hal_kbd_is_down(KC_RIGHT)) {
+        *confirm_yes = !*confirm_yes;
+        return MENU_CONFIRM_TOGGLE;
+    }
+    if (hal_kbd_is_down(KC_ENTER) || hal_kbd_is_down(KC_SPACE) || hal_kbd_is_down(KC_XFER)) {
+        if (*confirm_yes) {
+            int r = cfg->action(slot);
+            if (r != 0)
+                return (r < 0) ? MENU_CONFIRM_FAILED : MENU_CONFIRM_EXIT;
+        }
+        *confirm_yes = 1;
+        return MENU_CONFIRM_CLOSED;
+    }
+    if (hal_kbd_is_down(KC_ESC)) {
+        *confirm_yes = 1;
+        return MENU_CONFIRM_CLOSED;
+    }
+
+    hal_mouse_update();
+    if (hal_mouse_was_clicked(HAL_MOUSE_LBUTTON)) {
+        int mx = hal_mouse_get_x(), my = hal_mouse_get_y();
+        if (mx >= cfg->no_x0 && mx < cfg->no_x0 + 60 && my >= cfg->y0 && my < cfg->y1) {
+            hal_mouse_flush();
+            *confirm_yes = 1;
+            return MENU_CONFIRM_CLOSED;
+        }
+        if (mx >= cfg->yes_x0 && mx < cfg->yes_x0 + 60 && my >= cfg->y0 && my < cfg->y1) {
+            hal_mouse_flush();
+            if (cfg->mouse_yes_always || *confirm_yes) {
+                int r = cfg->action(slot);
+                if (r != 0)
+                    return (r < 0) ? MENU_CONFIRM_FAILED : MENU_CONFIRM_EXIT;
+            }
+            *confirm_yes = 1;
+            return MENU_CONFIRM_CLOSED;
+        }
+    }
+    return MENU_CONFIRM_NONE;
+}
+
 /*=== Button positioning ===================================================*/
 
 static void btn_pos(int mx, int my, int cols, int i, const char *text,
@@ -158,12 +278,9 @@ int menu_show(int mx, int my, int cols, int argc, const char **argv)
                                       hal_mouse_get_x(), hal_mouse_get_y());
                 if (hit >= 0) {
                     NB_DEBUG("menu: mouse sel=%d (%s)\r\n", hit, argv[hit]);
-                    /* Exit contract (shared by all menu UIs): close the
-                     * layer (base snapshot back to VRAM) first, then flush
-                     * the mouse and restore the shared menu palette. */
-                    menu_layer_close(1);
-                    hal_mouse_flush();
-                    menu_restore_item_palette();
+                    /* Exit contract (shared by all menu UIs): restore the
+                     * base snapshot, flush the mouse, restore the palette. */
+                    menu_finish();
                     return hit;
                 }
             }
@@ -238,9 +355,7 @@ int menu_show(int mx, int my, int cols, int argc, const char **argv)
             }
             if (hal_kbd_is_down(KC_SPACE) || hal_kbd_is_down(KC_ENTER) || hal_kbd_is_down(KC_XFER)) {
                 NB_DEBUG("menu: keyboard sel=%d (%s)\r\n", sel, argv[sel]);
-                menu_layer_close(1);
-                hal_mouse_flush();
-                menu_restore_item_palette();
+                menu_finish();
                 return sel;
             }
 

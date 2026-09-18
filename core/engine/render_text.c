@@ -393,3 +393,20 @@ void draw_title_large(const char *s, int x, int y, int spacing, uint8_t color)
         }
     }
 }
+
+/* Total pixel width of a draw_title_large string at 2x scale: each glyph
+ * advances 2x its width plus spacing, so full width = 2*text_width + the
+ * inter-glyph spacings.  Used to center titles like "CG GALLERY". */
+int text_title_width(const char *s, int spacing)
+{
+    const uint8_t *p = (const uint8_t *)s;
+    int n = 0;
+    while (*p) {
+        if ((*p & 0x80) == 0)
+            p++;
+        else
+            p += ((*p & 0xE0) == 0xC0) ? 2 : 3;
+        n++;
+    }
+    return n ? 2 * text_width(s, 0) + (n - 1) * spacing : 0;
+}

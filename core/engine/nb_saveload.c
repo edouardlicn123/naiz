@@ -70,6 +70,50 @@ static const int slot_y[SLOTS_PER_PAGE] = { 90, 146, 202, 258 };
 /* Convert page-relative slot index to absolute slot number. */
 static int slot_abs(int page, int row) { return page * SLOTS_PER_PAGE + row; }
 
+/* Number of visible slots on 'page' (clamped to [1, SLOTS_PER_PAGE]). */
+static int save_load_slots_on_page(int page)
+{
+    int n = SAVE_SLOTS - page * SLOTS_PER_PAGE;
+    if (n > SLOTS_PER_PAGE) n = SLOTS_PER_PAGE;
+    if (n < 1) n = 1;
+    return n;
+}
+
+/* Display label for a save slot: prefers the chapter title, falls back to
+ * the filename when the save was taken outside any defined chapter. */
+const char *slot_chapter_label(const SlotInfo *si)
+{
+    return si->chapter_title[0] ? si->chapter_title : si->filename;
+}
+
+/* Confirm-mode action: executes the save/load for the confirmed slot.
+ * g_confirm_is_load mirrors the is_load arg of the running save_load_menu
+ * (menus are non-reentrant, so a single flag is safe).  Returns 1 on load
+ * success (leave the menu), 0 after a save (stay + refresh the list), -1 on
+ * load failure (caller shows an error box). */
+static int g_confirm_is_load = 0;
+
+static int save_load_confirm_action(int slot)
+{
+    if (g_confirm_is_load) {
+        if (load_game_slot(slot) != 0) {
+            hal_logf("[LOAD] load_game_slot(%d) FAILED\r\n", slot);
+            return -1;
+        }
+        return 1;
+    }
+    save_game_slot(slot);
+    slot_cache_page = -1;   /* slot data changed */
+    return 0;
+}
+
+/* Confirm UI geometry for the full-screen save/load menu. */
+static const MenuConfirmCfg g_sl_confirm_cfg = {
+    .yes_x0 = 250, .no_x0 = 330, .y0 = 370, .y1 = 392,
+    .mouse_yes_always = 0,
+    .action = save_load_confirm_action
+};
+
 /* Rebuild the label/existence cache for the given page. */
 static void save_load_cache_build(int page)
 {
@@ -85,7 +129,7 @@ static void save_load_cache_build(int page)
         slot_info(si_idx, &si);
         slot_exists_cache[i] = si.exists;
         if (si.exists) {
-            const char *chapter = si.chapter_title[0] ? si.chapter_title : si.filename;
+            const char *chapter = slot_chapter_label(&si);
             snprintf(slot_label_cache[i], sizeof(slot_label_cache[i]),
                      "%.31s - %.63s - %.19s",
                      si.slot_name, chapter, si.timestamp);
@@ -132,7 +176,9 @@ static void save_load_draw(int is_load, int page, int slot_idx, int focus_on_bac
                 }
             }
             if (!drawn)
-                draw_title_large(tr(is_load ? "LOAD" : "SAVE"), 282, 28, 4, PAL_WHITE);
+                draw_title_large(tr(is_load ? "LOAD" : "SAVE"),
+                                 (LAYER_SCREEN_W - text_title_width(tr(is_load ? "LOAD" : "SAVE"), 4)) / 2,
+                                 28, 4, PAL_WHITE);
         }
         for (i = 0; i < SLOTS_PER_PAGE; i++) {
             int si_idx = slot_abs(page, i);
@@ -144,15 +190,8 @@ static void save_load_draw(int is_load, int page, int slot_idx, int focus_on_bac
          * strips back to the layer base first: the composite persists
          * between redraws, so an arrow dropping out at the first/last page
          * or digits changing width would otherwise linger as ghosts. */
-        menu_layer_erase_to_base(56, 318, 16, 16);
-        menu_layer_erase_to_base(576, 318, 16, 16);
-        menu_layer_erase_to_base(310, 330, 20, 14);
-        if (page > 0) draw_text("<", 0, 56, 318, 72, 334, 0, PAL_WHITE);
-        if (page < total_pages - 1) draw_text(">", 0, 576, 318, 592, 334, 0, PAL_WHITE);
-        snprintf(buf, sizeof(buf), "%d/%d", page + 1, total_pages);
-        draw_text(buf, 0, 310, 330, 330, 344, 0, PAL_WHITE);
-        draw_rounded_emboss(66, 352, 80, 30, 4,
-                            BTN_FILL_IDX, BTN_HIGHLIGHT_IDX, BTN_SHADOW_IDX);
+        menu_pagenav_draw(318, 330, PAL_WHITE, page, total_pages);
+        menu_back_draw(352, focus_on_back, 1, PAL_WHITE);
         /* The confirm layer (prompt + Yes/No buttons) is conditional too:
          * erase its strips so leaving confirm mode does not leave ghosts. */
         menu_layer_erase_to_base(260, 314, 160, 16);
@@ -178,9 +217,9 @@ static void save_load_draw(int is_load, int page, int slot_idx, int focus_on_bac
         }
     }
 
-    /* Back button */
-    draw_text(tr("Back"), 0, 90, 359, 80, 382, 1,
-              focus_on_back ? MENU_PAL_YELLOW : PAL_WHITE);
+    /* Back button: only the label on incremental redraws (emboss repainted
+     * by the full draw above). */
+    menu_back_draw(352, focus_on_back, 0, PAL_WHITE);
 
     /* Confirm dialog */
     if (confirm) {
@@ -201,11 +240,13 @@ static void save_load_draw(int is_load, int page, int slot_idx, int focus_on_bac
 static void save_load_menu(int is_load, int from_mainmenu)
 {
     int slot_idx = 0, page = 0, confirm = 0, confirm_yes = 1, running = 1, focus_on_back = 0;
-    int total_pages = (SAVE_SLOTS + SLOTS_PER_PAGE - 1) / SLOTS_PER_PAGE;
+    int total_pages = menu_pagecount(SAVE_SLOTS, SLOTS_PER_PAGE);
     char buf[128];
     SlotInfo si;
     const char *saved_fn;
     char orig_nb[64];
+
+    g_confirm_is_load = is_load;
 
     /* Snapshot caller filename before slot operations corrupt sd */
     saved_fn = save_get_filename();
@@ -233,41 +274,27 @@ static void save_load_menu(int is_load, int from_mainmenu)
         hal_kbd_update();
 
         if (confirm) {
-            if (hal_kbd_is_down(KC_LEFT) || hal_kbd_is_down(KC_RIGHT))
-                confirm_yes = !confirm_yes;
-            if (hal_kbd_is_down(KC_ENTER) || hal_kbd_is_down(KC_SPACE) || hal_kbd_is_down(KC_XFER)) {
-                if (confirm_yes) {
-                    if (is_load) {
-                        if (load_game_slot(abs_slot) != 0) {
-                            hal_logf("[LOAD] load_game_slot(%d) FAILED\r\n", abs_slot);
-                            confirm = 0; confirm_yes = 1;
-                            save_load_draw(is_load, page, slot_idx, focus_on_back, confirm, confirm_yes, total_pages, 1);
-                            show_error_msg("Load failed.", LAYER_DIALOG_CONTENT_X + 168, LAYER_DIALOG_CONTENT_Y - 10);
-                            save_load_draw(is_load, page, slot_idx, focus_on_back, confirm, confirm_yes, total_pages, 1);
-                            hal_mouse_draw_cursor_force();
-                            continue;
-                        }
-                        running = 0; break;
-                    } else {
-                        save_game_slot(abs_slot);
-                        slot_cache_page = -1;   /* slot data changed */
-                    }
-                }
+            int r = menu_confirm_input(&confirm_yes, abs_slot, &g_sl_confirm_cfg);
+            if (r == MENU_CONFIRM_TOGGLE) {
+                save_load_draw(is_load, page, slot_idx, focus_on_back, confirm, confirm_yes, total_pages, 0);
+                hal_mouse_draw_cursor_force();
+            } else if (r == MENU_CONFIRM_CLOSED) {
                 confirm = 0; confirm_yes = 1; focus_on_back = 0;
                 save_load_draw(is_load, page, slot_idx, focus_on_back, confirm, confirm_yes, total_pages, 1);
                 hal_mouse_draw_cursor_force();
-                continue;
-            }
-            if (hal_kbd_is_down(KC_ESC)) {
+            } else if (r == MENU_CONFIRM_FAILED) {
                 confirm = 0; confirm_yes = 1; focus_on_back = 0;
                 save_load_draw(is_load, page, slot_idx, focus_on_back, confirm, confirm_yes, total_pages, 1);
+                show_error_msg("Load failed.", 260, 346);
+                save_load_draw(is_load, page, slot_idx, focus_on_back, confirm, confirm_yes, total_pages, 1);
                 hal_mouse_draw_cursor_force();
-                continue;
+            } else if (r == MENU_CONFIRM_EXIT) {
+                running = 0; break;
             }
+            hal_mouse_draw_cursor();
+            continue;
         } else {
-            int slots_on_page = SAVE_SLOTS - page * SLOTS_PER_PAGE;
-            if (slots_on_page > SLOTS_PER_PAGE) slots_on_page = SLOTS_PER_PAGE;
-            if (slots_on_page < 1) slots_on_page = 1;
+            int slots_on_page = save_load_slots_on_page(page);
 
             if (focus_on_back) {
                 if (hal_kbd_is_down(KC_UP)) {
@@ -331,89 +358,56 @@ static void save_load_menu(int is_load, int from_mainmenu)
         hal_mouse_update();
         hal_mouse_recenter_if_idle();
 
-        {  /* mouse input */
+        {  /* mouse input (list mode only — confirm mode is handled above) */
             int mx, my;
             if (hal_mouse_was_clicked(HAL_MOUSE_LBUTTON)) {
                 mx = hal_mouse_get_x();
                 my = hal_mouse_get_y();
-                if (confirm) {
-                    if (mx >= 250 && mx < 310 && my >= 370 && my < 392) {
-                        if (confirm_yes) {
-                            if (is_load) {
-                                if (load_game_slot(slot_abs(page, slot_idx)) != 0) {
-                                    hal_logf("[LOAD] load_game_slot(%d) FAILED\r\n", slot_abs(page, slot_idx));
-                                    confirm = 0; confirm_yes = 1;
-                                    save_load_draw(is_load, page, slot_idx, focus_on_back, confirm, confirm_yes, total_pages, 1);
-                                    show_error_msg("Load failed.", 260, 346);
-                                    save_load_draw(is_load, page, slot_idx, focus_on_back, confirm, confirm_yes, total_pages, 1);
-                                    hal_mouse_draw_cursor_force();
-                                    continue;
-                                }
-                                running = 0; break;
+                /* Back button */
+                if (menu_back_hit(352, mx, my)) {
+                    if (from_mainmenu) {
+                        nb_load(orig_nb[0] ? orig_nb : "mainmenu.nb");
+                    } else {
+                        if (load_game_temp() != 0)
+                            hal_log("[SAVELOAD] load_game_temp failed in mouse back\r\n");
+                    }
+                    running = 0; break;
+                }
+                /* Page prev */
+                if (menu_page_hit(318, mx, my) == 1 && page > 0) {
+                    page--; slot_idx = 0;
+                    save_load_draw(is_load, page, slot_idx, focus_on_back, confirm, confirm_yes, total_pages, 1);
+                    hal_mouse_draw_cursor_force();
+                    continue;
+                }
+                /* Page next */
+                if (menu_page_hit(318, mx, my) == 2 && page < total_pages - 1) {
+                    page++; slot_idx = 0;
+                    save_load_draw(is_load, page, slot_idx, focus_on_back, confirm, confirm_yes, total_pages, 1);
+                    hal_mouse_draw_cursor_force();
+                    continue;
+                }
+                /* Slot selection */
+                if (mx >= 80 && mx < 560 && my >= slot_y[0] && my < slot_y[SLOTS_PER_PAGE - 1] + 44) {
+                    int i;
+                    int slots_on_page = save_load_slots_on_page(page);
+                    for (i = 0; i < slots_on_page; i++) {
+                        if (my >= slot_y[i] && my < slot_y[i] + 44) {
+                            slot_idx = i; focus_on_back = 0;
+                            slot_info(slot_abs(page, i), &si);
+                            if (is_load && !si.exists) {
+                                show_error_msg("No save data.", 260, 346);
+                                save_load_draw(is_load, page, slot_idx, focus_on_back, confirm, confirm_yes, total_pages, 1);
+                                hal_mouse_draw_cursor_force();
                             } else {
-                                save_game_slot(slot_abs(page, slot_idx));
-                                slot_cache_page = -1;   /* slot data changed */
+                                confirm = 1; focus_on_back = 0;
+                                save_load_draw(is_load, page, slot_idx, focus_on_back, confirm, confirm_yes, total_pages, 1);
+                                hal_mouse_draw_cursor_force();
                             }
+break;
                         }
-                        confirm = 0; confirm_yes = 1; focus_on_back = 0;
-                        save_load_draw(is_load, page, slot_idx, focus_on_back, confirm, confirm_yes, total_pages, 1);
-                        hal_mouse_draw_cursor_force();
-                        continue;
                     }
-                    if (mx >= 330 && mx < 390 && my >= 370 && my < 392) {
-                        confirm = 0; confirm_yes = 1; focus_on_back = 0;
-                        save_load_draw(is_load, page, slot_idx, focus_on_back, confirm, confirm_yes, total_pages, 1);
-                        hal_mouse_draw_cursor_force();
-                        continue;
-                    }
-                } else {
-                    /* Back button */
-                    if (mx >= 66 && mx < 146 && my >= 352 && my < 382) {
-                        if (from_mainmenu) {
-                            nb_load(orig_nb[0] ? orig_nb : "mainmenu.nb");
-                        } else {
-                            if (load_game_temp() != 0)
-                                hal_log("[SAVELOAD] load_game_temp failed in mouse back\r\n");
-                        }
-                        running = 0; break;
-                    }
-                    /* Page prev */
-                    if (mx >= 56 && mx < 72 && my >= 318 && my < 334 && page > 0) {
-                        page--; slot_idx = 0;
-                        save_load_draw(is_load, page, slot_idx, focus_on_back, confirm, confirm_yes, total_pages, 1);
-                        hal_mouse_draw_cursor_force();
-                        continue;
-                    }
-                    /* Page next */
-                    if (mx >= 576 && mx < 592 && my >= 318 && my < 334 && page < total_pages - 1) {
-                        page++; slot_idx = 0;
-                        save_load_draw(is_load, page, slot_idx, focus_on_back, confirm, confirm_yes, total_pages, 1);
-                        hal_mouse_draw_cursor_force();
-                        continue;
-                    }
-                    /* Slot selection */
-                    if (mx >= 80 && mx < 560 && my >= slot_y[0] && my < slot_y[SLOTS_PER_PAGE - 1] + 44) {
-                        int i;
-                        int slots_on_page = SAVE_SLOTS - page * SLOTS_PER_PAGE;
-                        if (slots_on_page > SLOTS_PER_PAGE) slots_on_page = SLOTS_PER_PAGE;
-                        for (i = 0; i < slots_on_page; i++) {
-                            if (my >= slot_y[i] && my < slot_y[i] + 44) {
-                                slot_idx = i; focus_on_back = 0;
-                                slot_info(slot_abs(page, i), &si);
-                                if (is_load && !si.exists) {
-                                    show_error_msg("No save data.", 260, 346);
-                                    save_load_draw(is_load, page, slot_idx, focus_on_back, confirm, confirm_yes, total_pages, 1);
-                                    hal_mouse_draw_cursor_force();
-                                } else {
-                                    confirm = 1; focus_on_back = 0;
-                                    save_load_draw(is_load, page, slot_idx, focus_on_back, confirm, confirm_yes, total_pages, 1);
-                                    hal_mouse_draw_cursor_force();
-                                }
-                                break;
-                            }
-                        }
-                        continue;
-                    }
+                    continue;
                 }
             }
         }
@@ -423,10 +417,7 @@ static void save_load_menu(int is_load, int from_mainmenu)
 
         hal_mouse_draw_cursor();
     }
-    /* Exit contract (shared by all menu UIs): close the layer (base snapshot
-     * back to VRAM) first, then restore the shared menu palette. */
-    menu_layer_close(1);
-    menu_restore_item_palette();
+    menu_finish();
 }
 
 /* loadscene command: open load slot selection menu */

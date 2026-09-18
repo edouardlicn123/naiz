@@ -1,8 +1,8 @@
 # Naiz — AI 编程规则
 
-> **当前版本**: `0.2.119`（`projects/demo-a2/config.toml`）
+> **当前版本**: `0.2.120`（`projects/demo-a2/config.toml`）
 >
-> **开发历史**: R1–R30、0.2.109–0.2.117 及动画工具链等全部 Bug 修复/功能演进记录已迁至根目录 [`CHANGELOG.md`](CHANGELOG.md)（最新：load 菜单翻页/confirm 残影修复 0.2.117）。
+> **开发历史**: R1–R30、0.2.109–0.2.117 及动画工具链等全部 Bug 修复/功能演进记录已迁至根目录 [`CHANGELOG.md`](CHANGELOG.md)（最新：菜单 UI 整合落地 devdoc 102 / 0.2.120）。
 >
 > **防复发机制**: 见 §十九 — 每次修改后必须对照 C16/P11/S7 等 39 条规则逐一检查。
 >

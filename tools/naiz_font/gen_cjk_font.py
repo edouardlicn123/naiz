@@ -23,9 +23,19 @@ Usage:
 """
 
 import argparse
+import os
 import struct
 import sys
 from pathlib import Path
+
+# Bootstrap for standalone runs (python3 tools/naiz_font/gen_cjk_font.py);
+# under `-m tools.*` the tools package resolves from the repo root already.
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
+from naiz_lib.langdefs import (  # noqa: E402  (runtime-table single source)
+    LANG_CODES as RUNTIME_LANGS,
+    CJK_FAMILY,
+    LATIN_FAMILY,
+)
 
 GLYPH_BYTES = 32  # 16 rows × 2 bytes/row (bit-packed)
 
@@ -64,10 +74,6 @@ LANG_RANGES = {
     "KOR": [CJK_SYMBOLS, CJK_IDEO, HANGUL],
 }
 
-# Runtime language codes from core/engine/settings_menu.c (single source of truth).
-RUNTIME_LANGS = ["eng", "jpn", "chi", "cht", "kor", "fre", "ger", "ita", "spa", "por"]
-CJK_FAMILY = {"jpn", "chi", "cht", "kor"}
-LATIN_FAMILY = {"fre", "ger", "ita", "spa", "por"}
 CJK_BASE = (0x3000, 0x303F)   # CJK Symbols & Punctuation, mandatory for CJK-family
 LATIN_BASE = (0x00A0, 0x00FF)  # Latin-1 Supplement, mandatory for Latin-family
 
