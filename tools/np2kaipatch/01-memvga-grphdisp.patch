@@ -1,0 +1,13 @@
+diff --git a/mem/memvga.c b/mem/memvga.c
+index 8ba3075..dee3fb5 100755
+--- a/mem/memvga.c
++++ b/mem/memvga.c
+@@ -37,7 +37,7 @@
+ 	vramex[addr] = (v);													\
+ 	bit = (addr & 0x40000)?2:1;											\
+ 	vramupdate[LOW15(addr >> 3)] |= bit;								\
+-	gdcs.grphdisp |= bit;												\
++	gdcs.grphdisp |= 5;													\
+ }
+ 
+ #define	VGARD16(p, a) {													\

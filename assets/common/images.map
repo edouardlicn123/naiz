@@ -1,0 +1,6 @@
+# Shared background assets (processed before per-game assets)
+bg/yellow_grid.png  images/yellow_grid.MAG  --256color
+bg/pink_grid.png    images/pink_grid.MAG    --256color
+bg/bg_gallery.png   images/gallery.MAG      --256color --cover
+bg/bg_load.png      images/bg_load.MAG      --256color --cover
+logo/powed.png          images/powed.MAG        --256color

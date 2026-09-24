@@ -1,0 +1,12 @@
+{
+  "expressions": [
+    {"char_id": 9,  "expr": "normal",    "asset_id": 1},
+    {"char_id": 9,  "expr": "sad",       "asset_id": 8},
+    {"char_id": 9,  "expr": "smile",     "asset_id": 9},
+    {"char_id": 9,  "expr": "surprised", "asset_id": 10},
+    {"char_id": 9,  "expr": "swimming",  "asset_id": 11},
+    {"char_id": 10, "expr": "normal",    "asset_id": 2},
+    {"char_id": 10, "expr": "sad",       "asset_id": 12},
+    {"char_id": 11, "expr": "normal",    "asset_id": 3}
+  ]
+}

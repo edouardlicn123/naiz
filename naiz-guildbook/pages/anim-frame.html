@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>frame：放一张画面 — Naiz Guildbook</title>
+<link rel="stylesheet" href="../style.css">
+</head>
+<body>
+<nav class="sidebar" id="sidebar-nav"></nav>
+<script src="../sidebar-animation.js"></script>
+<main class="main">
+
+<h1>frame：放一张画面</h1>
+<blockquote><strong>创建</strong>：2026-08-29<br><strong>最后更新</strong>：2026-08-29</blockquote>
+<p><code>frame</code> 用于<strong>整图动画</strong>（开场设定里选了 <code>pixel</code> 的那种）。每一行 <code>frame</code> 就是动画里的「一张画面」，并写明这张画面停留几秒。连续写几行，就成了会动的画面。返回总览见 <a href="anim-语法.html">语法总览</a>。</p>
+<hr>
+
+<h2>1. 怎么写</h2>
+<pre><code>frame(停留秒数){素材昵称}</code></pre>
+<ul>
+<li>括号里写<strong>一个数字</strong>（秒，可以是小数，比如 0.5 表示半秒）。</li>
+<li>大括号里写这张画面用的素材<strong>昵称</strong>（登记时起的名字，不用写路径）。</li>
+<li>想让几张图轮流播、且共用同一个停留时间，就写在一行里用逗号分开：<code>{图1,图2,图3}</code>。</li>
+</ul>
+
+<h2>2. 举个 galgame 里的例子</h2>
+<pre><code># 角色眨眼：睁眼半秒、闭眼半秒，来回切换
+animaconf(fullscreen,pixel,主角)
+frame(0.5){睁眼}
+frame(0.5){闭眼}
+
+# 云慢慢飘：三张图各停 0.3 秒，轮流出现
+frame(0.3){云1,云2,云3}</code></pre>
+<p>工具会自动把「秒数」换算成动画内部的计时（每秒 60 格），你只要填秒数就行，不用管那些细节。如果秒数乘以 60 不是整数，工具只会嘟囔一句提示，不影响生成。</p>
+
+<h2>3. 写的时候注意</h2>
+<ul>
+<li><strong>只用在整图动画</strong>（开场设定选了 <code>pixel</code>）。变色动画里写 <code>frame</code> 会报错。</li>
+<li>整图动画<strong>至少写一行</strong> <code>frame</code>，否则没有画面。</li>
+<li>大括号里的昵称必须已经在素材昵称表里登记过（回去跑 <code>register</code>），否则工具说「找不到这个名字」。</li>
+<li>全屏动画里的每张图片都必须是 640×400 大小。</li>
+</ul>
+
+<h2>4. 常见错误</h2>
+<ul>
+<li>变色动画里误用了 frame → 改用 base + pal。</li>
+<li>提示「未登记的名字」→ 素材没登记，先 <code>register</code>。</li>
+<li>提示尺寸不对 → 全屏动画图片要正好 640×400。</li>
+</ul>
+<p>→ <a href="anim-语法.html">返回语法总览</a></p>
+
+</main>
+</body>
+</html>

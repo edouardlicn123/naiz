@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>makegame.sh 使用说明 — Naiz Guildbook</title>
+<link rel="stylesheet" href="../style.css">
+</head>
+<body>
+<nav class="sidebar" id="sidebar-nav"></nav>
+<script src="../sidebar-tools.js"></script>
+<main class="main">
+
+<h1>makegame.sh 使用说明</h1>
+<blockquote><strong>创建</strong>：2026-08-29<br><strong>最后更新</strong>：2026-08-29</blockquote>
+<p><code>makegame.sh</code> 是<strong>游戏数据构建</strong>脚本：把项目里的剧本、素材、配置打包成可在模拟器里运行的 HDI 镜像，并提供测试入口。引擎编译见 <code>start.sh</code> 的 Watcom 安装。<strong>日常最推荐直接运行、用数字菜单选择项目与操作</strong>；命令行子命令适合写进脚本或熟练后使用。</p>
+<hr>
+
+<h2>1. 交互式菜单（主要用法）</h2>
+<p>不带任何参数运行：</p>
+<pre><code>./makegame.sh</code></pre>
+<p>会进入两级菜单，<strong>每一步都输入数字并按回车</strong>：</p>
+<ul>
+<li><strong>第一步</strong>：列出所有项目（如 <code>1) demo-a2 …</code>），选一个数字进入该项目。</li>
+<li><strong>第二步</strong>：在该项目下选择要执行的操作，例如构建数据、启动测试、重新注入 HDI、刷新多语言文本等，同样按数字选择。</li>
+</ul>
+<p>菜单操作失败不会退出，会回到菜单让你重试。这种方式不用记命令和项目名，最适合日常使用。</p>
+<p><em>新手提示：想跑起来看看效果，进项目后选「测试」那一项即可启动模拟器。</em></p>
+
+<h2>2. 命令行用法（进阶 / 脚本化）</h2>
+<p>熟练或要写进自动化脚本时，可直接跟子命令，跳过菜单：</p>
+<pre><code>./makegame.sh &lt;子命令&gt; &lt;game&gt; [选项]</code></pre>
+<table>
+<tr><th>子命令</th><th>作用</th></tr>
+<tr><td><code>build &lt;game&gt;</code></td><td>全流程构建：数据构建 + 引擎编译检查 + HDI 注入</td></tr>
+<tr><td><code>make &lt;game&gt;</code></td><td>仅制作 HDI 镜像（注入已有数据到 <code>disks/&lt;game&gt;.hdi</code>）</td></tr>
+<tr><td><code>test &lt;game&gt; [--serial] [--porttest] [--auto]</code></td><td>启动模拟器测试</td></tr>
+<tr><td><code>i18n-gen &lt;game&gt; [--force]</code></td><td>生成/刷新国际化文本</td></tr>
+</table>
+
+<h2>3. 选项说明</h2>
+<ul>
+<li><code>&lt;game&gt;</code>：项目目录名，位于 <code>projects/&lt;game&gt;/</code>（如 <code>demo-a2</code>）。</li>
+<li><code>--serial</code>：测试时通过串口输出调试信息（最可靠的排错通道）。</li>
+<li><code>--porttest</code>：只检测模拟器串口端口是否可用，不启动游戏。</li>
+<li><code>--auto</code>：若 <code>games/&lt;game&gt;/engine_a.exe</code> 存在则优先注入它。</li>
+<li><code>--force</code>（i18n-gen）：忽略增量判断，强制重新生成文本。</li>
+</ul>
+
+<h2>4. 常见用法示例</h2>
+<pre><code># 交互菜单里选项目 → 选「构建」（推荐）
+./makegame.sh
+# 等效的命令行写法：
+./makegame.sh build demo-a2
+
+# 只重新打包 HDI（不改数据）
+./makegame.sh make demo-a2
+
+# 用串口模式在模拟器里跑起来看日志
+./makegame.sh test demo-a2 --serial</code></pre>
+
+<h2>5. 关联</h2>
+<ul>
+<li><a href="tool-start.html">start.sh</a> — 环境安装与审计入口。</li>
+<li><a href="tool-anima.html">anima.sh</a> — 动画制作工具（动画产物由本脚本一并打包进 HDI）。</li>
+</ul>
+
+</main>
+</body>
+</html>

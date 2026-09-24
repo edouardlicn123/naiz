@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>delay — Naiz Guildbook</title>
+<link rel="stylesheet" href="../style.css">
+</head>
+<body>
+<nav class="sidebar" id="sidebar-nav"></nav>
+<script src="../sidebar-scripts.js"></script>
+<main class="main">
+
+<h1>delay 剧本延时</h1>
+<hr>
+<blockquote><strong>创建</strong>：2026-08-29</blockquote>
+<p><code>delay(seconds)</code> 暂停剧本推进指定秒数。</p>
+
+<h2>1. 语法</h2>
+<pre><code>delay(seconds)</code></pre>
+<table>
+<tr><th>参数</th><th>类型</th><th>说明</th></tr>
+<tr><td><code>seconds</code></td><td>number</td><td>暂停秒数；基于 60Hz 帧计数，最长 60 秒</td></tr>
+</table>
+
+<h2>2. 示例</h2>
+<pre><code>delay(2)</code></pre>
+
+<div class="note-box"><p>基于 60Hz 帧计数实现；超过 60 秒按 60 秒处理。若需等待动画而非固定时长，请使用 <code>waitanima{}</code>（见 <code>sc16-waitanima.html</code>）。</p></div>
+
+</main>
+</body>
+</html>

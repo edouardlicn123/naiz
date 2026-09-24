@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>pal：让颜色变化 — Naiz Guildbook</title>
+<link rel="stylesheet" href="../style.css">
+</head>
+<body>
+<nav class="sidebar" id="sidebar-nav"></nav>
+<script src="../sidebar-animation.js"></script>
+<main class="main">
+
+<h1>pal：让颜色变化</h1>
+<blockquote><strong>创建</strong>：2026-08-29<br><strong>最后更新</strong>：2026-08-29</blockquote>
+<p><code>pal</code> 用于<strong>变色动画</strong>（开场设定里选了 <code>palette</code> 的那种）。它写出「这一次颜色要怎么变」，以及变完停留几秒。画面本身不动，只让颜色发生改变——很适合做灯光闪烁、魔法光晕、色调渐变。返回总览见 <a href="anim-语法.html">语法总览</a>。</p>
+<hr>
+
+<h2>1. 怎么写</h2>
+<pre><code>pal(停留秒数){色表昵称}</code></pre>
+<ul>
+<li>括号里写<strong>一个数字</strong>（秒，可小数）。</li>
+<li>大括号里写这次变化用的<strong>色表文件昵称</strong>（一个色表描述「哪些颜色改成什么」）。可以写多个、用逗号分开，它们会轮流生效并共用同一个停留时间。</li>
+</ul>
+
+<h2>2. 色表文件（.pal）长什么样</h2>
+<p>色表是个很简单的文本文件，每行写一条「把某个编号的颜色，改成红绿蓝数值」：</p>
+<pre><code># 灯光例子：把编号 0 改成红色，编号 15 改成黑色
+0 255 0 0
+15 0 0 0</code></pre>
+<ul>
+<li>每行四个数字：<code>编号 红 绿 蓝</code>，数值都在 0–255 之间。</li>
+<li>行首加 <code>#</code> 是备注，会被忽略。</li>
+<li>同一个编号不要在一份色表里写两次。</li>
+<li>没被点名的颜色，就沿用上一步的样子（所以一连串 pal 是「在前一步基础上接着改」）。</li>
+</ul>
+
+<h2>3. 举个 galgame 里的例子</h2>
+<pre><code># 标题界面灯光：正常 → 暗 → 亮，来回呼吸
+animaconf(cine,palette,标题流光)
+base(){正常}
+pal(0.2){暗}
+pal(0.2){亮}</code></pre>
+
+<h2>4. 写的时候注意</h2>
+<ul>
+<li><strong>只用在变色动画</strong>（开场设定选了 <code>palette</code>）。整图动画里写 <code>pal</code> 会报错。</li>
+<li><strong>必须写在 base 之后</strong>（先有底图，再谈变化）。</li>
+<li>变色动画<strong>至少写一次</strong> <code>pal</code>。</li>
+<li>色表昵称也要先 <code>register</code> 登记；色表文件格式写错（不是每行四个数字等）工具会报错。</li>
+</ul>
+
+<h2>5. 常见错误</h2>
+<ul>
+<li>整图动画里误用了 pal → 改用 frame。</li>
+<li>把 pal 写在了 base 前面 → 把 base 放到最前。</li>
+<li>提示 .pal 格式错 → 检查每行是不是「编号 红 绿 蓝」四个数字、编号有无重复。</li>
+</ul>
+<p>→ <a href="anim-语法.html">返回语法总览</a></p>
+
+</main>
+</body>
+</html>

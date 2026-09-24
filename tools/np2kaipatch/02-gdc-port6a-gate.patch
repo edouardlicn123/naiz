@@ -1,0 +1,22 @@
+diff --git a/io/gdc.c b/io/gdc.c
+index 736b820..6eaac48 100755
+--- a/io/gdc.c
++++ b/io/gdc.c
+@@ -549,15 +549,11 @@ static void IOOUTCALL gdc_o6a(UINT port, REG8 dat) {
+ #if defined(SUPPORT_PC9821)
+ #if defined(SUPPORT_CRT31KHZ)
+ 			case 0x20:
+-				if (gdc.mode2 & 0x08) {
+-					gdc_analogext(FALSE);
+-				}
++				gdc_analogext(FALSE);
+ 				break;
+ 
+ 			case 0x21:
+-				if (gdc.mode2 & 0x08) {
+-					gdc_analogext(TRUE);
+-				}
++				gdc_analogext(TRUE);
+ 				break;
+ 			case 0x68:
+ 				gdc.analog &= ~(1 << GDCANALOG_256E);

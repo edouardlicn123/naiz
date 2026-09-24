@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>stopanima — Naiz Guildbook</title>
+<link rel="stylesheet" href="../style.css">
+</head>
+<body>
+<nav class="sidebar" id="sidebar-nav"></nav>
+<script src="../sidebar-scripts.js"></script>
+<main class="main">
+
+<h1>stopanima 停止动画</h1>
+<hr>
+<blockquote><strong>创建</strong>：2026-08-29</blockquote>
+<p><code>stopanima{}</code> 立即停止当前播放的动画并唤醒剧本。</p>
+
+<h2>1. 语法</h2>
+<pre><code>stopanima{}</code></pre>
+<table>
+<tr><th>参数</th><th>类型</th><th>说明</th></tr>
+<tr><td>—</td><td>—</td><td>无参数</td></tr>
+</table>
+
+<h2>2. 示例</h2>
+<pre><code>playanima(loop){bg_anim}
+...
+stopanima{}</code></pre>
+
+<div class="note-box"><p>用于中断 <code>loop</code> 动画，或主动结束 <code>once</code> 动画。常与 <code>playanima</code> / <code>waitanima</code> 搭配（见 <code>sc15-playanima.html</code>、<code>sc16-waitanima.html</code>）。</p></div>
+
+</main>
+</body>
+</html>

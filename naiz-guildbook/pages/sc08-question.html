@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>question — Naiz Guildbook</title>
+<link rel="stylesheet" href="../style.css">
+</head>
+<body>
+<nav class="sidebar" id="sidebar-nav"></nav>
+<script src="../sidebar-scripts.js"></script>
+<main class="main">
+
+<h1>question 选择分支</h1>
+<hr>
+<blockquote><strong>创建</strong>：2026-07-27<strong>最后更新</strong>：2026-07-27</blockquote>
+<p><code>question()</code> 命令用于显示选择分支，选项与变量联动。变量定义见 <a href="cf01-变量系统.html">cf01 变量系统</a>。</p>
+
+<h2>1. 语法</h2>
+<pre><code>question(text;opt1,var1,op1,delta1;opt2,var2,op2,delta2;...)</code></pre>
+<p>分号 <code>;</code> 为顶层分隔符，每个选项段内用逗号 <code>,</code> 分隔四个字段：</p>
+<table>
+<tr><th>字段</th><th>说明</th></tr>
+<tr><td><code>text</code></td><td>问题文本（第一段）</td></tr>
+<tr><td><code>label</code></td><td>选项显示文本</td></tr>
+<tr><td><code>var</code></td><td>变量 id（须在 variables.json 中定义）</td></tr>
+<tr><td><code>op</code></td><td>操作符：<code>+</code>（加）、<code>-</code>（减）、<code>=</code>（赋值）</td></tr>
+<tr><td><code>delta</code></td><td>整数值</td></tr>
+</table>
+
+<h2>2. 限制</h2>
+<ul>
+<li>最多 10 个选项段（解析限制）</li>
+<li>最多同时显示 4 个选项（UI 限制）</li>
+<li>选中后按 op 执行操作，受 variables.json 中 min/max 限制</li>
+<li>选择结果存入 <code>last_choice</code>（0 起始索引）</li>
+</ul>
+
+<h2>3. 示例</h2>
+<pre><code>question(Where to?;Forest,bond_fei,+,5;Cave,bond_ira,=,10;Town,bond_neon,-,3)</code></pre>
+<ul>
+<li>选 Forest → bond_fei += 5</li>
+<li>选 Cave → bond_ira = 10</li>
+<li>选 Town → bond_neon -= 3</li>
+</ul>
+
+</main>
+</body>
+</html>

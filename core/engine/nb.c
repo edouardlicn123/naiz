@@ -1,0 +1,482 @@
+/*
+ * NB interpreter — pure-text script engine for Naiz
+ * Replaces scene.c binary VM with text-based .nb script execution.
+ * Reference: devdocs/0.1版开发文档总结.html#doc-21
+ */
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include "vm.h"
+#include "scene_layers.h"
+#include "render.h"
+#include "settings.h"
+#include "hal.h"
+#include "tr.h"
+#include "nb_internal.h"
+#include "nb_dialog.h"
+#include "cjk.h"
+#include "nb_vars.h"
+#include "nb_anim.h"   /* ANI animation support */
+#include "save.h"
+#include "strutil.h"
+#include "farchive.h"
+#include "audio.h"
+
+/* Known unimplemented menu commands: continue, load, scenes,
+ * special, music, cg, settings. Their handlers log and return. */
+
+/*=== Debug macros ========================================================*/
+
+/* Debug logging — shared macro in debug.h (defines NB_DEBUG_ENABLE from NAIZ_DEBUG) */
+#include "debug.h"
+
+/* Constants moved to nb_internal.h (NB_LINE_MAX, NB_ARGS_MAX, NB_BUF_SIZE, NB_FILENAME_MAX, MENU_ITEM_H, SPRITE_X_*) */
+
+/*=== Interpreter state ===================================================*/
+
+/* Interpreter state structure — private to nb.c.  Other modules use the
+ * nb_* accessors declared in nb_internal.h (direct field access is
+ * forbidden outside this file). */
+typedef struct {
+    char   filename[NB_FILENAME_MAX];
+    char   buf[NB_BUF_SIZE];
+    int    num_lines;
+    int    pc;
+    char   lang[8];
+    int    last_choice;
+    char   chapter_title[64];
+    char   scene_type[16];
+} NbState;
+
+static NbState nb;  /* Interpreter state — owned exclusively by nb.c */
+
+/* SCENE.DAT archive (devdoc 100): all scene scripts packed into one TOC
+ * archive.  Opened lazily at nb_init; when unavailable nb_load falls back
+ * to the loose-file path, so old HDI images keep working. */
+static FArchive g_scene_arc;
+static int      g_scene_arc_open = 0;
+
+/* Read a scene script `name` from the SCENE.DAT archive into `buf`
+ * (capacity `cap` bytes).  Returns the number of bytes copied (0 for an
+ * empty script), or -1 when the archive is closed or the name is not
+ * found — the caller then falls back to the loose-file path.  When the
+ * script is larger than cap-1 bytes, *truncated is set and only the first
+ * cap-1 bytes are copied, leaving room for the caller's NUL terminator. */
+static int nb_scene_archive_read(const char *name, char *buf, int cap,
+                                 int *truncated)
+{
+    long offset = 0, size = 0;
+    long n;
+
+    if (truncated)
+        *truncated = 0;
+    if (!g_scene_arc_open || !name || !buf || cap <= 0)
+        return -1;
+    if (farchive_lookup_name(&g_scene_arc, name, &offset, &size, NULL) != 0)
+        return -1;
+    if (size <= 0)
+        return 0;
+    if (truncated && size >= cap)
+        *truncated = 1;
+
+    n = farchive_read_buf(&g_scene_arc, offset, size, buf, cap - 1);
+    if (n < 0)
+        return -1;
+    return (int)n;
+}
+
+/* Argv index of the brace payload on the last parsed line, or -1 when that
+ * line carried none.  Set by the line parser; consumed by commands (e.g. cg)
+ * to tell cg(){key} apart from the paren-only form. */
+static int last_brace_arg = -1;
+
+/* Return the brace-payload argv index from the most recently parsed line
+ * (see nb_parse_line).  Declared in nb_internal.h. */
+int nb_get_last_brace_arg(void)
+{
+    return last_brace_arg;
+}
+
+/* Set the chapter title string (metadata, saved to save files). */
+static void nb_set_chapter_title(const char *title)
+{
+    str_copy(nb.chapter_title, sizeof(nb.chapter_title), title);
+}
+
+/* Set scene configuration (chapter title + scene type).
+ * type: "normal" / "cg" / "menu".  Invalid/empty type falls back to "normal". */
+void nb_set_scene_conf(const char *title, const char *type)
+{
+    nb_set_chapter_title(title);
+    if (type && strcmp(type, "normal") != 0 &&
+        strcmp(type, "cg") != 0 && strcmp(type, "menu") != 0) {
+        hal_log("WARN: sceneconf: unknown type, fallback to normal\r\n");
+        type = "normal";
+    }
+    if (type)
+        str_copy(nb.scene_type, sizeof(nb.scene_type), type);
+    else
+        nb.scene_type[0] = '\0';
+}
+
+/* Remember the last question choice (or -1 when unanswered). */
+void nb_set_last_choice(int choice)
+{
+    nb.last_choice = choice;
+}
+
+/* Return the currently loaded script filename. */
+const char *nb_get_filename(void)
+{
+    return nb.filename;
+}
+
+/* Return the loaded script buffer (read-only).  Used by the line parser. */
+const char *nb_get_buffer(void)
+{
+    return nb.buf;
+}
+
+/* Return 1 when the runtime language is CJK (chi/jpn/kor) — blackletter
+ * covers Latin only, so it is disabled for CJK languages. */
+int nb_lang_is_cjk(void)
+{
+    return strcmp(nb.lang, "chi") == 0
+        || strcmp(nb.lang, "cht") == 0
+        || strcmp(nb.lang, "jpn") == 0
+        || strcmp(nb.lang, "kor") == 0;
+}
+
+#include "nb_commands.h"
+
+/*=== Core: nb_init / nb_load / nb_process ================================*/
+
+/*
+ * nb_init — NB engine initialization.
+ * Sequence: clear state -> read settings -> init translation table
+ *   -> button/dialog palette -> load logo.nb
+ * @return 0 (currently never fails)
+ */
+int nb_init(void)
+{
+    hal_log("[NB] nb_init start\r\n");
+    memset(&nb, 0, sizeof(nb));
+    nb_dialog_reset();
+
+    settings_load();
+    /* Sync the language into the NB state (owned here). nb_set_lang then
+     * applies the full language-driven rendering state: translation table,
+     * CJK glyph font, and blackletter dialog style (Latin-only, so it
+     * applies only for non-CJK languages). */
+    nb_set_lang(settings_get_lang());
+
+    nb_var_init();
+
+    /* Open the SCENE.DAT archive (best-effort): on failure keep the
+     * loose-file path so old HDI images without the archive still run. */
+    if (farchive_open(&g_scene_arc, "SCENE.DAT", 8192) == 0) {
+        g_scene_arc_open = 1;
+    } else {
+        hal_log("WARN: no SCENE.DAT, falling back to loose scene files\r\n");
+    }
+
+    /* Single scene-switch entry: boot flows through scene_switch too
+     * (audio is already silent here; the entry keeps every scene change on
+     * one path — stage 2 G). */
+    scene_switch("logo.nb", SCENE_SWITCH_INIT);
+    vm_request_process();
+    vm_delay_reset();
+
+    NB_DEBUG("init: lang=%s dlgstyle=%d\r\n", nb.lang, dlg_get_style());
+    return 0;
+}
+
+/*
+ * nb_load — Load and switch to a new NB script file (low-level loader).
+ * Called exclusively through scene_switch() (the single scene-change entry,
+ * stage 2 G); kept static so no other module can bypass the switch path.
+ * Sequence: open file -> read lines into nb.buf -> record total lines
+ *   -> clear screen + reset layers/keyboard/dialog state
+ * @param filename  .nb script file path (relative to ENGINE.EXE)
+ * Side effect: sets VMFLAG_SCENE_CHANGED | VMFLAG_PROCESS
+ */
+static void nb_load(const char *filename)
+{
+    FILE *f = NULL;
+    int pos;
+    int n = 0;
+    int nb_old_skip;
+    int from_arc = 0;
+    int truncated = 0;
+
+    /* Archive-first load: SCENE.DAT hit reads the whole script into
+     * nb.buf with a single bounded read; a miss falls back to the
+     * original loose-file path, preserving backward compatibility. */
+    if (g_scene_arc_open) {
+        n = nb_scene_archive_read(filename, nb.buf, NB_BUF_SIZE, &truncated);
+        if (n >= 0)
+            from_arc = 1;
+    }
+    if (!from_arc) {
+        f = fopen(filename, "r");
+        if (!f) {
+            hal_log("ERROR: cannot open file\r\n");
+            vm_set_error();
+            return;
+        }
+    }
+
+    pos = 0;
+    nb.num_lines = 0;
+    nb.pc = 0;
+    nb_old_skip = (strcmp(nb.filename, "logo.nb") == 0 || strcmp(nb.filename, "op.nb") == 0);
+    str_copy(nb.filename, NB_FILENAME_MAX, filename);
+
+    if (from_arc) {
+        int i, complete;
+
+        nb.buf[n] = '\0';
+        /* num_lines = '\n' count + trailing line without terminator
+         * (exactly equivalent to the fgets path: nb_get_line splits on
+         * '\n' and a final unterminated line still counts as one). */
+        complete = 0;
+        for (i = 0; i < n; i++) {
+            if (nb.buf[i] == '\n') complete++;
+        }
+        nb.num_lines = complete;
+        if (n > 0 && nb.buf[n - 1] != '\n')
+            nb.num_lines++;
+    } else {
+        int incomplete = 0, m;
+        while (pos < NB_BUF_SIZE - 1 && fgets(nb.buf + pos, NB_BUF_SIZE - pos, f)) {
+            if (!incomplete) nb.num_lines++;
+            m = (int)strlen(nb.buf + pos);
+            incomplete = (m > 0 && nb.buf[pos + m - 1] != '\n');
+            pos += m;
+            if (pos >= NB_BUF_SIZE - 1) {
+                /* Known limit: scripts must fit in NB_BUF_SIZE (32 KB).
+                 * Any trailing lines beyond the buffer are dropped with a
+                 * WARN; num_lines only counts complete lines, so the script
+                 * halts cleanly rather than mis-executing partial lines. */
+                hal_logf("WARN: '%s' truncated at %d bytes (max %d)\r\n",
+                         filename, pos, NB_BUF_SIZE);
+                break;
+            }
+        }
+        fclose(f);
+    }
+    if (truncated) {
+        hal_logf("WARN: '%s' truncated at %d bytes (max %d)\r\n",
+                 filename, n, NB_BUF_SIZE);
+    }
+
+    /* Full scene reset (skip transition for logo/op — both entering and exiting) */
+    scene_end(nb_old_skip || strcmp(filename, "logo.nb") == 0 || strcmp(filename, "op.nb") == 0);
+    nb_dialog_reset();
+    nb.chapter_title[0] = '\0';
+    nb.scene_type[0] = '\0';
+
+    hal_logf("[LOAD] nb_load '%s' (%d lines)\r\n", filename, nb.num_lines);
+    vm_request_scene_change();
+}
+
+/*=== Scene switching (single entry, stage 2 G) =============================*/
+
+/* Scene-switch single entry: owns the audio stop (E) and funnels every scene
+ * transition through nb_load.  The black screen, keyboard drain and display
+ * reset happen inside nb_load -> scene_end; the only scene-end side effect
+ * moved out of scene_end (audio_stop_all, stage 2 E) lives here so a scene
+ * change can never run with stale pending audio.  reason is logged. */
+void scene_switch(const char *filename, int reason)
+{
+    static const char *const rname[] = { "init", "script", "hotkey",
+                                         "apply", "menu" };
+    const char *rs = "?";
+
+    if (reason >= SCENE_SWITCH_INIT && reason <= SCENE_SWITCH_MENU)
+        rs = rname[reason];
+    hal_logf("[SCENE] switch '%s' reason=%s\r\n", filename, rs);
+
+    audio_stop_all();     /* silence BGM (all-notes-off) + PCM (scene end) */
+    nb_load(filename);
+}
+
+/* Menu / non-game scenes where F5/F6 save hotkeys must be disabled.
+ * Scene type is declared per-scene via sceneconf(..., menu). */
+int nb_is_menu_scene(void)
+{
+    return nb.scene_type[0] != '\0' && strcmp(nb.scene_type, "menu") == 0;
+}
+
+/* Copy interpreter filename/lang/chapter_title into caller buffers. */
+void nb_get_state(char *filename, int fn_size,
+                  char *lang, int lang_size,
+                  char *title, int title_size)
+{
+    str_copy(filename, fn_size, nb.filename);
+    str_copy(lang, lang_size, nb.lang);
+    str_copy(title, title_size, nb.chapter_title);
+}
+
+/* Restore the runtime language from a saved snapshot.  Reloads the
+ * translation table so the language switch takes effect immediately, then
+ * syncs the CJK glyph font and blackletter dialog style to the new language
+ * (single source of truth for language-driven rendering state: covers boot,
+ * in-game settings, and save/load applies alike).
+ * Mirrors the nb_init fallback: a language with no translation files at all
+ * degrades its lookup table to 'eng' (tr() falls back to source text either
+ * way). */
+void nb_set_lang(const char *lang)
+{
+    str_copy(nb.lang, sizeof(nb.lang), lang);
+    tr_init(nb.lang);
+    if (tr_get_count() == 0 && strcmp(nb.lang, "eng") != 0) {
+        NB_DEBUG("WARN: no translations for lang='%s', falling back to 'eng'\r\n", nb.lang);
+        tr_init("eng");
+    }
+    cjk_load_for_lang(nb.lang);
+    text_set_blackletter(settings_get_blackletter_dialog() && !nb_lang_is_cjk());
+}
+
+/*
+ * nb_process — NB engine main execution loop (called each frame).
+ *
+ * Per-frame flow:
+ *   1) If dialog has paging (text_offset >= 0) -> continue drawing, pause
+ *   2) Check VMFLAG_FINALEND/ERROR -> exit
+ *   3) Check if pc exceeds total lines -> stop
+ *   4) Read next line -> skip empty/'#' comments -> strip inline comments
+ *   5) parse_line -> dispatch via cmd_table to handler
+ *   6) Scene change flag -> break loop
+ *
+ * @return 0=normal, SCENE_STATUS_FINALEND=exit, SCENE_STATUS_ERROR=error
+ */
+int nb_process(void)
+{
+    char line[NB_LINE_MAX];          /* Current line buffer */
+    const char *args[NB_ARGS_MAX];   /* Parsed argument pointer array */
+    int argc;                        /* Argument count */
+    char cmd_name[64];               /* Command name */
+
+    /* NOTE: no per-call logging here — nb_process() runs every frame at 60Hz;
+     * serial_puts costs ~200 port-I/O traps per byte and would throttle the
+     * whole loop to a few Hz. Event logs ([LOAD]/[INPUT]/lifecycle) only. */
+
+    while (vm_get_flags() & VMFLAG_PROCESS) {
+        /* waitanima hold: stay paused until the animation terminates;
+         * anim_stop_internal() re-requests processing when it ends, so
+         * spurious wakeups (input, delay expiry) can never skip the wait. */
+        if (anim_waiting()) {
+            vm_pause_process();
+            break;
+        }
+
+        /* Dialog paging (stage 2 B): a live page yields the script; a wake
+         * advances to the next page (dialog_show renders it) or dismisses the
+         * final page.  While waiting, the page self-recomposes through
+         * layer_dialog_recompose + dialog_render_* projection — nb_process
+         * no longer redraws it every frame. */
+        if (nb_dialog_pending()) {
+            if (nb_dialog_get_offset() >= 0 && nb_dialog_get_text()) {
+                dialog_show(nb_dialog_get_charname(), nb_dialog_get_text());
+                vm_pause_process();
+            } else {
+                nb_dialog_dismiss();
+                hal_mouse_update();
+                continue;
+            }
+            break;
+        }
+
+        /* Check termination/error flags. */
+        if (vm_get_flags() & (VMFLAG_FINALEND | VMFLAG_ERROR))
+            break;
+
+        /* Check if script has finished. */
+        if (nb.pc >= nb.num_lines) {
+            if (nb.num_lines == 0)
+                hal_logf("[LOAD] ERROR: script '%s' has 0 lines, halting\r\n",
+                         nb.filename);
+            else
+                NB_DEBUG("WARN: pc=%d beyond end, stopping\r\n", nb.pc);
+            vm_pause_process();
+            break;
+        }
+
+        nb_get_line(nb.pc, line, sizeof(line));
+        NB_DEBUG("nb_process: line[%d]: %s\r\n", nb.pc, line);
+        nb.pc++;
+        if (strlen(line) >= sizeof(line) - 1) {
+            NB_DEBUG("WARN: line %d truncated (max %d bytes), skipping\r\n", nb.pc - 1, (int)sizeof(line) - 1);
+            continue;
+        }
+
+        /* Skip empty lines and full-line comments. */
+        if (line[0] == '\0' || line[0] == '#') {
+            NB_DEBUG("nb_process: skipping empty/comment line\r\n");
+            continue;
+        }
+
+        /* Strip inline comments (# outside {...} only). */
+        {
+            char *p = line, *hash = NULL;
+            int depth = 0;
+            while (*p) {
+                if (*p == '{') depth++;
+                if (*p == '}' && depth > 0) depth--;
+                if (depth == 0 && *p == '#') { hash = p; break; }
+                p++;
+            }
+            if (hash) *hash = '\0';
+        }
+
+        /* Save raw line before parse_line (commas/semicolons still intact). */
+        {
+            char line_copy[NB_LINE_MAX];
+            str_copy(line_copy, sizeof(line_copy), line);
+
+            /* Parse command and arguments (comma-separated). */
+            argc = nb_parse_line(line, cmd_name, sizeof(cmd_name),
+                              args, NB_ARGS_MAX, &last_brace_arg);
+
+            if (argc < 0) {
+                NB_DEBUG("ERROR: parse failed: %s\r\n", line);
+                continue;
+            }
+
+            /* For question/scene: re-parse with ';' as the top-level
+             * delimiter (segments are themselves comma-delimited). */
+            if (strcmp(cmd_name, "question") == 0 ||
+                strcmp(cmd_name, "scene") == 0) {
+                int semi_argc = nb_parse_line_semi(line_copy, args,
+                                                   NB_ARGS_MAX);
+                if (semi_argc >= 0) argc = semi_argc;
+            }
+
+            NB_DEBUG("exec[%d]: %s\r\n", nb.pc - 1, line);
+
+            nb_commands_dispatch(cmd_name, argc, args);
+        }
+
+        /* A dialog submission holds the script until the page is consumed
+         * (dialog_show no longer pauses internally, stage 2 B). */
+        if (nb_dialog_pending()) {
+            vm_pause_process();
+            break;
+        }
+
+        hal_mouse_update();
+
+        /* Scene change: break current frame, restart new scene next time. */
+        if (vm_get_flags() & VMFLAG_SCENE_CHANGED) {
+            NB_DEBUG("[LOAD] scene changed, clearing flag and breaking\r\n");
+            vm_clear_scene_change();
+            break;
+        }
+    }
+
+    /* Return status to main loop. */
+    if (vm_get_flags() & VMFLAG_FINALEND) return SCENE_STATUS_FINALEND;
+    if (vm_get_flags() & VMFLAG_ERROR)    return SCENE_STATUS_ERROR;
+    return 0;
+}

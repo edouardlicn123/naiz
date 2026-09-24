@@ -1,0 +1,427 @@
+/*
+ * nb_commands.c — NB script command handlers and dispatch table
+ *
+ * Extracted from nb.c: all cmd_* handlers, resolve helpers, and dispatch table.
+ * Reference: devdocs/0.1版开发文档总结.html#doc-21
+ */
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <limits.h>
+#include "render.h"
+#include "palette.h"
+#include "image.h"
+#include "scene_layers.h"
+#include "hal.h"
+#include "tr.h"
+#include "nb_internal.h"
+#include "nb_saveload.h"
+#include "nb_dialog.h"
+#include "nb_vars.h"
+#include "debug.h"
+#include "nb_asset_table.h"
+#include "nb_anim.h"
+#include "nb_commands.h"
+#include "vm.h"
+#include "strutil.h"
+#include "scene_display.h"
+
+/*=== Asset lookup helpers ==================================================*/
+
+static int resolve_asset(const char *key)
+{
+    const struct { const char *key; int id; } *p;
+    for (p = asset_map; p->key; p++) {
+        if (strcmp(p->key, key) == 0) {
+            NB_DEBUG("resolve_asset: %s -> id=%d\r\n", key, p->id);
+            return p->id;
+        }
+    }
+    return -1;
+}
+
+/* Public asset lookup: searches image assets (asset_map), then falls back
+ * to sprite assets (spr_asset_map) so SPR-type keys resolve too. */
+int nb_asset_id(const char *key)
+{
+    int id = resolve_asset(key);
+    const struct { const char *key; int id; } *p;
+    if (id >= 0)
+        return id;
+    for (p = spr_asset_map; p->key; p++) {
+        if (strcmp(p->key, key) == 0)
+            return p->id;
+    }
+    return -1;
+}
+
+static int resolve_char_id(const char *key)
+{
+    const struct { const char *key; int id; const char *name; } *p;
+    for (p = char_map; p->key; p++) {
+        if (strcmp(p->key, key) == 0)
+            return p->id;
+    }
+    return -1;
+}
+
+static int resolve_expr(int char_id, const char *expr)
+{
+    const struct { int char_id; const char *expr; int asset_id; } *p;
+    for (p = expr_map; p->char_id >= 0; p++) {
+        if (p->char_id == char_id && strcmp(p->expr, expr) == 0)
+            return p->asset_id;
+    }
+    return -1;
+}
+
+static int resolve_expression(int char_id, const char *expr)
+{
+    int asset_id = resolve_expr(char_id, expr);
+    if (asset_id >= 0)
+        return asset_id;
+
+    NB_DEBUG("WARN: char %d expr '%s' not found, fallback to 'normal'\r\n",
+             char_id, expr);
+    asset_id = resolve_expr(char_id, "normal");
+    if (asset_id >= 0)
+        return asset_id;
+
+    NB_DEBUG("ERROR: char %d 'normal' not found either\r\n", char_id);
+    return -1;
+}
+
+static const char *resolve_display_name(const char *key)
+{
+    const struct { const char *key; int id; const char *name; } *p;
+    const char *t;
+
+    t = tr(key);
+    if (t != key) return t;
+
+    for (p = char_map; p->key; p++) {
+        if (strcmp(p->key, key) == 0)
+            return p->name;
+    }
+    return key;
+}
+
+static int pos_to_x(char pos)
+{
+    switch (pos) {
+    case 'l': return SPRITE_X_LEFT;
+    case 'c': return SPRITE_X_CENTER;
+    case 'r': return SPRITE_X_RIGHT;
+    default:  return SPRITE_X_CENTER;
+    }
+}
+
+/*
+ * nb_next_field — Extract next comma-delimited field from segment string.
+ *   *s points to start of a "f1,f2,..." segment (leading whitespace skipped).
+ *   On success: copies field into buf (truncated to bufsz), null-terminated;
+ *   advances *s past comma + trailing whitespace; returns 1.
+ *   On failure (no comma found): *s unchanged; returns 0.
+ */
+int nb_next_field(const char **s, char *buf, size_t bufsz)
+{
+    const char *p = *s, *comma;
+    size_t len;
+
+    while (*p == ' ' || *p == '\t') p++;
+    comma = strchr(p, ',');
+    if (!comma) return 0;
+    len = comma - p;
+    if (len >= bufsz) len = bufsz - 1;
+    memcpy(buf, p, len);
+    buf[len] = '\0';
+    *s = comma + 1;
+    while (**s == ' ' || **s == '\t') (*s)++;
+    return 1;
+}
+
+/*=== Command handlers ======================================================*/
+
+/* Grammar (mirrors cmd_cg):
+ *   bg(effect[,transition]){key}   key is the brace payload; the paren
+ *                                  position carries effect/transition params
+ *                                  (currently unused placeholders).
+ *   bg(hidedialog)                 keyword directive, no payload. */
+static void cmd_bg(int argc, const char **argv, const char *cmd_name)
+{
+    int id;
+    const char *key;
+
+    (void)cmd_name;
+    if (argc < 1) { NB_DEBUG("bg: no args\r\n"); return; }
+
+    if (argc == 1 && strcmp(argv[0], "hidedialog") == 0) {
+        NB_DEBUG("bg: hidedialog\r\n");
+        layer_dialog_hide();
+        nb_dialog_reset();
+        return;
+    }
+
+    /* Hard gate: the asset key must arrive via the brace payload; parens
+     * are reserved for parameters and never carry the asset. */
+    if (nb_get_last_brace_arg() != argc - 1) {
+        NB_DEBUG("bg: usage bg(effect[,transition]){asset_key} "
+                 "(parens reserved for params)\r\n");
+        return;
+    }
+    key = argv[argc - 1];
+
+    id = resolve_asset(key);
+    if (id < 0) {
+        NB_DEBUG("bg: unknown asset '%s'\r\n", key);
+        return;
+    }
+    if (display_apply_bg((unsigned short)id) != 0)
+        NB_DEBUG("bg: display_apply_bg(%d) failed\r\n", id);
+    NB_DEBUG("bg: id=%d key=%s\r\n", id, key);
+}
+
+static void cmd_host(int argc, const char **argv, const char *cmd_name)
+{
+    (void)cmd_name;
+    if (argc < 1) return;
+    display_apply_dialog(NULL, tr(argv[0]));
+}
+
+/* Grammar (mirrors cmd_cg):
+ *   char(pos[,expr[,type]]){name}  name is the brace payload; parens carry
+ *                                  display parameters (position/expression/
+ *                                  body|face).  expr/type default like before.
+ *   char(hideall)                  keyword directive, no payload. */
+static void cmd_char(int argc, const char **argv, const char *cmd_name)
+{
+    int char_id, asset_id, x;
+    const char *name, *expr, *type;
+
+    (void)cmd_name;
+    if (argc == 1 && strcmp(argv[0], "hideall") == 0) {
+        layer_sprite_hide_all();
+        layer_dialog_hide();
+        nb_dialog_reset();
+        NB_DEBUG("char: hideall\r\n");
+        return;
+    }
+
+    /* Hard gate: the character name must arrive via the brace payload. */
+    if (argc < 1) return;
+    if (nb_get_last_brace_arg() != argc - 1) {
+        NB_DEBUG("char: usage char(pos[,expr[,type]]){name} "
+                 "(name in braces, parens reserved for params)\r\n");
+        return;
+    }
+    name = argv[argc - 1];
+    if (argc < 2) { NB_DEBUG("char: need position + {name}\r\n"); return; }
+    if (argv[0][0] == '\0') { NB_DEBUG("char: empty pos\r\n"); return; }
+
+    char_id = resolve_char_id(name);
+    if (char_id < 0) {
+        NB_DEBUG("char: unknown character '%s'\r\n", name);
+        return;
+    }
+    if (char_id >= LAYER_MAX_SPRITES) {
+        NB_DEBUG("WARN: char_id=%d exceeds LAYER_MAX_SPRITES (%d)\r\n", char_id, LAYER_MAX_SPRITES);
+        return;
+    }
+
+    x = pos_to_x(argv[0][0]);
+
+    expr = (argc >= 3 && argv[1][0]) ? argv[1] : "normal";
+
+    asset_id = resolve_expression(char_id, expr);
+    if (asset_id < 0) {
+        NB_DEBUG("char: no asset for char '%s' expr '%s'\r\n", name, expr);
+        return;
+    }
+
+    type = (argc >= 4 && argv[2][0]) ? argv[2] : NULL;
+    if (type == NULL) {
+        type = layer_has_sprite(char_id) ? "face" : "body";
+    }
+
+    NB_DEBUG("char: id=%d asset=%d x=%d type=%s\r\n", char_id, asset_id, x, type);
+
+    display_apply_sprite(char_id, asset_id, x, type);
+}
+
+static void cmd_dialogue(int argc, const char **argv, const char *cmd_name)
+{
+    const char *display_name;
+    if (argc < 1) return;
+
+    display_name = resolve_display_name(cmd_name);
+    NB_DEBUG("dialog: %s -> %s\r\n", cmd_name, display_name);
+    display_apply_dialog(display_name, tr(argv[0]));
+}
+
+
+/* Scene configuration: title + type.
+ * Grammar (brace-only): sceneconf(){Title[,type]} — the {..} payload is a
+ * single arg "Title, type", split on ',' below.  The paren alias
+ * sceneconf(Title,type) was removed: parens are reserved for parameters. */
+static void cmd_sceneconf(int argc, const char **argv, const char *cmd_name)
+{
+    char title[NB_LINE_MAX];
+    char type[16];
+    const char *p;
+
+    (void)cmd_name;
+    if (argc < 1) return;
+
+    /* Hard gate: title/type must arrive via the brace payload. */
+    if (nb_get_last_brace_arg() != argc - 1) {
+        NB_DEBUG("sceneconf: usage sceneconf(){title[,type]}\r\n");
+        return;
+    }
+
+    title[0] = '\0';
+    type[0] = '\0';
+
+    /* Text form: {Title, type} arrives as one arg; split on ','. */
+    p = argv[0];
+    if (nb_next_field(&p, title, sizeof(title))) {
+        /* title read; p points to type (may be empty). */
+        if (*p) {
+            str_copy(type, sizeof(type), p);
+        }
+    } else {
+        /* No comma: entire arg is the title, type defaults to NULL. */
+        str_copy(title, sizeof(title), argv[0]);
+    }
+
+    nb_set_scene_conf(tr(title), type[0] ? type : NULL);
+}
+
+/*
+ * cmd_var — Variable read/write command.
+ *   var(id, =, value)   -> nb_var_set(lookup(id), value)
+ *   var(id, +, delta)   -> nb_var_add(lookup(id), delta)
+ *   var(id, -, delta)   -> nb_var_add(lookup(id), -delta)
+ */
+static void cmd_var(int argc, const char **argv, const char *cmd_name)
+{
+    int idx, val;
+
+    (void)cmd_name;
+    if (argc < 3) {
+        NB_DEBUG("var: need 3 args (id, op, value)\r\n");
+        return;
+    }
+
+    idx = nb_var_lookup(argv[0]);
+    if (idx < 0) {
+        hal_logf("WARN: var: unknown variable '%s'\r\n", argv[0]);
+        return;
+    }
+
+    val = atoi(argv[2]);
+
+    if (strcmp(argv[1], "=") == 0) {
+        nb_var_set(idx, val);
+        NB_DEBUG("var: set %s=%d\r\n", argv[0], val);
+    } else if (strcmp(argv[1], "+") == 0) {
+        nb_var_add(idx, val);
+        NB_DEBUG("var: add %s+=%d\r\n", argv[0], val);
+    } else if (strcmp(argv[1], "-") == 0) {
+        /* -(INT_MIN) is UB; pass INT_MIN through and let nb_var_add
+         * clamp with 64-bit arithmetic. */
+        int d = (val == INT_MIN) ? INT_MIN : -val;
+        nb_var_add(idx, d);
+        NB_DEBUG("var: add %s-=%d\r\n", argv[0], val);
+    } else {
+        hal_logf("WARN: var: unknown op '%s' (use =/+/ -)\r\n", argv[1]);
+    }
+}
+
+static void cmd_delay(int argc, const char **argv, const char *cmd_name)
+{
+    const char *p;
+    int neg, whole, frac, ndig, frames;
+    double sec;
+    (void)cmd_name;
+    if (argc < 1 || !argv[0][0]) { NB_DEBUG("delay: no args\r\n"); return; }
+    p = argv[0];
+    neg = 0; whole = 0; frac = 0; ndig = 0;
+    if (*p == '-') { neg = 1; p++; }
+    while (*p >= '0' && *p <= '9') { whole = whole * 10 + (*p - '0'); p++; }
+    if (*p == '.') { p++; while (*p >= '0' && *p <= '9') { frac = frac * 10 + (*p - '0'); ndig++; p++; } }
+    sec = (double)whole + (double)frac;
+    { int i; for (i = 0; i < ndig; i++) sec /= 10.0; }
+    if (neg) sec = -sec;
+    frames = (int)(sec * 60.0 + 0.5);
+    if (frames <= 0) frames = 1;
+    if (frames > DELAY_FRAMES_MAX) frames = DELAY_FRAMES_MAX;
+    vm_set_delay(frames);
+    vm_pause_process();
+    NB_DEBUG("delay: %.2fs = %d frames\r\n", sec, frames);
+}
+
+/*=== Command dispatch table ===============================================*/
+
+typedef void (*CmdHandler)(int argc, const char **argv, const char *cmd_name);
+
+/* Command metadata bits (devdoc 103 stage 2 C).  Audited by
+ * tools/tests/test_cmd_meta.py: handlers WITHOUT CMD_TOUCHES_DISPLAY must not
+ * call any render/layer/palette/image API (keeps the front/back boundary
+ * from regressing through a new handler). */
+enum {
+    CMD_BLOCKING         = 0x01,   /* handler blocks until script may continue */
+    CMD_NEEDS_INPUT      = 0x02,   /* waits for user input (keyboard/mouse) */
+    CMD_TOUCHES_DISPLAY  = 0x04,   /* writes VRAM / layers / palette / animation */
+    CMD_TOUCHES_AUDIO    = 0x08,   /* starts/stops audio */
+    CMD_TERMINATES_SCENE = 0x10    /* switches scene (scene_switch) */
+};
+
+typedef struct {
+    const char *name;
+    CmdHandler  handler;
+    unsigned char flags;
+} CmdEntry;
+
+static const CmdEntry cmd_table[] = {
+    {"bg",           cmd_bg,          CMD_TOUCHES_DISPLAY},
+    {"cg",           cmd_cg,          CMD_TOUCHES_DISPLAY},
+    {"char",         cmd_char,        CMD_TOUCHES_DISPLAY},
+    {"scene",        cmd_scene,       CMD_TERMINATES_SCENE},
+    {"sceneconf",    cmd_sceneconf,   0},
+    {"mainmenu",     cmd_mainmenu,    CMD_BLOCKING | CMD_NEEDS_INPUT | CMD_TOUCHES_DISPLAY},
+    {"startsetting", cmd_startsetting, CMD_BLOCKING | CMD_NEEDS_INPUT | CMD_TOUCHES_DISPLAY},
+    {"question",     cmd_question,    CMD_BLOCKING | CMD_NEEDS_INPUT | CMD_TOUCHES_DISPLAY},
+    {"settingmenu",  cmd_settingmenu, 0},
+    {"cgvmenu",      cmd_cgvmenu,     CMD_BLOCKING | CMD_NEEDS_INPUT | CMD_TOUCHES_DISPLAY},
+    {"musicmenu",    cmd_musicmenu,   0},
+    {"bgm",          cmd_bgm,         CMD_TOUCHES_AUDIO},
+    {"sound",        cmd_sound,       CMD_TOUCHES_AUDIO},
+    {"voice",        cmd_voice,       CMD_TOUCHES_AUDIO},
+    {"host",         cmd_host,        CMD_BLOCKING | CMD_TOUCHES_DISPLAY},
+    {"loadscene",    cmd_loadscene,   CMD_BLOCKING | CMD_NEEDS_INPUT | CMD_TOUCHES_DISPLAY},
+    {"var",          cmd_var,         0},
+    {"fei",          cmd_dialogue,    CMD_BLOCKING | CMD_TOUCHES_DISPLAY},
+    {"ira",          cmd_dialogue,    CMD_BLOCKING | CMD_TOUCHES_DISPLAY},
+    {"neon",         cmd_dialogue,    CMD_BLOCKING | CMD_TOUCHES_DISPLAY},
+    {"playanima",    cmd_playanima,   CMD_TOUCHES_DISPLAY},
+    {"waitanima",    cmd_waitanima,   CMD_BLOCKING},
+    {"stopanima",    cmd_stopanima,   CMD_TOUCHES_DISPLAY},
+    {"delay",        cmd_delay,       CMD_BLOCKING},
+    {NULL, NULL, 0}
+};
+
+/*=== Dispatch function ====================================================*/
+
+void nb_commands_dispatch(const char *cmd_name, int argc, const char **argv)
+{
+    const CmdEntry *entry = cmd_table;
+    while (entry->name) {
+        if (strcmp(entry->name, cmd_name) == 0) {
+            NB_DEBUG("nb_process: executing command '%s'\r\n", cmd_name);
+            entry->handler(argc, argv, cmd_name);
+            return;
+        }
+        entry++;
+    }
+    hal_logf("WARN: unknown command '%s'\r\n", cmd_name);
+}

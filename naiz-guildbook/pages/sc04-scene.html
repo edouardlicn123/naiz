@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>scene — Naiz Guildbook</title>
+<link rel="stylesheet" href="../style.css">
+</head>
+<body>
+<nav class="sidebar" id="sidebar-nav"></nav>
+<script src="../sidebar-scripts.js"></script>
+<main class="main">
+
+<h1>scene 场景跳转</h1>
+<hr>
+<blockquote><strong>创建</strong>：2026-07-27<br><strong>最后更新</strong>：2026-08-13</blockquote>
+<p><code>scene()</code> 命令用于跳转场景，支持无条件跳转和条件链跳转（依赖变量系统）。</p>
+
+<h2>1. 无条件跳转</h2>
+<pre><code>scene(target)</code></pre>
+<table>
+<tr><th>参数</th><th>类型</th><th>说明</th></tr>
+<tr><td><code>target</code></td><td>keyword / 3-digit</td><td>场景名或编号</td></tr>
+</table>
+<p>target 取值：</p>
+<table>
+<tr><th>值</th><th>说明</th></tr>
+<tr><td><code>logo</code></td><td>启动 Logo 场景（<code>logo.nb</code>）</td></tr>
+<tr><td><code>op</code></td><td>开场场景（<code>op.nb</code>）</td></tr>
+<tr><td><code>mainmenu</code></td><td>主菜单场景（<code>mainmenu.nb</code>）</td></tr>
+<tr><td><code>001</code>–<code>020</code></td><td>故事场景 <code>nbookXXX.nb</code></td></tr>
+<tr><td><code>end</code></td><td>结束游戏，返回主菜单</td></tr>
+</table>
+
+<h2>2. 条件链跳转</h2>
+<pre><code>scene(var1,op1,val1,...,target1;var2,op2,val2,...,target2[;default])</code></pre>
+<p>每个 <code>;</code> 段由 1 个或多个 <code>var,op,val</code> 三元组 + 末尾 <code>target</code> 组成。段内多三元组为 <strong>AND</strong>（全部满足才匹配），段间为 <strong>OR</strong>（首个匹配的段跳转）。</p>
+<table>
+<tr><th>字段</th><th>说明</th></tr>
+<tr><td><code>var</code></td><td>变量 id（须在 variables.json 中定义）</td></tr>
+<tr><td><code>op</code></td><td>比较运算符：<code>==</code> <code>!=</code> <code>&gt;</code> <code>&gt;=</code> <code>&lt;</code> <code>&lt;=</code></td></tr>
+<tr><td><code>val</code></td><td>比较值（整数）</td></tr>
+<tr><td><code>target</code></td><td>跳转目标（3-digit，如 <code>002</code> → <code>nbook002.nb</code>）</td></tr>
+</table>
+<p>每个段支持 1–8 个三元组（<code>SCENE_MAX_CONDS = 8</code>），最后的字段始终是 target。</p>
+<p><strong>默认值约定</strong>：最后一段若不含逗号（如 <code>;001</code>），则作为显式默认跳转目标；若最后一段含逗号，则所有段均为条件段，无匹配时 fallback 到<strong>第一个段</strong>的 target。</p>
+
+<h2>3. 示例</h2>
+<pre><code>scene(003)                                          ← 无条件跳转 nbook003.nb
+scene(bond_fei,&gt;=,5,005;001)                        ← 单条件：bond_fei≥5→005，否则→001
+scene(bond_ira,&gt;=,5,bond_neon,&gt;=,3,005;001)         ← AND：两个好感度都达标→005，否则→001
+scene(bond_ira,&gt;=,5,005;bond_neon,&gt;=,3,005;001)         ← OR：任一达标→005，否则→001
+scene(bond_ira,&gt;=,5,005;bond_neon,&gt;=,3,004)         ← 无显式默认：任一达标→各自目标，否则 fallback→005（第一段 target）</code></pre>
+
+<h2>4. sceneconf 场景配置</h2>
+<p><code>sceneconf</code> 命令声明当前场景的<strong>配置信息</strong>：章节标题 + 场景类型。它不控制跳转。</p>
+<pre><code>sceneconf(){A normal day, normal}
+sceneconf(){, menu}   # 菜单类场景：标题可省略</code></pre>
+<table>
+<tr><th>字段</th><th>必填</th><th>说明</th></tr>
+<tr><td><code>title</code></td><td>否</td><td>章节标题。随存档记录，在存档/读档界面显示（未设置时回退显示场景文件名）</td></tr>
+<tr><td><code>type</code></td><td>否（默认 <code>normal</code>）</td><td>场景类型，见下表</td></tr>
+</table>
+<h3>4.1 场景类型</h3>
+<table>
+<tr><th>类型</th><th>说明</th></tr>
+<tr><td><code>normal</code></td><td>普通剧情场景（默认）</td></tr>
+<tr><td><code>cg</code></td><td>CG 展示场景</td></tr>
+<tr><td><code>menu</code></td><td>菜单类场景（主菜单/存档/读档/Logo 等）。此类场景中 <strong>F5 存档 / F6 读档热键被禁用</strong></td></tr>
+</table>
+<p>约定：<code>sceneconf</code> 通常写在场景文件<strong>第一行</strong>。菜单类场景（mainmenu / loadscene / logo / op）必须声明 <code>type=menu</code>，否则存档热键会误可用。</p>
+
+</main>
+</body>
+</html>

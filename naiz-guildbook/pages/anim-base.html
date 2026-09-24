@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>base：变色动画的底图 — Naiz Guildbook</title>
+<link rel="stylesheet" href="../style.css">
+</head>
+<body>
+<nav class="sidebar" id="sidebar-nav"></nav>
+<script src="../sidebar-animation.js"></script>
+<main class="main">
+
+<h1>base：变色动画的底图</h1>
+<blockquote><strong>创建</strong>：2026-08-29<br><strong>最后更新</strong>：2026-08-29</blockquote>
+<p><code>base</code> 用于<strong>变色动画</strong>（开场设定里选了 <code>palette</code> 的那种）。它写出「变化之前」的第一张底图——后面每一次颜色变化都是在这张底图的基础上改。返回总览见 <a href="anim-语法.html">语法总览</a>。</p>
+<hr>
+
+<h2>1. 怎么写</h2>
+<pre><code>base(){素材昵称}</code></pre>
+<p>大括号里写<strong>正好一个</strong>素材昵称（底图），不用写括号里的数字。</p>
+
+<h2>2. 举个 galgame 里的例子</h2>
+<pre><code># 灯光忽明忽暗：先有一张正常亮度的底图，再让它变暗、变亮
+animaconf(cine,palette,标题流光)
+base(){正常亮度}
+pal(0.2){暗一点}
+pal(0.2){亮回来}</code></pre>
+<p>底图本身的颜色，会被后面每一张「色表」叠加修改——没被点名的颜色就保持底图的样子。</p>
+
+<h2>3. 写的时候注意</h2>
+<ul>
+<li><strong>只用在变色动画</strong>（开场设定选了 <code>palette</code>）。整图动画里写 <code>base</code> 会报错。</li>
+<li>变色动画里 <code>base</code> <strong>只能写一次</strong>。</li>
+<li><strong>必须写在 pal 前面</strong>（先有底图，再有变化）。如果先写 pal 再说 base，工具会报错。</li>
+<li>底图的昵称也要先 <code>register</code> 登记过。</li>
+</ul>
+
+<h2>4. 常见错误</h2>
+<ul>
+<li>整图动画里误用了 base → 改用 frame。</li>
+<li>写了两次 base → 保留一个就好。</li>
+<li>把 pal 写在了 base 前面 → 把 base 挪到最前。</li>
+</ul>
+<p>→ <a href="anim-语法.html">返回语法总览</a></p>
+
+</main>
+</body>
+</html>

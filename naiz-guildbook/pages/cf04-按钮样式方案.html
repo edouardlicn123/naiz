@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>按钮样式方案 — Naiz Guildbook</title>
+<link rel="stylesheet" href="../style.css">
+</head>
+<body>
+<nav class="sidebar" id="sidebar-nav"></nav>
+<script src="../sidebar-reference.js"></script>
+<main class="main">
+<h1>按钮样式方案</h1>
+<blockquote><strong>创建</strong>：2026-06-27<br><strong>最后更新</strong>：2026-06-27</blockquote>
+<p>本文说明游戏中菜单按钮的视觉规格和配色方案。按钮样式通过 <code>settings.txt</code> 的 <code>btnstyle</code> 设置。</p>
+<hr>
+
+<h2>1. 按钮规格</h2>
+<table>
+<thead>
+<tr><th>属性</th><th>值</th></tr>
+</thead>
+<tbody>
+<tr><td>宽度</td><td><strong>100 px</strong></td></tr>
+<tr><td>高度</td><td><strong>34 px</strong></td></tr>
+<tr><td>圆角半径</td><td><strong>17 px</strong></td></tr>
+<tr><td>边框样式</td><td>浮雕（上/左边高光，下/右边阴影）</td></tr>
+<tr><td>文字</td><td>按钮内居中</td></tr>
+</tbody>
+</table>
+<p>所有按钮尺寸固定，不受 <code>mainmenu()</code> 坐标参数影响。</p>
+
+<hr>
+
+<h2>2. 配色方案</h2>
+<p><code>btnstyle</code> 提供 5 套配色（<code>settings.txt</code> 中 <code>btnstyle=N</code>，N 为 0–4）：</p>
+<table>
+<thead>
+<tr><th>样式</th><th>底色</th><th>高光</th><th>阴影</th></tr>
+</thead>
+<tbody>
+<tr><td><strong>0</strong> 黑</td><td><code>#000000</code></td><td><code>#3F3F3F</code></td><td><code>#000000</code></td></tr>
+<tr><td><strong>1</strong> 蓝</td><td><code>#0000FF</code></td><td><code>#3F3FFF</code></td><td><code>#0000BF</code></td></tr>
+<tr><td><strong>2</strong> 暗红</td><td><code>#800000</code></td><td><code>#9F3F3F</code></td><td><code>#600000</code></td></tr>
+<tr><td><strong>3</strong> 绿</td><td><code>#008000</code></td><td><code>#3F9F3F</code></td><td><code>#006000</code></td></tr>
+<tr><td><strong>4</strong> 紫</td><td><code>#800080</code></td><td><code>#9F3F9F</code></td><td><code>#600060</code></td></tr>
+</tbody>
+</table>
+<p>文字颜色为固定白色（未选中）和黄色（选中），不随配色变化。</p>
+
+<hr>
+
+<h2>3. 配置方法</h2>
+<p>在 <code>settings.txt</code> 中设置按钮样式值：</p>
+<pre><code>btnstyle=1     # 蓝色按钮
+btnstyle=3     # 绿色按钮</code></pre>
+<p>样式在游戏启动时生效，改变后需重启游戏。</p>
+
+<hr>
+
+<h2>4. 与其他文档的关系</h2>
+<table>
+<thead>
+<tr><th>文档</th><th>内容</th></tr>
+</thead>
+<tbody>
+<tr><td><a href="ui01-主菜单设计.html">ui01-主菜单设计</a></td><td>mainmenu 命令语法、选项调度、场景流程</td></tr>
+<tr><td><a href="sc01-NB剧本概述.html">sc01-NB剧本概述</a></td><td>bg/host/key/scene/savescene/loadscene 命令</td>
+</tr>
+<tr><td><a href="ui02-设置系统设计.html">ui02-设置系统设计</a></td><td>settings.txt 完整配置参考</td></tr>
+<tr><td><a href="cf03-对话框样式方案.html">cf03-对话框样式方案</a></td><td>对话框底色（与按钮色系同步）</td></tr>
+</tbody>
+</table>
+
+</main>
+</body>
+</html>

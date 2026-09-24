@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>黑花字（Blackletter） — Naiz Guildbook</title>
+<link rel="stylesheet" href="../style.css">
+</head>
+<body>
+<nav class="sidebar" id="sidebar-nav"></nav>
+<script src="../sidebar-reference.js"></script>
+<main class="main">
+
+<h1>黑花字（Blackletter）</h1>
+<hr>
+<blockquote><strong>创建</strong>：2026-08-04</blockquote>
+
+<p>黑花字（Fraktur / Blackletter）是西文的古典印刷花体字型，Naiz 用它为读/存档页标题与对话正文提供装饰性的拉丁字体效果。</p>
+
+<h2>1. 是什么</h2>
+<ul>
+  <li>基于 <strong>UnifrakturMaguntia</strong> 字体（SIL OFL 1.1 开源许可）制作。</li>
+  <li>只含<strong>拉丁字母与标点</strong>，不含 CJK 字形。</li>
+  <li>部署数据分两块：
+    <ul>
+      <li><code>BLACK.DAT</code> — 16×16 点阵字库，供对话正文等 ASCII 文字使用。</li>
+      <li><code>loadtitle.MAG</code> / <code>savetitle.MAG</code> — 整幅花体标题图（"LOAD" / "SAVE"），供读/存档页标题使用。</li>
+    </ul>
+  </li>
+</ul>
+
+<h2>2. 适用范围（重要）</h2>
+<p>黑花字只含拉丁字符，因此<strong>仅当运行时语言为非 CJK</strong>（如 <code>eng</code>）时生效。当语言为 <code>chi</code> / <code>jpn</code> / <code>kor</code> 时，无论开关如何设置，都会<strong>自动回退到原字体</strong>，不会出现缺字或串字。</p>
+
+<h2>3. 如何开启</h2>
+<p>在项目 <code>config.toml</code> 的 <code>[blackletter]</code> 段设置开关：</p>
+<pre><code>[blackletter]
+# 读/存档页标题 LOAD / SAVE 是否用黑花体 MAG
+title = true
+# 正文 ASCII 是否用黑花体 16×16（BLACK.DAT）
+dialog = true</code></pre>
+<table>
+<tr><th>字段</th><th>默认</th><th>作用范围</th></tr>
+<tr>
+  <td><code>title</code></td><td><code>false</code></td>
+  <td>读档 / 存档页顶部的大标题（LOAD / SAVE）。开启后以居中花体标题图替换默认大字标题。</td>
+</tr>
+<tr>
+  <td><code>dialog</code></td><td><code>false</code></td>
+  <td>对话、问题选项、存档菜单等处的 ASCII 文字。开启后正文拉丁字符改用 16×16 黑花体点阵。</td>
+</tr>
+</table>
+<p>值必须是 <code>true</code> / <code>false</code> 布尔，<strong>不要加引号</strong>（<code>"true"</code> 会被当作字符串而误判为"开"）。</p>
+
+<h2>4. 生效流程</h2>
+<p>修改后重新构建游戏即可：</p>
+<pre><code>./makegame.sh build &lt;game&gt;</code></pre>
+<ol>
+  <li><code>build_game.py</code> 读取 <code>config.toml</code> 的黑花字开关，写入 <code>settings.txt</code> 的 <code>blacktitle=</code> / <code>blackdialog=</code>。</li>
+  <li>引擎启动时读取 <code>settings.txt</code>，得到两个开关。</li>
+  <li>运行时语言为非 CJK 时生效；为 CJK 时自动回退原字体。</li>
+</ol>
+
+<h2>5. 与其它设置的关系</h2>
+<ul>
+  <li>黑花字作用于<strong>拉丁文字</strong>；CJK 文字始终走 CJK 点阵字库，不受影响。</li>
+  <li>对话框样式（<code>dlgstyle</code>）、字体等设置与黑花字相互独立，可同时使用。</li>
+  <li>完整配置格式见 <a href="cf02-项目配置文件.html">cf02 项目配置文件</a>。</li>
+</ul>
+
+<h2>6. 注意事项</h2>
+<ul>
+  <li>黑花体字型偏装饰、可读性低于默认字体，长句正文建议保持默认，仅在标题或短句使用。</li>
+  <li>开关仅影响非 CJK 语言；多语言发布时，CJK 玩家看到的仍是原字体，属预期行为。</li>
+  <li>修改开关后需重新 <code>makegame.sh build</code> 才会部署到 <code>settings.txt</code>。</li>
+</ul>
+
+</main>
+</body>
+</html>

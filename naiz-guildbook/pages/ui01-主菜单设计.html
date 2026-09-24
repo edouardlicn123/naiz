@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>主菜单设计 — Naiz Guildbook</title>
+<link rel="stylesheet" href="../style.css">
+</head>
+<body>
+<nav class="sidebar" id="sidebar-nav"></nav>
+<script src="../sidebar-reference.js"></script>
+<main class="main">
+<h1>主菜单设计</h1>
+<blockquote><strong>创建</strong>：2026-06-27<br><strong>最后更新</strong>：2026-06-27</blockquote>
+<p>本文说明主菜单的场景流程、编辑方法和多语言翻译。命令语法见 <a href="sc07-mainmenu.html">sc07-mainmenu</a>。</p>
+<hr>
+
+<h2>1. 场景流程</h2>
+<p>游戏启动后的场景链为：</p>
+<pre><code>logo.nb → op.nb → mainmenu.nb
+                       │
+            start ─────┤
+              ↓        │
+         nbook001.nb   │
+           ⋮           │
+        scene(end) ────┘
+                       │
+            exit ──────┘
+                 引擎关闭</code></pre>
+<ul>
+<li>主线故事由 <code>start</code> 触发，从 <code>nbook001.nb</code> 开始</li>
+<li>故事结尾的 <code>scene(end)</code> 自动返回主菜单</li>
+<li>游戏进行中按 <kbd>Esc</kbd> 可随时返回主菜单</li>
+<li>选择 <code>exit</code> 直接关闭引擎，返回 DOS</li>
+</ul>
+
+<hr>
+
+<h2>2. 编辑示例</h2>
+<p>主菜单由 <code>mainmenu.nb</code> 文件定义。去掉某个选项即可隐藏对应的按钮：</p>
+<pre><code># 两列，只保留 start、gallery、settings 和 exit
+mainmenu(400, 200, 2, 0, start, gallery, settings, exit)</code></pre>
+<table>
+<thead>
+<tr><th>规则</th><th>说明</th></tr>
+</thead>
+<tbody>
+<tr><td><strong>exit 必须排在最后</strong></td><td>引擎按顺序解析，后面的选项不显示</td></tr>
+<tr><td><strong>最多 16 项</strong></td><td>一个 mainmenu 命令最多容纳 16 个选项</td></tr>
+<tr><td><strong>不能新增选项名</strong></td><td>引擎只识别上表列出的选项名，自定义名称无效</td></tr>
+</tbody>
+</table>
+
+<hr>
+
+<h2>3. 翻译</h2>
+<p>菜单选项的显示文字通过多语言系统自动翻译。无需在脚本中写不同语言的菜单——引擎在显示时从 <code>i18n/role_*.txt</code> 查找翻译。</p>
+<p>翻译文件示例：</p>
+<pre><code># i18n/role_chi.txt
+start=开始游戏
+exit=退出游戏
+continue=继续游戏</code></pre>
+
+</main>
+</body>
+</html>
