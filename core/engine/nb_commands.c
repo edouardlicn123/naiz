@@ -394,6 +394,7 @@ static const CmdEntry cmd_table[] = {
     {"settingmenu",  cmd_settingmenu, 0},
     {"cgvmenu",      cmd_cgvmenu,     CMD_BLOCKING | CMD_NEEDS_INPUT | CMD_TOUCHES_DISPLAY},
     {"musicmenu",    cmd_musicmenu,   0},
+    {"specialmenu",  cmd_specialmenu, CMD_BLOCKING | CMD_NEEDS_INPUT | CMD_TOUCHES_DISPLAY},
     {"bgm",          cmd_bgm,         CMD_TOUCHES_AUDIO},
     {"sound",        cmd_sound,       CMD_TOUCHES_AUDIO},
     {"voice",        cmd_voice,       CMD_TOUCHES_AUDIO},

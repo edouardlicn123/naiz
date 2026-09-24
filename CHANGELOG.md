@@ -6,6 +6,9 @@
 
 | 条目 |
 |------|
+| [0.2.142 — 菜单增量 blit 跨行距拷贝根修 + VRAM 紧凑缓冲契约审计（devdoc 115）](#c25) |
+| [0.2.141 — Special 菜单视觉修正：Back 文字截断根修 + 行按钮缩半居中（devdoc 114 反馈轮）](#c24) |
+| [0.2.140 — Special 菜单落地：LOAD 范式全屏列表 + 菜单归属场景收口（devdoc 114）](#c23) |
 | [0.2.139 — 资产市场工具落地：整包下载器 market.sh（独立 naiz_assets 仓库）](#c22) |
 | [0.2.138 — 光标移动残影根治：splice 只进一次性书写副本，持久合成缓冲不烘烙（devdoc 111）](#c21) |
 | [0.2.137 — 光标写入全程零缺窗：对话框合成缓冲预拼光标（devdoc 110）](#c20) |
@@ -28,6 +31,49 @@
 | [0.2.120 — 菜单 UI 整合落地（devdoc 102）](#c15) |
 | [0.2.119 — powered 资产归位 `common/logo/` + 资产键统一](#c16) |
 | [Bug 修复状态（R1–R30 综合摘要与历史子条目）](#c17) |
+
+---
+
+<a id="c25"></a>
+### 0.2.142 — 菜单增量 blit 跨行距拷贝根修 + VRAM 紧凑缓冲契约审计（devdoc 115）
+
+NP2kai 目检：从 special 菜单返回主菜单后 continue/start 两键花屏（杂点/横线乱码）。根因为**跨行距拷贝**（`vram_read/write` 契约 = 紧凑缓冲，行距必须等于参数 `w`）：
+
+- **`menu_layer_blit_rect`（menu_layer.c:139，不透明分支，唯一实测 bug）**：把 640 行距的 composite **切片**当紧凑缓冲传给 `vram_write(..., w=按钮宽100, h=34)` → 第 0 行正确、第 1..h-1 行全部错位 → 键面横线乱码。触发面 = `menu_label_draw`（nb_menu.c:220），`menu_show` 类菜单（主菜单/设置）**按任意方向键即花**；special/LOAD/画廊只走全量 blit 不受影响。「返回后才花」仅是当时按过一次 ↓（sel 0→2，重绘 continue+start）。修复 = 不透明分支改**逐行 `vram_write`（h==1，行距无关）**。
+- **`cursor_composite_splice`（cursor.c:333，同族潜患一并拔除）**：保存光标盒下背景用一块 24×24=576 连续字节 memcpy，源行距却是 480 → 必然跨行；鼠标完整移入叙述框后离开时 `cursor_erase` 用损坏背景擦除旧盒 → 框内斜纹残影（文本静止时持续）。修复 = 24 行逐行拷贝。光标常态路径（24×24 紧凑）本就正确。
+- **同族全量审计**：全代码库 `vram_read/write` 九处调用方 + bg/dialog/sprite/transition 各拷贝面逐条核对，仅上述两处需动（devdoc 115 §4 表）。透明 blit 分支、`menu_layer_erase_to_base`（显式 640 行距）、对话框 480×115 紧凑缓冲均合规。
+- **验证**：`make -C core` 0 errors / 0 warnings；pytest 463 passed；`./start.sh fullaudit` 7/7 `[✓]`。`makegame.sh build + make demo-a2` 更新 HDI。
+- `bump_version` → 0.2.142（demo-a2/animatest 同步）。
+
+---
+
+<a id="c24"></a>
+### 0.2.141 — Special 菜单视觉修正：Back 文字截断根修 + 行按钮缩半居中（devdoc 114 反馈轮）
+
+NP2kai 目检反馈两处问题并修复：
+
+- **Back 文字空白根修（共享 UI bug）**：`menu_back_draw`（nb_menu.c:96）调用 `draw_text(tr("Back"), 0, tx, y+7, 80, **30**, 1, color)`——`draw_text` 的第 6 参是 **y 坐标截断**（`render_text.c:136 if (y >= max_y) return`），常量 `30` 使 y=352+7=359 ≥ 30 恒早退 → **所有菜单（LOAD/special/CG 画廊）的 Back 文字从未画出**，只剩凹刻框。改传 `y+30`（按钮底边坐标，与行文字 `y+36` 同语义）。此 bug 同样影响 LOAD/画廊 Back，一并根治。
+- **special 行按钮布局**：宽度 480→**240**（`(640-240)/2 = 200` 居中，SPECIAL_BTN_X/W）；行标签按 `text_width` **居中于各自按钮**（`lx = 200 + (240-lw)/2`，焦点 `>` 指示条留守按钮内左缘 206），鼠标命中区同步改 `[200,440)`。
+- 渲染管线：凹刻（全量）+ 指示条/居中标签（增量）仍在 `menu_layer_begin_draw/commit/blit` 两阶段内，翻页全量重绘 + cursor_force 保持（AGENTS §十四 / C17）。
+- **验证**：`make -C core` 0 errors / 0 warnings；pytest 463 passed；`./start.sh fullaudit` 全 `[✓]`；`makegame.sh build + make demo-a2` 更新 HDI。NP2kai 目检：Back 返回文字可见、3 行按钮 240 宽、标题（音乐/music 等）居按钮正中。
+- `bump_version` → 0.2.141（demo-a2/animatest 同步）。
+
+---
+
+<a id="c23"></a>
+### 0.2.140 — Special 菜单落地：LOAD 范式全屏列表 + 菜单归属场景收口（devdoc 114）
+
+主菜单重设计：新增 special 菜单承载 gallery/scenes/music，主菜单只留 continue/load/start/special/settings/exit；special 的布局/行为/显示方式完全对照 LOAD 读档场景。
+
+- **引擎**：新建 `core/engine/nb_special.c` 命令 `specialmenu(gallery,scenes,music)`——LOAD 范式全屏列表：`draw_title_large` 标题 + 凹刻行 `draw_rounded_emboss(80,row_y[i],480,44,SAVE_SLOT_R)` + 分页条 `menu_pagenav_draw` + Back + `focus_on_back` 模型，两阶段增量渲染（§十四 合规）；条目经 `tr()` 渲染（sys_<lang> 已有 gallery/scenes/music/Back 译文）。
+- **保留分页**（用户定案）：每页 4 行复用 slot_y 几何，`menu_pagecount(argc,4)` 总页、首/末页箭头自动隐藏、`%d/%d` 恒显；Left/Right 切页、鼠标箭头同 LOAD；翻页全量重绘 + `hal_mouse_draw_cursor_force()`（C17）。
+- **路由**：`gallery`→`nb_set_menu_return("special.nb")` + cgview.nb；`scenes`→CAPTURE_TEMP + OPEN_LOAD（Esc 靠 temp 快照回 special 画面）；`music`→TODO 桩；Back/Esc→mainmenu.nb；未知项 NB_DEBUG 告警（消灭静默失败）。
+- **菜单归属场景**：`g_menu_return[64]` + `nb_set/get_menu_return()`（str_copy 收口，C32）；`nb_cggallery.c` 两处退出改 `gallery_return_home()` 读父场景，空回退 mainmenu.nb；mainmenu special/gallery 分支先清归属（读写点相邻，无陈旧污染）。
+- **场景脚本**（demo-a2）：mainmenu.nb 按钮序列 → `continue,load,start,special,settings,exit`（exit 末位约定保持）；新建 special.nb：`sceneconf(){Special, menu}` + `bg(normal){yellow_grid}`（id13）+ specialmenu。
+- **i18n**：`i18n_gen.py` menu_options 收集扩展 `cmd in ('mainmenu','specialmenu')`（specialmenu 全量 args，mainmenu 依旧 args[4:] 跳坐标）；`SYSTEM_UI_KEYS` 登记标题键 `"SPECIAL"`（§十四 规则 3，防重生成 ORPHANED）。
+- **守卫测试**：新增 `tools/tests/test_i18n_menu_options.py`（+3 例 = 463）：mainmenu 引擎按钮收集 / specialmenu 条目收集 / 条目不作对白泄漏，全部基于真实项目场景文件；`test_cmd_meta.py` 自动覆盖新命令 flags（BLOCKING|NEEDS_INPUT|TOUCHES_DISPLAY）。
+- **验证**：`make -C core` 0 errors / 0 warnings；pytest 463 passed；`./start.sh fullaudit` 全 `[✓]`（6/6 节）；`makegame.sh build demo-a2` 含 special.nb / yellow_grid / i18n 重生成。NP2kai 目检：主菜单 6 键、special 黄色网格 LOAD 式列表、gallery/scenes/Back 返回路径、每场景切换黑屏。
+- `bump_version` → 0.2.140（demo-a2/animatest 同步）。
 
 ---
 

@@ -101,7 +101,7 @@ void menu_back_draw(int y, int focus, int emboss, uint8_t idle_fg)
     if (emboss)
         draw_rounded_emboss(66, y, 80, 30, 4,
                             BTN_FILL_IDX, BTN_HIGHLIGHT_IDX, BTN_SHADOW_IDX);
-    draw_text(tr("Back"), 0, tx, y + 7, 80, 30, 1,
+    draw_text(tr("Back"), 0, tx, y + 7, 80, y + 30, 1,
               focus ? MENU_PAL_YELLOW : idle_fg);
 }
 

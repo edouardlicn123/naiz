@@ -25,6 +25,21 @@
 #include "nb_asset_table.h"
 #include "strutil.h"
 
+/* Menu-parent scene (e.g. special.nb) consumed by sub-menus (cg view) on
+ * exit; cleared whenever the main menu hands off to a sub-menu directly. */
+static char g_menu_return[64];
+
+void nb_set_menu_return(const char *scene)
+{
+    str_copy(g_menu_return, sizeof(g_menu_return),
+             scene != NULL ? scene : "");
+}
+
+const char *nb_get_menu_return(void)
+{
+    return g_menu_return;
+}
+
 void cmd_mainmenu(int argc, const char **argv, const char *cmd_name)
 {
     int mx, my, mw, sel;
@@ -74,10 +89,12 @@ void cmd_mainmenu(int argc, const char **argv, const char *cmd_name)
     } else if (strcmp(argv[sel + 4], "scenes") == 0) {
         hal_log("TODO: scene select\r\n");
     } else if (strcmp(argv[sel + 4], "special") == 0) {
-        hal_log("TODO: special menu\r\n");
+        nb_set_menu_return("");
+        scene_switch("special.nb", SCENE_SWITCH_MENU);
     } else if (strcmp(argv[sel + 4], "music") == 0) {
         hal_log("TODO: music room\r\n");
     } else if (strcmp(argv[sel + 4], "gallery") == 0) {
+        nb_set_menu_return("");
         scene_switch("cgview.nb", SCENE_SWITCH_MENU);
     } else if (strcmp(argv[sel + 4], "settings") == 0) {
         hal_log("TODO: settings menu\r\n");

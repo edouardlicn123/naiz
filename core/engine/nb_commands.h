@@ -25,6 +25,7 @@ void cmd_startsetting(int argc, const char **argv, const char *cmd_name);
 void cmd_settingmenu(int argc, const char **argv, const char *cmd_name);
 void cmd_cgvmenu(int argc, const char **argv, const char *cmd_name);
 void cmd_musicmenu(int argc, const char **argv, const char *cmd_name);
+void cmd_specialmenu(int argc, const char **argv, const char *cmd_name);
 
 /* Shared comma-field parser (defined in nb_commands.c), used by
  * nb_scene.c and nb_question.c.  Returns 1 on success.

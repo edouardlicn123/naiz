@@ -20,7 +20,8 @@
 | | | `char(hideall)` | 隐藏所有立绘 + clean reset |
 | `scene` | `cmd_scene` (nb_scene.c) | `scene <id\|"end">` / `scene <var,op,val,target;...;default>` | 无条件/条件链跳转，id → nbook{id}.nb。默认值约定：最后一段无逗号→显式默认；无显式默认→fallback 到第一段 target |
 | `sceneconf` | `cmd_sceneconf` (nb_commands.c) | `sceneconf(){<title>[,type]}` | 场景配置：章节标题 + 类型（normal/cg/menu，默认 normal）。**仅花括号形态**（paren 别名已废止），随存档记录标题，type=menu 时禁用存档热键 |
-| `mainmenu` | `cmd_mainmenu` (nb_mainmenu.c) | `mainmenu <x> <y> <w> <h> <opt1> <opt2> ...` | 主菜单，"start"→game, "continue"→最新槽位, "load"→读档, "gallery"→cgview, "exit"→end；scenes/special/music/settings 为 TODO 桩 |
+| `mainmenu` | `cmd_mainmenu` (nb_mainmenu.c) | `mainmenu <x> <y> <w> <h> <opt1> <opt2> ...` | 主菜单，"start"→game, "continue"→最新槽位, "load"→读档, "settings"→startsetting, "exit"→end；"special"→special.nb，scenes/music/gallery 已迁入 special（保留桩） |
+| `specialmenu` | `cmd_specialmenu` (nb_special.c) | `specialmenu <opt1> <opt2> ...` | **Special 菜单（LOAD 范式全屏列表，0.2.140）**：凹刻行+分页+Back+focus_on_back，条目经 tr() 渲染；`gallery`→cgview.nb（回 special）、`scenes`→loadscen.nb（temp 快照回 special）、`music`→TODO 桩、Back/Esc→mainmenu.nb |
 | `question` | `cmd_question` (nb_question.c) | `question <text;opt,var,op,delta;...>` | 选项+变量操作(+/-/=)，结果存 nb.last_choice；鼠标/键盘两路经 `apply_option()` 合一（R21，含 INT_MIN 守卫 C22） |
 | `var` | `cmd_var` (nb_commands.c) | `var <id> <=/+|/-> <value>` | 变量读写（赋值/加减），需在 variables.json 定义 |
 | `settingmenu` | `cmd_settingmenu` (nb_mainmenu.c) | — | 设置菜单（TODO 桩，见 STUBS）；**已实现的是 `startsetting`** |
@@ -28,7 +29,7 @@
 | `musicmenu` | `cmd_musicmenu` (nb_mainmenu.c) | — | 音乐菜单（TODO 桩，见 STUBS） |
 | `cg` | `cmd_cg` (nb_cg.c) | `cg(){<asset_key>}` | 展示 CG（type='CG' 资产）：资产 key 必须写在花括号负载中——括号位预留给未来的参数设置，**不再承载资产描述**（`cg(key)` 括号形态被硬性拒绝）；绘制后永久解锁该 CG 至 SYSTEM.SAV；**换图同时自动收起对话框并清空当前对白**（R20 全屏事件语义），下一句台词在其上重新开框 |
 | | | `cg(hidedialog)` | 关闭对话框，还原背景区域（与 `bg(hidedialog)` 平行；`cg(){key}` 已自动收起对话框，此指令用于显式收口，见 R20） |
-| `cgvmenu` | `cmd_cgvmenu` (nb_cggallery.c:206) | — | 打开 CG 画廊（由 cgview.nb 调用）：网格浏览 + 锁定占位 + 翻页 + 全屏预览 + 解锁位图缓存（R22）；ESC/Back 回主菜单；0.2.079 自 nb_mainmenu.c 拆出，0.2.092 起 menu_layer 渲染 |
+| `cgvmenu` | `cmd_cgvmenu` (nb_cggallery.c:206) | — | 打开 CG 画廊（由 cgview.nb 调用）：网格浏览 + 锁定占位 + 翻页 + 全屏预览 + 解锁位图缓存（R22）；ESC/Back 回**菜单归属场景** `nb_get_menu_return()`（默认 mainmenu.nb，0.2.140 起 special 进入则回 special.nb）；0.2.079 自 nb_mainmenu.c 拆出，0.2.092 起 menu_layer 渲染 |
 | `host` | `cmd_host` (nb_commands.c) | `host <text>` | 系统旁白（无角色名） |
 | `loadscene` | `cmd_loadscene` (nb_saveload.c:400) | — | 打开读档选单（由 loadscene.nb 调用），经 `save_load_menu(is_load=1, from_mainmenu=0)` 进入两阶段渲染菜单 |
 | `fei` / `ira` / `neon` | `cmd_dialogue` (nb_commands.c) | `<name>{<text>}` 或 `<name>(<text>)` | 角色台词（自动带角色名） |

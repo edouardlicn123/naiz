@@ -27,3 +27,4 @@ chime=
 ding=
 hi=
 test1=
+Special=特別篇

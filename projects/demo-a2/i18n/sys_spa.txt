@@ -27,3 +27,4 @@ Yes=Sí
 [Yes]=[Sí]
 No save data.=No hay datos guardados.
 Load failed.=Error al cargar.
+SPECIAL=Especial

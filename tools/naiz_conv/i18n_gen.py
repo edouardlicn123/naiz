@@ -35,6 +35,7 @@ SYSTEM_UI_KEYS = {
     "Text Speed", "Instant",
     "CG GALLERY", "No CGs available.",
     "No save data.", "Load failed.",
+    "SPECIAL",
 }
 
 
@@ -86,11 +87,15 @@ def extract_texts(nb_files):
                         if label:
                             question_texts.add(label)
 
-                if cmd == 'mainmenu' and len(args) > 4:
-                    for a in args[4:]:
-                        a = a.strip()
-                        if a:
-                            menu_options.add(a)
+                if cmd in ('mainmenu', 'specialmenu'):
+                    # mainmenu: button list starts after x,y,w,h; specialmenu
+                    # takes pure entry keys.  Both render through tr() in C.
+                    offset = 4 if cmd == 'mainmenu' else 0
+                    if len(args) > offset:
+                        for a in args[offset:]:
+                            a = a.strip()
+                            if a:
+                                menu_options.add(a)
 
     return dialogue_texts, question_texts, menu_options
 

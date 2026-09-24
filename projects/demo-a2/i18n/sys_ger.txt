@@ -27,3 +27,4 @@ Yes=Ja
 [Yes]=[Ja]
 No save data.=Keine Speicherdaten.
 Load failed.=Laden fehlgeschlagen.
+SPECIAL=Spezial

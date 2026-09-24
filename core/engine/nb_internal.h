@@ -85,6 +85,11 @@ void nb_get_line(int line_num, char *out, int out_size);
 
 /* nb.c: core — nb_load moved to nb.h (public API) */
 
+/* nb_mainmenu.c: menu-parent scene routing.  Sub-menus (dlgview) read the
+ * parent scene via nb_get_menu_return(); empty falls back to mainmenu.nb. */
+void nb_set_menu_return(const char *scene);
+const char *nb_get_menu_return(void);
+
 /* DialogState + dialog_show moved to nb_dialog.h */
 
 /* nb_menu.c: menu UI */

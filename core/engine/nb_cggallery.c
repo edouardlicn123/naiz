@@ -233,6 +233,15 @@ static void gallery_exit_preview(int page, int sel, int focus_on_back)
     hal_mouse_draw_cursor_force();
 }
 
+/* Return to the menu-parent scene (set by specialmenu), falling back to the
+ * main menu.  The parent is read at exit time so a stale value can never be
+ * consumed across a fresh entry. */
+static void gallery_return_home(void)
+{
+    const char *ret = nb_get_menu_return();
+    scene_switch(ret[0] != '\0' ? ret : "mainmenu.nb", SCENE_SWITCH_MENU);
+}
+
 /* cmd_cgvmenu — CG gallery browsing menu (bridging script cgview.nb ends). */
 void cmd_cgvmenu(int argc, const char **argv, const char *cmd_name)
 {
@@ -255,7 +264,7 @@ void cmd_cgvmenu(int argc, const char **argv, const char *cmd_name)
             hal_mouse_draw_cursor();
         }
         hal_mouse_flush();
-        scene_switch("mainmenu.nb", SCENE_SWITCH_MENU);
+        gallery_return_home();
         return;
     }
 
@@ -354,5 +363,5 @@ void cmd_cgvmenu(int argc, const char **argv, const char *cmd_name)
 
     menu_finish();
     gallery_palette_restore();
-    scene_switch("mainmenu.nb", SCENE_SWITCH_MENU);
+    gallery_return_home();
 }

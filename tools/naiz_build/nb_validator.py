@@ -40,6 +40,7 @@ SIGNATURES = {
     'scene':    (1, None, 'scene(name)'),
     'sceneconf': (0, 0, 'sceneconf(){title[,type]}'),
     'mainmenu': (5, None, 'mainmenu(x, y, w, h, opt, ...)'),
+    'specialmenu': (1, None, 'specialmenu(entry, ...)'),
     'host':     (0, 0, 'host(){text}'),
     'bgm':      (0, 1, 'bgm(){key} | bgm(stop)'),
     'sound':    (0, 0, 'sound(){key}'),

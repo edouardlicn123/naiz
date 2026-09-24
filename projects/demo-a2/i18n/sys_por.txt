@@ -27,3 +27,4 @@ Yes=Sim
 [Yes]=[Sim]
 No save data.=Sem dados salvos.
 Load failed.=Falha ao carregar.
+SPECIAL=Especial

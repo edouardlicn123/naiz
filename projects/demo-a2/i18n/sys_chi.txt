@@ -27,3 +27,4 @@ Yes=是
 [Yes]=[是]
 No save data.=暂无存档数据
 Load failed.=加载失败
+SPECIAL=特别篇

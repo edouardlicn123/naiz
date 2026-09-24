@@ -135,8 +135,17 @@ void menu_layer_blit_rect(int x, int y, int w, int h)
         render_blit_transparent(menu_layer_buf, menu_layer_w,
                                 bx, by, w, h,
                                 menu_layer_x, menu_layer_y, PAL_TRANSPARENT);
-    else
-        vram_write(menu_layer_buf + by * menu_layer_w + bx, x, y, w, h);
+    else {
+        int i;
+        /* vram_write contract: the buffer is compact (row stride == the rect
+         * width), so a slice of the 640-wide composite cannot be published in
+         * one call (the source stride would be mistaken for 'w').  Publish
+         * row by row; h==1 keeps every row's source at its row origin
+         * (devdoc 115). */
+        for (i = 0; i < h; i++)
+            vram_write(menu_layer_buf + (by + i) * menu_layer_w + bx,
+                       x, y + i, w, 1);
+    }
 }
 
 void menu_layer_erase_to_base(int x, int y, int w, int h)

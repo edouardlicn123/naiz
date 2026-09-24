@@ -27,3 +27,4 @@ Yes=はい
 [Yes]=[はい]
 No save data.=セーブデータがありません
 Load failed.=ロードに失敗しました
+SPECIAL=スペシャル

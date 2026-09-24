@@ -313,6 +313,7 @@ int cursor_composite_splice(unsigned char *buf, int stride,
 {
     int x, y, draw_x, draw_y, row, col;
     int ox, oy;
+    int r;
 
     if (!hal_mouse_available()) return 0;
 
@@ -329,9 +330,13 @@ int cursor_composite_splice(unsigned char *buf, int stride,
     oy = draw_y - fy;
 
     /* Background = the composite pixels under the box (dialog text), saved
-     * BEFORE the arrow is blended in so a later erase restores clean text. */
-    memcpy(cursor_saved.buf, buf + oy * stride + ox,
-           CURSOR_SAVED_W * CURSOR_SAVED_H);
+     * BEFORE the arrow is blended in so a later erase restores clean text.
+     * The source is strided (dialog composite = LAYER_DIALOG_W per row), so
+     * a single contiguous copy spanning the box would cross row boundaries;
+     * copy row by row (devdoc 115). */
+    for (r = 0; r < CURSOR_SAVED_H; r++)
+        memcpy(cursor_saved.buf + r * CURSOR_SAVED_W,
+               buf + (oy + r) * stride + ox, CURSOR_SAVED_W);
 #ifdef NAIZ_TRACE_CURSOR
     nz_capture("S", cursor_saved.buf, draw_x, draw_y);
 #endif

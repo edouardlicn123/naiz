@@ -27,3 +27,4 @@ Yes=Oui
 [Yes]=[Oui]
 No save data.=Aucune sauvegarde.
 Load failed.=Chargement échoué.
+SPECIAL=Spécial
