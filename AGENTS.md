@@ -1,6 +1,6 @@
 # Naiz — AI 编程规则
 
-> **当前版本**: `0.2.142`（`projects/demo-a2/config.toml`）
+> **当前版本**: `0.2.143`（`projects/demo-a2/config.toml`）
 >
 > **开发历史已移至 [`CHANGELOG.md`](CHANGELOG.md)**: R1–R30、0.2.109–0.2.117 及动画工具链等全部 Bug 修复/功能演进记录均以条目形式存于根目录 `CHANGELOG.md`，**本文件（AGENTS.md）不承载任何开发历史摘要，只存规则与当前版本**；历史速查一律读 CHANGELOG.md（最新：Special 菜单视觉修正——Back 文字截断根修/0.2.141），新条目追加到 CHANGELOG.md 顶部而**不是**本文件。
 >
@@ -153,7 +153,7 @@ naiz_midi / naiz_music 已作为独立项目移出到 `~/`。详见 `docs/B91-�
   `python -m tools.diag.symbol_audit`（A=static 候选，B=死导出，C=耦合/拆分视图，D=符号清单，E=拆分簇；`-s A,E` 只出指定节）
 - 封装工作流：用户运行 `start.sh audit` → 审计日志存 `logs/symbol_audit_<时间戳>.log` 并同步输出终端 → AI 读取最新日志的 A/B/E 节 → 核实后执行封装/拆分
 - **规则审计工作流**（§十七 固化）：用户运行 `start.sh fullaudit [--no-make]` → 6 步流水线（规则增量审计/`start.sh audit` 同款 `./start.sh fullaudit`/pytest/py_compile/`bash -n`/symbol_audit/make）整体复用 `tools.audit.audit` 引擎（sha256 增量，状态存 `audit_state.json`，文件哈希不变则 SKIP；扫描范围 `core/*/*.c` + `core/**/*.h` + `tools/**/*.py` + shell，头文件对 C13/C14 门控排除）与 `start.sh audit` 的 symbol_audit 步骤，仅 `--no-make` 跳过 make 节；全部通过后按 `pytest`/`py_compile`/`bash -n`/`symbol_audit`/`make` 顺序输出 `[✓]`。**symbol_audit 第 5 步带 `-s A,B --gate`**：A（未用 static 候选）/B（死导出）节任一输出即 exit 1 判失败（R30），`start.sh audit` 本色保持信息用途不带 gate。AI 修改源码后应主动运行 `./start.sh fullaudit` 验证无回归。AI 核验启发式候选后应主动 `--note REL:LINENO:VERDICT[:TEXT]` 登记到独立 `verify_notes.json`（带**行级**快照，被核行文本未变则无关编辑不 STALE；v1 整文件 sha8 快照兼容加载；单条也可用 `--note rel:line --verdict ok/fixed/todo`）；新代码审查用 `--since <git-ref>`（仅审计变更行，新增违规 exit 1，未变更文件保留既往记录）
-- **市场脚本 `tools/naiz_market/market.py`（根 `market.sh` 包装）**：从市场仓库（`market.toml` `[market] repo`，默认 `edouardlicn123/naiz_assets`）按需整包下载资源到 `<dest>/`（默认 `assets_samples`，gitignored）。**强制规律**：市场仓库**顶层目录 = 一个资源包**，整包下载、不做文件级选择；**包显示名规律**——目录名按 `_` 切分，首段 `()` 包裹、余段以空格连接（`images_sample_scenebg` → `(images)sample scenebg`）；`list`/`menu` 一律按此显示包名，包解析接受 原始目录名 / 后缀种类名 两种。后续更新本脚本必须保持此规律。
+- **市场脚本 `tools/naiz_market/market.py`（根 `market.sh` 包装）**：从市场仓库（`market.toml` `[market] repo`，默认 `edouardlicn123/naiz_assets`）按需整包下载资源到 `<dest>/`（默认 `assets_samples`，gitignored）。**强制规律**：市场仓库**顶层目录 = 一个资源包**，整包下载、不做文件级选择；**包显示名规律**——目录名按 `_` 切分，首段 `()` 包裹、余段以空格连接（`images_sample_scenebg` → `(images)sample scenebg`）；`list`/`menu` 一律按此显示包名，包解析接受 原始目录名 / 后缀种类名 两种。后续更新本脚本必须保持此规律。**下载去重**：目标路径已有同名文件时默认跳过（打印 `SKIP (exists)`，不下载不覆盖）；需刷新用 `--force` 强制覆盖。四个子命令均支持 `--force`。
 
 ### 变更后更新规约
 

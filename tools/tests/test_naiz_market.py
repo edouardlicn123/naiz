@@ -2,9 +2,10 @@
 
 Covers the AGENTS.md §13 mandatory rules (pack = top-level dir, display-name
 first-segment-paren rule, whole-pack download) plus download mechanics:
-overwrite, atomic write, size validation, path-boundary guard, LICENSE copy,
-dry-run, and the numeric-menu selection parser. Network is fully
-monkeypatched; nothing touches the network or the filesystem outside tmp_path.
+skip-existing (default) / force overwrite, atomic write, size validation,
+path-boundary guard, LICENSE copy, dry-run, and the numeric-menu selection
+parser. Network is fully monkeypatched; nothing touches the network or the
+filesystem outside tmp_path.
 """
 
 import pytest
@@ -122,8 +123,20 @@ def test_download_pack_writes_under_dest(tmp_path, monkeypatch):
     assert not list(out.rglob("*.part"))
 
 
-def test_download_overwrites_existing(tmp_path, monkeypatch):
+def test_download_skips_existing(tmp_path, monkeypatch, capsys):
     m = _market(tmp_path, monkeypatch)
+    target = tmp_path / "out/images_sample_scenebg/bg-city-day.jpg"
+    target.parent.mkdir(parents=True)
+    target.write_bytes(b"stale")
+    m.download_pack("images_sample_scenebg",
+                    m.packs()["images_sample_scenebg"])
+    assert target.read_bytes() == b"stale"          # untouched, not re-downloaded
+    assert not list((tmp_path / "out").rglob("*.part"))
+    assert "SKIP (exists)" in capsys.readouterr().out
+
+
+def test_download_force_overwrites(tmp_path, monkeypatch):
+    m = _market(tmp_path, monkeypatch, force=True)
     target = tmp_path / "out/images_sample_scenebg/bg-city-day.jpg"
     target.parent.mkdir(parents=True)
     target.write_bytes(b"stale")
@@ -148,6 +161,17 @@ def test_dry_run_writes_nothing(tmp_path, monkeypatch):
     m.download_pack("images_sample_scenebg", files)
     out = tmp_path / "out"
     assert not out.exists() or not list(out.rglob("*"))
+
+
+def test_license_skipped_when_present(tmp_path, monkeypatch, capsys):
+    m = _market(tmp_path, monkeypatch)
+    out = tmp_path / "out"
+    out.mkdir(parents=True)
+    license_f = out / "LICENSE"
+    license_f.write_bytes(b"existing")
+    m.download_packs(["images_sample_scenebg"])
+    assert license_f.read_bytes() == b"existing"
+    assert "SKIP (exists)" in capsys.readouterr().out
 
 
 def test_license_copied_to_dest_root(tmp_path, monkeypatch):

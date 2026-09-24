@@ -19,6 +19,8 @@ Subcommands:
   get-all   download every pack
 
 Common flags (on any subcommand): --repo --ref --dest --config --dry-run.
+Files whose destination path already exists are skipped; pass --force to
+re-download and overwrite them.
 """
 
 import argparse
@@ -104,13 +106,14 @@ def safe_target(dest, path):
 # ---------------------------------------------------------------------------
 
 class Market:
-    def __init__(self, repo, ref, dest, dry_run=False):
+    def __init__(self, repo, ref, dest, dry_run=False, force=False):
         if "/" not in repo:
             raise MarketError(f"repo must be 'owner/repo', got {repo!r}")
         self.repo = repo
         self.ref = ref
         self.dest = Path(dest)
         self.dry_run = dry_run
+        self.force = force
         self._tree = None
 
     # -- listing ------------------------------------------------------------
@@ -195,6 +198,9 @@ class Market:
         for path, size in files:
             target = safe_target(self.dest, path)
             n += 1
+            if target.exists() and not self.force:
+                print(f"  {target.name:<40} {human_size(size)}  SKIP (exists)")
+                continue
             if self.dry_run:
                 print(f"  {target.name:<40} {human_size(size)}  (dry-run)")
                 continue
@@ -238,6 +244,9 @@ class Market:
         if target is None:
             print("LICENSE not present in market repo (skipped)")
             return 0
+        if target.exists() and not self.force:
+            print(f"LICENSE -> {self.dest}/LICENSE  SKIP (exists)")
+            return 1
         if self.dry_run:
             print(f"LICENSE -> {self.dest}/LICENSE  (dry-run)")
             return 0
@@ -378,6 +387,8 @@ def build_parser():
         sp.add_argument("--dest", help="download root (default: from market.toml)")
         sp.add_argument("--config", help=f"TOML config path (default: <root>/{DEFAULT_CONFIG_NAME})")
         sp.add_argument("--dry-run", action="store_true", help="plan only, no writes")
+        sp.add_argument("--force", action="store_true",
+                        help="re-download and overwrite existing files (default: skip)")
 
     sp = sub.add_parser("list", help="list all packs")
     add_common(sp)
@@ -397,7 +408,8 @@ def main(argv=None):
     ns = build_parser().parse_args(argv)
     try:
         repo, ref, dest = load_config(ns)
-        market = Market(repo, ref, dest, dry_run=bool(getattr(ns, "dry_run", False)))
+        market = Market(repo, ref, dest, dry_run=bool(getattr(ns, "dry_run", False)),
+                        force=bool(getattr(ns, "force", False)))
         cmd = ns.cmd or "menu"
         if cmd == "list":
             return cmd_list(market)

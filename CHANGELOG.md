@@ -6,6 +6,7 @@
 
 | 条目 |
 |------|
+| [0.2.143 — 市场下载同名跳过 + `--force` 逃生口（market.py）](#c26) |
 | [0.2.142 — 菜单增量 blit 跨行距拷贝根修 + VRAM 紧凑缓冲契约审计（devdoc 115）](#c25) |
 | [0.2.141 — Special 菜单视觉修正：Back 文字截断根修 + 行按钮缩半居中（devdoc 114 反馈轮）](#c24) |
 | [0.2.140 — Special 菜单落地：LOAD 范式全屏列表 + 菜单归属场景收口（devdoc 114）](#c23) |
@@ -31,6 +32,20 @@
 | [0.2.120 — 菜单 UI 整合落地（devdoc 102）](#c15) |
 | [0.2.119 — powered 资产归位 `common/logo/` + 资产键统一](#c16) |
 | [Bug 修复状态（R1–R30 综合摘要与历史子条目）](#c17) |
+
+---
+
+<a id="c26"></a>
+### 0.2.143 — 市场下载同名跳过 + `--force` 逃生口（market.py）
+
+`tools/naiz_market/market.py` 下载行为变更：目标路径已存在（同名文件）时**默认跳过**，不重复下载、不覆盖；需要刷新时加 `--force` 强制重新下载并原子覆盖。
+
+- `download_pack`：每个文件先查 `target.exists()`，命中且未 `--force` → 打印 `SKIP (exists)` 并 `continue`（实跑与 `--dry-run` 均生效，检查纯本地无网络）；`n` 计数仍含跳过文件，`Done: N packs · M files` 语义不变。
+- `copy_license`：同样 `target.exists()` 跳过（返回 1 计入文件数），`--force` 覆盖。
+- CLI：四个子命令（list/cats/menu/get/get-all）统一新增 `--force`（`add_common`），`Market.__init__` 增加 `force` 参数；`market.sh` 透传无需改动（`"$@"`）。
+- 测试：`test_download_overwrites_existing` 改为 `test_download_skips_existing`（存量内容保持不动 + SKIP 输出）；新增 `test_download_force_overwrites`、`test_license_skipped_when_present`；一并更新模块 docstring 措辞。
+- **验证**：pytest 465 passed（原 463 + 新 2）；`./start.sh fullaudit` 7/7 `[✓]`。`makegame.sh build + make demo-a2` 更新 HDI（版本号同步）。
+- `bump_version` → 0.2.143（demo-a2/animatest 同步）。
 
 ---
 
