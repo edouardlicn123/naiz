@@ -6,6 +6,7 @@
 
 | 条目 |
 |------|
+| [0.2.139 — 资产市场工具落地：整包下载器 market.sh（独立 naiz_assets 仓库）](#c22) |
 | [0.2.138 — 光标移动残影根治：splice 只进一次性书写副本，持久合成缓冲不烘烙（devdoc 111）](#c21) |
 | [0.2.137 — 光标写入全程零缺窗：对话框合成缓冲预拼光标（devdoc 110）](#c20) |
 | [0.2.136 — 光标揭示顿闪消除：写后直绘 + 不透明矩形快路径（devdoc 109）](#c19) |
@@ -30,7 +31,19 @@
 
 ---
 
-<a id="c21"></a>
+<a id="c22"></a>
+### 0.2.139 — 资产市场工具落地：整包下载器 market.sh（独立 naiz_assets 仓库）
+
+新工程基建：独立公开市场仓库 `edouardlicn123/naiz_assets`（MIT）落地根级市场工具，供项目按需拉取外置资源包（图片等），不占用本仓体积。
+
+- **工具链**：根 `market.sh`（venv 转发，无参数默认 `menu`）+ `tools/naiz_market/market.py`（stdlib 零新依赖）+ `market.toml`（`[market] repo="edouardlicn123/naiz_assets" ref="main" dest="assets_samples"`）。落点 `assets_samples/` 已入 .gitignore。
+- **模型与规律（AGENTS §十三 强制，脚本必须遵守）**：市场仓库**顶层目录 = 一个资源包**，整包下载、不做文件级选择；**包显示名规律** = 目录名按 `_` 切分、首段 `()` 包裹、余段空格连接（`images_sample_scenebg` → `(images)sample scenebg`）；`list`/`menu` 一律按此显示，包解析接受 原始目录名 / 后缀种类名（公共前缀 `images_sample_` 剥离后 `scenebg`）两种。
+- **下载语义**：Trees API（`truncated` 校验）取清单 → `raw.githubusercontent.com` 逐文件；`Path` 边界校验（拒 `..`/绝对路径，`resolve().is_relative_to`）；`.part` 原子写 + 与清单 size 比对后 `os.replace`；**总是覆盖**；每次下载运行统一写 `<dest>/LICENSE`；网络/HTTP/size 不符/未知包 → `MarketError` + `exit 1` 硬失败（消灭静默失败）。
+- **CLI**：`menu` 交互式数字编号（`N`/`N,M`/`N-M`，`a` 全选，`0`/`q` 退出，EOFError 容错）/ `list` / `cats` / `get <包>...` / `get-all`；`--repo/--ref/--dest/--config/--dry-run`（dry-run 只列计划不动盘）。
+- **守卫测试**（`tools/tests/test_naiz_market.py`，+17 例 = 460）：命名规律、公共前缀与 kinds 回退、根级文件过滤、包解析（精确/种类/未知报错）、整包落盘与**覆盖原子写**、size 不符拒绝、dry-run 零写入、LICENSE 拷贝、路径穿越防线、菜单解析（含降序区间拒绝）、配置缺失报错。网络层全 monkeypatch 离线。
+- **验证**——`pytest 460 passed`（443+17）、`py_compile` 双文件通过、`bash -n market.sh` 通过、`list` 实联（trees API）成功列包、dry-run get 走通、`make -C core` 0 err/0 warn、`./start.sh fullaudit` 全绿；ob repo 22 资产（scenebg 14 + charactor_schoolgirl 8）。**doc**：docs/B90 §三 登记 `tools.naiz_market.market` 行、AGENTS §十三 增强制规律条目、AGENTS 头版本同步。`bump_version` 双项目 → 0.2.139。真机 `market` 实下载整包入 `assets_samples/` 留人工（资源属外置、不入 HDI）。
+
+---
 ### 0.2.138 — 光标移动残影根治：splice 只进一次性书写副本，持久合成缓冲不烘烙（devdoc 111）
 
 0.2.137 后用户反馈：**「暂时不闪烁了，但鼠标移动有残影」**——c20 忙于以零缺窗替换缺窗，却给下个问题埋了雷。**根因**：c20 的 `cursor_composite_splice` 把活箭头就地混进**跨 pass 持久化**的合成缓冲 `dialog_layer`；demo-a2 使用 dither 对话框样式（`projects/demo-a2/scene/settings.txt` `dlgstyle=5`），`dialog_paint_box` 的 dither 孔位像素**保留缓冲旧内容**，且 `layer_dialog_clear()`/`layer_dialog_show()` 不做 `dialog_seed_base()` 全幅重绘 → 鼠标移动后旧位置箭头像素残留在持久缓冲里，随后被任意一次 `dialog_layer_blit` 写回 VRAM / 被下次 splice 的 `memcpy` 采作 `cursor_saved.buf` 背景 → 移动残影（C18 快路径副作用核对缺失：splice 把「含箭头的缓冲」拷进防残影基准，等于永久化了自我的污染）。devdoc 110 的「透明/部分缓冲禁止 splice」只堵了部分缓冲，漏掉**不透明+洞（dither）**的持久缓冲自污染路径。

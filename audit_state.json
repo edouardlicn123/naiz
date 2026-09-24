@@ -1,7 +1,7 @@
 {
   "version": 2,
-  "git_head": "13258a2",
-  "checked_at": "2026-09-22T11:36:36",
+  "git_head": "0dc3b36",
+  "checked_at": "2026-09-24T11:29:33",
   "files": {
     "core/build.sh": {
       "sha256": "0e6bb3f41cae8f6c5a014a49767f93990ddd3e2c461a85ec991c01b40b66b11e",
@@ -34,10 +34,16 @@
       "findings": []
     },
     "core/engine/cursor.c": {
-      "sha256": "f85779a50da4c01cc5fbe276f3fc6ab50bf431ab3c1754bea6dda08996e856a3",
+      "sha256": "fe1f46963efdc919b4e25625a6a0b0fedba6e1d877cf70efd16a2c057d0d8ebf",
       "violations": 0,
-      "candidates": 0,
-      "findings": []
+      "candidates": 1,
+      "findings": [
+        {
+          "line": 26,
+          "rule": "C35",
+          "level": "HEUR"
+        }
+      ]
     },
     "core/engine/cursor.h": {
       "sha256": "be01f24e3d86827662366102e9266f923f2e452828dcd25d6d4e98e972a2bc3f",
@@ -127,32 +133,32 @@
       "findings": []
     },
     "core/engine/layer_dialog.c": {
-      "sha256": "4a994883c2eb46b38df76a8fd2574d356de466df00204fd8c2b8693b3ce84bfd",
+      "sha256": "79305210f1457986b8cf162e6b7f0a091dc492d56ed6639fb7ccdffe318acf2a",
       "violations": 0,
       "candidates": 5,
       "findings": [
         {
-          "line": 193,
+          "line": 197,
           "rule": "C35",
           "level": "HEUR"
         },
         {
-          "line": 193,
+          "line": 197,
           "rule": "C9",
           "level": "HEUR"
         },
         {
-          "line": 205,
+          "line": 209,
           "rule": "C9",
           "level": "HEUR"
         },
         {
-          "line": 211,
+          "line": 215,
           "rule": "C9",
           "level": "HEUR"
         },
         {
-          "line": 247,
+          "line": 251,
           "rule": "C9",
           "level": "HEUR"
         }
@@ -284,7 +290,7 @@
       "findings": []
     },
     "core/engine/nb_dialog.c": {
-      "sha256": "b786dae16a190068fef5b52e85359b44fee666899102ee5fb80916c9c6ef3520",
+      "sha256": "415d1a67377ab8e5cc51012a6b04012ef12e0a76f7d4fe233bcb36db89762dcd",
       "violations": 0,
       "candidates": 0,
       "findings": []
@@ -1312,6 +1318,18 @@
       "candidates": 0,
       "findings": []
     },
+    "tools/naiz_market/market.py": {
+      "sha256": "cf63b83c5931411dde78956ec1c790d646c31eb7c7dc6747e8384b9c3bfea954",
+      "violations": 0,
+      "candidates": 1,
+      "findings": [
+        {
+          "line": 354,
+          "rule": "P8",
+          "level": "HEUR"
+        }
+      ]
+    },
     "tools/naiz_screendig/__init__.py": {
       "sha256": "79161cda41137f9e2f7af10dcf8c1aa0b10d05b9a26d95a1516013a519b7c942",
       "violations": 0,
@@ -1368,16 +1386,16 @@
     }
   },
   "summary": {
-    "files": 186,
-    "changed": 1,
-    "skipped": 185,
+    "files": 187,
+    "changed": 4,
+    "skipped": 183,
     "out_of_scope": 0,
     "violations": 0,
-    "candidates": 43,
+    "candidates": 45,
     "fresh_violations": 0,
-    "fresh_candidates": 5,
+    "fresh_candidates": 7,
     "verified": 26,
     "stale": 0,
-    "open": 17
+    "open": 19
   }
 }
