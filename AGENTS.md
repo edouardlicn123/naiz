@@ -1,6 +1,6 @@
 # Naiz — AI 编程规则
 
-> **当前版本**: `0.2.143`（`projects/demo-a2/config.toml`）
+> **当前版本**: `0.3.001`（`projects/demo-a2/config.toml`）
 >
 > **开发历史已移至 [`CHANGELOG.md`](CHANGELOG.md)**: R1–R30、0.2.109–0.2.117 及动画工具链等全部 Bug 修复/功能演进记录均以条目形式存于根目录 `CHANGELOG.md`，**本文件（AGENTS.md）不承载任何开发历史摘要，只存规则与当前版本**；历史速查一律读 CHANGELOG.md（最新：Special 菜单视觉修正——Back 文字截断根修/0.2.141），新条目追加到 CHANGELOG.md 顶部而**不是**本文件。
 >

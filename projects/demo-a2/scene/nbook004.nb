@@ -1,5 +1,5 @@
 sceneconf(){Come with cat, normal}
-bg(normal){seasidebg}
+bg(normal){beach1}
 char(l,swimming,body){fei}
 char(r,normal,body){neon}
 fei(){What a good day!}

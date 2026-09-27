@@ -13,6 +13,7 @@
     '<a class="nav-item" href="' + pp + 'tool-start.html">start.sh</a>',
     '<a class="nav-item" href="' + pp + 'tool-makegame.html">makegame.sh</a>',
     '<a class="nav-item" href="' + pp + 'tool-anima.html">anima.sh</a>',
+    '<a class="nav-item" href="' + pp + 'tool-market.html">market.sh</a>',
     '<div class="sidebar-section">其他分类</div>',
     '<a class="nav-item nav-other" href="' + rootRef + 'scripts.html">游戏剧本 →</a>',
     '<a class="nav-item nav-other" href="' + rootRef + 'manual.html">基本概念 →</a>',

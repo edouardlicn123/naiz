@@ -1,7 +1,7 @@
 {
   "version": 2,
-  "git_head": "c7d3b1e",
-  "checked_at": "2026-09-24T18:01:59",
+  "git_head": "6ee9ab9",
+  "checked_at": "2026-09-27T16:14:55",
   "files": {
     "core/build.sh": {
       "sha256": "0e6bb3f41cae8f6c5a014a49767f93990ddd3e2c461a85ec991c01b40b66b11e",
@@ -237,7 +237,7 @@
       "findings": []
     },
     "core/engine/nb_asset_table.h": {
-      "sha256": "6c6f72b92a18d603da8df3747664c1d86fbce6764a1d8e3cf5076d202ab45496",
+      "sha256": "fd23fb61a74033b95fb9acbf4f15b134ada0ef66344b8892b2b2e492be28376e",
       "violations": 0,
       "candidates": 0,
       "findings": []
@@ -1405,7 +1405,7 @@
     "violations": 0,
     "candidates": 46,
     "fresh_violations": 0,
-    "fresh_candidates": 1,
+    "fresh_candidates": 0,
     "verified": 26,
     "stale": 0,
     "open": 20

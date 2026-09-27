@@ -27,6 +27,7 @@
     '<a class="nav-item" href="' + pp + 'cf04-按钮样式方案.html">按钮样式方案</a>',
     '<a class="nav-item" href="' + pp + 'cf05-过渡效果.html">过渡效果</a>',
     '<a class="nav-item" href="' + pp + 'cf06-黑花字.html">黑花字</a>',
+    '<a class="nav-item" href="' + pp + 'cf07-图片登记.html">图片登记</a>',
     '<a class="nav-item nav-other" href="' + other + '">游戏剧本 →</a>',
   ].join('\n');
 

@@ -6,15 +6,16 @@
 
 /* Image asset key->ID lookup (for cmd_bg) */
 static const struct { const char *key; int id; } asset_map[] = {
-    {"splbg", 0},
     {"logo", 4},
     {"mainmenu", 5},
     {"powered", 6},
-    {"seasidebg", 7},
     {"yellow_grid", 13},
     {"pink_grid", 14},
     {"gallery", 15},
     {"bg_load", 16},
+    {"beach1", 25},
+    {"homeday", 26},
+    {"homenite", 27},
     {NULL, 0}
 };
 
@@ -61,12 +62,12 @@ static const struct { const char *name; int id; } anim_map[] = {
 
 /* CG asset key->ID lookup (for cg command) */
 static const struct { const char *key; int id; } cg_map[] = {
-    {"__dummy__", 0},
+    {"cg01", 28},
     {NULL, 0}
 };
 
 /* Number of registered CG assets */
-#define CG_COUNT 0
+#define CG_COUNT 1
 
 /* Shared type for registered audio assets */
 typedef struct { const char *name; int id; } AudioAssetMap;

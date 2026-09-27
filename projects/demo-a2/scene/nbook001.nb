@@ -1,7 +1,7 @@
 sceneconf(){A normal day, normal}
-bg(normal){splbg}
+bg(normal){homeday}
 bgm(){test1}
-host(){Welcome to the Naiz engine demo.This is a visual novel engine for PC-98 systems.}
+host(){Ira,Fei and Neon living in a ancent house.}
 sound(){chime}
 char(l,normal,body){fei}
 char(r,normal,body){ira}

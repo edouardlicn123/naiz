@@ -6,6 +6,12 @@
 
 | 条目 |
 |------|
+| [0.3.001 — 0.3 开版（minor 进位）](#c32) |
+| [0.2.148 — 0.2 收官：devdocs 68–115 归纳为 0.2 版开发文档总结](#c31) |
+| [0.2.147 — guildbook 新增两篇：cf07 图片登记 + tool-market 资产市场](#c30) |
+| [0.2.146 — 删除旧背景 seasidebg/splbg（4 层清理）](#c29) |
+| [0.2.145 — 新图 cover 全屏 + images.map 英文选项注释](#c28) |
+| [0.2.144 — demo-a2 新增 4 图登记入库（3 背景 IMG + cg01 CG）](#c27) |
 | [0.2.143 — 市场下载同名跳过 + `--force` 逃生口（market.py）](#c26) |
 | [0.2.142 — 菜单增量 blit 跨行距拷贝根修 + VRAM 紧凑缓冲契约审计（devdoc 115）](#c25) |
 | [0.2.141 — Special 菜单视觉修正：Back 文字截断根修 + 行按钮缩半居中（devdoc 114 反馈轮）](#c24) |
@@ -33,6 +39,62 @@
 | [0.2.119 — powered 资产归位 `common/logo/` + 资产键统一](#c16) |
 | [Bug 修复状态（R1–R30 综合摘要与历史子条目）](#c17) |
 
+---
+
+<a id="c32"></a>
+### 0.3.001 — 0.3 开版（minor 进位）
+
+`bump_version --minor`（0.2.148 → 0.3.000）+ `bump_version`（→ 0.3.001），双项目同号；0.2 收官文档见 `#c31`，待实施/挂起项（72/83/95/96/97/100/101/102、94/98）转 0.3 输入。
+---
+
+<a id="c31"></a>
+### 0.2.148 — 0.2 收官：devdocs 68–115 归纳为 0.2 版开发文档总结
+
+0.2 版开发结束 characteristic 归档：`devdocs/0.2版开发文档总结.html`（65KB，仿 0.1 模板样式/分组/卡片结构），7 组 48 篇全覆盖（程序校验 doc id 68–115 无缺号、无残留占位）。
+
+- 一、调研审计与早期方案（68–72）；二、NAIZ_ANIM 动画链（73–83，73–76 标已过时由 77 取代）；三、层管理统一/调试导出/CJK 加载（84–87）；四、CG 全功能链（88–95，94 挂起 2 实机项 + 二期缩略图）；五、对话框图层化/CJK 精简/整合审计（96–99，96 未实施、98 目检挂起）；六、归档/音频/分离改造/打字机（100–107，100/101/102 待实施）；七、光标契约系列 + Special 菜单（108–115）。
+- 原 md 零改动（只读归纳，遵守已完结文档禁改规则）；待实施/挂起项在状态签与落点中如实标注，转 0.3 输入。
+- `bump_version` → 0.2.148（demo-a2/animatest 同步）。
+---
+
+<a id="c30"></a>
+### 0.2.147 — guildbook 新增两篇：cf07 图片登记 + tool-market 资产市场
+
+`images.map` 与 `market.sh` 此前在 guildbook 无网页说明，补两篇（仿既有模板与卡片样式，链接闭环已验）：
+
+- `pages/cf07-图片登记.html`（基本概念/配置）：格式实例、六选项表、入库三步（map→ASSETS.DB→build）、8.3/key/剧本引用约束、退役 4 层；注册进 `sidebar-reference.js` 配置节 + `manual.html` 加卡。
+- `pages/tool-market.html`（制作工具）：包定义与显示名规律、`market.toml`、list/cats/menu/get/get-all 子命令表、通用参数与 `--force` 覆盖、素材入库衔接；注册进 `sidebar-tools.js` + `tools.html` 加卡（intro 从三篇改为四篇）。
+- `bump_version` → 0.2.147（demo-a2/animatest 同步）。
+---
+
+<a id="c29"></a>
+### 0.2.146 — 删除旧背景 seasidebg/splbg（4 层清理）
+
+`beach1/homeday/homenite` 上线后，旧背景 `seasidebg`（id=7）、`splbg`（id=0）退役：删前确认 scene/*.nb、expressions.json（引用 id 1,2,3,8–12）、tests 零引用。
+
+- `assets/demo-a2/images.map` 去 2 行；源 PNG 2 个 + `projects/.../images` 下 MAG 2 个删除；`ASSETS.DB img_map` DELETE 2 行；`.mag_conv_state.json` 去 2 签名。
+- **验证**：`./makegame.sh build demo-a2` 全绿（0 转换/validator 0 errors）；IMAGE.DAT 29 entries 中两图消失（删位留空槽，存量 asset id 不漂移，`cg01`=28 稳定）；968553 bytes。
+- `bump_version` → 0.2.146（demo-a2/animatest 同步）。
+---
+
+<a id="c28"></a>
+### 0.2.145 — 新图 cover 全屏 + images.map 英文选项注释
+
+demo-a2 新增 4 图（beach1/homeday/homenite/cg01）之前按默认 contain 转出，居中贴留黑边；现 4 行补 `--cover`（`resize_to_screen` 按长边缩放占满 640×400、居中裁溢出，保持比例无变形），重转后解码验证皆为 640×400，IMAGE.DAT 重打 29 entries，validator 0 errors。
+
+- `assets/demo-a2/images.map` 头注释改写为英文完整说明：格式、8.3 约束、增量重转规则、`--256color/--sprite/--cover/--dither/--no-resize/--filter-white` 六选项语义；`assets/common/images.map` 头加指向全文的英文短注（条目零改动，不触发重转）。
+- `bump_version` → 0.2.145（demo-a2/animatest 同步）。
+---
+
+<a id="c27"></a>
+### 0.2.144 — demo-a2 新增 4 图登记入库（3 背景 IMG + cg01 CG）
+
+`assets/demo-a2/png/` 下 4 个未跟踪新素材完成注册并入库：`bg/bg-beach1.jpg`、`bg/bg-home-day.jpg`、`bg/bg-home-night.jpg`（JPG，`mag_convert` 经 PIL 直转）→ `type='IMG'`；`cg/cg01.png`（3.7MB）→ `type='CG'`（进 `cg_map`，`cg()`/画廊可用）。
+
+- `assets/demo-a2/images.map` +4 行：8.3 约束下 MAG 短名取 `beach1/homeday/homenite/cg01`（`bg-beach1` 等原名超 8 字符，截断会撞 HDI 短名）。
+- `projects/demo-a2/ASSETS.DB img_map` +4 行（id=25–28，key 与短名同名小写）；删无源孤儿 `projects/demo-a2/images/cg02.MAG`（无 scene/json 引用，`cg01.MAG` 旧 11KB 占位被新转 141KB 覆盖）。
+- **验证**：`./makegame.sh build demo-a2` 全绿（4 MAG 新转、IMAGE.DAT 29 entries 含新图、`nb_asset_table.h cg_map={"cg01",28}`、调色板无违规、validator 通过）。
+- `bump_version` → 0.2.144（demo-a2/animatest 同步）。
 ---
 
 <a id="c26"></a>

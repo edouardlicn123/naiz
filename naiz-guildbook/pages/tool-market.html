@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>market.sh 使用说明 — Naiz Guildbook</title>
+<link rel="stylesheet" href="../style.css">
+</head>
+<body>
+<nav class="sidebar" id="sidebar-nav"></nav>
+<script src="../sidebar-tools.js"></script>
+<main class="main">
+
+<h1>market.sh 使用说明</h1>
+<blockquote><strong>创建</strong>：2026-09-27<br><strong>最后更新</strong>：2026-09-27</blockquote>
+<p><code>market.sh</code> 是<strong>资产市场下载工具</strong>：从公开 GitHub 市场仓库按需整包下载资源（如场景背景）到本地，不占用本仓体积。下载是只读 HTTPS（GitHub API + raw），不需要写权限。项目内图片登记见 <a href="cf07-图片登记.html">cf07 图片登记</a>。</p>
+<hr>
+
+<h2>1. 基本概念：包</h2>
+<ul>
+<li>市场仓库<strong>顶层目录 = 一个资源包</strong>，永远整包下载，不做文件级选择。</li>
+<li>包显示名规律：目录名按 <code>_</code> 切分，首段用 <code>()</code> 包裹、余段空格连接（如 <code>images_sample_scenebg</code> → <code>(images)sample scenebg</code>）；命令行接受原始目录名或后缀种类名两种写法。</li>
+<li>下载落点默认 <code>assets_samples/</code>（已 gitignored），目标路径已有同名文件时默认<strong>跳过</strong>（打印 <code>SKIP (exists)</code>），加 <code>--force</code> 才覆盖。</li>
+</ul>
+
+<h2>2. 配置（market.toml）</h2>
+<p>仓库根目录 <code>market.toml</code>：</p>
+<pre><code>[market]
+repo = "edouardlicn123/naiz_assets"  # 市场仓库 owner/repo
+ref = "main"                          # 分支/版本
+dest = "assets_samples"               # 本地落点</code></pre>
+
+<h2>3. 子命令</h2>
+<table>
+<tr><th>子命令</th><th>作用</th></tr>
+<tr><td><code>list</code></td><td>列出全部包（显示名 / 文件数 / 总大小）</td></tr>
+<tr><td><code>cats</code></td><td>仅包显示名 + 文件计数</td></tr>
+<tr><td><code>menu</code>（默认）</td><td>交互式数字选包（支持 <code>1 2</code>、<code>1-3</code>，回车即整包下载）</td></tr>
+<tr><td><code>get &lt;包&gt;...</code></td><td>命令行整包下载（原始目录名或后缀种类名）</td></tr>
+<tr><td><code>get-all</code></td><td>下载全部包</td></tr>
+</table>
+<p>通用参数（置于子命令后）：<code>--repo</code> / <code>--ref</code> / <code>--dest</code> / <code>--config</code> / <code>--dry-run</code>（只规划不写盘）/ <code>--force</code>（覆盖已存在文件）。</p>
+
+<h2>4. 常见用法示例</h2>
+<pre><code># 交互菜单（推荐）
+./market.sh
+# 等效写法
+./market.sh menu
+
+# 看看有什么包
+./market.sh list
+
+# 下指定包（两种写法等价）
+./market.sh get images_sample_scenebg
+./market.sh get scenebg
+
+# 刷新已下过的文件
+./market.sh get scenebg --force</code></pre>
+<p>下载后的文件在 <code>assets_samples/</code> 下是原始素材；要进游戏，拷到 <code>assets/&lt;game&gt;/png/</code> 后按 <a href="cf07-图片登记.html">cf07 图片登记</a>三步入库。</p>
+
+</main>
+</body>
+</html>

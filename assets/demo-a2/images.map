@@ -1,12 +1,22 @@
-# PNG→MAG 映射表
-# 格式: <png_rel_path>  <mag_rel_path>  [选项]
-# 路径相对于 assets/<game>/ 和 projects/<game>/
-# png2mag.py 自动检测 PNG 比 MAG 新时转换
+# PNG->MAG mapping table (consumed by build_game.py convert_png_to_mag).
+# Format: <png_rel_path>  <mag_rel_path>  [options]
+#   png_rel_path: source under assets/<game>/ (any PIL-readable format: PNG/JPG)
+#   mag_rel_path: output under projects/<game>/ (MAG basename <= 8 chars, 8.3 rule)
+# Rebuild is incremental: re-converts when the source is newer or options change.
+# Options:
+#   --256color      quantize to the 256-color shared palette (default marker)
+#   --sprite        character sprite: reserve palette idx 15 as transparent,
+#                   keep index 15 out of quantization (uses PROTECTED_IDX_NO15)
+#   --cover         scale to FILL 640x400 keeping aspect, center-crop overflow
+#                   (no bars). Default without it is contain: fit inside and
+#                   center-paste with bars. Backgrounds/CGs that must fill the
+#                   screen need this flag.
+#   --dither        Floyd-Steinberg dithering during quantization
+#   --no-resize     skip auto-resize to 640x400 (keep source pixels as-is)
+#   --filter-white  map near-white pixels to palette white before quantization
 
 png/bg/comlogo.png       images/comlogo.MAG   --256color
 png/bg/mainmenu.png       images/mainmenu.MAG   --256color
-png/bg/seasidebg.png       images/seasidebg.MAG   --256color
-png/bg/splbg.png       images/splbg.MAG   --256color
 png/char/fei-normal.png       images/fei-normal.MAG   --256color --sprite
 png/char/fei-sad.png       images/fei-sad.MAG   --256color --sprite
 png/char/fei-smile.png       images/fei-smile.MAG   --256color --sprite
@@ -15,3 +25,7 @@ png/char/fei-swimming.png       images/fei-swimming.MAG   --256color --sprite
 png/char/ira-normal.png       images/ira-normal.MAG   --256color --sprite
 png/char/ira-sad.png       images/ira-sad.MAG   --256color --sprite
 png/char/neon-normal.png       images/neon-normal.MAG   --256color --sprite
+png/bg/bg-beach1.jpg       images/beach1.MAG   --256color --cover
+png/bg/bg-home-day.jpg       images/homeday.MAG   --256color --cover
+png/bg/bg-home-night.jpg       images/homenite.MAG   --256color --cover
+png/cg/cg01.png       images/cg01.MAG   --256color --cover

@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>图片登记 — Naiz Guildbook</title>
+<link rel="stylesheet" href="../style.css">
+</head>
+<body>
+<nav class="sidebar" id="sidebar-nav"></nav>
+<script src="../sidebar-reference.js"></script>
+<main class="main">
+
+<h1>图片登记（images.map）</h1>
+<blockquote><strong>创建</strong>：2026-09-27<br><strong>最后更新</strong>：2026-09-27</blockquote>
+<p>本文从<strong>制作者</strong>视角说明新图片如何进入游戏：<code>images.map</code> 声明 PNG→MAG 转换、<code>ASSETS.DB</code> 登记资源行、<code>build</code> 打包进 <code>IMAGE.DAT</code>。MAG 格式与调色板机制见 <a href="mc04-MAG图片机制.html">mc04 MAG 图片机制</a>，构建命令见 <a href="tool-makegame.html">makegame.sh</a>。</p>
+<hr>
+
+<h2>1. 文件位置与格式</h2>
+<p>每个项目有一份映射表 <code>assets/&lt;game&gt;/images.map</code>，另有 <code>assets/common/images.map</code> 存放全项目通用素材（构建时<strong>先处理 common，再处理本项目</strong>）。一行登记一张图：</p>
+<pre><code>&lt;png相对路径&gt;  &lt;MAG相对路径&gt;  [选项...]</code></pre>
+<ul>
+<li><code>png相对路径</code>：相对于 <code>assets/&lt;game&gt;/</code> 的源文件，PIL 可读即可（PNG/JPG 均可）。</li>
+<li><code>MAG相对路径</code>：相对于 <code>projects/&lt;game&gt;/</code> 的输出，一般放在 <code>images/</code> 下；<strong>MAG 基名 ≤8 字符</strong>（DOS 8.3 约束，超长会在 HDI 短名阶段截断碰撞）。</li>
+<li><code>#</code> 开头为注释行；文件头注释即完整选项说明。</li>
+</ul>
+<p>实例（demo-a2 新增 4 图）：</p>
+<pre><code>png/bg/bg-beach1.jpg       images/beach1.MAG   --256color --cover
+png/bg/bg-home-day.jpg     images/homeday.MAG  --256color --cover
+png/cg/cg01.png            images/cg01.MAG     --256color --cover</code></pre>
+
+<h2>2. 行内选项</h2>
+<table>
+<tr><th>选项</th><th>含义</th></tr>
+<tr><td><code>--256color</code></td><td>量化到 256 色共享调色板（默认标记，背景/立绘/CG 通用）</td></tr>
+<tr><td><code>--sprite</code></td><td>角色立绘：调色板索引 15 留作透明标记，不参与量化；alpha&lt;128 区域映射为索引 15</td></tr>
+<tr><td><code>--cover</code></td><td>按长边缩放占满 640×400、居中裁掉溢出（保持比例，无黑边）。不加则为 contain：按短边缩放、居中贴、留边。需占满全屏的背景/CG 必须加</td></tr>
+<tr><td><code>--dither</code></td><td>量化时 Floyd-Steinberg 抖动</td></tr>
+<tr><td><code>--no-resize</code></td><td>跳过自动缩放到 640×400，保持源图像素（仅背景）</td></tr>
+<tr><td><code>--filter-white</code></td><td>量化前把近白像素映射到调色板白色</td></tr>
+</table>
+<p>构建是增量的：源文件变新<strong>或选项变化</strong>（签名记在 <code>projects/&lt;game&gt;/.mag_conv_state.json</code>）才重转，其余跳过。</p>
+
+<h2>3. 登记三步</h2>
+<p>只写 <code>images.map</code> 不够，MAG 还要在资源库里挂名，引擎才找得到：</p>
+<ol>
+<li><code>images.map</code> 加一行（选好选项，背景加 <code>--cover</code>，立绘加 <code>--sprite</code>）。</li>
+<li><code>projects/&lt;game&gt;/ASSETS.DB</code> 的 <code>img_map</code> 表手工插入一行（与 ANI 同待遇，暂无自动化登记入口）：
+<pre><code>INSERT INTO img_map (name, filename, type) VALUES ('beach1','images/beach1.MAG','IMG');</code></pre>
+<code>name</code> 为剧本引用 key（小写）；<code>type</code> 取 <code>'IMG'</code>（背景）/ <code>'SPR'</code>（立绘）/ <code>'CG'</code>（事件图，进画廊）。</li>
+<li>运行 <code>./makegame.sh build &lt;game&gt;</code>：PNG→MAG → <code>IMAGE.DAT</code> 重打 → <code>nb_asset_table.h</code> 再生（含 <code>cg_map</code>）。</li>
+</ol>
+
+<h2>4. 剧本引用</h2>
+<ul>
+<li>背景：<code>bg(){beach1}</code>；事件 CG：<code>cg(){cg01}</code>——对象一律写<strong>花括号负载</strong>，<code>bg(beach1)</code> 这类括号形态会被拒绝。</li>
+<li><code>cg(){key}</code> 展示后自动收起对话框并永久解锁进画廊，下一句台词自动重开框。</li>
+</ul>
+
+<h2>5. 删除旧图（4 层清理）</h2>
+<p>退役图片要清干净，否则残留进包：<code>images.map</code> 去行 → 源 PNG 与 <code>projects/.../images</code> 下 MAG 删除 → <code>ASSETS.DB</code> 按 <code>filename</code> DELETE → <code>.mag_conv_state.json</code> 去对应签名。动手前先确认 <code>scene/*.nb</code> 与 <code>expressions.json</code> 零引用。<code>IMAGE.DAT</code> 删位留空槽，存量 asset id 不漂移。</p>
+
+</main>
+</body>
+</html>

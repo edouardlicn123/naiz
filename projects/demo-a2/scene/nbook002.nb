@@ -1,5 +1,5 @@
 sceneconf(){Have question?, normal}
-bg(normal){splbg}
+bg(normal){homeday}
 char(l,normal,body){fei}
 char(r,normal,body){ira}
 fei(){Ira.do you want to go to seaside with me?}

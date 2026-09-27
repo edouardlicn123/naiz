@@ -1,4 +1,6 @@
-# Shared background assets (processed before per-game assets)
+# Shared background assets (processed before per-game assets).
+# See assets/demo-a2/images.map header for the full format/options reference.
+# Quick rule: backgrounds/CGs that must fill 640x400 need --cover.
 bg/yellow_grid.png  images/yellow_grid.MAG  --256color
 bg/pink_grid.png    images/pink_grid.MAG    --256color
 bg/bg_gallery.png   images/gallery.MAG      --256color --cover
