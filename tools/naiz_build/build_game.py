@@ -133,7 +133,7 @@ def convert_png_to_mag(assets_dir: Path, proj_dir: Path):
         # Determine type from ASSETS.DB
         mag_filename = Path(mag_rel).name
         atype = asset_types.get(mag_filename)
-        if atype is not None and atype not in ('IMG', 'SPR', 'CG'):
+        if atype is not None and atype not in ('IMG', 'SPR', 'CG', 'THUMB'):
             print(f"ERROR: unknown asset type {atype!r} for {mag_filename}")
             sys.exit(1)
 
@@ -453,6 +453,14 @@ def build_game(game_name: str):
         convert_png_to_mag(common_dir, proj_dir)
 
     convert_png_to_mag(assets_dir, proj_dir)
+
+    # 1b. Generate gallery-grid thumbnails (type='THUMB').  Must run before
+    # the ASSETS.DB export below so cg_thumb_map[] is emitted, and before
+    # pack_images() so the entries land in IMAGE.DAT.
+    from naiz_build.cg_thumb import build_cg_thumbs
+    thumb_asset_dirs = [d for d in (common_dir, assets_dir)
+                        if (d / "images.map").exists()]
+    build_cg_thumbs(proj_dir, thumb_asset_dirs)
 
     # 2a. Export ASSETS.DB → C header for engine compilation
     export_py = ROOT / "tools" / "naiz_build" / "export_asset_table.py"

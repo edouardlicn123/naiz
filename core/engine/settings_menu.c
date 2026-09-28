@@ -5,6 +5,12 @@
  * Uses render.h primitives directly (draw_text_outlined, fill_rect,
  * vram_read/vram_write, mouse input).
  *
+ * Language selection is permanent here and lives nowhere else: this menu runs
+ * before tr_init() and the CJK font load, so it must stay ASCII-only and the
+ * language must be picked before the translation table exists. In-game
+ * settings live in the settingmenu scene (nb_setting.c), which must never
+ * gain a Language row.
+ *
  * Visual definition:
  *   Title:    1x white text + black outline, top-left
  *   Version:  1x white text + black outline, top-right
@@ -16,14 +22,12 @@
  * Anti-flicker (save_load_menu pattern):
  *   full=1: initial draw — background + all text + save all snapshots
  *   full=2: language change — restore lang_name snapshot + indicators, redraw lang name only
- *   full=3: text speed change — restore speed value snapshot + indicators, redraw value only
  *   full=0: focus change — restore indicator snapshots + redraw indicator only
  *   no change: no redraw at all
  *
  * Layout (1x text, 8x16 glyphs):
  *   Naiz Settings                              v0.2.068
  *   > Language  <    English    >              (focus=LANG)
- *   > Text Speed  <  32/s      >               (focus=SPEED)
  *   > Start Game                               (focus=START)
  */
 #include <stdio.h>
@@ -50,19 +54,12 @@ static const char *LANG_CODES[] = {
 
 /* Focus targets */
 #define FOCUS_LANG   0
-#define FOCUS_SPEED  1
-#define FOCUS_START  2
-
-/* Typewriter speed values (chars/sec; 0 = Instant). Kept in sync with
- * settings.c TEXT_SPEED_* parsing. */
-static const int SPD_VALUES[] = { 0, 16, 32, 64 };
-#define N_SPEEDS 4
+#define FOCUS_START  1
 
 /* Layout constants (1x text) */
 #define INDICATOR_X  5      /* > focus indicator (1x) */
 #define MENU_X       30     /* all menu text x start */
 #define SEL_Y        122    /* language selector row y (1x, 16px tall) */
-#define SPD_Y        (SEL_Y + 30)   /* text speed row y (between Lang and Start) */
 #define SEL_LX       170    /* < arrow x */
 #define ARROW_W      40
 #define GAP          4
@@ -81,16 +78,11 @@ static const int SPD_VALUES[] = { 0, 16, 32, 64 };
 #define IND_SAVE_H   18
 #define LANG_NAME_SAVE_W 110
 #define LANG_NAME_SAVE_H 18
-#define SPD_NAME_SAVE_W  128
-#define SPD_NAME_SAVE_H  18
 #define IND_CLEAR_X  (INDICATOR_X - 2)
 #define IND_CLEAR_Y_FIELD  (SEL_Y - 1)    /* language indicator row */
-#define IND_CLEAR_Y_SPD    (SPD_Y - 1)    /* text speed indicator row */
 #define IND_CLEAR_Y_START  (START_BY - 1) /* start indicator row */
 #define LANG_CLEAR_X (LABEL_CX - LANG_NAME_SAVE_W / 2)
 #define LANG_CLEAR_Y (SEL_Y - 1)
-#define SPD_CLEAR_X  (LABEL_CX - SPD_NAME_SAVE_W / 2)
-#define SPD_CLEAR_Y  (SPD_Y - 1)
 
 /* Draw text with 1px black outline glow (8-direction offset). */
 static void draw_text_outlined(const char *s, int byte_start,
@@ -106,15 +98,6 @@ static void draw_text_outlined(const char *s, int byte_start,
     draw_text(s, byte_start, x, y, 640, 400, bold, color);
 }
 
-/* Display name for a typewriter speed: Instant (i18n) or "N/s" format. */
-static const char *speed_label(int speed)
-{
-    if (speed == 16) return "16/s";
-    if (speed == 32) return "32/s";
-    if (speed == 64) return "64/s";
-    return tr("Instant");
-}
-
 /* Find the current language index from settings, default to English */
 static int find_lang_index(void)
 {
@@ -128,37 +111,28 @@ static int find_lang_index(void)
     return 0;
 }
 
-/* Find the current text speed index from settings (default Instant-safe). */
-static int find_speed_index(void)
+/* Erase both focus-indicator strips and redraw the one for 'focus'. */
+static void settings_draw_indicator(int focus)
 {
-    int cur = settings_get_text_speed();
-    int i;
-    for (i = 0; i < N_SPEEDS; i++) {
-        if (SPD_VALUES[i] == cur)
-            return i;
-    }
-    return N_SPEEDS - 1;   /* 32 default */
+    menu_layer_erase_to_base(IND_CLEAR_X, IND_CLEAR_Y_FIELD, IND_SAVE_W, IND_SAVE_H);
+    menu_layer_erase_to_base(IND_CLEAR_X, IND_CLEAR_Y_START, IND_SAVE_W, IND_SAVE_H);
+    if (focus == FOCUS_LANG)
+        draw_text_outlined(">", 0, INDICATOR_X, SEL_Y, 0, PAL_WHITE);
+    else
+        draw_text_outlined(">", 0, INDICATOR_X, START_BY, 0, PAL_WHITE);
 }
 
 /* Hit test: returns which element was clicked
- * 0 = lang left arrow, 1 = lang right arrow, 2 = start button,
- * 3 = speed left arrow, 4 = speed right arrow, -1 = none */
+ * 0 = lang left arrow, 1 = lang right arrow, 2 = start button, -1 = none */
 static int menu_hittest(int mx, int my)
 {
     if (mx >= SEL_LX && mx < SEL_LX + ARROW_W &&
         my >= SEL_Y && my < SEL_Y + 20)
         return 0;
-    if (mx >= SEL_LX && mx < SEL_LX + ARROW_W &&
-        my >= SPD_Y && my < SPD_Y + 20)
-        return 3;
     if (mx >= LABEL_X + LABEL_AREA_W + GAP &&
         mx <  LABEL_X + LABEL_AREA_W + GAP + ARROW_W &&
         my >= SEL_Y && my < SEL_Y + 20)
         return 1;
-    if (mx >= LABEL_X + LABEL_AREA_W + GAP &&
-        mx <  LABEL_X + LABEL_AREA_W + GAP + ARROW_W &&
-        my >= SPD_Y && my < SPD_Y + 20)
-        return 4;
     if (mx >= START_X && mx < START_X + START_BW &&
         my >= START_BY && my < START_BY + START_BH)
         return 2;
@@ -169,10 +143,9 @@ static int menu_hittest(int mx, int my)
  * to VRAM (settings_menu_run, before menu_layer_open) so it lands in the
  * layer's base snapshot; title/static/dynamic content goes into the
  * composite.  full=2: language change — erase the dynamic areas back to the
- * base then redraw.  full=3: text speed change — same for the speed value row.
- * full=0: focus change — erase + redraw indicators only.
+ * base then redraw.  full=0: focus change — erase + redraw the indicator only.
  * Every change commits and blits the whole region. */
-static void settings_menu_draw(int lang_idx, int speed, int focus, int full)
+static void settings_menu_draw(int lang_idx, int focus, int full)
 {
     int tw;
 
@@ -194,76 +167,29 @@ static void settings_menu_draw(int lang_idx, int speed, int focus, int full)
         draw_text_outlined("<", 0, SEL_LX + 10, SEL_Y, 0, PAL_WHITE);
         draw_text_outlined(">", 0,
                            LABEL_X + LABEL_AREA_W + GAP + 10, SEL_Y, 0, PAL_WHITE);
-        draw_text_outlined(tr("Text Speed"), 0, MENU_X, SPD_Y, 0, PAL_WHITE);
-        draw_text_outlined("<", 0, SEL_LX + 10, SPD_Y, 0, PAL_WHITE);
-        draw_text_outlined(">", 0,
-                           LABEL_X + LABEL_AREA_W + GAP + 10, SPD_Y, 0, PAL_WHITE);
         draw_text_outlined(tr("Start Game"), 0, START_X, START_BY, 0, PAL_WHITE);
 
-        /* Dynamic content (language name / speed value + focus indicator) */
+        /* Dynamic content (language name + focus indicator) */
         tw = text_width(LANG_NAMES[lang_idx], 0);
         draw_text_outlined(LANG_NAMES[lang_idx], 0,
                            LABEL_CX - tw / 2, SEL_Y, 0, PAL_WHITE);
-        tw = text_width(speed_label(speed), 0);
-        draw_text_outlined(speed_label(speed), 0, LABEL_CX - tw / 2, SPD_Y, 0,
-                           PAL_WHITE);
-        if (focus == FOCUS_LANG)
-            draw_text_outlined(">", 0, INDICATOR_X, SEL_Y, 0, PAL_WHITE);
-        else if (focus == FOCUS_SPEED)
-            draw_text_outlined(">", 0, INDICATOR_X, SPD_Y, 0, PAL_WHITE);
-        else if (focus == FOCUS_START)
-            draw_text_outlined(">", 0, INDICATOR_X, START_BY, 0, PAL_WHITE);
+        settings_draw_indicator(focus);
     }
 
     if (full == 2) {
-        /* Language change: erase the dynamic areas plus all indicators,
-         * then redraw the language name with the current focus indicator. */
+        /* Language change: erase the language name plus both indicators,
+         * then redraw the name with the current focus indicator. */
         menu_layer_erase_to_base(LANG_CLEAR_X, LANG_CLEAR_Y,
                                  LANG_NAME_SAVE_W, LANG_NAME_SAVE_H);
-        menu_layer_erase_to_base(IND_CLEAR_X, IND_CLEAR_Y_FIELD, IND_SAVE_W, IND_SAVE_H);
-        menu_layer_erase_to_base(IND_CLEAR_X, IND_CLEAR_Y_SPD, IND_SAVE_W, IND_SAVE_H);
-        menu_layer_erase_to_base(IND_CLEAR_X, IND_CLEAR_Y_START, IND_SAVE_W, IND_SAVE_H);
         tw = text_width(LANG_NAMES[lang_idx], 0);
         draw_text_outlined(LANG_NAMES[lang_idx], 0,
                            LABEL_CX - tw / 2, SEL_Y, 0, PAL_WHITE);
-        if (focus == FOCUS_LANG)
-            draw_text_outlined(">", 0, INDICATOR_X, SEL_Y, 0, PAL_WHITE);
-        else if (focus == FOCUS_SPEED)
-            draw_text_outlined(">", 0, INDICATOR_X, SPD_Y, 0, PAL_WHITE);
-        else if (focus == FOCUS_START)
-            draw_text_outlined(">", 0, INDICATOR_X, START_BY, 0, PAL_WHITE);
-    }
-
-    if (full == 3) {
-        /* Text speed change: erase the speed value area plus all indicators,
-         * then redraw the value with the current focus indicator. */
-        menu_layer_erase_to_base(SPD_CLEAR_X, SPD_CLEAR_Y,
-                                 SPD_NAME_SAVE_W, SPD_NAME_SAVE_H);
-        menu_layer_erase_to_base(IND_CLEAR_X, IND_CLEAR_Y_FIELD, IND_SAVE_W, IND_SAVE_H);
-        menu_layer_erase_to_base(IND_CLEAR_X, IND_CLEAR_Y_SPD, IND_SAVE_W, IND_SAVE_H);
-        menu_layer_erase_to_base(IND_CLEAR_X, IND_CLEAR_Y_START, IND_SAVE_W, IND_SAVE_H);
-        tw = text_width(speed_label(speed), 0);
-        draw_text_outlined(speed_label(speed), 0, LABEL_CX - tw / 2, SPD_Y, 0,
-                           PAL_WHITE);
-        if (focus == FOCUS_LANG)
-            draw_text_outlined(">", 0, INDICATOR_X, SEL_Y, 0, PAL_WHITE);
-        else if (focus == FOCUS_SPEED)
-            draw_text_outlined(">", 0, INDICATOR_X, SPD_Y, 0, PAL_WHITE);
-        else if (focus == FOCUS_START)
-            draw_text_outlined(">", 0, INDICATOR_X, START_BY, 0, PAL_WHITE);
+        settings_draw_indicator(focus);
     }
 
     if (full == 0) {
-        /* Focus change: erase all indicators, redraw the focused one. */
-        menu_layer_erase_to_base(IND_CLEAR_X, IND_CLEAR_Y_FIELD, IND_SAVE_W, IND_SAVE_H);
-        menu_layer_erase_to_base(IND_CLEAR_X, IND_CLEAR_Y_SPD, IND_SAVE_W, IND_SAVE_H);
-        menu_layer_erase_to_base(IND_CLEAR_X, IND_CLEAR_Y_START, IND_SAVE_W, IND_SAVE_H);
-        if (focus == FOCUS_LANG)
-            draw_text_outlined(">", 0, INDICATOR_X, SEL_Y, 0, PAL_WHITE);
-        else if (focus == FOCUS_SPEED)
-            draw_text_outlined(">", 0, INDICATOR_X, SPD_Y, 0, PAL_WHITE);
-        else if (focus == FOCUS_START)
-            draw_text_outlined(">", 0, INDICATOR_X, START_BY, 0, PAL_WHITE);
+        /* Focus change: indicators only. */
+        settings_draw_indicator(focus);
     }
 
     menu_layer_commit();
@@ -273,9 +199,8 @@ static void settings_menu_draw(int lang_idx, int speed, int focus, int full)
 void settings_menu_run(void)
 {
     int lang_idx = find_lang_index();
-    int spd_idx = find_speed_index();
     int focus = FOCUS_LANG;
-    int prev_lang, prev_spd, prev_focus;
+    int prev_lang, prev_focus;
 
     NB_DEBUG("settings_menu: enter (default lang=%s)\r\n", LANG_CODES[lang_idx]);
 
@@ -298,7 +223,7 @@ void settings_menu_run(void)
     menu_layer_open(0, 0, LAYER_SCREEN_W, LAYER_SCREEN_H, 0);
 
     /* Initial full draw */
-    settings_menu_draw(lang_idx, SPD_VALUES[spd_idx], focus, 1);
+    settings_menu_draw(lang_idx, focus, 1);
     hal_mouse_draw_cursor_force();
 
     for (;;) {
@@ -306,35 +231,26 @@ void settings_menu_run(void)
         hal_mouse_update();
 
         prev_lang = lang_idx;
-        prev_spd = spd_idx;
         prev_focus = focus;
 
         /* Keyboard */
         if (hal_kbd_is_down(KC_LEFT)) {
             if (focus == FOCUS_LANG)
                 lang_idx = (lang_idx - 1 + N_LANGS) % N_LANGS;
-            else if (focus == FOCUS_SPEED)
-                spd_idx = (spd_idx - 1 + N_SPEEDS) % N_SPEEDS;
             hal_kbd_drain_advance();
         }
         if (hal_kbd_is_down(KC_RIGHT)) {
             if (focus == FOCUS_LANG)
                 lang_idx = (lang_idx + 1) % N_LANGS;
-            else if (focus == FOCUS_SPEED)
-                spd_idx = (spd_idx + 1) % N_SPEEDS;
             hal_kbd_drain_advance();
         }
         if (hal_kbd_is_down(KC_DOWN)) {
             if (focus == FOCUS_LANG)
-                focus = FOCUS_SPEED;
-            else if (focus == FOCUS_SPEED)
                 focus = FOCUS_START;
             hal_kbd_drain_advance();
         }
         if (hal_kbd_is_down(KC_UP)) {
             if (focus == FOCUS_START)
-                focus = FOCUS_SPEED;
-            else if (focus == FOCUS_SPEED)
                 focus = FOCUS_LANG;
             hal_kbd_drain_advance();
         }
@@ -349,26 +265,18 @@ void settings_menu_run(void)
                 lang_idx = (lang_idx - 1 + N_LANGS) % N_LANGS;
             } else if (hit == 1) {
                 lang_idx = (lang_idx + 1) % N_LANGS;
-            } else if (hit == 3) {
-                spd_idx = (spd_idx - 1 + N_SPEEDS) % N_SPEEDS;
-            } else if (hit == 4) {
-                spd_idx = (spd_idx + 1) % N_SPEEDS;
             } else if (hit == 2) {
                 break;
             }
             hal_mouse_flush();
         }
 
-        /* Redraw: full=2 on language change, full=3 on speed change,
-         * full=0 on focus change */
+        /* Redraw: full=2 on language change, full=0 on focus change */
         if (lang_idx != prev_lang) {
-            settings_menu_draw(lang_idx, SPD_VALUES[spd_idx], focus, 2);
-            hal_mouse_draw_cursor_force();
-        } else if (spd_idx != prev_spd) {
-            settings_menu_draw(lang_idx, SPD_VALUES[spd_idx], focus, 3);
+            settings_menu_draw(lang_idx, focus, 2);
             hal_mouse_draw_cursor_force();
         } else if (focus != prev_focus) {
-            settings_menu_draw(lang_idx, SPD_VALUES[spd_idx], focus, 0);
+            settings_menu_draw(lang_idx, focus, 0);
             hal_mouse_draw_cursor_force();
         }
 
@@ -376,8 +284,7 @@ void settings_menu_run(void)
     }
 
     settings_set_lang(LANG_CODES[lang_idx]);
-    settings_set_text_speed(SPD_VALUES[spd_idx]);
     menu_layer_close(1);
-    NB_DEBUG("settings_menu: selected lang=%s (%s), speed=%d\r\n",
-             LANG_NAMES[lang_idx], LANG_CODES[lang_idx], SPD_VALUES[spd_idx]);
+    NB_DEBUG("settings_menu: selected lang=%s (%s)\r\n",
+             LANG_NAMES[lang_idx], LANG_CODES[lang_idx]);
 }

@@ -28,3 +28,7 @@ Yes=Sí
 No save data.=No hay datos guardados.
 Load failed.=Error al cargar.
 SPECIAL=Especial
+SETTINGS=AJUSTES
+16/s=16 car./s
+32/s=32 car./s
+64/s=64 car./s

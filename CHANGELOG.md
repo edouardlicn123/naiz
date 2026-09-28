@@ -6,6 +6,10 @@
 
 | 条目 |
 |------|
+| [0.3.006 — CG 画廊三修：真实缩略图（构建期生成）+ 预览返回调色板保序 + footer 统一](#c37) |
+| [0.3.005 — 004 结局章末尾插入 cg01 + Neon 夸 Fei / Fei 回「色猫」七句对白](#c36) |
+| [0.3.004 — 设置菜单九语言译文补齐：速度档标签入表 + tr() 化](#c35) |
+| [0.3.003 — 游戏内设置菜单场景：Text Speed 迁出开机菜单 + settingmenu 落地](#c34) |
 | [0.3.002 — 资产市场交互菜单启动清屏一次（TTY 守卫）](#c33) |
 | [0.3.001 — 0.3 开版（minor 进位）](#c32) |
 | [0.2.148 — 0.2 收官：devdocs 68–115 归纳为 0.2 版开发文档总结](#c31) |
@@ -40,6 +44,78 @@
 | [0.2.119 — powered 资产归位 `common/logo/` + 资产键统一](#c16) |
 | [Bug 修复状态（R1–R30 综合摘要与历史子条目）](#c17) |
 
+---
+
+<a id="c37"></a>
+### 0.3.006 — CG 画廊三修：真实缩略图（构建期生成）+ 预览返回调色板保序 + footer 统一
+
+收掉 devdoc 92/94 挂起的「二期真缩略图」，并修掉两个真实显示 bug。
+
+**根因（均为调色板/几何层面，非笔误）**
+
+- **返回预览后标题与格子变黑**：`pack_images.py` 生成共享调色板时把 **248–255 全部写成 (0,0,0) 黑**（246 量化色 + 10 保留槽），而 `image.c:225-239` 的 `image_set_palette()` 对**非 sprite 图应用全部 256 色**（`num_colors=256`）。画廊里**任何一次图片载入**（`gallery_exit_preview()` 的 `layer_bg_change(gallery_bg)`，以及本轮新增的每次缩略图载入）都会把 250（`MENU_PAL_WHITE`→标题）、255（`GAL_FILL_UNLOCKED`→格子）、254 抹成黑；旧代码只在画廊入口调一次 `menu_save_item_palette()` / `gallery_palette_save()`，退出后从未重建 → 违背 devdoc 92 「恢复背景 + 调色板保序」的原设计。
+- **Back 旁左下白块**：`nb_cggallery.c` 调 `menu_back_draw(356,…)` 画出 x66..145/y356..385 的按钮，紧随其后的 `menu_pagenav_draw(370,370,…)` 触发 `nb_menu.c` 里 `menu_layer_erase_to_base(56,370,16,16)`（x56..71/y370..385），与按钮左缘**重叠 6×16 px** 并把 base 快照拷回（画廊背景近白，实测 RGB 253,254,249）→ 白块；且 `CG_COUNT=1` 时 `page>0` 不成立、`<` 不绘制，擦除留下空洞。画廊是**唯一**传 `arrows_y=370` 的调用方（saveload/special/setting 均为 318/352）。
+- **缩略图纯蓝**：devdoc 92/94 明确记载的二期顺延（"真缩略图顺延二期"）——`gallery_draw_cell()` 只做 `fill_rect` + 编号文字，从不画图。**关键前提修正**：因 `pack_images.py` 已让全部图片共享同一 256 色调色板，缩略图**无需任何调色板切换**，只在构建期降采样即可。
+
+**变更**
+
+1. `core/engine/nb_cggallery.c`
+   - 新增 `gallery_apply_widget_palette()` 单一所有者，重申 250(白)/251(黄)/255(蓝)/254(黑)；三个调用点：画廊入口、`gallery_exit_preview()` 的 `layer_bg_change()` 之后、每次载入缩略图之后。
+   - 几何 `GAL_CELL_H` 100→**84**、`GAL_STEP_Y` 104→**88**（`GAL_GRID_BOTTOM` 自动得 304，网格底 304 < 箭头带 318，留 14px）；footer 统一为与其余三个系统菜单**完全一致**的 `menu_pagenav_draw(318, 330, …)` + `menu_back_draw(352, …)`，并把 352/318/330 提为具名常量（`gallery_draw_cells_range` 另两处硬编码 356 与两处 `menu_page_hit(370,…)` 一并收口）；`[LOCKED]` 按新高度重新居中。
+   - 新增 `gallery_draw_badge()`：左上角「CG %02d」序号，**深底板 + 白字**。底板宽随 `text_width()` 实测（`FONT_GLYPH_W=8`，"CG 01"=40px → 48×20 板），因画廊背景与 CG 缩略图实测均值亮度 ~178（偏亮），裸白字不可读。底板色复用 `PAL_CURSOR_BLACK`(254) 并纳入 apply 契约。缩略图与蓝底回退两条路径统一绘制。
+   - `gallery_draw_cell()` 走 **`menu_layer_blit_sprite()`** 而非 `vram_blit()`：网格在 `menu_layer_begin_draw()`…`menu_layer_blit()` 之间绘制，`menu_layer_blit()` 只把 fill/pset/字形路由进合成缓冲，而 `vram_blit` 直写 VRAM → 会被合成缓冲整屏覆盖、缩略图不可见。`menu_layer.c:171` 已有该原语（双轴裁剪安全 + 层未开时回退 VRAM），**无需新增封装**。`PAL_NO_TRANSPARENCY` 作跳过哨兵与 `vram_blit` 语义一致；实测缩略图最大像素索引 **247**（< 248 保留区），哨兵安全。
+2. `core/engine/nb_menu.c` — `menu_pagenav_draw()` **仅在对应箭头确实要绘制时才擦该侧**；计数器擦除保持无条件（计数器总是绘制）。这条同时修掉所有单页菜单的同类空洞，属通用修复。
+3. `tools/naiz_build/cg_thumb.py`（**新增**）— 构建期画廊缩略图生成器：读 ASSETS.DB `type='CG'` 行 → 经 `assets/common/images.map` + `assets/<game>/images.map` 反查源 PNG（项目树覆盖 common）→ `resize_to_screen(..., cover=True)` **cover 裁切**到 **144×84**（无黑边）→ 复用 `convert_image(no_resize=True, reserved=PROTECTED_IDX_ALL)` 编码（先借后造，未给 `mag_convert` 加新参数）→ 输出 `images/<name>_t.MAG`、upsert `type='THUMB'` 行、增量跳过（`.cg_thumb_state.json`）。**8.3 守卫**：`<name>_t` 超 8 字符或短名碰撞即 `RuntimeError` 硬失败；CG 找不到源 PNG 亦硬失败。
+4. 管线接线 — `build_game.py` 在两次 `convert_png_to_mag()` 之后、`export_asset_table()`/`pack_images()` 之前调用 `build_cg_thumbs()`（`THUMB` 类型白名单同步放行）；`pack_images.py` 的 types 元组加 `'THUMB'`（否则不入包）；`export_asset_table.py` 生成 **`cg_thumb_map[]` + `CG_THUMB_COUNT`**，按名（`<cg_name>_t`）关联 cg_map，**与 cg_map 逐下标平行**，缺图输出 `id=0` 而非压缩数组（避免整体错位），引擎据此回退蓝底。
+5. `tools/tests/test_cg_thumb_size.py`（**新增**）— 守住跨语言常量重复：`THUMB_W/H == GAL_CELL_W/H`，并断言网格底 `< GAL_ARROWS_Y`、footer 三 y 递增。
+
+**验证**：`make -C core` 0 err/0 warn；`pytest tools/tests/` **473 passed**（新增 4 条）；`nb_validator` 0 errors；`makegame.sh build demo-a2` 成功（`[29] cg01_t.MAG` 入包，`IMAGE.DAT palette verification OK (30 entries, shared 256-colour palette)`）；`makegame.sh make demo-a2` 成功（30 new / 3 updated / 33 total）；`./start.sh fullaudit` **7/7 通过**。缩略图数值校验：与源图同 cover 裁切参考的平均亮度 178.5 vs 179.0、逐像素平均差 13.8（≈ 246 色量化噪声），占用满 246 个可用色槽。`bump_version` → `0.3.006`。
+
+---
+
+<a id="c36"></a>
+### 0.3.005 — 004 结局章末尾插入 cg01 + Neon 夸 Fei / Fei 回「色猫」七句对白
+
+`nbook004.nb`（`bond_neon` 分支的结局章）末尾、既有 3 句对白之后 `scene(end)` 之前，追加 `char(hideall)` → `cg(){cg01}` → 7 句英文对白：Neon 主动夸 Fei 身材，Fei 以 `You perverted cat.`（色猫）回嘴，Neon 再反将一军。
+
+- **顺序硬性**：`char(hideall)` 必须在 `cg()` **之前**。`display_apply_cg()` → `layer_bg_change()` 内含 `layer_redraw_sprites()`（`scene_display.c:166`），立绘层独立于背景层，不先隐藏则 fei/neon 立绘会叠在 2048×1152 的 CG 上。
+- **衔接既有设定**：Neon 反驳句复用「the sea」，回扣本场她 `I just want to stay at the beach` 的别扭性格；Fei 末句反击 `you are the one wearing the swimsuit`，回扣她本场是 `swimming` 立绘。全部行 ≤70 字符（`NB_LINE_MAX`=256）。
+- **CG 副作用（知情告知）**：`cmd_cg()` 绘制前即 `sys_save_unlock_cg(1)`（`nb_cg.c:73`）→ 玩家只要走到 004 结局分支，**cg01 即永久解锁进画廊**（`cg01` 在 `ASSETS.DB` 中为 CG 类、id=28，`cg_id`=1 首位槽位），无法再补解锁。
+- **i18n（仅英文，留空待译）**：`source_lang="eng"`，7 句新对白以英文为基准入库 `game_<lang>.txt` 空值，运行时 `tr()` 回退英文——与既有剧情对白现状一致（全库仅 `Special` 等少数系统项有译文）。用户明确本轮不补译文。
+- **顺带根治 i18n 提取遗漏**：`cg(){key}` 的花括号负载是**资产 key**（同 `bg`/`char`），此前未列入 `extract_texts()` 的排除元组，导致一旦有场景用 `cg()` 就会往 9 个 `game_*.txt` 注入伪键（本次即产生 `cg01=`）。已在排除元组补 `'cg'`，并定点清除该残留键；`i18n_gen` 重生成后 `game=37`（30+7）、**无 `# ORPHANED`**。
+  - 附记：`i18n_gen --force` 是**破坏性**的——先 `unlink()` 模板再 merge（`i18n_gen.py:250-254`），会连同 `Special=特别篇` 等全部既有译文一起清空，不可用于清理孤立键。
+- 未动 `expressions.json` / `characters.json` / `variables.json`（不新增表情、不引好感度变量）；未改 B92（未增删改 NB 命令）/ B90（无 C 改动）。
+- 验证：`nb_validator` 0 errors；`i18n_gen` 9 语言 `sys=34 role=3 game=37` 且无 ORPHANED；`makegame.sh build/make demo-a2` 成功；`./start.sh fullaudit` 7/7 全绿；`bump_version` → 0.3.005（demo-a2/animatest 同步）。
+---
+
+<a id="c35"></a>
+### 0.3.004 — 设置菜单九语言译文补齐：速度档标签入表 + tr() 化
+
+`#c34` 落地设置场景时，三档速度标签按 AGENTS.md §十四「纯数字」例外留作未译的 `16/s`/`32/s`/`64/s`；本轮把它们正式纳入翻译体系——单位随语言书写（`字/秒`、`자/초`、`car./s`、`Z./s`），符合「系统界面文字一律经 tr()」的强制范围。
+
+- 标签入表（与取值同源同长）：`settings.h` 新增 `extern const char *const SETTINGS_TEXT_SPEED_LABELS[SETTINGS_TEXT_SPEED_N]`，`settings.c` 定义为 `{"Instant","16/s","32/s","64/s"}`（English `tr()` key）。两数组共用 `SETTINGS_TEXT_SPEED_N` 长度宏 → **下标错位无法编译**，`values[i]` 与 `labels[i]` 恒成对。
+- `nb_setting.c` 表驱动化：`SettingRow` 删 `const char *(*label_of)(int value)` 回调、增 `const char *const *labels` 字段，绘制改走 `tr(r->labels[r->cur])`；`speed_label()` 的 if 链随之删除。取值文案由「每设置一个函数」降为「纯数据」，加一项设置仍只加一条表项，且值→文案不再散落。
+- i18n：`i18n_gen.py` `SYSTEM_UI_KEYS` 增 `"16/s" "32/s" "64/s"`；九语言 `sys_*.txt` 补译 —— chi/cht `16 字/秒`、jpn `16字/秒`、kor `16자/초`、fre/ita/spa/por `16 car./s`、ger `16 Z./s`（32/64 同形）。`i18n_gen` 重生成 9 语言 `sys=34` 全齐、无 `# ORPHANED`；CJK 字库自动吸收新字（jpn 128→129、chi 118→119、cht 117→118、kor 210→211 codepoints）。
+- 前置核查：`tr()` 为纯 `strcmp` 精确匹配线性扫描（`core/lib/tr.c:147`），载入侧只跳过空行/`#` 注释并按首个 `=` 切分（`load_file`），**数字开头的 key 无特殊处理** → `16/s` 作为 key 安全。
+- 文档同步：`docs/B90` `cmd_settingmenu()` 条目补「labels 与 values 索引对齐、经 tr() 渲染」；`docs/B92` `settingmenu` 行同补。
+- 验证：`make -C core` 0 errors / 0 warnings；`nb_validator` OK；`pytest tools/tests/` 469 passed；`./start.sh fullaudit` 7/7 全绿；`bump_version` → 0.3.004（demo-a2/animatest 同步）。
+---
+
+<a id="c34"></a>
+### 0.3.003 — 游戏内设置菜单场景：Text Speed 迁出开机菜单 + settingmenu 落地
+
+主菜单 `settings` 按钮不再打 TODO 日志，接到新的游戏内设置场景（`setting.nb` → `cmd_settingmenu`）；开机菜单（`settings_menu.c`）保留 Language + Start Game，**Text Speed 移入新场景**。视觉/交互范式对齐 LOAD 范式（`nb_saveload.c` / `nb_special.c`）：凹刻行全屏列表 + 行内 `< 值 >` + Back + `focus_on_back`。
+
+- 新增 `core/engine/nb_setting.c`：表驱动 `SettingRow`（`label`/`values`/`n_values`/`cur`/`current`/`label_of`/`commit`），加一项设置只需加一条表项，文件内无设置专属分支。行矩形 `(120,y,400,44)`，`y={90,146,202,258}`，焦点符 x=126，标签 x=140/宽 170，`<` x=330，值区 x=350..430 居中，`>` x=450，Back y=352。
+- 交互：`↑↓` 移焦（行 ↔ Back）；`←→` 步进聚焦行取值（环形）；设置行上 `Enter`/`Space`/`Xfer` **无操作**（取值就地生效，无可确认项），仅 Back 聚焦时退出；`Esc` 任意位置退出。`←→` 已被调档占用，故**无键盘翻页**，翻页箭头在行数超 `SETTING_ROWS`(4) 时自行出现（当前仅 1 项 1 页）。调档走 `commit` 立即生效（下一段对话即新速度），退出时仅在 `dirty` 时调**一次** `settings_save()`。
+- 单一事实源：`settings.h` 新增 `SETTINGS_TEXT_SPEED_N` / `extern const int SETTINGS_TEXT_SPEEDS[]`，`settings_set_text_speed()` 与 `settings_load()` 的校验均改为遍历该表（原先三处各自硬编码 `{0,16,32,64}`）。返回值越界仍回退默认。
+- 开机菜单 `settings_menu.c` 精简：删 `SPD_VALUES`/`N_SPEEDS`/`SPD_Y`/`SPD_NAME_SAVE_*`/`IND_CLEAR_Y_SPD`/`SPD_CLEAR_*`/`FOCUS_SPEED` + `speed_label()`/`find_speed_index()`，`menu_hittest` 由 5 分支收为 3 分支（0=左箭头/1=右箭头/2=Start/−1 无），`full` 由 3 态收为 2 态（全量 / 焦点），三处重复的指示符「擦+重绘」抽为 `settings_draw_indicator()`。
+- **Language 永久留在开机菜单**：该菜单运行于 `tr_init()` + CJK 字库加载**之前**，必须纯 ASCII，且语言须在翻译表存在前选定；`nb_setting.c` 表内不得新增 Language 行（文件头注释与 AGENTS.md §十四 已固化）。
+- 接线：`nb_mainmenu.c` 删旧桩 `cmd_settingmenu`（`nb_commands.h` 原型保留，实现迁至 `nb_setting.c`），`settings` 分支改 `nb_set_menu_return("")` + `scene_switch("setting.nb", SCENE_SWITCH_MENU)`；`nb_commands.c` 标志 `0` → `CMD_BLOCKING | CMD_NEEDS_INPUT | CMD_TOUCHES_DISPLAY`。新增 `projects/demo-a2/scene/setting.nb`（`sceneconf(){Settings, menu}` + `bg(normal){yellow_grid}` + `settingmenu()`，背景沿用 special 菜单）。`animatest` 无 settings 入口且 `i18n.targets=[]`，未改。
+- 退出归属：`setting_return_home()` 在**退出时**读 `nb_get_menu_return()`，空则回落 `mainmenu.nb`（同 `gallery_return_home`），杜绝陈旧值被下次进入消费。
+- i18n：`i18n_gen.py` `SYSTEM_UI_KEYS` 增 `"SETTINGS"`；九语言 `sys_*.txt` 补译（chi 设置 / cht 設定 / fre PARAMÈTRES / ger EINSTELLUNGEN / ita IMPOSTAZIONI / jpn 設定 / kor 설정 / por CONFIGURAÇÕES / spa AJUSTES）。取值标签 `16/s`/`32/s`/`64/s` 为纯数字+单位，按 AGENTS.md §十四 例外**不译**。`i18n_gen` 重生成 9 语言 `sys=31` 全齐、无 `# ORPHANED`。
+- 文档同步：`docs/B92` `settingmenu` 行由「TODO 桩」改为实际语义；`docs/B90` 新增 `cmd_settingmenu()` 条目、`cmd_mainmenu()` 行去掉旧桩；AGENTS.md §十四 固化 Language 归属规则 + 头部版本 0.3.003。
+- 验证：`make -C core` 0 errors / 0 warnings（`NB_DEBUG` 展开 `snprintf`，`debug.h` 不含 `stdio.h`，故本文件保留 `<stdio.h>`）；`bump_version` → 0.3.003（demo-a2/animatest 同步）；`pytest tools/tests/` 23 passed；`./start.sh fullaudit` 7/7 全绿。
 ---
 
 <a id="c33"></a>

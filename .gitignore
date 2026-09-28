@@ -18,6 +18,7 @@ bak-devdocs/
 dist/
 .opencode/
 .mag_conv_state.json
+.cg_thumb_state.json
 *.hdi
 *.pyc
 *.rej

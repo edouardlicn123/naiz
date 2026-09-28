@@ -14,6 +14,16 @@
 #define TEXT_SPEED_INSTANT  0
 #define TEXT_SPEED_DEFAULT  32
 
+/* Single source of truth for the valid typewriter speeds: the parser
+ * whitelist, the setter whitelist and the settings-menu value list all
+ * read this table, so adding a speed is a one-place change.
+ * LABELS is index-aligned with SPEEDS and holds the English tr() keys
+ * rendered by the in-game settings menu (both arrays share one length
+ * macro, so a mismatch cannot compile). */
+#define SETTINGS_TEXT_SPEED_N  4
+extern const int SETTINGS_TEXT_SPEEDS[SETTINGS_TEXT_SPEED_N];
+extern const char *const SETTINGS_TEXT_SPEED_LABELS[SETTINGS_TEXT_SPEED_N];
+
 /* Parsed game settings (settings.txt). */
 typedef struct {
     unsigned char dialog_style;

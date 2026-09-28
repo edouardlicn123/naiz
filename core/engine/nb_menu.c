@@ -69,13 +69,20 @@ void menu_pagenav_draw(int arrows_y, int count_y, uint8_t fg,
 {
     char buf[16];
 
-    menu_layer_erase_to_base(56, arrows_y, 16, 16);
-    menu_layer_erase_to_base(576, arrows_y, 16, 16);
-    menu_layer_erase_to_base(310, count_y, 20, 14);
-    if (page > 0)
+    /* Erase a side only when its arrow is actually drawn: an unconditional
+     * erase left a base-restored notch on the Back button in the CG gallery
+     * (whose arrows_y overlapped the button) and would punch a hole in any
+     * widget at that spot on single-page menus.  The counter always draws,
+     * so its erase stays unconditional. */
+    if (page > 0) {
+        menu_layer_erase_to_base(56, arrows_y, 16, 16);
         draw_text("<", 0, 56, arrows_y, 72, arrows_y + 16, 0, fg);
-    if (page < total_pages - 1)
+    }
+    if (page < total_pages - 1) {
+        menu_layer_erase_to_base(576, arrows_y, 16, 16);
         draw_text(">", 0, 576, arrows_y, 592, arrows_y + 16, 0, fg);
+    }
+    menu_layer_erase_to_base(310, count_y, 20, 14);
     snprintf(buf, sizeof(buf), "%d/%d", page + 1, total_pages);
     draw_text(buf, 0, 310, count_y, 330, count_y + 14, 0, fg);
 }

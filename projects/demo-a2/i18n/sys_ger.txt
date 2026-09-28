@@ -28,3 +28,7 @@ Yes=Ja
 No save data.=Keine Speicherdaten.
 Load failed.=Laden fehlgeschlagen.
 SPECIAL=Spezial
+SETTINGS=EINSTELLUNGEN
+16/s=16 Z./s
+32/s=32 Z./s
+64/s=64 Z./s

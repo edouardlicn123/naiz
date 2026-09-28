@@ -5,4 +5,13 @@ char(r,normal,body){neon}
 fei(){What a good day!}
 fei(){Isn't it,Neon?}
 neon(){Yes but I don't want to swim,I just want to stay at the beach.}
+char(hideall)
+cg(){cg01}
+neon(){Hey,you really have a great figure.}
+fei(){Sorry?}
+neon(){Your body is really nice.I have wanted to say that for a long time.}
+fei(){That is the most suspicious compliment I ever heard.}
+neon(){What is wrong with admiring a nice figure?I am only looking at the sea.}
+fei(){You perverted cat.}
+neon(){Hmph,you are the one wearing the swimsuit.}
 scene(end)

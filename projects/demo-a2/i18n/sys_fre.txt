@@ -28,3 +28,7 @@ Yes=Oui
 No save data.=Aucune sauvegarde.
 Load failed.=Chargement échoué.
 SPECIAL=Spécial
+SETTINGS=PARAMÈTRES
+16/s=16 car./s
+32/s=32 car./s
+64/s=64 car./s

@@ -19,6 +19,7 @@ import os
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
 
 from naiz_build.c_header import escape, header_preamble, header_footer
+from naiz_build.cg_thumb import THUMB_SUFFIX, THUMB_TYPE
 
 
 def load_json(project_dir, name):
@@ -142,6 +143,29 @@ def generate(project_dir, output_path):
         # -- CG_COUNT constant --
         lines.append('/* Number of registered CG assets */')
         lines.append('#define CG_COUNT %d' % len(cg_rows))
+        lines.append('')
+
+        # -- cg_thumb_map: gallery-grid thumbnail per CG (type='THUMB') --
+        # Emitted index-parallel to cg_map[]: entry i is the thumbnail of
+        # cg_map[i], or id 0 when the CG has no thumbnail built (the gallery
+        # then falls back to the plain unlock-blue tile).  Kept index-parallel
+        # rather than compacted so a missing asset cannot shift every later
+        # cell onto the wrong CG.
+        lines.append('/* Gallery-grid thumbnail key->ID lookup (parallel to cg_map; 0 = none) */')
+        lines.append('static const struct { const char *key; int id; } cg_thumb_map[] = {')
+        thumb_rows = {row[0]: row[1] for row in db.execute(
+            "SELECT name, id FROM img_map WHERE type=? ORDER BY id", (THUMB_TYPE,)
+        )}
+        if not cg_rows:
+            lines.append('    {"__dummy__", 0},')
+        for row in cg_rows:
+            tid = thumb_rows.get(row[1] + THUMB_SUFFIX, 0)
+            lines.append('    {"%s", %d},' % (escape(row[1] + THUMB_SUFFIX), tid))
+        lines.append('    {NULL, 0}')
+        lines.append('};')
+        lines.append('')
+        lines.append('/* Number of registered gallery-grid thumbnails */')
+        lines.append('#define CG_THUMB_COUNT %d' % len(cg_rows))
         lines.append('')
 
         # -- audio asset maps: bgm/snd/voice (types BGM/SND/VC) --

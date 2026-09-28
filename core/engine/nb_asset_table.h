@@ -69,6 +69,15 @@ static const struct { const char *key; int id; } cg_map[] = {
 /* Number of registered CG assets */
 #define CG_COUNT 1
 
+/* Gallery-grid thumbnail key->ID lookup (parallel to cg_map; 0 = none) */
+static const struct { const char *key; int id; } cg_thumb_map[] = {
+    {"cg01_t", 29},
+    {NULL, 0}
+};
+
+/* Number of registered gallery-grid thumbnails */
+#define CG_THUMB_COUNT 1
+
 /* Shared type for registered audio assets */
 typedef struct { const char *name; int id; } AudioAssetMap;
 

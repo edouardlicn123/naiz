@@ -32,7 +32,8 @@ SYSTEM_UI_KEYS = {
     "LOAD", "SAVE", "Empty",
     "Load to Slot %d?", "Save to Slot %d?", "Overwrite Slot %d?",
     "Naiz Settings", "Language", "Start Game",
-    "Text Speed", "Instant",
+    "Text Speed", "Instant", "16/s", "32/s", "64/s",
+    "SETTINGS",
     "CG GALLERY", "No CGs available.",
     "No save data.", "Load failed.",
     "SPECIAL",
@@ -62,7 +63,7 @@ def extract_texts(nb_files):
 
                 cmd, args, text, raw = parsed
 
-                if text and cmd not in ('host', 'mainmenu', 'question', 'char', 'bg', 'scene', 'sceneconf'):
+                if text and cmd not in ('host', 'mainmenu', 'question', 'char', 'bg', 'cg', 'scene', 'sceneconf'):
                     dialogue_texts.add(text.strip())
 
                 if cmd == 'sceneconf' and text:

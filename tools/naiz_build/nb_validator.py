@@ -48,6 +48,7 @@ SIGNATURES = {
     'loadscene': (0, 0, 'loadscene()'),
     'cgvmenu':  (0, 0, 'cgvmenu()'),
     'startsetting': (0, 0, 'startsetting()'),
+    'settingmenu': (0, 0, 'settingmenu()'),
     'var':      (3, 3, 'var(id, op(=|+| -), value)'),
     'playanima': (0, 2, 'playanima([once|loop[,sec]]){name}'),
     'waitanima': (0, 0, 'waitanima(){}'),
@@ -58,7 +59,7 @@ SIGNATURES = {
 # Stub commands: registered in the engine cmd_table but their handlers only
 # log "not implemented yet" (nb_mainmenu.c).  Deliberately kept flagged here
 # so a script using one fails validation instead of silently no-op'ing.
-STUBS = frozenset({'settingmenu', 'musicmenu'})
+STUBS = frozenset({'musicmenu'})
 
 # Numeric literal accepted for var values / question deltas (engine atoi
 # would silently coerce junk to 0 — a script typo we want red instead).

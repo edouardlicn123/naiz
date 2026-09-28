@@ -97,7 +97,8 @@ void cmd_mainmenu(int argc, const char **argv, const char *cmd_name)
         nb_set_menu_return("");
         scene_switch("cgview.nb", SCENE_SWITCH_MENU);
     } else if (strcmp(argv[sel + 4], "settings") == 0) {
-        hal_log("TODO: settings menu\r\n");
+        nb_set_menu_return("");
+        scene_switch("setting.nb", SCENE_SWITCH_MENU);
     } else if (strcmp(argv[sel + 4], "exit") == 0) {
         vm_set_finalend();
     }
@@ -117,12 +118,6 @@ void cmd_startsetting(int argc, const char **argv, const char *cmd_name)
          * table, CJK glyph font, blackletter style). */
         nb_set_lang(settings_get_lang());
     }
-}
-
-void cmd_settingmenu(int argc, const char **argv, const char *cmd_name)
-{
-    (void)argc; (void)argv; (void)cmd_name;
-    NB_DEBUG("settingmenu: not implemented yet\r\n");
 }
 
 void cmd_musicmenu(int argc, const char **argv, const char *cmd_name)

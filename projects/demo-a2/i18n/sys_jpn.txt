@@ -28,3 +28,7 @@ Yes=はい
 No save data.=セーブデータがありません
 Load failed.=ロードに失敗しました
 SPECIAL=スペシャル
+SETTINGS=設定
+16/s=16字/秒
+32/s=32字/秒
+64/s=64字/秒

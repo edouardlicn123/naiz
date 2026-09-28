@@ -14,6 +14,11 @@
  *   image_set_palette(img) is called automatically.
  * For sprites (is_sprite == 1):
  *   no palette update — share scene palette.
+ *
+ * image_set_palette() never writes the engine-chrome palette slots
+ * IMG_CHROME_PAL_FIRST..IMG_CHROME_PAL_LAST (see the comment at that
+ * define): those are owned by the dialog/button/menu subsystems, so
+ * loading artwork cannot repaint the live UI colors.
  */
 #include "image.h"
 #include "mag.h"
@@ -22,6 +27,24 @@
 #include "farchive.h"
 #include "hal.h"
 #include "image_internal.h"
+
+/* Engine-chrome palette slots, skipped by image_set_palette() for every
+ * image type.  They belong to the UI subsystems, not to artwork:
+ *   248 dialog fill      249 button fill       250 menu white
+ *   251 menu yellow      252 button highlight  253 button shadow
+ *   254 cursor black     255 no-transparency sentinel
+ * Owners are dlg_update_palette(), btn_update_palette(),
+ * menu_save_item_palette(), palette_reset_reserved() and the per-scene
+ * widget helpers.  pack_images.py writes this range as black placeholders
+ * and artwork must not reference it (guarded by
+ * tools/tests/test_palette_reserved_slots.py), so a background or sprite
+ * load can only ever repaint 0..247.
+ *
+ * Declared as a local range instead of including render.h / scene_layers.h:
+ * image.c sits below the UI layer in the module graph and must not depend
+ * on it (see docs/B91 §4 HAL boundary rules). */
+#define IMG_CHROME_PAL_FIRST 248
+#define IMG_CHROME_PAL_LAST  255
 
 /* Open IMAGE.DAT archive with TOC resident and single-blob raw access */
 static FArchive g_image_arc;
@@ -232,8 +255,12 @@ static void image_set_palette(const MagImage *img)
 
     for (i = 0; i < nc; i++) {
         /* sprites: skip idx 7/15 to preserve engine white for transparency
-         * BG images: apply full palette (including idx 7/15) */
+         * BG images: apply full palette (including idx 7/15)
+         * every image: skip the engine-chrome slots 248..255 (dialog fill,
+         * button scheme, menu text, cursor black) so the UI keeps the colors
+         * its owners set — loading artwork never repaints the chrome */
         if (img->is_sprite && (i == 7 || i == 15)) continue;
+        if (i >= IMG_CHROME_PAL_FIRST && i <= IMG_CHROME_PAL_LAST) continue;
         hal_set_palette(i, img->palette_r[i],
                         img->palette_g[i], img->palette_b[i]);
     }

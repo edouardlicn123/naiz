@@ -28,3 +28,7 @@ Yes=是
 No save data.=暂无存档数据
 Load failed.=加载失败
 SPECIAL=特别篇
+SETTINGS=设置
+16/s=16 字/秒
+32/s=32 字/秒
+64/s=64 字/秒

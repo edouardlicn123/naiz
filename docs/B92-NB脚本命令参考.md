@@ -20,16 +20,16 @@
 | | | `char(hideall)` | 隐藏所有立绘 + clean reset |
 | `scene` | `cmd_scene` (nb_scene.c) | `scene <id\|"end">` / `scene <var,op,val,target;...;default>` | 无条件/条件链跳转，id → nbook{id}.nb。默认值约定：最后一段无逗号→显式默认；无显式默认→fallback 到第一段 target |
 | `sceneconf` | `cmd_sceneconf` (nb_commands.c) | `sceneconf(){<title>[,type]}` | 场景配置：章节标题 + 类型（normal/cg/menu，默认 normal）。**仅花括号形态**（paren 别名已废止），随存档记录标题，type=menu 时禁用存档热键 |
-| `mainmenu` | `cmd_mainmenu` (nb_mainmenu.c) | `mainmenu <x> <y> <w> <h> <opt1> <opt2> ...` | 主菜单，"start"→game, "continue"→最新槽位, "load"→读档, "settings"→startsetting, "exit"→end；"special"→special.nb，scenes/music/gallery 已迁入 special（保留桩） |
+| `mainmenu` | `cmd_mainmenu` (nb_mainmenu.c) | `mainmenu <x> <y> <w> <h> <opt1> <opt2> ...` | 主菜单，"start"→game, "continue"→最新槽位, "load"→读档, "settings"→setting.nb（游戏内设置，见 `settingmenu`）, "exit"→end；"special"→special.nb，scenes/music/gallery 已迁入 special（保留桩） |
 | `specialmenu` | `cmd_specialmenu` (nb_special.c) | `specialmenu <opt1> <opt2> ...` | **Special 菜单（LOAD 范式全屏列表，0.2.140）**：凹刻行+分页+Back+focus_on_back，条目经 tr() 渲染；`gallery`→cgview.nb（回 special）、`scenes`→loadscen.nb（temp 快照回 special）、`music`→TODO 桩、Back/Esc→mainmenu.nb |
 | `question` | `cmd_question` (nb_question.c) | `question <text;opt,var,op,delta;...>` | 选项+变量操作(+/-/=)，结果存 nb.last_choice；鼠标/键盘两路经 `apply_option()` 合一（R21，含 INT_MIN 守卫 C22） |
 | `var` | `cmd_var` (nb_commands.c) | `var <id> <=/+|/-> <value>` | 变量读写（赋值/加减），需在 variables.json 定义 |
-| `settingmenu` | `cmd_settingmenu` (nb_mainmenu.c) | — | 设置菜单（TODO 桩，见 STUBS）；**已实现的是 `startsetting`** |
-| `startsetting` | `cmd_startsetting` (nb_mainmenu.c:89) | `startsetting()` | **设置菜单（已实现）**：`settings_menu_run()` + `settings_save()`，语言变更时重载 CJK 字库/翻译表并按黑花体设置刷新 |
+| `settingmenu` | `cmd_settingmenu` (nb_setting.c) | `settingmenu()` | 游戏内设置菜单（LOAD 范式全屏列表）：凹刻行 + 行内 `< 值 >` 调档 + Back + focus_on_back；`←→` 步进取值故无键盘翻页；当前仅 Text Speed（取值/标签同源同长 `SETTINGS_TEXT_SPEEDS`/`_LABELS`，均经 tr() 渲染），取值即时生效、退出时 `settings_save` 落盘；Back/Esc→`nb_get_menu_return()`（空则 mainmenu.nb）。**Language 不在此**（固定在开机 `startsetting`） |
+| `startsetting` | `cmd_startsetting` (nb_mainmenu.c:107) | `startsetting()` | **设置菜单（已实现）**：`settings_menu_run()` + `settings_save()`，语言变更时重载 CJK 字库/翻译表并按黑花体设置刷新 |
 | `musicmenu` | `cmd_musicmenu` (nb_mainmenu.c) | — | 音乐菜单（TODO 桩，见 STUBS） |
 | `cg` | `cmd_cg` (nb_cg.c) | `cg(){<asset_key>}` | 展示 CG（type='CG' 资产）：资产 key 必须写在花括号负载中——括号位预留给未来的参数设置，**不再承载资产描述**（`cg(key)` 括号形态被硬性拒绝）；绘制后永久解锁该 CG 至 SYSTEM.SAV；**换图同时自动收起对话框并清空当前对白**（R20 全屏事件语义），下一句台词在其上重新开框 |
 | | | `cg(hidedialog)` | 关闭对话框，还原背景区域（与 `bg(hidedialog)` 平行；`cg(){key}` 已自动收起对话框，此指令用于显式收口，见 R20） |
-| `cgvmenu` | `cmd_cgvmenu` (nb_cggallery.c:206) | — | 打开 CG 画廊（由 cgview.nb 调用）：网格浏览 + 锁定占位 + 翻页 + 全屏预览 + 解锁位图缓存（R22）；ESC/Back 回**菜单归属场景** `nb_get_menu_return()`（默认 mainmenu.nb，0.2.140 起 special 进入则回 special.nb）；0.2.079 自 nb_mainmenu.c 拆出，0.2.092 起 menu_layer 渲染 |
+| `cgvmenu` | `cmd_cgvmenu` (nb_cggallery.c:206) | — | 打开 CG 画廊（由 cgview.nb 调用）：网格浏览 + 锁定占位 + 翻页 + 全屏预览 + 解锁位图缓存（R22）；ESC/Back 回**菜单归属场景** `nb_get_menu_return()`（默认 mainmenu.nb，0.2.140 起 special 进入则回 special.nb）；0.2.079 自 nb_mainmenu.c 拆出，0.2.092 起 menu_layer 渲染；**0.3.006** 已解锁格改显构建期生成的真实缩略图（`cg_thumb_map[]`，缺图回退蓝底），左上角带「CG %02d」序号角标 |
 | `host` | `cmd_host` (nb_commands.c) | `host <text>` | 系统旁白（无角色名） |
 | `loadscene` | `cmd_loadscene` (nb_saveload.c:400) | — | 打开读档选单（由 loadscene.nb 调用），经 `save_load_menu(is_load=1, from_mainmenu=0)` 进入两阶段渲染菜单 |
 | `fei` / `ira` / `neon` | `cmd_dialogue` (nb_commands.c) | `<name>{<text>}` 或 `<name>(<text>)` | 角色台词（自动带角色名） |
@@ -121,7 +121,9 @@ AUDIO.DAT → core/engine/audio.c/h       音频归档（naiz_audio/pack_audio.p
 PNG → naiz_conv/mag_convert.py → MAG
 ASSETS.DB → naiz_build/pack_images.py → IMAGE.DAT
 scene/*.nb → naiz_build/build_game.py::pack_scenes → SCENE.DAT（8.3 短名 TOC；跳过 0 字节残留；单脚本 <32 KiB；增量写出；CRLF/CR 自动归一化 LF——引擎归档读取仅认 '\n' 分段）
-ASSETS.DB → naiz_build/export_asset_table.py → core/engine/nb_asset_table.h（asset/spr/char/expr/anim/cg_map 六表 + CG_COUNT 常量 + bgm_map/snd_map/voice_map 三音频表）
+ASSETS.DB → naiz_build/export_asset_table.py → core/engine/nb_asset_table.h（asset/spr/char/expr/anim/cg_map 六表 + CG_COUNT 常量 + bgm_map/snd_map/voice_map 三音频表 + **0.3.006** 起 `cg_thumb_map[]` / `CG_THUMB_COUNT` 画廊缩略图表）
+
+CG 缩略图子管线（0.3.006，`tools/naiz_build/cg_thumb.py`）：`assets/**/images.map` 源 PNG →（ASSETS.DB `type='CG'` 行驱动）→ cover 裁切 144×84 → `projects/<game>/images/<cg_name>_t.MAG` → 注册 `type='THUMB'` → 随 IMAGE.DAT 打包。`cg_thumb_map[]` 与 `cg_map[]` **逐下标平行**（缺缩略图输出 `id=0`，不压缩数组）。因 `pack_images.py` 全图共享同一 256 色调色板，缩略图无需调色板切换。
 ASSETS.DB(bgm/snd/voice 行) → naiz_audio/pack_audio.py → AUDIO.DAT（8.3 短名 TOC 碰撞硬拒；BGM 直通 MIDI 原字节，SE/voice 校验 .pcm 头）
 assets + .nb → naiz_build/build_game.py → games/<game>/
 games/<game>/ → naiz_img/inject.py → disks/<game>.hdi

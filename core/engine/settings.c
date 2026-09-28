@@ -15,6 +15,17 @@
 
 static GameSettings g_settings;
 
+/* Valid typewriter speeds (single source of truth; see settings.h). */
+const int SETTINGS_TEXT_SPEEDS[SETTINGS_TEXT_SPEED_N] = {
+    TEXT_SPEED_INSTANT, 16, TEXT_SPEED_DEFAULT, 64
+};
+
+/* Display labels, index-aligned with SETTINGS_TEXT_SPEEDS.  These are
+ * English tr() keys, resolved by the settings menu at draw time. */
+const char *const SETTINGS_TEXT_SPEED_LABELS[SETTINGS_TEXT_SPEED_N] = {
+    "Instant", "16/s", "32/s", "64/s"
+};
+
 const char *settings_get_version(void)
 {
     return g_settings.version;
@@ -42,9 +53,13 @@ int settings_get_text_speed(void)
 
 void settings_set_text_speed(int speed)
 {
-    if (speed == TEXT_SPEED_INSTANT || speed == 16 ||
-        speed == 32 || speed == 64)
-        g_settings.text_speed = (unsigned char)speed;
+    int i;
+    for (i = 0; i < SETTINGS_TEXT_SPEED_N; i++) {
+        if (SETTINGS_TEXT_SPEEDS[i] == speed) {
+            g_settings.text_speed = (unsigned char)speed;
+            return;
+        }
+    }
 }
 
 /*
@@ -57,7 +72,7 @@ int settings_load(void)
     FILE *f = fopen("settings.txt", "r");
     char line[64];
     char *eq, *val, *nl;
-    int known, ds, bs, ts;
+    int known, ds, bs, ts, i;
 
     memset(&g_settings, 0, sizeof(g_settings));
     g_settings.text_speed = TEXT_SPEED_DEFAULT;
@@ -113,8 +128,12 @@ int settings_load(void)
         } else if (strcmp(line, "text_speed") == 0) {
             known = 1;
             ts = atoi(val);
-            if (ts == TEXT_SPEED_INSTANT || ts == 16 || ts == 32 || ts == 64)
-                g_settings.text_speed = (unsigned char)ts;
+            for (i = 0; i < SETTINGS_TEXT_SPEED_N; i++) {
+                if (SETTINGS_TEXT_SPEEDS[i] == ts) {
+                    g_settings.text_speed = (unsigned char)ts;
+                    break;
+                }
+            }
             /* unknown values fall back to the default (32) */
         }
 

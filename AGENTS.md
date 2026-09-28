@@ -1,8 +1,8 @@
 # Naiz — AI 编程规则
 
-> **当前版本**: `0.3.002`（`projects/demo-a2/config.toml`）
+> **当前版本**: `0.3.006`（`projects/demo-a2/config.toml`）
 >
-> **开发历史已移至 [`CHANGELOG.md`](CHANGELOG.md)**: R1–R30、0.2.109–0.2.117 及动画工具链等全部 Bug 修复/功能演进记录均以条目形式存于根目录 `CHANGELOG.md`，**本文件（AGENTS.md）不承载任何开发历史摘要，只存规则与当前版本**；历史速查一律读 CHANGELOG.md（最新：资产市场交互菜单启动清屏一次/0.3.002），新条目追加到 CHANGELOG.md 顶部而**不是**本文件。
+> **开发历史已移至 [`CHANGELOG.md`](CHANGELOG.md)**: R1–R30、0.2.109–0.2.117 及动画工具链等全部 Bug 修复/功能演进记录均以条目形式存于根目录 `CHANGELOG.md`，**本文件（AGENTS.md）不承载任何开发历史摘要，只存规则与当前版本**；历史速查一律读 CHANGELOG.md（最新：CG 画廊三修：真实缩略图 + 调色板保序 + footer 统一/0.3.006），新条目追加到 CHANGELOG.md 顶部而**不是**本文件。
 >
 > **防复发机制**: 见 §十九 — 每次修改后必须对照 C16/P11/S7 等 39 条规则逐一检查。
 >
@@ -189,6 +189,11 @@ naiz_midi / naiz_music 已作为独立项目移出到 `~/`。详见 `docs/B91-�
 4. 必须为 `config.toml` `i18n.targets` 各语言在 `sys_<lang>.txt` 提供对应译文；空值视为未完成（运行时回退英文）
 5. 含 `%d` 等格式串整句翻译（译文保留 `%d`），经 `snprintf(buf, tr(fmt), n)` 展开
 6. 角色名与剧情文案的**原文基准遵循项目设定**（脚本原文 / `char_map` 规范名 / `source_lang`），其翻译照常经 `role_<lang>.txt` / `game_<lang>.txt` 提供——本节强制范围仅限**系统界面文字**（`sys_<lang>.txt`，8.3 安全基名）
+
+### 语言选择（Language）归属
+- **Language 行永久留在开机菜单**（`settings_menu.c` / `startsetting`），游戏内设置场景（`settingmenu` / `nb_setting.c`）**不得新增 Language 行**
+- 机制原因：开机菜单运行于 `tr_init()` + CJK 字库加载**之前**，必须纯 ASCII 绘制；且语言须在翻译表存在**之前**选定，故游戏内无法安全改语言
+- 开机菜单仍每次启动显示（Language + Start Game），只承载语言选择；其余设置项（Text Speed 等）走游戏内设置场景
 
 ### 对话框文字清除
 - 标准方法：`layer_dialog_restore()`，禁止 `fill_rect` / `fill_rect_pattern` / `scene_draw_dialog()`
