@@ -4,8 +4,9 @@ Covers the AGENTS.md §13 mandatory rules (pack = top-level dir, display-name
 first-segment-paren rule, whole-pack download) plus download mechanics:
 skip-existing (default) / force overwrite, atomic write, size validation,
 path-boundary guard, LICENSE copy, dry-run, and the numeric-menu selection
-parser. Network is fully monkeypatched; nothing touches the network or the
-filesystem outside tmp_path.
+parser. Also pins the interactive menu's one-shot screen clear (TTY-guarded,
+not repeated per redraw). Network is fully monkeypatched; nothing touches the
+network or the filesystem outside tmp_path.
 """
 
 import pytest
@@ -232,6 +233,59 @@ def test_parse_selection_rejects_bad_input():
         parse_selection("a-b", 5)
     with pytest.raises(ValueError):
         parse_selection("2-1", 5)
+
+
+# ---------------------------------------------------------------------------
+# Screen clear
+# ---------------------------------------------------------------------------
+
+class _FakeTTY:
+    """Minimal stdout stand-in exposing only what clear_screen() touches."""
+
+    def __init__(self, tty):
+        self.tty = tty
+        self.written = ""
+
+    def isatty(self):
+        return self.tty
+
+    def write(self, text):
+        self.written += text
+
+    def flush(self):
+        pass
+
+
+def test_clear_screen_emits_ansi_on_tty(monkeypatch):
+    fake = _FakeTTY(True)
+    monkeypatch.setattr(market.sys, "stdout", fake)
+    market.clear_screen()
+    assert fake.written == market.CLEAR_SCREEN
+
+
+def test_clear_screen_skipped_when_not_tty(monkeypatch):
+    fake = _FakeTTY(False)
+    monkeypatch.setattr(market.sys, "stdout", fake)
+    market.clear_screen()
+    assert fake.written == ""
+
+
+def test_clear_screen_skipped_on_dumb_terminal(monkeypatch):
+    fake = _FakeTTY(True)
+    monkeypatch.setattr(market.sys, "stdout", fake)
+    monkeypatch.setenv("TERM", "dumb")
+    market.clear_screen()
+    assert fake.written == ""
+
+
+def test_menu_clears_screen_once_per_session(tmp_path, monkeypatch):
+    m = _market(tmp_path, monkeypatch)
+    calls = []
+    monkeypatch.setattr(market, "clear_screen", lambda: calls.append(1))
+    answers = iter(["1", "0"])
+    monkeypatch.setattr("builtins.input", lambda prompt="": next(answers))
+    m.menu()                              # downloads pack 1, then quits
+    assert len(calls) == 1                # one clear, not one per redraw
 
 
 # ---------------------------------------------------------------------------

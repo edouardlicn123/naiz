@@ -14,7 +14,8 @@ downloaded whole; there is no file-level selection.
 Subcommands:
   list      list all packs (display name, file count, total size)
   cats      list pack display names and file counts only
-  menu      interactive numeric pack picker (downloads in pack units)
+  menu      interactive numeric pack picker (downloads in pack units);
+            clears the screen once at startup (skipped when stdout is not a TTY)
   get       download one or more named packs (exact dir / suffix kind)
   get-all   download every pack
 
@@ -35,6 +36,7 @@ from pathlib import Path
 GITHUB_API_ROOT = "https://api.github.com/repos"
 RAW_ROOT = "https://raw.githubusercontent.com"
 DEFAULT_CONFIG_NAME = "market.toml"
+CLEAR_SCREEN = "\033[2J\033[H"
 
 
 class MarketError(RuntimeError):
@@ -87,6 +89,16 @@ def human_size(num):
             return f"{num:.0f} {unit}" if unit == "B" else f"{num:.1f} {unit}"
         num /= 1024.0
     return f"{num:.1f} GB"
+
+
+def clear_screen():
+    """Clear the terminal and home the cursor; no-op on non-TTY output."""
+    if not sys.stdout.isatty():
+        return
+    if os.environ.get("TERM") == "dumb":
+        return
+    sys.stdout.write(CLEAR_SCREEN)
+    sys.stdout.flush()
 
 
 def safe_target(dest, path):
@@ -263,13 +275,17 @@ class Market:
     # -- interactive numeric pack menu --------------------------------------
 
     def menu(self):
+        clear_screen()
+        first = True
         while True:
             all_packs = self.packs()
             if not all_packs:
                 raise MarketError(f"no packs found in {self.repo} @ {self.ref}")
             widths = [len(self.display_name(d)) for d in all_packs]
             pad = max(widths) if widths else 0
-            print("")
+            if not first:
+                print("")              # redraws need a gap after the log
+            first = False
             print("Naiz Asset Market")
             print(f"  repo : {self.repo}   @ {self.ref}")
             print(f"  {len(all_packs)} packs  ->  {self.dest}/ (gitignored)")

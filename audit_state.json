@@ -1,7 +1,7 @@
 {
   "version": 2,
-  "git_head": "6ee9ab9",
-  "checked_at": "2026-09-27T16:14:55",
+  "git_head": "08c5a62",
+  "checked_at": "2026-09-28T08:59:14",
   "files": {
     "core/build.sh": {
       "sha256": "0e6bb3f41cae8f6c5a014a49767f93990ddd3e2c461a85ec991c01b40b66b11e",
@@ -1331,12 +1331,12 @@
       "findings": []
     },
     "tools/naiz_market/market.py": {
-      "sha256": "db98d90db75ce10ba48a42c75914e8e3d992203639e0d8048ef3d0bef9c6ac7f",
+      "sha256": "61cfc564d2a57d36d860a5f16f61d23013e79c34380c4d096c0b044c3a43e525",
       "violations": 0,
       "candidates": 1,
       "findings": [
         {
-          "line": 363,
+          "line": 379,
           "rule": "P8",
           "level": "HEUR"
         }
@@ -1405,7 +1405,7 @@
     "violations": 0,
     "candidates": 46,
     "fresh_violations": 0,
-    "fresh_candidates": 0,
+    "fresh_candidates": 1,
     "verified": 26,
     "stale": 0,
     "open": 20

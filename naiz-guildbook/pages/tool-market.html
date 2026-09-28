@@ -35,11 +35,12 @@ dest = "assets_samples"               # 本地落点</code></pre>
 <tr><th>子命令</th><th>作用</th></tr>
 <tr><td><code>list</code></td><td>列出全部包（显示名 / 文件数 / 总大小）</td></tr>
 <tr><td><code>cats</code></td><td>仅包显示名 + 文件计数</td></tr>
-<tr><td><code>menu</code>（默认）</td><td>交互式数字选包（支持 <code>1 2</code>、<code>1-3</code>，回车即整包下载）</td></tr>
+<tr><td><code>menu</code>（默认）</td><td>交互式数字选包（支持 <code>1 2</code>、<code>1-3</code>，回车即整包下载）；启动时清屏一次，后续重绘不清，下载日志保留在菜单上方</td></tr>
 <tr><td><code>get &lt;包&gt;...</code></td><td>命令行整包下载（原始目录名或后缀种类名）</td></tr>
 <tr><td><code>get-all</code></td><td>下载全部包</td></tr>
 </table>
 <p>通用参数（置于子命令后）：<code>--repo</code> / <code>--ref</code> / <code>--dest</code> / <code>--config</code> / <code>--dry-run</code>（只规划不写盘）/ <code>--force</code>（覆盖已存在文件）。</p>
+<p>清屏只作用于 <code>menu</code>，且仅在输出是终端时生效（重定向到文件、过管道时写入纯文本，不含转义序列）。</p>
 
 <h2>4. 常见用法示例</h2>
 <pre><code># 交互菜单（推荐）

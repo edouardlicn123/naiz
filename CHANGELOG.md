@@ -6,6 +6,7 @@
 
 | 条目 |
 |------|
+| [0.3.002 — 资产市场交互菜单启动清屏一次（TTY 守卫）](#c33) |
 | [0.3.001 — 0.3 开版（minor 进位）](#c32) |
 | [0.2.148 — 0.2 收官：devdocs 68–115 归纳为 0.2 版开发文档总结](#c31) |
 | [0.2.147 — guildbook 新增两篇：cf07 图片登记 + tool-market 资产市场](#c30) |
@@ -39,6 +40,18 @@
 | [0.2.119 — powered 资产归位 `common/logo/` + 资产键统一](#c16) |
 | [Bug 修复状态（R1–R30 综合摘要与历史子条目）](#c17) |
 
+---
+
+<a id="c33"></a>
+### 0.3.002 — 资产市场交互菜单启动清屏一次（TTY 守卫）
+
+资产市场交互菜单（`market.sh` 无参 / `market.sh menu`）启动时清屏一次，取代原先「每轮重绘前打一个空行」的凑合分隔；下载日志留在菜单上方，菜单在其下重绘。
+
+- `tools/naiz_market/market.py`：新增常量 `CLEAR_SCREEN = "\033[2J\033[H"` + 助手 `clear_screen()`（Helpers 段），`Menu.menu()` 在 `while` 循环**之前**调用一次（早于 `packs()` 取树，错误信息也落在干净屏幕上）；`first` 标志取代无条件 `print("")`，首屏不多打空行。
+- 守卫：`sys.stdout.isatty()` 为假（重定向 / 过管道）或 `TERM=dumb` 时直接返回 → `list`/`cats`/`get`/`get-all` 与管道输出不受影响（本就未接入）。纯 `sys.stdout.write` 转义，不引 `os.system`/子进程（P14）；`market.sh` 保持纯包装未改。
+- `tools/tests/test_naiz_market.py`：新增 4 例 —— TTY 发转义 / 非 TTY 不发 / `TERM=dumb` 不发 / `menu()` 跑满两轮（`input` 返 `1` 再 `0`）清屏计数 `== 1`（钉死「一次」而非「每轮一次」）。`pytest tools/tests/test_naiz_market.py` 23 passed。
+- 文档同步：`docs/B90-参考-函数索引.md` market 行、`naiz-guildbook/pages/tool-market.html` `menu` 行 + 清屏作用域说明。
+- 验证：`bump_version` → 0.3.002（demo-a2/animatest 同步）；`./start.sh fullaudit` 全绿。
 ---
 
 <a id="c32"></a>
