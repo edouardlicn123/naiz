@@ -74,9 +74,16 @@ static unsigned long rd32(const unsigned char *p)
 static void anim_stop_internal(void)
 {
     AnimState *a = &g_anim;
+    int was_waiting;
 
     if (!a->active)
         return;
+
+    /* Capture the waitanima hold before a->wait is cleared below, so the
+     * wake below matches the documented intent: only a pending hold resumes
+     * the script.  A plain anim that ends must not leave VMFLAG_PROCESS set,
+     * or a bg/cg issued right after it advances the script on its own. */
+    was_waiting = a->wait;
 
     if (a->img) {
         mag_release(a->img);
@@ -110,7 +117,8 @@ static void anim_stop_internal(void)
     if (a->decode_buf) { free(a->decode_buf); a->decode_buf = NULL; }
     a->decode_buf_size = 0;
 
-    vm_request_process();
+    if (was_waiting)
+        vm_request_process();
 }
 
 /* Decode container frame `frame` into a fresh MagImage. Returns NULL on any

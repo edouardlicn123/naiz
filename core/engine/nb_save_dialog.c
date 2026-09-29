@@ -16,6 +16,7 @@
 #include "save.h"
 #include "tr.h"
 #include "strutil.h"
+#include "input_boundary.h"
 
 /* Save dialog menu: in-place UI within dialog area. */
 static void save_dlg_draw_slots(int row, int col);
@@ -120,7 +121,7 @@ void save_dialog_menu(void)
     layer_dialog_clear();
 
     menu_save_item_palette();
-    hal_kbd_drain_advance();
+    input_drain_boundary();
 
     save_dlg_draw_header();
 

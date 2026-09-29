@@ -164,8 +164,30 @@ void dialog_show(const char *charname, const char *text)
             NB_DEBUG("dialog_show: text fully displayed\r\n");
         }
         dialog_state.reveal_end = dialog_state.page_start;
-        dialog_state.reveal_active =
-            (settings_get_text_speed() != TEXT_SPEED_INSTANT) ? 1 : 0;
+        /* A line that fits on a single page (page_start == 0 and the render
+         * consumed the whole text) is already fully painted above.  Arming the
+         * reveal for it would overwrite that painting with an empty prefix and
+         * force the reader to click once just to finish typing before a second
+         * click could leave the page — two clicks for one visible transition,
+         * which reads as the line flashing by.  0.3.008 blamed the mouse click
+         * FIFO piling up during the cg() blit; A/B disproved that, because the
+         * mouse is polled rather than IRQ-driven, so a blit misses presses
+         * instead of queueing them.  Single-page lines are therefore shown at
+         * once; the typewriter stays on every page of a multi-page line,
+         * including its last, so the effect remains uniform. */
+        {
+            int single_page = (dialog_state.page_start == 0 && next < 0);
+            dialog_state.reveal_active =
+                (settings_get_text_speed() != TEXT_SPEED_INSTANT &&
+                 !single_page) ? 1 : 0;
+            /* Runtime-visible branch marker.  The typewriter is what makes a
+             * single-page line repaint (full text -> empty prefix -> retype)
+             * and swallow an early click as a reveal-jump, so probes and bug
+             * reports need to see which branch a page took. */
+            NB_DEBUG("dialog_show: typewriter %s (%s page)\r\n",
+                     dialog_state.reveal_active ? "armed" : "off",
+                     single_page ? "single" : "paged");
+        }
         if (dialog_state.reveal_active) {
             reveal_armed = 0;   /* recalibrate wall-clock baseline per page */
             /* Typewriter on: overwrite the just-painted full page with the

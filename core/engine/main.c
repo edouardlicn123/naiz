@@ -26,6 +26,7 @@
 
 /* Debug logging — shared macro in debug.h */
 #include "debug.h"
+#include "input_boundary.h"
 
 /*
  * Engine main entry — initialization + main loop.
@@ -147,7 +148,7 @@ int main(void)
             if (!vm_delay_active() && !(vm_get_flags() & VMFLAG_PROCESS)) {
                 int wait_anim = anim_waiting();
                 NB_DEBUG("[MAIN] Entering input waiting\r\n");
-                hal_kbd_drain_advance();
+                input_drain_boundary();
                 for (;;) {
                     vblank_wait();  /* 60Hz heartbeat (same pace as outer loop) */
                     hal_kbd_update();

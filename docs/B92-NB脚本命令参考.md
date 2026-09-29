@@ -29,7 +29,7 @@
 | `musicmenu` | `cmd_musicmenu` (nb_mainmenu.c) | — | 音乐菜单（TODO 桩，见 STUBS） |
 | `cg` | `cmd_cg` (nb_cg.c) | `cg(){<asset_key>}` | 展示 CG（type='CG' 资产）：资产 key 必须写在花括号负载中——括号位预留给未来的参数设置，**不再承载资产描述**（`cg(key)` 括号形态被硬性拒绝）；绘制后永久解锁该 CG 至 SYSTEM.SAV；**换图同时自动收起对话框并清空当前对白**（R20 全屏事件语义），下一句台词在其上重新开框 |
 | | | `cg(hidedialog)` | 关闭对话框，还原背景区域（与 `bg(hidedialog)` 平行；`cg(){key}` 已自动收起对话框，此指令用于显式收口，见 R20） |
-| `cgvmenu` | `cmd_cgvmenu` (nb_cggallery.c:206) | — | 打开 CG 画廊（由 cgview.nb 调用）：网格浏览 + 锁定占位 + 翻页 + 全屏预览 + 解锁位图缓存（R22）；ESC/Back 回**菜单归属场景** `nb_get_menu_return()`（默认 mainmenu.nb，0.2.140 起 special 进入则回 special.nb）；0.2.079 自 nb_mainmenu.c 拆出，0.2.092 起 menu_layer 渲染；**0.3.006** 已解锁格改显构建期生成的真实缩略图（`cg_thumb_map[]`，缺图回退蓝底），左上角带「CG %02d」序号角标 |
+| `cgvmenu` | `cmd_cgvmenu` (nb_cggallery.c:206) | — | 打开 CG 画廊（由 cgview.nb 调用）：网格浏览 + 锁定占位 + 翻页 + 全屏预览 + 解锁位图缓存（R22）；ESC/Back 回**菜单归属场景** `nb_get_menu_return()`（默认 mainmenu.nb，0.2.140 起 special 进入则回 special.nb）；0.2.079 自 nb_mainmenu.c 拆出，0.2.092 起 menu_layer 渲染；**0.3.006** 已解锁格改显构建期生成的真实缩略图（`cg_thumb_map[]`，缺图回退蓝底），左上角带「%02d」序号角标（深底板白字，0.3.007 起去掉 "CG " 前缀） |
 | `host` | `cmd_host` (nb_commands.c) | `host <text>` | 系统旁白（无角色名） |
 | `loadscene` | `cmd_loadscene` (nb_saveload.c:400) | — | 打开读档选单（由 loadscene.nb 调用），经 `save_load_menu(is_load=1, from_mainmenu=0)` 进入两阶段渲染菜单 |
 | `fei` / `ira` / `neon` | `cmd_dialogue` (nb_commands.c) | `<name>{<text>}` 或 `<name>(<text>)` | 角色台词（自动带角色名） |
@@ -59,6 +59,16 @@ fei → "Fei", ira → "Ira", neon → "Neon"
 - 文本缓冲：`dialog_text_buf[1024]`
 - 解析器限制：`NB_ARGS_MAX = 20`，一次 `cmd(...)` 最多 20 个参数。`mainmenu` 需要 4 固定 + N 项，所以最多容纳 16 个菜单项。若需更多，增大此值即可。
 
+### 剧本编写陷阱（0.3.008 起 devdoc 116；0.3.009 订正第 1 条并补第 4 条，devdoc 117）
+
+以下四点，前三点在剧本层即可触发（无需改 C 代码），第 4 点是验收方式约定：
+
+1. **`cg` / `bg` 之后必须紧跟对白行**。二者是长耗时非阻塞显示操作（解 639×400 MAG + 整屏 blit + 2 次图层快照 + 立绘重绘），引擎不在此等待输入；若其后不接对白页，剧本会在同一 pass 内连续跑过多条命令，玩家来不及看清新画面，而对白页的 page-yield 同时是消费者的等待点。因此**不要在 `cg`/`bg` 之后连写多个非对白命令**（如 `cg` + `char` + `delay`）。
+   > ⚠ 旧版此处把原因写作「blit 期间不轮询 → 点击堆积在 FIFO → 堆积点击被当成本页输入」，**该判定已被 0.3.009 推翻**：`mouse_update()` 纯轮询、无 IRQ，blit 期间是**采不到**而非**堆积**（详见 `devdocs/117` §二）。真正与「首击无效」相关的是下面第 4 条的打字机契约。
+2. **`playanima` 之后紧跟 `bg`/`cg`**：二者隐式 `anim_stop()`。0.3.008 前普通 `anim` 结束会留下未被清除的 `VMFLAG_PROCESS`，导致紧随其后的非对白命令让剧本无输入自行前进；现已门控为「仅 waitanima 持有态才唤醒」。改用 `waitanima` 才会真正暂停。
+3. **`delay` 期间不接受翻页输入**（`vm_delay_active()` 门控输入等待，到点自动继续）——这是 `delay` 的既定语义，非缺陷。
+4. **单页对白不需要在剧本层做任何事，但别用点击次数验收**（0.3.009，devdoc 117）。能装进一页的整句由 `dialog_show()` 一次显示，首击即翻页；这曾因重复 arm 打字机而退化成「首击被吞、需两下」，且**症状随点击时机而变**（打字约 0.6s 打完，慢点就正常）。验收请用 `tools/diag/np2kai_ab.py` 的 `--forbid 'typewriter armed .single page'`（确定性），或直接看串口日志的 `dialog_show: typewriter off (single page)`，**不要数点击**。
+
 ---
 
 ## 2. 关键常量速查
@@ -78,6 +88,24 @@ LAYER_MAX_SPRITES = 16
 PAL_WHITE = 7, PAL_TRANSPARENT = 15
 对话框填充色 = 248
 ```
+
+**引擎 chrome 保留槽 248–255（0.3.007 起图片永不写入）**
+
+```
+248 对话框填充    249 按键 fill      250 菜单白
+251 菜单黄        252 按键 highlight  253 按键 shadow
+254 光标黑        255 无透明哨兵
+```
+
+各槽所有者：`dlg_update_palette()`（248）、`btn_update_palette()`（249/252/253，读取全局
+`g_button_style` = `settings.txt` 的 `btnstyle`，配色表 `COLOR_SCHEMES`）、
+`menu_save_item_palette()`（250/251）、`palette_reset_reserved()`（7/15/254）、
+各场景 widget helper（如画廊 255/254）。
+
+`image_set_palette()`（`core/engine/image.c`）对**所有**图类型跳过 248–255，
+故「载入图片」不再重绘 UI 配色 —— 载入背景/缩略图/立绘后按钮与对话框颜色保持不变。
+该跳过的前提「artwork 不引用 248–255」由 `tools/tests/test_palette_reserved_slots.py`
+守护（逐个解码 `projects/*/images/*.MAG`，断言 `max(pixels) < 248`）。
 
 对话框样式 `g_dialog_style`：
 ```
@@ -123,7 +151,7 @@ ASSETS.DB → naiz_build/pack_images.py → IMAGE.DAT
 scene/*.nb → naiz_build/build_game.py::pack_scenes → SCENE.DAT（8.3 短名 TOC；跳过 0 字节残留；单脚本 <32 KiB；增量写出；CRLF/CR 自动归一化 LF——引擎归档读取仅认 '\n' 分段）
 ASSETS.DB → naiz_build/export_asset_table.py → core/engine/nb_asset_table.h（asset/spr/char/expr/anim/cg_map 六表 + CG_COUNT 常量 + bgm_map/snd_map/voice_map 三音频表 + **0.3.006** 起 `cg_thumb_map[]` / `CG_THUMB_COUNT` 画廊缩略图表）
 
-CG 缩略图子管线（0.3.006，`tools/naiz_build/cg_thumb.py`）：`assets/**/images.map` 源 PNG →（ASSETS.DB `type='CG'` 行驱动）→ cover 裁切 144×84 → `projects/<game>/images/<cg_name>_t.MAG` → 注册 `type='THUMB'` → 随 IMAGE.DAT 打包。`cg_thumb_map[]` 与 `cg_map[]` **逐下标平行**（缺缩略图输出 `id=0`，不压缩数组）。因 `pack_images.py` 全图共享同一 256 色调色板，缩略图无需调色板切换。
+CG 缩略图子管线（0.3.006，`tools/naiz_build/cg_thumb.py`）：`assets/**/images.map` 源 PNG →（ASSETS.DB `type='CG'` 行驱动）→ cover 裁切 144×84 → `projects/<game>/images/<cg_name>_t.MAG` → 注册 `type='THUMB'` → 随 IMAGE.DAT 打包。`cg_thumb_map[]` 与 `cg_map[]` **逐下标平行**（缺缩略图输出 `id=0`，不压缩数组）。因 `pack_images.py` 全图共享同一 256 色调色板，缩略图无需调色板切换；且 0.3.007 起 `image_set_palette()` 不写 248–255，载入缩略图不会抹掉引擎 chrome 配色。
 ASSETS.DB(bgm/snd/voice 行) → naiz_audio/pack_audio.py → AUDIO.DAT（8.3 短名 TOC 碰撞硬拒；BGM 直通 MIDI 原字节，SE/voice 校验 .pcm 头）
 assets + .nb → naiz_build/build_game.py → games/<game>/
 games/<game>/ → naiz_img/inject.py → disks/<game>.hdi

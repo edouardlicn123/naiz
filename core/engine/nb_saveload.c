@@ -24,6 +24,7 @@
 
 /* Debug logging — shared macro in debug.h */
 #include "debug.h"
+#include "input_boundary.h"
 
 #define SLOTS_PER_PAGE 4
 
@@ -257,7 +258,7 @@ static void save_load_menu(int is_load, int from_mainmenu)
         orig_nb[0] = '\0';
 
     menu_save_item_palette();
-    hal_kbd_drain_advance();
+    input_drain_boundary();
 
     hal_mouse_erase_cursor();
     /* All save/load UI drawing routes into the menu layer composite; each

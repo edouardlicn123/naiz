@@ -40,6 +40,7 @@
 #include "debug.h"
 #include "image.h"
 #include "tr.h"
+#include "input_boundary.h"
 
 /* Language list: display names and lang codes */
 static const char *LANG_NAMES[] = {
@@ -204,9 +205,8 @@ void settings_menu_run(void)
 
     NB_DEBUG("settings_menu: enter (default lang=%s)\r\n", LANG_CODES[lang_idx]);
 
-    hal_kbd_drain_advance();
+    input_drain_boundary();
     hal_mouse_set_pos(LAYER_SCREEN_W / 2, LAYER_SCREEN_H / 2);
-    hal_mouse_flush();
 
     /* Background onto VRAM first, so the menu layer's base snapshot captures
      * it (menu widget drawing then composites above the clean background). */

@@ -6,6 +6,10 @@
 
 | 条目 |
 |------|
+| [0.3.010 — 实机验证五禁写入 AGENTS + HDI 新鲜度双守卫 + 守卫自证不变量测试](#c41) |
+| [0.3.009 — 单页对白不再重复 arm 打字机：CG 后首句首击即翻页（devdoc 117）](#c40) |
+| [0.3.008 — 输入边界收口为单一 helper + anim 幽灵唤醒门控 + 阻塞元数据死标志标注（devdoc 116）](#c39) |
+| [0.3.007 — 图片调色板不再侵占引擎 chrome 槽 248–255：Back 按钮跟随全局 btnstyle + 角标只显编号](#c38) |
 | [0.3.006 — CG 画廊三修：真实缩略图（构建期生成）+ 预览返回调色板保序 + footer 统一](#c37) |
 | [0.3.005 — 004 结局章末尾插入 cg01 + Neon 夸 Fei / Fei 回「色猫」七句对白](#c36) |
 | [0.3.004 — 设置菜单九语言译文补齐：速度档标签入表 + tr() 化](#c35) |
@@ -43,6 +47,119 @@
 | [0.2.120 — 菜单 UI 整合落地（devdoc 102）](#c15) |
 | [0.2.119 — powered 资产归位 `common/logo/` + 资产键统一](#c16) |
 | [Bug 修复状态（R1–R30 综合摘要与历史子条目）](#c17) |
+
+---
+
+<a id="c41"></a>
+### 0.3.010 — 实机验证五禁写入 AGENTS + HDI 新鲜度双守卫 + 守卫自证不变量测试
+
+**起因**：0.3.009 的 A/B 一度让**故意回退的构建报 PASS**（`c40` A/B 表里对照组是 `BUG_SIGNATURE_PRESENT`，但更早几轮曾整体报 PASS）。根因不在探针、也不在断言，而是**只跑了 `makegame.sh build`**：它只部署 DOS 树，注入 `disks/<game>.hdi` 的是 `make`，而模拟器启动的是 HDI。探针因此在测**上一个引擎**——而旧引擎的日志**一切正常**，于是「构建不对」这件事在整轮运行里没有任何表征。这一次经历直接催生了本条：把踩过的坑固化成规则 + 自动守卫。
+
+**变更**
+
+1. **`makegame.sh test` HDI 新鲜度门控** — 在 `exec … test-hdi` 之前比对 `disks/$GAME.hdi` 与 `games/$GAME/engine.exe` 的 mtime（`[ "$HDI_PATH" -ot "$ENGINE_PATH" ]`），过期则打印修复步骤并 `exit 1`。位置关键：**必须在启动模拟器之前**，放在 `exec` 之后就是死代码。
+2. **探针 `preflight()` 增 `STALE_HDI` 门控** — 同一比对，命中即返回门控名（`preflight` 失败一律 `sys.exit(1)`）。**顺带修一处既有缺陷**：`preflight` 的失败分支原为 `print(1 if gate in ("NOBOOT","NOWINDOW") else 0)`，即**除两个已废弃门控外所有门控都退出 0**——门控失败却对调用方报成功，正是本轮一直在根治的病；那两个门控名在探针重写时已不存在，故该分支实际等价于「永远返回 0」。
+3. **修 `NO_HDI` 错误路标** — 原文案是「run makegame.sh build」，而 `build` 只部署 DOS 树、**根本不产生 HDI**（`make` 才 inject）。这个错路标正是「只 build 不 make」这一错误认知的诱因之一，现文案改为 `build` + `make` 两步。
+4. **新增 `tools/tests/test_hdi_freshness_guard.py`** — 断言**守卫本身存在且接在文档化入口上**（`makegame.sh` test 分支含 `-ot` 且位于 `test-hdi` 之前；探针 `preflight()` 含 `STALE_HDI` + mtime 比对；门控失败 `sys.exit(1)` 而非 `print`；`NO_HDI` 文案指向 `make`）。
+   **刻意不做**「HDI 过期即 pytest 失败」：那会让**每次改代码都红**（`engine.exe` 变新即过期），噪声源必然被加 skip 或忽略，门控等于没加。状态级断言改为 `NAIZ_CHECK_HDI=1` **可选**启用，产物缺失则 `pytest.skip`（沿用 `test_palette_reserved_slots.py` 惯例）。
+5. **AGENTS.md 新增「实机验证五禁」（§八）** — 五条各自对应 0.3.009 的一次误判，每条给**现象 → 正确判据 → 出处**：
+   - 禁把串口 trace 一次性观察当因果证据（`[INPUT]` 是输入被消费，不等于用户点了；正确判据看 `[MOUSE] b=0/b=1` 轮询序列，原始 trace 是 37 次 `b=0`）；
+   - 禁只 build 不 make（＝跑旧引擎且日志正常）；
+   - 禁用竞态指标当判别器（点击计数 vs 短句 0.6s 打字窗口；改用引擎侧确定性标记 + 探针 `--forbid`）；
+   - 禁门控只覆盖单一输入通道（键盘 `[INPUT] Key confirmed` / 鼠标 `b=1`），且门控失败必须非零退出；
+   - 禁结论推翻后留下互相矛盾的文档。
+   另：§九.6「消灭静默失败」补一句「验证必须证明它测的是目标物，**假通过比失败更危险**」；§十三补录探针（此前 AGENTS 全文未收录该工具）。
+6. **AGENTS §十 新增「结论推翻时的文档订正」** — 这是被 devdoc 116 逼出来的规则空洞：「已完结文档禁止修改」与「结论被推翻」正面冲突，当时只能破例加 errata。现固化为四步路径：原文档正文一字不改 + 顶部 `⚠ ERRATA` 指路 / 新建编号+1 接替文档 / CHANGELOG 加订正标记（锚点与索引号只增不改）/ AGENTS 对应规则就地订正。判定标准：**任何地方还留着一个已知错误的结论，就是未完成**。
+
+**验证**
+
+- 守卫**正向生效**：`touch games/demo-a2/engine.exe` 造过期态后，`./makegame.sh test demo-a2 --serial` 打印 `ERROR: HDI 过期` 并 `exit 1`（未启动模拟器）；探针返回 `VERDICT = STALE_HDI` 且 `exit 1`。`make` 恢复后两者均放行，`preflight()` 返回 `(True, '', '')`。
+- 不变量测试**自证**：临时删除 `makegame.sh` 守卫后 `test_makegame_test_branch_gates_stale_hdi` 转红，恢复后全绿——避免留下又一个没人验证过的守卫。
+- `make -C core` 0 err/0 warn；`pytest tools/tests/` **514 passed / 1 skipped**（新增 5 项，其中 `NAIZ_CHECK_HDI` 状态检查默认 skip）；`./start.sh fullaudit` **7/7**；`bash -n makegame.sh` 通过。
+
+---
+<a id="c40"></a>
+### 0.3.009 — 单页对白不再重复 arm 打字机：CG 后首句首击即翻页（devdoc 117）
+
+**症状**：`projects/demo-a2/scene/nbook004.nb` 第 10 行 `neon(){Hey,you really have a great figure.}`（串口日志 0 基 `line[9]`，紧随 `line[8] cg(){cg01}`）在 CG 之后**首击无效**，需再点一下才翻页。0.3.008 曾把该症状误判为「点击 FIFO 在 blit 期间堆积导致无输入自动翻页」，实机 A/B 已推翻（判定过程见 [0.3.008](#c39) 顶部订正段），本条为真实根因与修复。
+
+**根因**：`core/engine/nb_dialog.c` `dialog_show()` 中，能装进一页的整句先由 `layer_dialog_render_page()` **一次性完整绘制**（`next < 0`），但 `reveal_active` 仍按「非 INSTANT 速度」无条件置位，于是走进「Typewriter on」分支调用 `dialog_render_reveal()`，**用空前缀覆盖刚画好的整页**（只剩对话框盒 + 角色名），再逐字重打。两个后果：
+
+1. **视觉**：整页文字 → 瞬间清空 → 逐字重现，即用户所说的「一闪而过」；
+2. **输入不一致**：`main.c:165-168`（鼠标）与 `main.c:198-201`（键盘）共用同一判定——若点击落在打字机进行中，首击走 `nb_dialog_reveal_finish()`（补完打字、**不翻页**），第二次才 `vm_request_process()`；若打字已打完，首击直接翻页。**同一句对白的行为随点击时机而变**，这正是它长期无法定案的原因；短句的打字机约 0.6s 打完，故「点得慢就正常、点得快要两下」。
+
+**修复**：单页行（`page_start == 0 && next < 0`）不再 arm 打字机，整句一次显示，首击即翻页；**多页行所有页（含末页）保持打字机**，效果统一不变。条件提取为 `single_page` 局部标志，使 arming 分支能同时报告页型。
+
+**新增运行时标记**：`dialog_show()` 现输出 `dialog_show: typewriter armed|off (single|paged page)`。此前该回归**只能靠点击计数观察，而点击计数本身是竞态**（短句 0.6s 内打完，探针开销即可错过窗口）——0.3.009 的 A/B 正是先被这个假通过骗过。标记把「单页行是否 arm 打字机」变成串口日志里的确定性事实。
+
+**诊断工具入库**：`tools/diag/np2kai_ab.py`（NP2kai + xdotool 串口 A/B 探针）。关键设计（均为实测踩坑后固化）：
+
+- `--forbid` 否定断言为**确定性判别**，`--clicks` 点击计数仅作辅助；
+- 按通道取输入采样标记：键盘看 `[INPUT] Key confirmed`、鼠标看 `b=1`——只认鼠标标记会把成功的键盘轮次误报为 `INPUT_NOT_SAMPLED`；
+- 按键走 **XTEST**（`xdotool key` 的 XSendEvent 合成事件会被 wxWidgets 丢弃），且用 `keydown`/`keyup` 显式保持 150ms——`xdotool key` 的按下+抬起仅约 12ms，落在两次 BIOS 端口轮询之间则完全采不到；
+- `--advance-to` 之后从**标记匹配结束位置**而非「当前末尾」开始找 `--target`，否则 CG blit 期间已写出的目标行永远等不到；
+- `STUCK_BOOT_MENU` 等门控失败时打印输入采样数与窗口片段，便于自解释。
+
+**A/B 实证**（`disks/demo-a2.hdi`，同一场景同一参数，仅回退/应用 `!single_page` 一处）：
+
+| 构建 | 标记 | 1 次输入后 `line[10]:` | 判定 |
+|------|------|----------------------|------|
+| 回退 | `typewriter armed (single page)` | 未出现 | `BUG_SIGNATURE_PRESENT` |
+| 修复 | `typewriter off (single page)` | 出现 | `PASS` |
+
+**验证**：`make -C core` 0 err/0 warn；`pytest tools/tests/` **510 passed**（`test_single_page_line_is_not_re_revealed` 对回退灵敏、对修复通过，已双向确认）；`./start.sh fullaudit` **7/7**；`makegame.sh build demo-a2` + `make demo-a2` 成功；探针 A/B 如上表。`bump_version` → `0.3.009`。
+
+**遗留**：`playanima → waitanima` 的 `anim_stop()` 幽灵唤醒门控（0.3.008 变更 3）尚缺专项实机回归，本次 A/B 未覆盖。
+
+---
+<a id="c39"></a>
+### 0.3.008 — 输入边界收口为单一 helper + anim 幽灵唤醒门控 + 阻塞元数据死标志标注（devdoc 116）
+
+**本条性质**：重构 + 预防性防护。
+
+> ⚠ **本条因果判定已于 0.3.009 订正**。原标题为「CG 后首句对白一闪而过根修」，并把根因归给「点击 FIFO 在 `cmd_cg` 整屏 blit 期间堆积」。**该判定被实机 A/B 推翻**：真实根因是单页对白行被重复 arm 打字机（见 [0.3.009](#c40) / `devdocs/117`）。`devdocs/116` 正文按存档规则保留原样，其顶部 errata 指路。
+
+**被推翻的判定（留痕）**：`cmd_cg` 的整屏 blit 期间不调 `hal_mouse_update()` 属实，但**点击并不会因此堆积**——`mouse_update()` 是纯轮询、无 IRQ 路径，鼠标状态只在轮询瞬间被采样，一次完整的「按下 + 释放」若整体落在两次轮询之间就根本采不到。原始证据 `logs/serial_demo-a2_trace.log` 在 CG 之后先出现 **37 次 `b=0` 轮询**，随后才是两次真实点击的 `b=1`，与「无输入自动翻页」的用户自述不符。故原根因段所称「堆积点击被当作新页输入」在物理上不成立；首击是否被吞取决于点击是否落在打字机进行中，因此**症状随点击时机而变**，这也是它长期难以定案的原因。
+
+**保留的变更（各自独立成立，与本症状无因果关系）**
+
+1. **新增 `core/engine/input_boundary.{h,c}`** — 剧本边界统一丢弃用户输入的**单一入口** `input_drain_boundary()` = `hal_kbd_drain_advance()` + `hal_kbd_set_ignore_frames(2)` + `hal_mouse_flush()`。三 call 缺一不可：`kbd_drain_advance()` 内含 `kbd_bios_reset()` 会擦 BIOS 环，但固定延时后即返回、**不等物理释放**，仍按住的方向键/推进键其自动重复码会泄入下一帧（键盘侧确有此路径）；鼠标侧**根本没有清点击 FIFO 的 drain**（`hal_mouse_drain()` 只清 dx/dy 累加器），尽管 blit 期间轮询停摆使点击无从堆积，此 call 仍用于兜住其它来源的陈旧点击。`core/Makefile:35` 为 wildcard，新文件零构建改动。
+2. **10 处入口统一调用**：`nb_save_dialog.c` / `nb_saveload.c` / `nb_setting.c` / `nb_special.c` / `layer.c` 五处补齐三件套（前三类均读 `hal_mouse_was_clicked` 而原先无 flush，菜单刚打开即可能被陈旧点击命中——属**卫生性加固**，非本 bug 根因），加已具备三件套的 `nb_menu.c` / `nb_interact.c` / `settings_menu.c` / `nb_cggallery.c` 统一走 helper。**保持原样**（语义不同）：`main.c` ESC 前 `hal_kbd_flush()`、F7 dump 后 drain、输入等待消费**之后**的 `hal_mouse_flush()`；`nb_saveload.c:show_error_msg()` 的 `drain+wait_any+drain` 三连；`settings_menu.c` 分页内节流。
+3. **`core/engine/nb_anim.c` — anim 幽灵唤醒门控**：`anim_stop_internal()` 尾部 `vm_request_process()` 改为**仅在清零 `a->wait` 之前捕获到 `was_waiting` 时**发出，即只有待决的 waitanima 持有态才恢复脚本（与函数头注释的既定意图一致）。此前无条件唤醒：普通 `anim` 结束后若紧跟 `bg`/`cg`（二者均隐式 `anim_stop()`），残留 `VMFLAG_PROCESS` 在下一条命令不开对白页时会让剧本**无输入自行前进**——与本 bug 症状相似但根因不同，属**独立缺陷**，此处一并根除以免后续误判为「未修干净」。
+4. **死标志标注**（`nb_commands.c`）：`nb_commands_dispatch()` 经核实**不读任何元数据位**，`CMD_BLOCKING` / `CMD_NEEDS_INPUT` / `CMD_TOUCHES_AUDIO` / `CMD_TERMINATES_SCENE` **仅作文档用**。危险点在于 `tools/tests/test_cmd_meta.py:42` 把它们列入「合法标志集」，使命令表**看起来被测试覆盖**而实际语义零强制——新增阻塞 handler 若漏写自暂停，剩余脚本会在单个 pass 内跑完。已在 enum 处与 `nb_commands_dispatch()` 处加注释明示「阻塞由 handler 自行实现，引擎侧唯一暂停点是 `nb_process()` 的 `nb_dialog_pending()`」。**不删标志**：删除需动约 20 行表项 + 改测试标志集，性价比不划算。
+5. **文档**：`docs/B90` 新增「输入边界收口 → `input_boundary.c`」节 + 标注 `mouse_drain()` 与 `mouse_flush()` 不可互换 + `anim_stop_internal()` 门控契约 + `nb_commands_dispatch()` 元数据警示；`docs/B92` 新增「剧本编写陷阱」小节（3 条剧本层即可触发的约束：cg/bg 后须紧跟对白行、playanima 后接 bg/cg、delay 期间不接受翻页输入）；`devdocs/116` 完整开发文档（**其根因段已被 0.3.009 推翻，见该文档顶部 errata**）。
+
+**一处误判纠正**：排查中曾按不存在的符号名 `vm_delay_set` 判定「delay 路径是死代码」，实为 `cmd_delay` → **`vm_set_delay()`**（`nb_commands.c:358`），且 `delay(1.5)` 在 `logo.nb` / `op.nb` 正在使用。`vm_delay_active()` 门控输入等待**正是 delay 的既定语义**（延迟期间不接受翻页、到点自动继续），行为正确，**无需任何改动**——该排除结论已在 devdoc 116 §三记录留痕。
+
+**验证**：`make -C core` 0 err/0 warn；`pytest tools/tests/` **509 passed**；`nb_validator` 两项目 0 errors；`makegame.sh build demo-a2` + `make demo-a2` 成功；`./start.sh fullaudit` **7/7 通过**（`logs/fullaudit_20260929_114418.log`）。`bump_version` → `0.3.008`。
+---
+
+<a id="c38"></a>
+### 0.3.007 — 图片调色板不再侵占引擎 chrome 槽 248–255：Back 按钮跟随全局 btnstyle + 角标只显编号
+
+0.3.006 遗留的两个用户可见问题：画廊格子角标显示成「CG 01」（应为「01」），以及 **Back 按钮不跟随全局 `btnstyle` 配色**（demo-a2 为 `btnstyle=2` 绿，实测 Back 框全黑）。
+
+**根因（0.3.006 的注释把因果讲反了，本轮一并纠正）**
+
+`btn_update_palette()`（`layer_dialog.c:103`）是 249/252/253 三个按键色槽的**唯一所有者**，只有两个调用方：`layer_bg_change()`（`layer_bg.c:168`）与 `btn_set_style()`（`layer_dialog.c:141`）。而 `image_set_palette()`（`image.c`）对非 sprite 图写满 `num_colors=256` 项 —— 用 `mag.c` 自己的公式解析 MAG 头确认 `cg01.MAG` / `cg01_t.MAG` 的 `num_colors` **均为 256**（此前记录的「246 色」是共享调色板里**实际被用到**的颜色数，不是 `num_colors`），配合 `pack_images.py` 把 248–255 写成黑占位，于是**任何一次图片载入都会把 249/252/253 抹成黑**。
+
+`gallery_draw_grid()` 的绘制顺序是「先 12 格（每格已解锁 → `image_load(thumb)` → 三个按键槽变黑），**再** `menu_back_draw(352, focus, emboss=1, …)`」，而 0.3.006 的 `gallery_apply_widget_palette()` 只恢复 250/251/255/254、**恰好漏掉 249/252/253** → Back 框全黑。
+
+**load 菜单为什么正常（即反馈中的「参考」）**：`blacktitle=0`（`games/demo-a2/settings.txt:61`）时它不载入标题图，chrome 紧跟 `layer_bg_change()` 之后绘制，三个槽仍是绿色。它并非用了更高明的写法，只是**恰好没有 image_load 卡在 `btn_update_palette()` 与 chrome 绘制之间**。反推：`blacktitle=1` 时它会以完全相同方式坏掉（12 个槽框 + Back 全黑），属潜伏同类（`blackletter_title` 目前仅 `settings_load()` 一处赋值，无 UI 入口）。
+
+**同根因排查（§十七）**：`image_set_palette()` 写满 0..255 的行为对**所有**图类型成立，sprite 分支只跳过 7/15、照写 248–255，故 `layer_sprite.c` 三处（`:119`/`:145`/`:207`）同属该类 —— 角色显示后再弹确认框时 Yes/No 按钮会变黑。`nb_special.c` / `nb_setting.c` 虽同样用 `BTN_FILL_IDX`，但绘制途中不载入图片，继承 `layer_bg_change()` 的正确值，不受影响；开机菜单 `settings_menu.c` 不用 emboss，亦不受影响。
+
+**变更**
+
+1. `core/engine/image.c` — **咽喉点收敛**：`image_set_palette()` 对**所有**图类型跳过 248–255（新增 `IMG_CHROME_PAL_FIRST/LAST` 局部常量，不 include `render.h`/`scene_layers.h` 以免 `image.c` 反向依赖 UI 层）。这与 sprite 分支已有的「跳过 7/15 保留引擎白」是同一意图的补完：`pack_images.py` 已把 248–255 定义为 `248-255=menu` 保留槽并写黑占位，作品像素实测最大索引 **247 从不引用它们**。一处改好画廊 / load 菜单潜伏路径 / sprite 三处，**零运行时开销**（仅在既有循环里多两个 `continue`），且不碰动画热路径。
+2. `core/engine/nb_cggallery.c`
+   - `gallery_draw_badge()`：`"CG %02d"` → `"%02d"`，底板宽随 `text_width()` 实测自动 48→24px。
+   - **删掉**每格缩略图载入后的 `gallery_apply_widget_palette()` 调用：改 1 后图片已不触碰 248–255，且入口已设定过，该调用成为每格 4 次冗余 `hal_set_palette`（12 格满屏重绘 ×4），留着还会诱导后来者以为「图片载入会抹掉 chrome」。
+   - `gallery_apply_widget_palette()` 保留但**职责收窄**：现在只「设定」画廊自有的 250/251/254/255，按键色 249/252/253 与对话框 248 **交还 `btn_update_palette` / `dlg_update_palette` 真正所有者**，不再重述（否则与全局设置脱钩）。
+   - 修正四处**事实错误/过期注释**：文件头布局（`cell 144x100, y=32/136/240` → `144x84, y=44/132/220`）、槽位所有权说明、`gallery_apply_widget_palette()` 契约、`gallery_exit_preview()` 里「`layer_bg_change` 抹黑保留槽」的因果。
+3. `tools/tests/test_palette_reserved_slots.py`（**新增**）— 锁住改 1 的前提：`image_set_palette()` 跳过 248–255 只有在「无 artwork 像素引用该区间」时成立，否则这类像素会渲染成 chrome 颜色。逐个解码 `projects/*/images/*.MAG`，断言 `max(pixels) < 248`（**35 条**）；另断言引擎侧 `IMG_CHROME_PAL_FIRST/LAST` 与测试常量一致、且跳过是**无条件**的（把守卫改成 sprite-only 即失败，已做变异验证）。MAG 解码复用 `naiz_lib.mag_codec.decode_mag_full()`，未新增解码逻辑。
+
+**验证**：`make -C core` 0 err/0 warn；`pytest tools/tests/` **509 passed**（新增 36 条）；`nb_validator` 两项目 0 errors；`makegame.sh build demo-a2` 成功；`makegame.sh make demo-a2` 成功；`./start.sh fullaudit` **7/7 通过**。附带确认缩略图尺寸无接缝：MAG 头 `right-left+1` = **144**、`bottom-top+1` = **84**，与 `GAL_CELL_W/H` 一致。`bump_version` → `0.3.007`。
 
 ---
 

@@ -79,10 +79,28 @@ case "$SUBCOMMAND" in
             fi
         fi
 
+        # HDI freshness gate (0.3.010): `build` only deploys the DOS tree,
+        # `make` is what injects it into disks/<game>.hdi.  Booting a stale
+        # HDI silently runs an OLD engine: every log line looks normal, so
+        # an A/B or a bug verdict drawn from it is invalid without any error
+        # being raised.  Guard here, at the one moment the emulator is about
+        # to be trusted, rather than in pytest (which would fire on every
+        # source edit).  Guarded by tools/tests/test_hdi_freshness_guard.py.
+        HDI_PATH="$ROOT/disks/$GAME.hdi"
+        ENGINE_PATH="$ROOT/games/$GAME/engine.exe"
+        if [ -f "$HDI_PATH" ] && [ -f "$ENGINE_PATH" ]; then
+            if [ "$HDI_PATH" -ot "$ENGINE_PATH" ]; then
+                echo "=== ERROR: HDI 过期: $HDI_PATH 比 $ENGINE_PATH 旧 ==="
+                echo "    模拟器会运行旧引擎（build 只部署 DOS 树，make 才注入 HDI）。"
+                echo "    修复: ./makegame.sh build $GAME && ./makegame.sh make $GAME"
+                exit 1
+            fi
+        fi
+
         ARGS=()
         [ -n "$SERIAL" ] && ARGS+=("--serial")
         [ -n "$AUTO" ] && ARGS+=("--auto")
-        exec "$VENV_PYTHON" -m tools.env_setup.install_env test-hdi --hdi "$ROOT/disks/$GAME.hdi" "${ARGS[@]}"
+        exec "$VENV_PYTHON" -m tools.env_setup.install_env test-hdi --hdi "$HDI_PATH" "${ARGS[@]}"
         ;;
 
     build)

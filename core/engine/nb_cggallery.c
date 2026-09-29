@@ -24,6 +24,7 @@
 #include "debug.h"
 #include "nb_asset_table.h"
 #include "tr.h"
+#include "input_boundary.h"
 
 /* Cell grid geometry.  GAL_CELL_W/GAL_CELL_H are the thumbnail pixel size
  * generated at build time by tools/naiz_build/cg_thumb.py — the two must
@@ -319,7 +320,7 @@ void cmd_cgvmenu(int argc, const char **argv, const char *cmd_name)
 
     if (CG_COUNT == 0) {
         NB_DEBUG("cgvmenu: CG_COUNT=0, empty gallery\r\n");
-        hal_kbd_drain_advance();
+        input_drain_boundary();
         hal_mouse_erase_cursor();
         draw_text(tr("No CGs available."), 0, 200, 190, 440, 210, 1, GAL_FG);
         hal_mouse_draw_cursor_force();
@@ -339,7 +340,7 @@ void cmd_cgvmenu(int argc, const char **argv, const char *cmd_name)
 
     total_pages = menu_pagecount(CG_COUNT, GAL_CELLS);
 
-    hal_kbd_drain_advance();
+    input_drain_boundary();
     hal_mouse_erase_cursor();
     menu_save_item_palette();
     gallery_palette_save();          /* force slot 255 to the unlock-blue */

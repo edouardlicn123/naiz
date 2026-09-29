@@ -19,6 +19,7 @@
 /*=== Debug ================================================================*/
 
 #include "debug.h"
+#include "input_boundary.h"
 
 /*=== Palette ===============================================================*/
 
@@ -262,7 +263,7 @@ int menu_show(int mx, int my, int cols, int argc, const char **argv)
     NB_DEBUG("menu: cols=%d pos=(%d,%d) wait...\r\n", cols, mx, my);
     NB_DEBUG("menu: pre_reset x=%d y=%d\r\n", hal_mouse_get_x(), hal_mouse_get_y());
 
-    hal_kbd_drain_advance();
+    input_drain_boundary();
     hal_mouse_erase_cursor();
     /* Open the menu layer: all drawing below (menu_draw + version) routes
      * into the composite; commit+blit publishes it atomically.  On OOM the

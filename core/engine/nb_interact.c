@@ -22,6 +22,7 @@
 
 /* Debug logging — shared macro in debug.h */
 #include "debug.h"
+#include "input_boundary.h"
 
 /* Hit-test the option rows within the dialog content band.  Mirrors the
  * legacy question_hittest geometry (base_x + 448 width). */
@@ -71,9 +72,8 @@ int ui_interact(const UiRequest *req)
     for (i = 0; i < n; i++)
         interact_draw_opt(req->labels[i], i, y, mw, i == sel);
 
-    hal_kbd_drain_advance();
+    input_drain_boundary();
     hal_mouse_set_pos(LAYER_SCREEN_W / 2, LAYER_SCREEN_H / 2);
-    hal_mouse_flush();
 
     for (;;) {
         if (--q_timeout <= 0) {

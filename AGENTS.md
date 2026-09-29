@@ -1,8 +1,8 @@
 # Naiz — AI 编程规则
 
-> **当前版本**: `0.3.006`（`projects/demo-a2/config.toml`）
+> **当前版本**: `0.3.010`（`projects/demo-a2/config.toml`）
 >
-> **开发历史已移至 [`CHANGELOG.md`](CHANGELOG.md)**: R1–R30、0.2.109–0.2.117 及动画工具链等全部 Bug 修复/功能演进记录均以条目形式存于根目录 `CHANGELOG.md`，**本文件（AGENTS.md）不承载任何开发历史摘要，只存规则与当前版本**；历史速查一律读 CHANGELOG.md（最新：CG 画廊三修：真实缩略图 + 调色板保序 + footer 统一/0.3.006），新条目追加到 CHANGELOG.md 顶部而**不是**本文件。
+> **开发历史已移至 [`CHANGELOG.md`](CHANGELOG.md)**: R1–R30、0.2.109–0.2.117 及动画工具链等全部 Bug 修复/功能演进记录均以条目形式存于根目录 `CHANGELOG.md`，**本文件（AGENTS.md）不承载任何开发历史摘要，只存规则与当前版本**；历史速查一律读 CHANGELOG.md（最新：实机验证五禁写入 AGENTS + HDI 新鲜度双守卫 + 守卫自证不变量测试/0.3.010），新条目追加到 CHANGELOG.md 顶部而**不是**本文件。
 >
 > **防复发机制**: 见 §十九 — 每次修改后必须对照 C16/P11/S7 等 39 条规则逐一检查。
 >
@@ -47,9 +47,23 @@ PC-98 外部知识参考文档见 `docs/refdocs/README.md`（按 A–H 类分组
 
 参考数据（参考项目、开发文档、NP2kai 模拟器、调试速查）见 `docs/B91-构建环境与参考速查.md §5`。
 
-## 八、调试速查
+## 八、调试与实机验证纪律
 
 见 `docs/B91-构建环境与参考速查.md §5.4`。串口输出（`makegame.sh test <game> --serial`）是最可靠通道。
+
+### 实机验证五禁（0.3.010 起，出处 devdoc 117 §五）
+
+这五条来自 0.3.009 一次根因误判的完整过程——**每一条都曾让错误的结论看起来完全正常**。诊断「一闪而过 / 无输入自行推进 / 首击无效」类症状时逐条对照：
+
+1. **禁：把串口 trace 的一次性观察当因果证据。** `[INPUT] Mouse clicked` 是**输入被消费**的记录，不等于「用户点了」。0.3.009 之前把 CG 后的两次 `[INPUT]` 读成「无输入自动翻页」，据此定案「点击 FIFO 堆积」，而实际上那两次是用户真实点击。
+   **正确判据**：看 `[MOUSE] g=0/0 d=0/0 b=0/…` 的**轮询序列**——`b=1` 之前若有一长串 `b=0`，则期间无输入被采样（原始 trace 是 37 次 `b=0`）。
+2. **禁：只 `build` 不 `make`。** `build` 只部署 DOS 树（`games/<game>`），**`make` 才注入 `disks/<game>.hdi`**，而模拟器启动的是 HDI。只 build 不 make ⇒ 实机跑的是**旧引擎**，而旧引擎的日志**一切正常**，于是 A/B 报 PASS、结论全废却毫无报错。改引擎后必须 `./makegame.sh build <game> && ./makegame.sh make <game>`。**两道守卫已落地**：`makegame.sh test` 比对 HDI 与 `engine.exe` 的 mtime，过期即 `exit 1`；`tools/diag/np2kai_ab.py` 的 `preflight()` 返回 `STALE_HDI` 门控（由 `tools/tests/test_hdi_freshness_guard.py` 守护，删守卫即红）。
+3. **禁：用竞态指标当判别器。** 「点几下才翻页」不是稳定判据——短句打字机约 0.6s 打完，探针自身开销即可错过窗口，回退版照样 PASS。
+   **正确判据**：用引擎侧确定性标记（本例 `dialog_show: typewriter armed|off (single|paged page)`）做**否定断言**（探针 `--forbid`），点击计数仅作辅助。
+4. **禁：门控只覆盖单一输入通道。** 采样门控只认鼠标 `b=1` 时，成功的键盘轮次会被误报为 `INPUT_NOT_SAMPLED`。门控标记必须与被测通道一致（键盘 `[INPUT] Key confirmed` / 鼠标 `b=1`）；同理，门控失败必须**非零退出**（`sys.exit`，不是 `print` 一个码）。
+5. **禁：结论推翻后留下互相矛盾的文档。** 错因写在 CHANGELOG 标题、devdoc 正文、AGENTS 三处，后人会照错的排查。订正路径见 §十「结论推翻时的文档订正」。
+
+> 反面教材与完整踩坑清单（含 XTEST vs XSendEvent、12ms 按压落在轮询间、点击落点落在窗口右边界、`--target` 起点选错）：`devdocs/117-单页对白重复arm打字机根修与输入边界收口订正.md` §五。
 
 ## 九、AI 协作原则
 
@@ -58,7 +72,7 @@ PC-98 外部知识参考文档见 `docs/refdocs/README.md`（按 A–H 类分组
 3. **外科手术**：只改必须改的，保持现有风格一致
 4. **结果导向**：定义成功标准，迭代至验证通过
 5. **先读后写**：完整理解相关代码后再修改
-6. **消灭静默失败**：异常/逻辑未命中时必须明确报错
+6. **消灭静默失败**：异常/逻辑未命中时必须明确报错。**验证同样适用**：门控失败必须非零退出，且必须证明「测的是目标物」——**假通过比失败更危险**（实测：跑旧引擎的 A/B 报 PASS，日志一切正常）。详见 §八 实机验证五禁
 7. **保持一致性**：命名、架构、意图与全局一致
 8. **中文沟通**：compact 后自动切换中文
 9. **英语注释**：日后所有 `.c` 和 `.py` 文件的代码注释统一用英语书写，不再使用中文注释
@@ -73,6 +87,17 @@ PC-98 外部知识参考文档见 `docs/refdocs/README.md`（按 A–H 类分组
 - 复制代码必须附来源项目 + GitHub + 许可证注释
 - 安装失败先查 `logs/env_install.log` 末尾 200 行
 - **用户要求"写 devdoc"时**：在 `devdocs/` 目录写入带数字前缀的开发文档（编号接续现有最大编号 +1，格式 `NN-描述.md`，如 `67-封装改进访问器收口与模块边界固化.md`）。devdocs/ 为历史存档，**已完成的文档禁止修改**（头部状态标记完结/归档），未完成的文档（计划中/规划中/细化中）可继续修订；编号由工具/人工按当前最大号顺延
+
+### 结论推翻时的文档订正
+
+「已完结文档禁止修改」与「结论被推翻」会正面冲突（0.3.008 的 devdoc 116 就是这么被逼出错因长期留存）。**唯一合规的订正路径**，四步缺一不可：
+
+1. **原文档正文一字不改**，仅在头部状态行下追加 `> ## ⚠ ERRATA（<版本> 追加）` 块：写明被推翻的结论、错在哪、正确结论是什么、指向新文档；
+2. **新建接替文档**（编号 +1）承载订正后的完整记录，含「症状 → 判定过程 → 根因 → 修复 → 验证」与踩坑清单；
+3. **CHANGELOG 对应条目加订正标记**并链接新文档；条目标题若本身含错因（标题是历史速查入口），**允许连带改写标题，但锚点号与索引编号只增不改**；
+4. **AGENTS 对应规则条目就地订正**——留在错误规则里的后果最严重，后人一定照它排查。
+
+判定标准：**任何地方还留着一个已知错误的结论，就是未完成**。详见 §八 五禁之五。
 
 ## 十一、显示管线约定
 
@@ -154,6 +179,7 @@ naiz_midi / naiz_music 已作为独立项目移出到 `~/`。详见 `docs/B91-�
 - 封装工作流：用户运行 `start.sh audit` → 审计日志存 `logs/symbol_audit_<时间戳>.log` 并同步输出终端 → AI 读取最新日志的 A/B/E 节 → 核实后执行封装/拆分
 - **规则审计工作流**（§十七 固化）：用户运行 `start.sh fullaudit [--no-make]` → 6 步流水线（规则增量审计/`start.sh audit` 同款 `./start.sh fullaudit`/pytest/py_compile/`bash -n`/symbol_audit/make）整体复用 `tools.audit.audit` 引擎（sha256 增量，状态存 `audit_state.json`，文件哈希不变则 SKIP；扫描范围 `core/*/*.c` + `core/**/*.h` + `tools/**/*.py` + shell，头文件对 C13/C14 门控排除）与 `start.sh audit` 的 symbol_audit 步骤，仅 `--no-make` 跳过 make 节；全部通过后按 `pytest`/`py_compile`/`bash -n`/`symbol_audit`/`make` 顺序输出 `[✓]`。**symbol_audit 第 5 步带 `-s A,B --gate`**：A（未用 static 候选）/B（死导出）节任一输出即 exit 1 判失败（R30），`start.sh audit` 本色保持信息用途不带 gate。AI 修改源码后应主动运行 `./start.sh fullaudit` 验证无回归。AI 核验启发式候选后应主动 `--note REL:LINENO:VERDICT[:TEXT]` 登记到独立 `verify_notes.json`（带**行级**快照，被核行文本未变则无关编辑不 STALE；v1 整文件 sha8 快照兼容加载；单条也可用 `--note rel:line --verdict ok/fixed/todo`）；新代码审查用 `--since <git-ref>`（仅审计变更行，新增违规 exit 1，未变更文件保留既往记录）
 - **市场脚本 `tools/naiz_market/market.py`（根 `market.sh` 包装）**：从市场仓库（`market.toml` `[market] repo`，默认 `edouardlicn123/naiz_assets`）按需整包下载资源到 `<dest>/`（默认 `assets_samples`，gitignored）。**强制规律**：市场仓库**顶层目录 = 一个资源包**，整包下载、不做文件级选择；**包显示名规律**——目录名按 `_` 切分，首段 `()` 包裹、余段以空格连接（`images_sample_scenebg` → `(images)sample scenebg`）；`list`/`menu` 一律按此显示包名，包解析接受 原始目录名 / 后缀种类名 两种。后续更新本脚本必须保持此规律。**下载去重**：目标路径已有同名文件时默认跳过（打印 `SKIP (exists)`，不下载不覆盖）；需刷新用 `--force` 强制覆盖。四个子命令均支持 `--force`。**清屏**：仅交互 `menu` 在进入循环前调 `clear_screen()` 清屏一次（菜单重绘不再清，下载日志留在菜单上方），`isatty()` 为假或 `TERM=dumb` 时不发转义（管道/重定向保持纯文本）。
+- **交互 A/B 诊断探针 `tools/diag/np2kai_ab.py`**（`python -m tools.diag.np2kai_ab`，0.3.010，devdoc 117）：NP2kai + xdotool 串口 A/B 探针。`--advance-to` 推进到前置标记 → `--target` 等目标状态 → `--clicks` 次输入 → `--quiet` 静默窗内判 `--expect`。**`--forbid` 否定断言为确定性判别，点击计数仅作辅助**（短句打字机约 0.6s 打完，点击计数是竞态）。任一门控（`STALE_HDI`/`NO_*`/`NEVER_REACHED_*`/`INPUT_NOT_SAMPLED`/`BUG_SIGNATURE_PRESENT`）一律**不报判定并 `exit 1`**。按键走 XTEST + 显式 150ms 保持（`xdotool key` 的 XSendEvent 被 wxWidgets 丢弃；12ms 按压落在 BIOS 端口轮询之间采不到）。需 `DISPLAY` + `xdotool`，**不进 CI**。用法与踩坑清单见 devdoc 117 §五/§六
 
 ### 变更后更新规约
 
@@ -170,10 +196,16 @@ naiz_midi / naiz_music 已作为独立项目移出到 `~/`。详见 `docs/B91-�
 ## 十四、编码规约
 
 ### 输入循环
-1. 入口 drain：`for(;;) { kbd_update(); … }` 前调 `kbd_drain_advance()`
+1. **入口 drain 一律调 `input_drain_boundary()`**（`core/engine/input_boundary.c`），**禁止裸调 `hal_kbd_drain_advance()`**。它 = `hal_kbd_drain_advance()` + `hal_kbd_set_ignore_frames(2)` + `hal_mouse_flush()`，三 call 缺一不可：
+   - `kbd_drain_advance()` 虽擦 BIOS 环，但固定延时后即返回、**不等物理释放**，仍按住的方向键/推进键其自动重复码会泄入下一帧；
+   - 鼠标侧**根本没有对应 drain** —— `hal_mouse_drain()` 只清 dx/dy 累加器，**不动 `mouse_click_fifo`**，只有 `hal_mouse_flush()` 清；注意 `blit` 期间不轮询是**采不到**而非**堆积**（`mouse_update()` 纯轮询、无 IRQ，一次按下+释放若整体落在两次轮询之间即完全不被采样）
 2. 超时保护：忙等循环引用 `KBD_WAIT_MAX_ITER`
 3. 语义查询：`kbd_is_pressed()`（非消耗）vs `kbd_is_down()`（消耗）
-4. scene 切换：`nb_load()` 末用 `kbd_drain_advance()` + `kbd_ignore_frames = 2`
+4. scene 切换：`nb_load()` 末用 `input_drain_boundary()`
+5. **例外（语义不同，勿合并）**：ESC 前 `hal_kbd_flush()`、dump 后 drain、**消费之后**的 `hal_mouse_flush()`；`nb_saveload.c:show_error_msg()` 的 `drain+wait_any+drain` 三连；分页内节流
+6. **阻塞命令元数据是死的**：`nb_commands_dispatch()` 不读 `CMD_BLOCKING`/`CMD_NEEDS_INPUT`/`CMD_TOUCHES_AUDIO`/`CMD_TERMINATES_SCENE`（仅作文档用，`test_cmd_meta.py` 只强制 `CMD_TOUCHES_DISPLAY`）。阻塞命令**必须自建输入循环**，返回时脚本才可继续；引擎侧唯一暂停点是 `nb_process()` 的 `nb_dialog_pending()`。漏写自暂停 → 剩余脚本在单个 pass 内跑完（详见 CHANGELOG 0.3.008 / devdoc 116）
+7. **`cg`/`bg` 之后须紧跟对白行**：长耗时非阻塞显示操作后若不接对白页，剧本会在同一 pass 内连续跑过多条命令，玩家来不及看清新画面；对白页的 page-yield 同时是消费者的等待点。连写多个非对白命令（`cg` + `char` + `delay`）会跳过这个等待点。`playanima` 后接 `bg`/`cg` 亦须留意 `anim_stop()` 唤醒门控（0.3.008 起仅 `was_waiting` 时唤醒）
+8. **单页对白不 arm 打字机**（`0.3.009` 根修）：`dialog_show()` 中「能装进一页的整句」（`page_start == 0 && next < 0`）已被 `layer_dialog_render_page()` 完整绘制，**不得再进 typewriter 分支**——那会用空前缀覆盖整页再重打（视觉「一闪而过」），并使首击被 `nb_dialog_reveal_finish()` 吞成无效操作、需两下才翻页；多页行所有页（含末页）则保持打字机。`dialog_show()` 输出 `typewriter armed|off (single|paged page)` 标记，改动该处后**用 `tools/diag/np2kai_ab.py` 的 `--forbid` 判定，不要靠点击计数**（短句约 0.6s 打完，点击计数是竞态）
 
 ### 菜单 UI 渲染（两阶段绘制）
 1. 入口全量绘制一次（`draw_rounded_emboss` 等昂贵原语只画一次），循环内只增量改文字颜色/指示符

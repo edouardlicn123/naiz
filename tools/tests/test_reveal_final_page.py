@@ -58,7 +58,7 @@ NB_DIALOG_C = ROOT / "core" / "engine" / "nb_dialog.c"
 
 def _func_body(name):
     src = NB_DIALOG_C.read_text(encoding="utf-8")
-    m = re.search(r"\bvoid\s+" + re.escape(name) + r"\s*\(void\)\s*\n\{", src)
+    m = re.search(r"\bvoid\s+" + re.escape(name) + r"\s*\([^)]*\)\s*\n\{", src)
     assert m, f"nb_dialog.c: function {name}() not found"
     start = m.end() - 1  # position of '{'
     depth = 0
@@ -164,12 +164,47 @@ def test_reveal_page_baseline_recalibrates():
         "virtual clock")
     assert "reveal_char_count = 0" in body, (
         "the arm pass must reset the per-page revealed-char count")
-    src = NB_DIALOG_C.read_text(encoding="utf-8")
-    start = src.index("dialog_state.reveal_active =")
-    window = src[start:start + 400]
-    assert "reveal_armed = 0" in window, (
+    body = _func_body("dialog_show")
+    arm = body.index("dialog_state.reveal_active =")
+    rearm = body.index("reveal_armed = 0")
+    assert arm < rearm, (
         "dialog_show() must re-arm the clock baseline when starting a new "
         "page, else the carry-over time burst-skips the first characters")
+
+
+def test_single_page_line_is_not_re_revealed():
+    # 0.3.008: a line that fits on one page is already fully painted by
+    # layer_dialog_render_page() before the reveal is armed.  Arming it anyway
+    # overwrote that painting with an empty prefix (the "Typewriter on" branch
+    # below), so the reader's first click could only finish the typing — a
+    # reveal-jump with no visible effect — and a second click was needed to
+    # leave the page.  Two clicks for one visible transition reads as the line
+    # flashing by.  The reveal must therefore stay disarmed for a single-page
+    # line (page_start == 0 and the render consumed the whole text).
+    src = NB_DIALOG_C.read_text(encoding="utf-8")
+    m = re.search(r"dialog_state\.reveal_active\s*=(.*?);", src, re.S)
+    assert m, "nb_dialog.c: dialog_show() must assign dialog_state.reveal_active"
+    expr = " ".join(m.group(1).split())
+    assert "TEXT_SPEED_INSTANT" in expr, (
+        "the INSTANT text-speed tier must still disarm the reveal")
+    # The single-page test is factored out into `single_page` so the arming
+    # branch can also report which page kind it took (the marker below); the
+    # assertion follows the variable rather than the raw comparison.
+    assert "!single_page" in expr, (
+        "0.3.008: the reveal must be disarmed for a line that fits on a single "
+        "page, otherwise the first click is swallowed as a no-op reveal-jump "
+        "and the line needs two clicks to leave — the 'dialogue flashes by' "
+        "report")
+    dm = re.search(r"int single_page\s*=\s*(.*?);", src, re.S)
+    assert dm, "nb_dialog.c: dialog_show() must compute the single_page flag"
+    defn = " ".join(dm.group(1).split())
+    assert "page_start == 0" in defn and "next < 0" in defn, (
+        "single_page must mean page_start == 0 && next < 0, i.e. the very "
+        "first page already contains the whole line")
+    assert "typewriter %s (%s page)" in src, (
+        "dialog_show() must report which page kind took the arming branch, so "
+        "the single-page regression is observable in the serial log instead of "
+        "depending on a click landing mid-typewriter")
 
 
 def test_no_per_frame_floor():

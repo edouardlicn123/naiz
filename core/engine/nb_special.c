@@ -23,6 +23,7 @@
 #include "nb.h"
 #include "tr.h"
 #include "debug.h"
+#include "input_boundary.h"
 
 #define SPECIAL_ROWS 4
 
@@ -126,7 +127,7 @@ void cmd_specialmenu(int argc, const char **argv, const char *cmd_name)
     total_pages = menu_pagecount(argc, SPECIAL_ROWS);
 
     menu_save_item_palette();
-    hal_kbd_drain_advance();
+    input_drain_boundary();
 
     hal_mouse_erase_cursor();
     menu_layer_open(0, 0, LAYER_SCREEN_W, LAYER_SCREEN_H, 0);

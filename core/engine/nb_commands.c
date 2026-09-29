@@ -367,10 +367,20 @@ typedef void (*CmdHandler)(int argc, const char **argv, const char *cmd_name);
 /* Command metadata bits (devdoc 103 stage 2 C).  Audited by
  * tools/tests/test_cmd_meta.py: handlers WITHOUT CMD_TOUCHES_DISPLAY must not
  * call any render/layer/palette/image API (keeps the front/back boundary
- * from regressing through a new handler). */
+ * from regressing through a new handler).
+ *
+ * IMPORTANT — CMD_BLOCKING / CMD_NEEDS_INPUT / CMD_TOUCHES_AUDIO /
+ * CMD_TERMINATES_SCENE are DOCUMENTATION ONLY: nb_commands_dispatch() calls
+ * the handler and returns, reading no metadata field.  A blocking command
+ * must therefore run its own input loop and return only when the script may
+ * continue; the only engine-side pause for a command is the
+ * nb_dialog_pending() check in nb_process().  Setting CMD_BLOCKING does NOT
+ * make the engine pause, and test_cmd_meta.py only enforces
+ * CMD_TOUCHES_DISPLAY — a new blocking handler that forgets its own pause
+ * will run the rest of the script in a single pass.  See devdoc 116. */
 enum {
-    CMD_BLOCKING         = 0x01,   /* handler blocks until script may continue */
-    CMD_NEEDS_INPUT      = 0x02,   /* waits for user input (keyboard/mouse) */
+    CMD_BLOCKING         = 0x01,   /* [doc-only] handler blocks until script may continue */
+    CMD_NEEDS_INPUT      = 0x02,   /* [doc-only] waits for user input (keyboard/mouse) */
     CMD_TOUCHES_DISPLAY  = 0x04,   /* writes VRAM / layers / palette / animation */
     CMD_TOUCHES_AUDIO    = 0x08,   /* starts/stops audio */
     CMD_TERMINATES_SCENE = 0x10    /* switches scene (scene_switch) */
@@ -413,6 +423,9 @@ static const CmdEntry cmd_table[] = {
 
 /*=== Dispatch function ====================================================*/
 
+/* Execute one command by name.  NOTE: the CmdEntry metadata is not consulted
+ * here — no bit is read (see the enum comment above); the handler alone
+ * determines whether the script may continue. */
 void nb_commands_dispatch(const char *cmd_name, int argc, const char **argv)
 {
     const CmdEntry *entry = cmd_table;

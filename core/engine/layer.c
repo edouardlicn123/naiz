@@ -10,6 +10,7 @@
 #include "layer_internal.h"
 #include "nb_anim.h"
 #include "hal.h"
+#include "input_boundary.h"
 
 /*=== Lifecycle ===========================================================*/
 
@@ -41,8 +42,7 @@ void scene_end(int skip_transition)
          * next scene's image_load) until the new background is blitted. */
         fill_rect(0, 0, LAYER_SCREEN_W, LAYER_SCREEN_H, 0);
     }
-    hal_kbd_drain_advance();
-    hal_kbd_set_ignore_frames(2);
+    input_drain_boundary();
 }
 
 /* Initialize/reset the layer system.
