@@ -1,7 +1,7 @@
 {
   "version": 2,
-  "git_head": "7b6deb5",
-  "checked_at": "2026-09-29T13:42:07",
+  "git_head": "8f224fc",
+  "checked_at": "2026-09-30T12:40:02",
   "files": {
     "core/build.sh": {
       "sha256": "0e6bb3f41cae8f6c5a014a49767f93990ddd3e2c461a85ec991c01b40b66b11e",
@@ -22,13 +22,13 @@
       ]
     },
     "core/engine/audio.c": {
-      "sha256": "9184166f85a28341ab5b78e09c89bb7c9b6c0c02aeb310df5ccb165e2555e87c",
+      "sha256": "aeb71541a68798e551b54919819a0922bc371c04a3f9cfa90dbd1203f2223cde",
       "violations": 0,
       "candidates": 0,
       "findings": []
     },
     "core/engine/audio.h": {
-      "sha256": "fe83518a7a19f90259c6ff7f960b6b88af834e36372390888eba9a71bc2f4398",
+      "sha256": "f66d4b2cede1468285c8dfc95e460cb9285ea9ef6bf191a995a7ab031ead75ce",
       "violations": 0,
       "candidates": 0,
       "findings": []
@@ -380,7 +380,7 @@
       "findings": []
     },
     "core/engine/nb_setting.c": {
-      "sha256": "7443536c71b36002e702bc00e01300641e73257acaced40fa61b7f439eff48d8",
+      "sha256": "03d8faf85f110bea98b63a53ed4b156d4bd7a2f4a1c2310483b7bb580f225eb2",
       "violations": 0,
       "candidates": 0,
       "findings": []
@@ -530,13 +530,24 @@
       "findings": []
     },
     "core/engine/settings.c": {
-      "sha256": "35937851fdaf64b1c31828001d9e184be0d3677ecbd1717f0350e8b6c530c82c",
+      "sha256": "1a187a20b1a9d59bee2c9f942a47f93a55b7c0e4df357b90fc18045fc566d332",
       "violations": 0,
-      "candidates": 0,
-      "findings": []
+      "candidates": 2,
+      "findings": [
+        {
+          "line": 202,
+          "rule": "C2",
+          "level": "HEUR"
+        },
+        {
+          "line": 235,
+          "rule": "C2",
+          "level": "HEUR"
+        }
+      ]
     },
     "core/engine/settings.h": {
-      "sha256": "7b29a022f0ec9e8bea630dde6587a3ec72e51044cac6aa7e1dbce28d8f12644a",
+      "sha256": "078e2cd45091825f3375d19f96cc0ca3f517aae5b9ba71de185a3d8618faba71",
       "violations": 0,
       "candidates": 0,
       "findings": []
@@ -757,13 +768,13 @@
       "findings": []
     },
     "core/plat/hal.h": {
-      "sha256": "d799b33a36fb2ba90cd281cfc74c3771b68fa33154708469d909b9f90a1f8c23",
+      "sha256": "ff7925df3201c5b7ce68af3c021b3e29f8bd9be6884a12bde90e630e19683267",
       "violations": 0,
       "candidates": 0,
       "findings": []
     },
     "core/plat/hal_audio.c": {
-      "sha256": "511ed496911be035daa6b0a5f3da1448487a5c7d8a1eaa6cf1573acab4de9e90",
+      "sha256": "1d50873bd1df9ce24a0a317f996a84585e896129a90325add4249446e453005e",
       "violations": 0,
       "candidates": 0,
       "findings": []
@@ -1032,7 +1043,7 @@
       "findings": []
     },
     "tools/naiz_build/build_game.py": {
-      "sha256": "1ffc0e9c96806389fa3b55ed2b4b39177fb7c5816d9c4c92536c2405bdc78690",
+      "sha256": "6e9250524cbc7cf61f67e4d71c17c0534e2deaa06b6986201235cf4f3b796514",
       "violations": 0,
       "candidates": 1,
       "findings": [
@@ -1128,7 +1139,7 @@
       "findings": []
     },
     "tools/naiz_conv/i18n_gen.py": {
-      "sha256": "06db59d8ef190266454e647acfd759636c7316315e4504bd34adb0ba4514732f",
+      "sha256": "e92b7cf0917bd0c9093238ad2390dd426eeaf1b2acf2867013916da3d145e9ad",
       "violations": 0,
       "candidates": 0,
       "findings": []
@@ -1430,15 +1441,15 @@
   },
   "summary": {
     "files": 193,
-    "changed": 3,
-    "skipped": 190,
+    "changed": 2,
+    "skipped": 191,
     "out_of_scope": 0,
     "violations": 0,
-    "candidates": 46,
+    "candidates": 48,
     "fresh_violations": 0,
-    "fresh_candidates": 2,
+    "fresh_candidates": 0,
     "verified": 23,
     "stale": 2,
-    "open": 21
+    "open": 23
   }
 }

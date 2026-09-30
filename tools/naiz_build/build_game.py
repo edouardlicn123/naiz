@@ -317,11 +317,18 @@ def deploy_runtime(proj_dir: Path, game_dir: Path):
         stale_cjk.unlink()
         print("  移除过时 CJK.DAT（字库已按语言拆分）")
 
-    # settings.txt
+    # settings.txt — build-owned project config, always replaced.
     settings_src = proj_dir / "scene" / "settings.txt"
     if settings_src.exists():
         safe_copy2(settings_src, game_dir / "settings.txt")
         print("  settings.txt 已部署")
+
+    # USER.CFG — player preferences owned by the runtime (devdoc 118).  It is
+    # deliberately NOT copied, injected or cleared: build must never touch it,
+    # or every build would reset the player's settings.  Stale builds can leave
+    # keys the engine no longer reads; settings.c ignores unknown keys.
+    if (game_dir / "USER.CFG").exists():
+        print("  USER.CFG 已保留（玩家偏好，不覆盖）")
 
     # inject version + blackletter flags from config.toml into deployed settings.txt
     if (proj_dir / "config.toml").exists():

@@ -43,6 +43,22 @@ typedef struct {
 
 static BgmState g_bgm;
 
+/* Player switches (devdoc 118).  Defaults are on: preserving the pre-0.3.011
+ * behaviour means a missing USER.CFG plays everything. */
+static int g_bgm_on = 1;
+static int g_snd_on = 1;
+static int g_vc_on = 1;
+
+/* BGM volume as MIDI CC7, 0-127.  127 == full == 0x7F in the SMF stream. */
+#define AUDIO_BGM_VOL_MAX  127
+static int g_bgm_vol = AUDIO_BGM_VOL_MAX;
+
+/* PCM attenuation 0-15 (0 = loudest, 15 = softest).  Mirrors the A466 bit
+ * layout; see F02 §4.2.  Distinct from AUDIO_PCM_VOL_DEFAULT so the two
+ * units can never be confused at a call site. */
+#define AUDIO_PCM_ATTEN_MAX  15
+static int g_pcm_vol = 0;
+
 /* Free any current BGM event table.  midi_free(NULL) is safe. */
 static void bgm_release(void)
 {
@@ -64,6 +80,20 @@ static int audio_map_find(const AudioAssetMap *map, const char *key)
     return -1;
 }
 
+/* Push CC7 (channel volume) to all 16 channels, skipping the busy poll when
+ * no MPU is present.  Reuses the all-16-channel shape of audio_bgm_stop. */
+static void bgm_apply_volume(void)
+{
+    int ch;
+
+    if (!g_mpu_ok) return;
+    for (ch = 0; ch < 16; ch++) {
+        hal_midi_out((uint8_t)(0xB0 + ch));
+        hal_midi_out(0x07);
+        hal_midi_out((uint8_t)g_bgm_vol);
+    }
+}
+
 void audio_bgm_start(const char *key)
 {
     long off, size;
@@ -72,6 +102,10 @@ void audio_bgm_start(const char *key)
     int count = 0;
 
     if (!key || !key[0]) return;
+    if (!g_bgm_on) {
+        hal_logf("BGM WARN: '%s' ignored (BGM disabled)\r\n", key);
+        return;
+    }
     if (!g_mpu_ok) {
         hal_logf("BGM WARN: '%s' ignored (no MPU detected)\r\n", key);
         return;
@@ -106,6 +140,7 @@ void audio_bgm_start(const char *key)
     g_bgm.idx = 0;
     g_bgm.wall0 = hal_wallclock_smooth_ms();
     g_bgm.active = 1;
+    bgm_apply_volume();
     hal_logf("BGM start '%s' (%d events)\r\n", key, count);
 }
 
@@ -128,6 +163,14 @@ void audio_bgm_stop(void)
 
 static uint8_t *g_pcm_buf;        /* owned container; freed on release */
 
+/* Which channel currently owns the shared PCM path (devdoc 118).  snd and
+ * voice share one mono channel, so turning one off must not cut the other:
+ * a release is issued only when the disabled channel is the current owner. */
+#define PCM_CH_NONE 0
+#define PCM_CH_SND  1
+#define PCM_CH_VC   2
+static int g_pcm_channel;
+
 static void pcm_release(void)
 {
     hal_pcm_stop();
@@ -135,9 +178,11 @@ static void pcm_release(void)
         free(g_pcm_buf);
         g_pcm_buf = NULL;
     }
+    g_pcm_channel = PCM_CH_NONE;
 }
 
-static void pcm_play(const AudioAssetMap *map, const char *key)
+/* 'chan' is PCM_CH_SND / PCM_CH_VC, recorded on every successful play. */
+static void pcm_play(const AudioAssetMap *map, const char *key, int chan)
 {
     long off, size;
     uint8_t *raw;
@@ -179,11 +224,97 @@ static void pcm_play(const AudioAssetMap *map, const char *key)
     hal_pcm_play(raw + PCM_HDR_SIZE, (uint32_t)(size - PCM_HDR_SIZE), rate, 0);
     free(g_pcm_buf);
     g_pcm_buf = raw;
+    g_pcm_channel = chan;
     hal_logf("PCM start '%s' (%ld B, rate %u)\r\n", key, size - PCM_HDR_SIZE, rate);
 }
 
-void audio_snd_play(const char *key) { pcm_play(snd_map, key); }
-void audio_vc_play(const char *key)  { pcm_play(voice_map, key); }
+void audio_snd_play(const char *key)
+{
+    if (!g_snd_on) {
+        hal_logf("PCM WARN: '%s' ignored (sound effects disabled)\r\n", key);
+        return;
+    }
+    pcm_play(snd_map, key, PCM_CH_SND);
+}
+
+void audio_vc_play(const char *key)
+{
+    if (!g_vc_on) {
+        hal_logf("PCM WARN: '%s' ignored (voice disabled)\r\n", key);
+        return;
+    }
+    pcm_play(voice_map, key, PCM_CH_VC);
+}
+
+/*=== Player switches and volume (devdoc 118) ==============================*/
+
+/* Cut the shared PCM path only when the disabled channel owns it, so
+ * switching sound effects off mid-voice leaves the voice playing. */
+static void pcm_disable(int chan)
+{
+    if (g_pcm_channel == chan)
+        pcm_release();
+}
+
+void audio_set_bgm_enabled(int on)
+{
+    int want = on ? 1 : 0;
+
+    if (want == g_bgm_on) return;
+    g_bgm_on = want;
+    if (!want)
+        audio_bgm_stop();
+    hal_logf("AUD bgm %s\r\n", want ? "on" : "off");
+}
+
+void audio_set_snd_enabled(int on)
+{
+    int want = on ? 1 : 0;
+
+    if (want == g_snd_on) return;
+    g_snd_on = want;
+    if (!want)
+        pcm_disable(PCM_CH_SND);
+    hal_logf("AUD snd %s\r\n", want ? "on" : "off");
+}
+
+void audio_set_vc_enabled(int on)
+{
+    int want = on ? 1 : 0;
+
+    if (want == g_vc_on) return;
+    g_vc_on = want;
+    if (!want)
+        pcm_disable(PCM_CH_VC);
+    hal_logf("AUD vc %s\r\n", want ? "on" : "off");
+}
+
+int audio_get_bgm_enabled(void) { return g_bgm_on; }
+int audio_get_snd_enabled(void) { return g_snd_on; }
+int audio_get_vc_enabled(void) { return g_vc_on; }
+
+void audio_set_bgm_volume(int v)
+{
+    if (v < 0) v = 0;
+    if (v > AUDIO_BGM_VOL_MAX) v = AUDIO_BGM_VOL_MAX;
+    if (v == g_bgm_vol) return;
+    g_bgm_vol = v;
+    /* Immediate effect: CC7 is applied live, no restart needed. */
+    bgm_apply_volume();
+    hal_logf("AUD bgm volume %d\r\n", v);
+}
+
+void audio_set_pcm_volume(int step)
+{
+    if (step < 0) step = 0;
+    if (step > AUDIO_PCM_ATTEN_MAX) step = AUDIO_PCM_ATTEN_MAX;
+    g_pcm_vol = step;
+    hal_pcm_set_volume(step);
+    hal_logf("AUD pcm volume %d\r\n", step);
+}
+
+int audio_get_bgm_volume(void) { return g_bgm_vol; }
+int audio_get_pcm_volume(void) { return g_pcm_vol; }
 
 /*=== Lifecycle ==========================================================*/
 

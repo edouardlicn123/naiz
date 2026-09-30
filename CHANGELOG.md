@@ -6,6 +6,9 @@
 
 | 条目 |
 |------|
+| [0.3.013 — i18n 译文宽度守卫：4/9 语言行标签 + 5 处值标签曾被静默裁剪（devdoc 119 §3.4/§5.1）](#c44) |
+| [0.3.012 — devdoc 118 规格订正 + 文档一致性回归守卫 `test_devdoc_refs.py`（devdoc 119）](#c43) |
+| [0.3.011 — 玩家偏好分家 USER.CFG + 游戏内设置扩展 7 行（三开关/双音量/阅读进度）+ 86 板 PCM 寄存器 refdoc（devdoc 118）](#c42) |
 | [0.3.010 — 实机验证五禁写入 AGENTS + HDI 新鲜度双守卫 + 守卫自证不变量测试](#c41) |
 | [0.3.009 — 单页对白不再重复 arm 打字机：CG 后首句首击即翻页（devdoc 117）](#c40) |
 | [0.3.008 — 输入边界收口为单一 helper + anim 幽灵唤醒门控 + 阻塞元数据死标志标注（devdoc 116）](#c39) |
@@ -49,6 +52,142 @@
 | [Bug 修复状态（R1–R30 综合摘要与历史子条目）](#c17) |
 
 ---
+
+<a id="c44"></a>
+### 0.3.013 — i18n 译文宽度守卫：4/9 语言行标签 + 5 处值标签曾被静默裁剪（devdoc 119 §3.4/§5.1）
+
+**起因**：用户问「还有什么未完成」时做只读审计，按 `text_width` 的真实规则（ASCII 8px / **字节高位即 CJK 16px**，故德语 `ä` 算 16px）逐条量了 9 语言的设置行文案，结论：**0.3.011 声称「15 个新 key × 9 语言已交付」，实际 4/9 语言的行标签放不下会被裁剪**。
+
+| 区域 | 限宽 | 溢出 |
+|---|---|---|
+| 行标签 `SET_LABEL_W` | 170px | `fre` 248 / `ger` 208 / `por` 184 / `spa` 184（`Sound & Voice Volume`） |
+| 值列 `SET_VAL_W` | 80px | `por`+`spa` `Instant` 96 / `fre`+`spa` `Off` 88 / `fre` `Instant` 88 |
+
+**根因**：`test_new_ui_keys_translated_everywhere` 断言「每个 key 在 9 个文件里都有**非空**译文」——校验了**存在性**，没校验**可用性**。且违反项目早已写下的成例 `nb_saveload.c:44`「Box width grows with the translated text so long CJK/European strings are not clipped」，只是没人把那条成例推广到设置行。
+
+**修复**（一律改译文，不动行几何——值列两侧紧邻 `SET_ARR_LX`=330 / `SET_ARR_RX`=450 箭头，加宽余量不足）：
+- 基准 key `Sound & Voice Volume` → `Sound & Voice Vol`（144px）；`fre`/`ger`/`por`/`spa` 译文缩短至 ≤152px；`ita` 由 168px（仅 2px 余量）收紧为 `Volume effetti/voce`
+- 值列改用各国惯用短形并**保持配对称谓**：`fre` `Actif`/`Inactif`、`Immédiat`；`spa` `Inactivo`、`Inmediato`；`por` `Imediato`。`On`/`Off`/`Instant` 经确认**仅**用于设置行（`nb_setting.c:99`、`settings.c:44`），无其他 UI 依赖
+
+**新增守卫**：
+- `tools/tests/test_i18n_label_width.py`（6 函数 / 14 项）——宽度常量从 `core/lib/font.h`、`core/lib/cjk.h` **读取**，行几何从 `nb_setting.c` **读取**，行标签与值标签从 C 源码**正则解析**，测试跟踪引擎而非二次冻结数字；`test_row_labels_parsed_from_engine` 防「正则失效→检查空转」；`test_high_bit_letters_cost_cjk_width` 冻结字节高位规则
+- `test_devdoc_refs.py` 补 `test_every_devdoc_ref_is_registered`（9→10 项）——**关闭白名单的开放世界**：原 `_devdoc_line_refs()` 定义了却从未被调用，白名单只保护「有人记得登记的引用」，新章节里写的引用无人检查。写 §3.4 时把 `nb_setting.c:241` 写成 `:240` **全绿通过**，正是这个缺口。新增 `STALE_QUOTED_REFS`（22 条）容纳**故意引用的失效值**：真值表左列（118 的错值）与变异表——118 §一/§3/§6/§8 不许改（§十 步骤 1），故错值只能引用不能修
+- `AGENTS.md` §十四 i18n 新增第 5 条「译文必须放得下，不只非空」：记 `text_width` 的字节高位规则、优先改译文而非改几何、指向宽度守卫
+
+**守卫自证**：改回 `fre` 原长串 → 标签列与值列断言**同时**转红（`2 failed, 12 passed`）；把 119 的 `241` 改成 `242` → 封闭性测试转红并指名 `nb_setting.c:242` 未归类。均恢复后全绿。**加上封闭性测试的第一件事**就是抓出 2 条漏登记的真引用（`build_game.py:474`、`render_text.c:235`），证明非空转。
+
+**验证**：`pytest tools/tests/` **569 passed / 1 skipped**；`NAIZ_CHECK_HDI=1` 下 **570 passed / 0 skipped**；`./start.sh fullaudit` 7/7；`make -C core` 0 err / 0 warn；`build+make` 全部通过。`bump_version` 0.3.012 → 0.3.013。
+
+**未完成（不因本次修正而改变）**：118 §十 的实机验证五项（PCM 四档听感、CC7 是否被 MPU-98II 采纳、音量即时生效、7 行分页手感、`USER.CFG` 实机存活）仍未做；「跳过已读 / Backlog / 手柄 / 分辨率 / 字号」按 §四 明确排除。详见 devdoc 118 §十、119 §3.4。
+
+---
+
+<a id="c43"></a>
+### 0.3.012 — devdoc 118 规格订正 + 文档一致性回归守卫（devdoc 119）
+
+**起因**：0.3.011 收口时只核对了「新增的 31 项测试是否存在」（全绿），没核对 devdoc 118 正文的声明与代码是否一致。事后逐条对照发现 118 虽标「完结」，却含**未做的声称**、**夸大的守卫强度**、**不存在的产物**与**20 处失效行号**。
+
+**根因（本轮唯一可复用的教训）**：把「`pytest` 全绿」当成了「文档正确」的证据——**没有任何测试读 `devdocs/`，二者无因果关系**。而 `devdocs/` 的规则只规定「已完成的文档禁止修改」，从未规定**谁在何时校对规格与实现的一致性**，这个双源之间的收敛环节无人负责。118 写于代码改动之前，§六/§七 描述的是**改动后**状态却保留了**改动前**行号（`settings.c` +221/-81、`nb_setting.c` +202/-47），我收口时只刷新了 §十一 验证结果，没回头校引用。
+
+**最隐蔽的一类**：§九 声称「roundtrip 目标改为 `USER.CFG`、`_parse_speed`/`_save_line` 拆两段」，实际**只改了模块 docstring**（`git diff` 8 增 2 删全在注释里，函数体一行未动）。**新增文件容易核对（文件在不在一目了然），而「既有文件被改过」这个事实会掩盖「改的是不是声称的那一处」**。
+
+**修复**（AGENTS.md §十 四步路径，**118 正文一字未改**，仅加 ERRATA 块）：
+
+| 步骤 | 落地 |
+|------|------|
+| 1 原文档加 `> ## ⚠ ERRATA` | `devdocs/118` 头部，四类不符逐条列明 + 指向 119 |
+| 2 新建接替文档 | `devdocs/119-用户偏好分家实装订正与设计门控与规格双源守恒.md`（含 33 处引用逐行核对、26 行行号真值表、计划落差分析） |
+| 3 CHANGELOG 加订正标记 | 本条 c42 内「⚠ 订正」小节 |
+| 4 AGENTS 就地订正 | §十 新增「**规格与实现的收敛责任**」：收口流程固定为「实现 → 逐条核对声称 → 校行号 → 标状态」，并写明 pytest 全绿不构成文档正确的证据 |
+
+**防呆**：`tools/tests/test_devdoc_refs.py`（8 函数 / 9 项）把不可测的「文档对不对」变成可测——行号引用须解析到**含该符号的非空行**、§九 类声称须与测试文件事实相符、**ERRATA 块不得被静默删除**、被引用文档须存在。其中 `test_devdoc_claims_match_test_files` 专门冻结订正后的事实，防止后人照 118 §九 的错声称去「修正」测试代码。
+
+**守卫自证**（4 组变异，全部按预期转红后恢复）：真值表改回失效行号 → 1 红；删 ERRATA 块 → 1 红；白名单塞入指向空行的引用 → 1 红；给 `test_text_speed_settings.py` 加第二个 `_parse_*` 函数（模拟后人照旧文档改代码）→ 1 红。
+
+**过程中我自己又犯了两次同类错误，已记入 119 §五**：① 写白名单时留了占位垃圾 `("nb_setting.c", 178 - 79)`，其值恰是 99 那个失效行号，被守卫当场抓住；② 用 `git checkout` 恢复变异时**连带回退了上一轮尚未提交的 docstring 成果**（`git diff` 变空才发现），已重写——**变异自证后恢复源码必须逐文件核对 `git diff`，不能整文件 checkout**。
+
+**验证**：`pytest tools/tests/` 554 passed / 1 skipped（`NAIZ_CHECK_HDI=1` 下 555 passed）；`./start.sh fullaudit` 7/7；`make -C core` 0 err / 0 warn。**未改动任何 `.c`/`.h`。**
+
+<a id="c42"></a>
+### 0.3.011 — 玩家偏好分家 USER.CFG + 游戏内设置扩展 7 行（三开关/双音量/阅读进度）+ 86 板 PCM 寄存器 refdoc（devdoc 118）
+
+**起因**：勘察游戏内设置场景时撞上两件事——设置页只有 1 行可用（`SETTING_ROWS=4` 的布局里 `g_rows[]` 仅 `Text Speed`），以及一个既存设计缺陷：`settings_save()` 写的是 `games/<game>/settings.txt`，而 `build_game.py` 每次**无条件**用 `projects/<game>/scene/settings.txt` 覆盖它 ⇒ 玩家改的 Language / Text Speed 每次 build 都被打回默认值。第二点决定了整个方案的形态：不先分家，加进去的每一行持久化设置都是「下次构建即丢失」的新增项。
+
+**根因**：`settings.txt` 同时承担两个生命周期方向相反的职责——项目配置（随 commit 走，由 `config.toml` 注入 `version`/`blacktitle`/`blackdialog`）与玩家偏好（随玩家走，运行期回写）。共处一文件 ⇒ 玩家的选择在**设计上**不可能存活。不是某次忘了同步，是结构性问题。
+
+#### 持久化分家
+
+| 文件 | 归属 | 键 |
+|------|------|-----|
+| `settings.txt` | 构建期维护（**不再被运行期回写**） | `dlgstyle` `btnstyle` `version` `blacktitle` `blackdialog`，以及 `lang` 项目默认 |
+| `USER.CFG`（新建，8.3 安全） | 运行期回写 | `lang` `text_speed` `bgm` `snd` `vc` `bgm_vol` `pcm_vol` |
+
+- 载入顺序：`settings.txt` → 叠加 `USER.CFG`（玩家优先）；缺任一文件为合法首启态，两种情况均有 `hal_log` 诊断。
+- `settings_save()` 改为只写 `USER.CFG` 7 键；三个调用点（`main.c` / `nb_mainmenu.c` / `nb_setting.c`）签名与位置不动。
+- `build_game.py` 增「`USER.CFG` 已保留」分支：**只探测、只打印，不绑定变量名、不写入**。
+- 抽出 `read_kv()` 供两文件共用，畸形行行为完全一致（消除原先 `feof(stdout)` 的错误句柄）。
+- 语言回落链保留：玩家未选 ⇒ 继承 `settings.txt` 的 `lang` 项目默认。
+
+#### 设置场景 1 行 → 7 行（2 页）
+
+| 页 | 行 |
+|----|-----|
+| 1 | Text Speed · BGM · Sound Effect · Voice |
+| 2 | BGM Volume · Sound & Voice Volume · Read Progress |
+
+- `SettingRow` 增加 `kind`（`ROW_ENUM` / `ROW_READOUT`）与 `text()`。**只读行不画 `<`/`>`、不响应 step、不响应箭头命中**——原实现是无条件画箭头、无条件循环，必须显式分叉。
+- **补上分页状态**（勘察时误判「翻页器已实现」）：原文件头注释明写「没有分页状态」且 `cmd_settingmenu` 有 `N_SETTING_ROWS > SETTING_ROWS` 直接 return 的硬门。现照 `nb_saveload.c` 范式补 `page` / `setting_row_count()` / `setting_row_abs()` / `setting_row_at()`，键盘用 Tab 换页（无 Shift-Tab：HAL 不提供修饰键查询，双键绑定不可靠）、只读行与 Back 焦点上的 LEFT/RIGHT 翻页，鼠标走 `menu_page_hit()`。键位说明同步更新。
+- 阅读进度复用 `sys_save_is_cg_unlocked()`，遍历照 `cg_map` 范式，分子按 `CG_TOTAL=99` 夹逼（解锁位图 99 位而资产表可能更多，C6/C29）；`0/0` 零资产兜底。纯数字格式串 ⇒ §十四.2 例外，不经 `tr()`。
+
+#### 三条开关与两条音量（硬件依据 `docs/refdocs/F02_86pcm_registers.md`）
+
+- 状态归 `audio.c`，三入口 `audio_bgm_start` / `audio_snd_play` / `audio_vc_play` 开头加门（已核实 `nb_audio.c` 全经此三处，无旁路）。BGM 关额外 `audio_bgm_stop()`（16 通道 all-notes-off）。
+- **精确切断**：新增 `g_pcm_channel`（NONE/SND/VC），`pcm_play` 赋值、`pcm_release` 清零，关闭某通道**仅当匹配**才 `pcm_release()` ⇒ 关音效不会误伤正在播的语音。
+- BGM 音量 = MIDI **CC7** 三档 `0/64/127` → `0%/50%/100%`（照 `audio_bgm_stop` 的 16 通道循环范式，起播与变更各下发一次，运行期即时生效）。
+- PCM 音量 = 86 板 **A466h** 电子音量四档 `0/5/10/15` → `Max/High/Mid/Low`（新增 `hal_pcm_set_volume()`，夹逼 0..15；`hal_pcm_play` 原有硬编码 `0xA0` 改为跟随当前 step）。
+- **标签刻意不同形**：BGM 用百分比是行业惯例且 0 档真静音；PCM 是 4bit 衰减器、不存在 0 音量、衰减曲线未记载 ⇒ 写 `25%` 是假信息，故用词档。
+- 写入前 `bgm_vol` 吸附到最近档位，手改 `USER.CFG` 也无法让菜单显示一个不可选的数值。
+
+#### 顺带订正三处「代码对、注释错」的术语陷阱（F02 §5.2）
+
+| 位置 | 原写法 | 实际语义 |
+|------|--------|---------|
+| `hal_audio.c` | `PCM_CTRL_A46A_FIFO` / 「A46A programs fifosize」 | bit5 是 **FIFO 中断许可**；置 1 时 A46A 解码为**中断间隔**寄存器 |
+| `hal_audio.c` | `PCM_CTRL_FIFOSIZE_MAX` 0xFF | 数值对，但写的是中断间隔寄存器 |
+| `hal_audio.c` | `outb(A460, 0x01)` / 「board enable」 | A460 写是 **OPNA mask**（bit0 选 OPNA），无「板卡使能」语义 |
+
+`hal_pcm_play` 的六步初始化协议**原本就走对了**（先置 bit5 写间隔、再清 bit5 写 D/A），但靠错误注释掩护——后人照注释改必踩雷。
+
+#### 验证
+
+- `make -C core`：0 err / 0 warn
+- `pytest tools/tests/`：**546 passed**（新增 31 项，`test_user_cfg_settings.py` 14 + `test_audio_settings_invariants.py` 17）
+- `./start.sh fullaudit`：**7/7 通过**（`logs/fullaudit_20260930_114516.log`）
+- `build demo-a2` + `build animatest` + `make demo-a2`：通过
+- `NAIZ_CHECK_HDI=1 pytest tools/tests/`：**546 passed**（无 skip）
+- **实机回归**（`build` 前写入 `USER.CFG`，`build` 后逐字节比对）：内容不变，build 输出「`USER.CFG` 已保留（玩家偏好，不覆盖）」
+- **守卫自证**（临时改坏源码，验证测试转红后恢复）：`hal_pcm_play` 恢复硬编码满音量 → `test_pcm_play_honours_the_stored_volume` 红；`pcm_disable` 改无条件切断 → `test_disable_only_releases_its_own_channel` 红；`settings_save` 改写 `settings.txt` → 2 项红；`settings_load` 误从 `settings.txt` 读 `text_speed` → `test_settings_load_reads_both_files_in_order` 红；`build_game.py` 恢复删除 `USER.CFG`（含绑定变量名的隐蔽写法）→ 2 项红
+
+#### 未验证（不得当作已通过）
+
+- **PCM 四档实际听感**：A466h 的 4bit 衰减**连模拟器都未实现**（MAME 源码 TODO 明列 `Make volume work`，`m_vol[]` 存了但未接 DAC 增益）。`0/5/10/15` 等距划分只是中性做法，等距于听感并非等距。
+- **CC7 是否被 MPU-98II 采纳**：CC7 是标准 GM 通道音量、MAME 的 mpu401 已实现，但 Yamaha 该卡在 UART 模式下的实际响应需实机听；若不采纳，BGM Volume 需退回纯开关。
+- 音量改动在播放中的即时性、7 行布局与翻页手感、`USER.CFG` 跨 build 存活的实机确认：**均待用户实机验证**。
+
+**产出文档**：`devdocs/118-玩家偏好分家与音频开关音量设置场景.md`（完结）、`docs/refdocs/F02_86pcm_registers.md`（新建，A–H 分类 F 声音类）+ `docs/refdocs/README.md` 索引。
+
+#### ⚠ 订正（规格侧，见 `devdocs/119`；实现条目本身继续有效）
+
+本条的实现部分无误，但**其规格来源 devdoc 118 存在四处与代码不符**，收口时未被发现：
+
+1. 118 §九 声称的两处改动（`test_text_speed_settings.py` 的 roundtrip 改指 `USER.CFG`、`_parse_speed`/`_save_line` 拆两段）**未落地**——实际只改了模块 docstring；
+2. 118 §九 把 build 守卫描述为「直接跑 `build_game.py` 部署段」，实际是**源码文本断言**，部署级验证是人工逐字节比对（见上「实机回归」）；
+3. 118 §七 点名的「`USER.CFG` 路径常量」**不存在**，且漏列 `build_game.py` 与两个测试文件；
+4. 118 §一/§三/§六/§八 的 **20 处行号**因实现位移失效（真值表见 119 §二）。
+
+**根因**：把「`pytest` 全绿」当成了「文档正确」的证据——没有任何测试读 `devdocs/`，二者无因果关系。**已落地防线**：`tools/tests/test_devdoc_refs.py`（9 项）把「文档行号引用可解析」「声称与测试文件事实相符」「订正块不得被静默删除」「引用文档存在」变成可测对象；`AGENTS.md` §十 新增「规格与实现的收敛责任」。**本轮未改动任何 `.c`/`.h`**，`pytest` 554 passed / 1 skipped（`NAIZ_CHECK_HDI=1` 下 555 passed）与 `fullaudit` 7/7 依旧通过。
+
+**接替文档**：`devdocs/119-用户偏好分家实装订正与设计门控与规格双源守恒.md`。118 按 §十 步骤 1 正文一字未改，仅加 ERRATA 块。
 
 <a id="c41"></a>
 ### 0.3.010 — 实机验证五禁写入 AGENTS + HDI 新鲜度双守卫 + 守卫自证不变量测试

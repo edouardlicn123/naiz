@@ -42,6 +42,7 @@ Naiz 引擎项目整理的外部 PC-98 知识参考资料。
 | 文件 | 内容 |
 |------|------|
 | `F01_sound_boards.md` | PC-9801-26K (OPN) + PC-9801-86 (OPNA) 声卡：跳线、DIP、兼容性 |
+| `F02_86pcm_registers.md` | 86 板 PCM(86PCM)寄存器级参考：A460/A466/A468/A46A/A46C/A66E 位域、A46A 双用途陷阱、本项目现状对照与未确认项 |
 
 ### G — 编程参考 (Programming Reference)
 

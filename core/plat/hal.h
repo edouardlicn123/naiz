@@ -161,6 +161,8 @@ unsigned long hal_wallclock_smooth_ms(void);
  *   每帧泵 FIFO（A466 bit7=full 时停泵）；loop=1 时数据耗尽自动回绕
  *   pos 至 0（素材表语义决定调用方传入），否则耗尽自动停；hal_pcm_stop
  *   停输出清缓冲。data 由调用方持有（HAL 借用至 play/stop），不自 free。
+ *   hal_pcm_set_volume 写 A466 电子音量（0=最响~15=最轻，**倒序**且
+ *   15 仍非静音）；真静音需 A66E bit0，音量档位见 F02 §4.2。
  */
 int  hal_audio_detect(void);
 void hal_midi_out(uint8_t b);
@@ -168,6 +170,7 @@ void hal_pcm_play(const uint8_t *data, uint32_t len, int rate, int loop);
 void hal_pcm_tick(void);
 void hal_pcm_stop(void);
 int  hal_pcm_active(void);
+void hal_pcm_set_volume(int step);
 
 /*============================================================================
  * 键盘扫描码常量（PC-98 硬件标准）

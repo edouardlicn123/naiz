@@ -1,10 +1,12 @@
 # Naiz — AI 编程规则
 
-> **当前版本**: `0.3.010`（`projects/demo-a2/config.toml`）
+> **当前版本**: `0.3.013`（`projects/demo-a2/config.toml`）
+>
+> **最新条目**: `CHANGELOG.md` `c44` — i18n 译文宽度守卫：4/9 语言行标签 + 5 处值标签曾被静默裁剪（devdoc 119 §3.4/§5.1，0.3.013）。前序 `c43` devdoc 118 规格订正 + 文档一致性回归守卫 `test_devdoc_refs.py`（devdoc 119，0.3.012）。前序 `c42` 玩家偏好分家 `USER.CFG` + 游戏内设置扩展 7 行（三开关 / 双音量 / 阅读进度）+ 86 板 PCM 寄存器 refdoc（devdoc 118，0.3.011）。更前 `c41` 实机验证五禁（0.3.010）、`c40` 单页对白重复 arm 打字机根修（0.3.009）。
 >
 > **开发历史已移至 [`CHANGELOG.md`](CHANGELOG.md)**: R1–R30、0.2.109–0.2.117 及动画工具链等全部 Bug 修复/功能演进记录均以条目形式存于根目录 `CHANGELOG.md`，**本文件（AGENTS.md）不承载任何开发历史摘要，只存规则与当前版本**；历史速查一律读 CHANGELOG.md（最新：实机验证五禁写入 AGENTS + HDI 新鲜度双守卫 + 守卫自证不变量测试/0.3.010），新条目追加到 CHANGELOG.md 顶部而**不是**本文件。
 >
-> **防复发机制**: 见 §十九 — 每次修改后必须对照 C16/P11/S7 等 39 条规则逐一检查。
+> **防复发机制**: 见 §十七 — 每次修改后必须对照 C16/P11/S7 等 39 条规则逐一检查；**写完 devdoc 另须过 §十「规格与实现的收敛责任」**（行号校准 + 声称逐条落地，pytest 全绿不算证据）。
 >
 > **构建验证**: `make -C core` — 0 errors, 0 warnings。Python 工具链全部 `.py` 文件语法通过（`tools/` 下 68 个含 `tools/diag/symbol_audit.py`，不含 venv）。
 
@@ -99,6 +101,15 @@ PC-98 外部知识参考文档见 `docs/refdocs/README.md`（按 A–H 类分组
 
 判定标准：**任何地方还留着一个已知错误的结论，就是未完成**。详见 §八 五禁之五。
 
+### 规格与实现的收敛责任（0.3.011 起）
+
+标为「完结」的 devdoc 同时是一份**规格**，故其正文中的 `file:line` 引用、函数名、符号名**必须与当前代码一致**——否则它是「已知错误的结论」，按上一条判定即未完成。
+
+- **收口流程固定为**：实现 → **逐条核对规格中每项声称** → 校行号 → 标状态。`pytest` 全绿**不构成文档正确的证据**（无任何测试读 `devdocs/`，二者无因果关系）。
+- **最容易漏的是「改动既有文件」类声称**：新增文件容易核对（文件在不在一目了然），而「文件被改过」这个事实会**掩盖「改的是不是声称的那一处」**——实测 `git diff` 全在注释里、函数体一行未动。
+- **行号会随实现位移**：写于改动之前的勘察/设计文档，其行号对当时成立；改动后必须重校，尤其是描述**改动后**状态的章节。
+- **防呆**：`tools/tests/test_devdoc_refs.py`（9 项）持续断言——行号引用可解析到含该符号的非空行、声称与测试文件事实相符、订正块未被静默删除、被引用文档存在。删守卫或改坏即红（devdoc 119）。
+
 ## 十一、显示管线约定
 
 本节为**硬性规定**，未经明确许可不得更改。完整规范见 `docs/B02-显示管线规范.md`。
@@ -157,6 +168,20 @@ for(;;)                  → idle 死循环
 **防呆**：`tools/naiz_img/inject_common._check_dos_collision()` 在根目录与子目录注入前整批校验，发现碰撞即 `RuntimeError` 硬失败（不得静默覆盖）；`tools/tests/test_dos_shortname.py` 对全部项目 i18n/scene 文件做 8.3 与短名互异回归。
 
 **新增文件/改名的规则**：运行相关文件名一律直接取 8.3 安全基名（如 `sys_*`/`role_*`/`game_*`、`nbook*.nb`），不得依赖注入层截断来"擦边"。
+
+### 玩家偏好文件 `USER.CFG`（0.3.011 起，禁止构建路径写入）
+
+`games/<game>/` 下有两份配置，**归属方向相反**：
+
+| 文件 | 归属 | 键 | build 行为 |
+|------|------|-----|-----------|
+| `settings.txt` | **项目** | `dlgstyle` `btnstyle` `version` `blacktitle` `blackdialog` + `lang` 默认 | **无条件覆盖**（`safe_copy2` + 从 `config.toml` 注入三键） |
+| `USER.CFG` | **玩家** | `lang` `text_speed` `bgm` `snd` `vc` `bgm_vol` `pcm_vol` | **只探测、只打印，绝不写入** |
+
+- **禁止在构建/注入路径复制、注入、清理或绑定变量名后删除 `USER.CFG`**——那会让每次 `build` 重置玩家设置。直接事故：0.3.010 之前 `settings_save()` 写 `settings.txt`，而 `build_game.py` 无条件覆盖它，玩家改的 Language / Text Speed 每次构建都被打回默认值（devdoc 118）。
+- 运行期写入只走 `settings_save()`；载入顺序 `settings.txt` → 叠加 `USER.CFG`（玩家优先）；缺文件为合法首启态。
+- 重置玩家设置 = 删除 `USER.CFG`。
+- **防呆**：`tools/tests/test_user_cfg_settings.py::test_build_never_writes_user_cfg` 逐行守卫（允许 `.exists()` 探测与日志行，**「先绑定变量名再 unlink」这种写法同样被拒**），删守卫或改坏即红。
 
 ### 变更规则
 
@@ -219,8 +244,12 @@ naiz_midi / naiz_music 已作为独立项目移出到 `~/`。详见 `docs/B91-�
 2. 禁止硬编码英文直绘（`draw_text` / `draw_text_outlined` / `draw_title_large`）；例外仅限纯数字/格式串（`%d/%d`、`<` `>`、`CG %02d`）、语言自名、版本号
 3. 新增 UI 字符串必须同步登记 `tools/naiz_conv/i18n_gen.py` 的 `SYSTEM_UI_KEYS`，否则 `i18n_gen` 重生成时被标 `# ORPHANED` 使译文失效
 4. 必须为 `config.toml` `i18n.targets` 各语言在 `sys_<lang>.txt` 提供对应译文；空值视为未完成（运行时回退英文）
-5. 含 `%d` 等格式串整句翻译（译文保留 `%d`），经 `snprintf(buf, tr(fmt), n)` 展开
-6. 角色名与剧情文案的**原文基准遵循项目设定**（脚本原文 / `char_map` 规范名 / `source_lang`），其翻译照常经 `role_<lang>.txt` / `game_<lang>.txt` 提供——本节强制范围仅限**系统界面文字**（`sys_<lang>.txt`，8.3 安全基名）
+5. **译文必须「放得下」，不只「非空」**——`draw_text` 在 x1/y1 处**静默裁剪**，超宽不报错、不编译警告，只会看板上少字。凡有固定宽度的绘制区域（设置行标签区 `SET_LABEL_W`、值列 `SET_VAL_W`、按钮、对话框），新增/修改译文后必须确认各语言 `text_width` 均在限宽内：
+   - 度量须与渲染器同规则：`text_width()`（`render_text.c`）按**字节高位**判定，`FONT_GLYPH_W`=8 / `CJK_GLYPH_W`=16——**变音符拉丁字母（`ä`/`é`/`ã`）按 16px 计**，不是 8px；
+   - 优先**改译文**而非改几何：几何一动牵连箭头/命中区/居中公式；确有成例可循（`nb_saveload.c:44` 错误框按 `text_width` 动态加宽）时才动几何；
+   - **防呆**：`tools/tests/test_i18n_label_width.py` 从 `font.h`/`cjk.h`/`nb_setting.c` **读取**宽度常量与行几何，对 9 语言的行标签（7 个）与值标签（13 个）断言不超限；删守卫或改坏即红（devdoc 119 §3.4）
+6. 含 `%d` 等格式串整句翻译（译文保留 `%d`），经 `snprintf(buf, tr(fmt), n)` 展开
+7. 角色名与剧情文案的**原文基准遵循项目设定**（脚本原文 / `char_map` 规范名 / `source_lang`），其翻译照常经 `role_<lang>.txt` / `game_<lang>.txt` 提供——本节强制范围仅限**系统界面文字**（`sys_<lang>.txt`，8.3 安全基名）
 
 ### 语言选择（Language）归属
 - **Language 行永久留在开机菜单**（`settings_menu.c` / `startsetting`），游戏内设置场景（`settingmenu` / `nb_setting.c`）**不得新增 Language 行**

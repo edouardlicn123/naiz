@@ -79,13 +79,25 @@ void hal_midi_out(uint8_t b)
 #define PCM_DACTRL_PORT  0xA46A
 #define PCM_DATA_PORT    0xA46C
 
-#define PCM_CTRL_OUT_EN     0x80  /* bit7: PCM output enable */
-#define PCM_CTRL_A46A_FIFO  0x20  /* bit5: A46A programs fifosize */
+/* Port bit fields (docs/refdocs/F02_86pcm_registers.md §4).  Note that
+ * A468 bit5 does NOT program a "fifosize": it is the FIFO interrupt permit,
+ * and while it is set A46A is decoded as the FIFO *interrupt interval*
+ * register instead of D/A control.  hal_pcm_play() raises it only to write
+ * the interval, then drops it before programming the D/A mode. */
+#define PCM_CTRL_OUT_EN     0x80  /* bit7: FIFO output enable */
+#define PCM_CTRL_A46A_IRQ   0x20  /* bit5: FIFO IRQ permit (A46A = irq interval) */
 #define PCM_CTRL_BUF_RESET  0x08  /* bit3: buffer reset (0->1 edge) */
 
-#define PCM_DACTRL_8BIT_MONO_R 0x50  /* 8-bit, right channel only */
+#define PCM_DACTRL_8BIT_MONO_R 0x50  /* bit6=0: 8bit, bits5-4=01: right only */
 
-#define PCM_CTRL_FIFOSIZE_MAX  0xFF  /* ~32KB threshold */
+/* 0xFF + 1 * 128 = 32768 = exactly the 32KB FIFO capacity. */
+#define PCM_IRQ_INTERVAL_MAX 0xFF
+
+/* A466 electronic volume: bit7-5 select the path (101b = VOL6 = PCM direct
+ * output), bit3-0 are the attenuation — REVERSED, 0 = loudest and 15 still
+ * audible.  True PCM mute is A66E bit0, not this register. */
+#define PCM_VOL_PATH_PCM    0xA0
+#define PCM_VOL_ATTEN_MAX   15
 
 #define PCM_TICK_MAX_BYTES 2048
 
@@ -99,10 +111,21 @@ struct pcm_state {
 };
 
 static struct pcm_state g_pcm;
+static int g_pcm_vol;    /* A466 attenuation 0-15, 0 = loudest */
 
 int hal_pcm_active(void)
 {
     return g_pcm.active;
+}
+
+void hal_pcm_set_volume(int step)
+{
+    if (step < 0)
+        step = 0;
+    if (step > PCM_VOL_ATTEN_MAX)
+        step = PCM_VOL_ATTEN_MAX;
+    g_pcm_vol = step;
+    outb(PCM_STATUS_PORT, (uint8_t)(PCM_VOL_PATH_PCM | step));
 }
 
 void hal_pcm_play(const uint8_t *data, uint32_t len, int rate, int loop)
@@ -117,18 +140,19 @@ void hal_pcm_play(const uint8_t *data, uint32_t len, int rate, int loop)
         rate = 7;
     rate_code = (uint8_t)rate;
 
-    outb(PCM_ID_PORT, 0x01);  /* board enable */
+    outb(PCM_ID_PORT, 0x01);  /* OPNA mask: bit0=1 selects OPNA, bit1=0 = not forced silent */
 
-    /* Select A46A=fifosize mode; raise + drop buffer reset, set rate. */
-    outb(PCM_CTRL_PORT, PCM_CTRL_OUT_EN | PCM_CTRL_A46A_FIFO | PCM_CTRL_BUF_RESET | rate_code);
-    outb(PCM_CTRL_PORT, PCM_CTRL_OUT_EN | PCM_CTRL_A46A_FIFO | rate_code);
-    outb(PCM_DACTRL_PORT, PCM_CTRL_FIFOSIZE_MAX);  /* large FIFO threshold */
+    /* Raise A468 bit5 so A46A decodes as the FIFO interrupt interval; pulse
+     * the reset bit; set the interval to the full 32KB FIFO. */
+    outb(PCM_CTRL_PORT, PCM_CTRL_OUT_EN | PCM_CTRL_A46A_IRQ | PCM_CTRL_BUF_RESET | rate_code);
+    outb(PCM_CTRL_PORT, PCM_CTRL_OUT_EN | PCM_CTRL_A46A_IRQ | rate_code);
+    outb(PCM_DACTRL_PORT, PCM_IRQ_INTERVAL_MAX);
 
-    /* Select A46A=dactrl mode; program 8bit mono. */
+    /* Drop bit5 so A46A decodes as D/A control again, then program 8bit mono. */
     outb(PCM_CTRL_PORT, PCM_CTRL_OUT_EN | rate_code);
     outb(PCM_DACTRL_PORT, PCM_DACTRL_8BIT_MONO_R);
 
-    outb(PCM_STATUS_PORT, 0xA0);  /* full volume */
+    outb(PCM_STATUS_PORT, (uint8_t)(PCM_VOL_PATH_PCM | g_pcm_vol));
 
     g_pcm.data = data;
     g_pcm.len = len;

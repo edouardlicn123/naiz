@@ -34,6 +34,11 @@ SYSTEM_UI_KEYS = {
     "Naiz Settings", "Language", "Start Game",
     "Text Speed", "Instant", "16/s", "32/s", "64/s",
     "SETTINGS",
+    # devdoc 118: audio switches + volume ladders + read progress
+    "BGM", "Sound Effect", "Voice", "On", "Off",
+    "BGM Volume", "0%", "50%", "100%",
+    "Sound & Voice Vol", "Max", "High", "Mid", "Low",
+    "Read Progress",
     "CG GALLERY", "No CGs available.",
     "No save data.", "Load failed.",
     "SPECIAL",

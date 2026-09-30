@@ -1,10 +1,22 @@
 """devdoc 105 typewriter: settings.text_speed parse semantics + i18n parity.
 
-Mirrors settings.c TEXT_SPEED_* semantics (single source is the engine —
-these tests keep the Python side honest and freeze the contract):
+Mirrors settings.c pref_set_text_speed semantics (single source is the
+engine — these tests keep the Python side honest and freeze the contract):
 - valid values are {0 (Instant), 16, 32, 64}; default 32;
 - unknown values fall back to the default;
 - settings_save writes text_speed=N and load parses it back.
+
+Since devdoc 118 the preference is persisted to USER.CFG, not to the
+build-owned settings.txt; the parse contract is unchanged, so this file
+still owns the speed whitelist and the i18n parity for the speed labels.
+See test_user_cfg_settings.py for the file split and test_audio_settings_
+invariants.py for the source-level guards.
+
+Note (devdoc 119 §4.1): devdoc 118 §9 claimed this file's roundtrip had been
+retargeted at USER.CFG and that _parse_speed/_save_line were split into a
+project half and a preference half.  Neither happened — only this docstring
+changed.  test_devdoc_refs.py::test_devdoc_claims_match_test_files freezes the
+corrected fact so the stale claim is not applied to the code by mistake.
 
 Also guards the i18n requirement: "Text Speed" / "Instant" must stay in
 SYSTEM_UI_KEYS (else marked # ORPHANED) and every project sys_<lang>.txt
