@@ -34,7 +34,6 @@ from naiz_lib import PROTECTED_IDX_ALL, COMMERCIAL_DOS_DIR, to_dos_name
 from naiz_lib.toc_archive import make_toc_archive
 from naiz_lib.palette_utils import validate_skin_palette, VALIDATE_DE_MAX
 from naiz_lib.mag_codec import decode_mag_palette
-from naiz_build.project_config import ProjectConfig
 from naiz_conv.i18n_gen import generate as i18n_gen
 from naiz_audio.pack_audio import pack_audio as _pack_audio
 from naiz_font.gen_cjk_font import (
@@ -317,46 +316,21 @@ def deploy_runtime(proj_dir: Path, game_dir: Path):
         stale_cjk.unlink()
         print("  移除过时 CJK.DAT（字库已按语言拆分）")
 
-    # settings.txt — build-owned project config, always replaced.
-    settings_src = proj_dir / "scene" / "settings.txt"
-    if settings_src.exists():
-        safe_copy2(settings_src, game_dir / "settings.txt")
-        print("  settings.txt 已部署")
+    # settings.txt is gone (devdoc 120): every project-level value lives in
+    # config.toml and reaches the engine through nb_config.h, compiled in by
+    # compile_engine().  No runtime file carries build-owned data any more, so
+    # prune the dead file rather than leaving it to rot in every games/ tree.
+    stale_settings = game_dir / "settings.txt"
+    if stale_settings.exists():
+        stale_settings.unlink()
+        print("  移除过时 settings.txt（项目配置已改由 config.toml 编译进引擎）")
 
-    # USER.CFG — player preferences owned by the runtime (devdoc 118).  It is
-    # deliberately NOT copied, injected or cleared: build must never touch it,
-    # or every build would reset the player's settings.  Stale builds can leave
-    # keys the engine no longer reads; settings.c ignores unknown keys.
+    # USER.CFG is now the only runtime-written file.  It is deliberately NOT
+    # copied, injected or cleared — build must never touch it, or every build
+    # would reset the player's settings.  Stale builds can leave keys the
+    # engine no longer reads; prefs.c ignores unknown keys.
     if (game_dir / "USER.CFG").exists():
         print("  USER.CFG 已保留（玩家偏好，不覆盖）")
-
-    # inject version + blackletter flags from config.toml into deployed settings.txt
-    if (proj_dir / "config.toml").exists():
-        try:
-            cfg = ProjectConfig(proj_dir)
-            inject = {
-                "version": cfg.version(),
-                "blacktitle": "1" if cfg.get_bool("blackletter", "title", False) else "0",
-                "blackdialog": "1" if cfg.get_bool("blackletter", "dialog", False) else "0",
-            }
-            settings_dst = game_dir / "settings.txt"
-            for key, val in inject.items():
-                if not val and key == "version":
-                    continue
-                if settings_dst.exists():
-                    content = settings_dst.read_text().splitlines()
-                    content = [l for l in content if not l.startswith(f"{key}=")]
-                    content.append(f"{key}={val}")
-                    settings_dst.write_text("\n".join(content) + "\n")
-                else:
-                    with open(settings_dst, "a") as f:
-                        f.write(f"{key}={val}\n")
-            ver = cfg.version()
-            if ver:
-                print(f"  版本 {ver} 已注入 settings.txt")
-            print(f"  blacktitle={inject['blacktitle']} blackdialog={inject['blackdialog']} 已注入 settings.txt")
-        except (ValueError, IOError) as e:
-            print(f"  WARN: config.toml 读取失败: {e}")
 
     # .nb 剧本文件（散文件路径，引擎现用；SCENE.DAT 接入引擎后停发）
     scene_dir = proj_dir / "scene"

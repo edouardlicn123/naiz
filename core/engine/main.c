@@ -1,7 +1,7 @@
 /*
  * Naiz Engine 主入口模块
  * — HAL / 字库 / 键盘 / 视频 / 调色板 / 图片归档初始化
- * — 运行时配置读取 (settings.txt)
+ * — 玩家偏好读取 (USER.CFG) + 项目配置 (config.toml→nb_config.h)
  * — AUTOEXEC.BAT 启动入口
  * — 主循环: kbd_update → delay → NB 解释器 / scene VM → cursor draw
  * — 初始化顺序有硬性要求，见 AGENTS.md §十一
@@ -20,8 +20,8 @@
 #include "nb_saveload.h"
 #include "save.h"
 #include "layer_debug.h"
-#include "settings.h"
-#include "settings_menu.h"
+#include "prefs.h"
+#include "bootmenu.h"
 #include "audio.h"
 
 /* Debug logging — shared macro in debug.h */
@@ -89,12 +89,20 @@ int main(void)
     sys_save_load();
 
     /* Settings: load existing or show first-launch menu */
-    settings_load();
-    settings_menu_run();
-    settings_save();
+    prefs_load();
+    bootmenu_run();
+    prefs_save();
+
+    /* Deterministic marker for the effective boot language.  The whole point
+     * of devdoc 120 was that the menu selection used to be saved but never
+     * read back, and that failure is invisible on screen until you squint at
+     * glyphs.  This line is the probe target for tools/diag/np2kai_ab.py
+     * --expect/--forbid; do not remove it without a replacement marker. */
+    hal_logf("[LANG] boot effective lang='%s' default='%s'\r\n",
+             prefs_get_lang(), NAIZ_DEFAULT_LANG);
 
     /* CJK: load language-specific file with fallback */
-    if (cjk_load_for_lang(settings_get_lang()) != 0) {
+    if (cjk_load_for_lang(prefs_get_lang()) != 0) {
         hal_log("CJK not found\r\n");
         ENGINE_EXIT(1);
     }

@@ -1,4 +1,4 @@
-"""Source-level invariants for devdoc 118.
+"""Source-level invariants for devdoc 118 / 120.
 
 These are structural guards, in the spirit of test_hdi_freshness_guard.py:
 they assert the *shape* of a code path rather than re-implementing it in
@@ -9,7 +9,7 @@ inherits a "protection" that was never checked.
    checked in the settings UI is a switch the engine ignores.
 2. A disabled PCM channel releases the shared path only when it owns it.
 3. A466 volume encoding is VOL6 (0xA0) | attenuation, clamped to 0..15.
-4. USER.CFG is the only file settings.c writes.
+4. USER.CFG is the only file prefs.c writes, and the only file it reads.
 """
 
 import re
@@ -18,7 +18,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent.parent
 
 AUDIO_C = (ROOT / "core" / "engine" / "audio.c").read_text("utf-8")
-SETTINGS_C = (ROOT / "core" / "engine" / "settings.c").read_text("utf-8")
+PREFS_C = (ROOT / "core" / "engine" / "prefs.c").read_text("utf-8")
 HAL_AUDIO_C = (ROOT / "core" / "plat" / "hal_audio.c").read_text("utf-8")
 NB_SETTING_C = (ROOT / "core" / "engine" / "nb_setting.c").read_text("utf-8")
 
@@ -154,56 +154,95 @@ def test_a46a_dactrl_is_written_after_bit5_is_cleared():
 
 # --- 4. persistence target ------------------------------------------------
 
-def test_settings_saves_only_user_cfg():
-    body = _func_body(SETTINGS_C, "settings_save")
+def test_prefs_saves_only_user_cfg():
+    body = _func_body(PREFS_C, "prefs_save")
     writes = re.findall(r'fopen\(\s*"([^"]+)"\s*,\s*"w"', body)
     assert writes == ["USER.CFG"], (
-        f"settings_save must write only USER.CFG, got {writes}"
+        f"prefs_save must write only USER.CFG, got {writes}"
     )
     for project_key in ("dlgstyle", "btnstyle", "blacktitle", "blackdialog"):
         assert f'fprintf(f, "{project_key}=' not in body, (
-            f"settings_save still writes the build-owned key {project_key}"
+            f"prefs_save still writes the build-owned key {project_key}"
         )
 
 
-def test_settings_load_reads_both_files_in_order():
-    body = _func_body(SETTINGS_C, "settings_load")
+def test_prefs_load_reads_only_user_cfg():
+    """USER.CFG is the only runtime file (devdoc 120).
+
+    settings.txt is gone: every project-level value reaches the engine as a
+    compile-time macro in nb_config.h, so there is no second file to parse and
+    nothing build can overwrite a preference in.
+    """
+    body = _func_body(PREFS_C, "prefs_load")
     reads = re.findall(r'fopen\(\s*"([^"]+)"\s*,\s*"r"', body)
-    assert reads == ["settings.txt", "USER.CFG"], (
-        f"expected project first then player overlay, got {reads}"
+    assert reads == ["USER.CFG"], (
+        f"USER.CFG must be the only file read, got {reads}"
     )
-    # Player preferences must come from USER.CFG only.  Scope the check to
-    # the settings.txt read block: the defaults initialised before it are
-    # legitimately named (g_pref.text_speed = TEXT_SPEED_DEFAULT).
-    proj_start = body.index('fopen("settings.txt", "r")')
-    proj_end = body.index('fopen("USER.CFG", "r")')
-    project_part = body[proj_start:proj_end]
-    user_part = body[proj_end:]
-    # Compare against the recognised-key dispatch only, so a comment saying
-    # "text_speed is ignored here" does not read as acceptance.
-    for key in ("text_speed", "bgm_vol", "pcm_vol", "bgm", "snd", "vc"):
-        assert f'strcmp(key, "{key}")' not in project_part, (
-            f"{key} is honoured from settings.txt: build would reset it"
-        )
+    assert '"settings.txt"' not in PREFS_C, (
+        "prefs.c still references settings.txt; the file no longer exists"
+    )
     for key in ("lang", "text_speed", "bgm", "snd", "vc", "bgm_vol", "pcm_vol"):
-        assert f'strcmp(key, "{key}")' in user_part, (
+        assert f'strcmp(key, "{key}")' in body, (
             f"{key} is not read from USER.CFG"
         )
 
 
-def test_settings_lang_falls_back_to_project_default():
-    body = _func_body(SETTINGS_C, "settings_load")
-    m = re.search(
-        r"if \(!g_pref\.lang\[0\]\)\s*str_copy\(g_pref\.lang,.*?g_settings\.lang\);",
-        body,
-        re.S,
+def test_prefs_lang_getter_and_setter_share_one_field():
+    """The 0.3.011-0.3.013 bug, frozen (devdoc 120).
+
+    prefs_set_lang() wrote g_pref.lang while prefs_get_lang() read a different
+    struct, so a boot-menu language choice was saved and then ignored. Both
+    halves of one preference must name the same field.
+    """
+    setter = _func_body(PREFS_C, "prefs_set_lang")
+    getter = _func_body(PREFS_C, "prefs_get_lang")
+    fields = re.findall(r"g_pref\.\w+", setter)
+    assert fields, "prefs_set_lang must record into g_pref"
+    read_field = re.search(r"return\s+g_pref\.(\w+)", getter)
+    assert read_field, (
+        "prefs_get_lang must return the field prefs_set_lang writes "
+        f"(expected g_pref.{fields[0]})"
     )
-    assert m, "an unset player language must inherit the project default"
+    assert read_field.group(1) == fields[0].split(".")[1], (
+        f"prefs_get_lang returns g_pref.{read_field.group(1)} but "
+        f"prefs_set_lang writes {fields[0]}: the choice is saved and ignored"
+    )
 
 
-def test_settings_txt_is_never_opened_for_writing():
-    """No path anywhere in settings.c may write settings.txt."""
-    for m in re.finditer(r'fopen\([^)]*\)', SETTINGS_C):
+def test_prefs_lang_falls_back_to_project_default():
+    """With no player choice, the language must come from config.toml."""
+    getter = _func_body(PREFS_C, "prefs_get_lang")
+    assert "NAIZ_DEFAULT_LANG" in getter, (
+        "prefs_get_lang must fall back to the project's NAIZ_DEFAULT_LANG"
+    )
+    body = _func_body(PREFS_C, "prefs_load")
+    assert "NAIZ_DEFAULT_LANG" not in body, (
+        "prefs_load must not copy the default into g_pref: that would pin the "
+        "shipping default into USER.CFG and freeze later default_lang changes. "
+        "The fallback belongs in prefs_get_lang only."
+    )
+
+
+def test_prefs_uses_compile_time_project_config():
+    """Project config must come from nb_config.h, never from a parsed file."""
+    for macro, fn in (("NAIZ_VERSION", "prefs_get_version"),
+                      ("NAIZ_BLACKLETTER_TITLE", "prefs_get_blackletter_title"),
+                      ("NAIZ_BLACKLETTER_DIALOG", "prefs_get_blackletter_dialog")):
+        assert macro in _func_body(PREFS_C, fn), (
+            f"{fn} must return {macro} (config.toml -> nb_config.h)"
+        )
+    load = _func_body(PREFS_C, "prefs_load")
+    assert "dlg_set_style(NAIZ_DLGSTYLE)" in load, (
+        "dialog style must come from NAIZ_DLGSTYLE"
+    )
+    assert "btn_set_style(NAIZ_BTNSTYLE)" in load, (
+        "button style must come from NAIZ_BTNSTYLE"
+    )
+
+
+def test_prefs_is_never_opened_for_writing():
+    """No path anywhere in prefs.c may write anything but USER.CFG."""
+    for m in re.finditer(r'fopen\([^)]*\)', PREFS_C):
         assert '"w"' not in m.group(0) or "USER.CFG" in m.group(0), (
-            f"settings.c opens a file for writing: {m.group(0)}"
+            f"prefs.c opens a file for writing: {m.group(0)}"
         )

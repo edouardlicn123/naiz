@@ -8,11 +8,30 @@
 [i18n]
 source_lang = "eng"
 targets = []
+# 出厂默认语言；targets 为空故只能取 source_lang。详见 demo-a2/config.toml 同名项。
+# Shipping default language; with empty targets it must be source_lang.
+default_lang = "eng"
 
 [project]
 title = "animatest"
 description = "Naiz 动画功能测试项目"
-version = "0.3.013"
+version = "0.3.017"
+
+# 运行时不再有 settings.txt，以下两项编译进引擎。
+# There is no settings.txt at runtime; both values are compiled into the engine.
+[dialog]
+# 对话框背景样式 (0-9)，编码规则见 demo-a2/config.toml [dialog]
+style = 0
+
+[button]
+# 按钮配色方案 (0-4)：0 黑 1 蓝 2 深红 3 绿 4 紫
+style = 0
+
+# 黑花体仅覆盖拉丁字符，CJK 语言下自动回退原字体。
+# Blackletter covers Latin only; CJK languages fall back to the default font.
+[blackletter]
+title = false
+dialog = false
 
 [transition]
 type = "cut"

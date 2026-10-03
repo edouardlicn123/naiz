@@ -58,3 +58,115 @@ def split_semi(raw):
     if raw is None:
         return []
     return [seg.strip() for seg in raw.split(';') if seg.strip()]
+
+
+def next_field(segment):
+    """Return (field, rest) for one comma-delimited field of a segment.
+
+    Byte-for-byte mirror of nb_next_field() in core/engine/nb_commands.c, so
+    the keys this module extracts are exactly the keys the engine looks up in
+    tr().  Keep both implementations in step -- they are the only thing
+    standing between a script edit and a silently untranslated string.
+
+    Escapes: "\\," is a literal comma inside the field, "\\\\" a literal
+    backslash, and any other "\\x" is preserved verbatim.  Surrounding blanks
+    are trimmed, matching nb_next_field().  Returns (None, segment) when no
+    delimiter remains, mirroring nb_next_field()'s "a LAST field without a
+    trailing comma is NOT consumed" contract.
+    """
+    s = segment
+    i = 0
+    while i < len(s) and s[i] in ' \t':
+        i += 1
+
+    # Locate the first delimiter, skipping every backslash-escaped pair.
+    j = i
+    while j < len(s):
+        if s[j] == '\\' and j + 1 < len(s):
+            j += 2
+            continue
+        if s[j] == ',':
+            break
+        j += 1
+    if j >= len(s):
+        return None, segment
+
+    # Trim trailing blanks so "Yes ,v" and "Yes,v" resolve to the same key.
+    end = j
+    while end > i and s[end - 1] in ' \t':
+        end -= 1
+
+    # Collapse the two defined escapes; leave any other "\x" alone.
+    out = []
+    p = i
+    while p < end:
+        if s[p] == '\\' and p + 1 < end and s[p + 1] in (',', '\\'):
+            p += 1
+        out.append(s[p])
+        p += 1
+
+    rest = s[j + 1:]
+    k = 0
+    while k < len(rest) and rest[k] in ' \t':
+        k += 1
+    return ''.join(out), rest[k:]
+
+
+def has_field_delim(segment):
+    """True when an unescaped comma remains in the segment.
+
+    Mirror of nb_has_field_delim() in core/engine/nb_commands.c.  Code that
+    only needs to *peek* for the next delimiter must use this instead of
+    ``',' in segment``, or an escaped comma looks like a field boundary.
+    """
+    j = 0
+    while j < len(segment):
+        if segment[j] == '\\' and j + 1 < len(segment):
+            j += 2
+            continue
+        if segment[j] == ',':
+            return True
+        j += 1
+    return False
+
+
+def option_fields(segment):
+    """Split a question/scene option segment into (label, var, op, delta).
+
+    Mirrors how cmd_question (core/engine/nb_question.c) actually reads it:
+    three nb_next_field() calls, then the delta taken from the remaining tail
+    rather than through the field splitter.  Returns None when the segment does
+    not supply at least three delimiters -- the "got N fields" case a
+    malformed script hits.
+    """
+    label, rest = next_field(segment)
+    if label is None:
+        return None
+    var, rest = next_field(rest)
+    if var is None:
+        return None
+    op, rest = next_field(rest)
+    if op is None:
+        return None
+    return label, var, op, rest.strip()
+
+
+def raw_fields(segment):
+    """Return the segment's field slices, still escaped, final field included.
+
+    Same boundary rules as next_field() but nothing is unescaped and the last
+    field is kept, so a linter can inspect the author's original spacing.  An
+    escaped comma stays inside its field, so "Ira\\, Jr." is one slice and is
+    not mistaken for a field with stray whitespace.
+    """
+    out, start, i = [], 0, 0
+    while i < len(segment):
+        if segment[i] == '\\' and i + 1 < len(segment):
+            i += 2
+            continue
+        if segment[i] == ',':
+            out.append(segment[start:i])
+            start = i + 1
+        i += 1
+    out.append(segment[start:])
+    return out

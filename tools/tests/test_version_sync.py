@@ -58,6 +58,41 @@ def test_all_projects_share_one_version():
     assert len(versions) == 1, f"project versions diverged: {sorted(versions)}"
 
 
+def test_generated_nb_config_matches_project_version():
+    """nb_config.h is a BUILD artifact of export_config.py, compiled into the
+    engine.  Nothing regenerates it during `make -C core`, so bumping
+    config.toml alone leaves the engine reporting the PREVIOUS version while
+    every other version test still passes -- the version invariant above reads
+    config.toml, never the generated header.  Hit this while closing out 0.3.015:
+    602 tests green with NAIZ_VERSION still at 0.3.014 until `build` ran.
+    """
+    import re
+    versions = set()
+    for cfg in sorted((ROOT / "projects").glob("*/config.toml")):
+        with cfg.open("rb") as f:
+            data = tomllib.load(f)
+        versions.add((data.get("project") or {}).get("version", ""))
+    want = versions.pop()
+    header = ROOT / "core/engine/nb_config.h"
+    assert header.is_file(), "core/engine/nb_config.h missing; run a build"
+    m = re.search(r'#define\s+NAIZ_VERSION\s+"([^"]*)"', header.read_text("utf-8"))
+    assert m, "NAIZ_VERSION not found in nb_config.h"
+    assert m.group(1) == want, (
+        "nb_config.h says %s but every project says %s; run "
+        "`./makegame.sh build <game>` to regenerate it, then `make -C core`"
+        % (m.group(1), want)
+    )
+
+
+def test_nb_config_guard_detects_stale_header(tmp_path):
+    """Self-test: the check above must be able to fail on a stale header."""
+    import re
+    stale = '#define NAIZ_VERSION "0.3.014"\n'
+    want = "0.3.015"
+    m = re.search(r'#define\s+NAIZ_VERSION\s+"([^"]*)"', stale)
+    assert m and m.group(1) != want
+
+
 # ---------------------------------------------------------------------------
 # write behavior: bump_all_projects unifies a drifted set in a tmpdir
 # ---------------------------------------------------------------------------

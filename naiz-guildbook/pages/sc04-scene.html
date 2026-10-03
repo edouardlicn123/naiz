@@ -13,7 +13,7 @@
 
 <h1>scene 场景跳转</h1>
 <hr>
-<blockquote><strong>创建</strong>：2026-07-27<br><strong>最后更新</strong>：2026-08-13</blockquote>
+<blockquote><strong>创建</strong>：2026-07-27<br><strong>最后更新</strong>：2026-10-03</blockquote>
 <p><code>scene()</code> 命令用于跳转场景，支持无条件跳转和条件链跳转（依赖变量系统）。</p>
 
 <h2>1. 无条件跳转</h2>
@@ -44,6 +44,7 @@
 </table>
 <p>每个段支持 1–8 个三元组（<code>SCENE_MAX_CONDS = 8</code>），最后的字段始终是 target。</p>
 <p><strong>默认值约定</strong>：最后一段若不含逗号（如 <code>;001</code>），则作为显式默认跳转目标；若最后一段含逗号，则所有段均为条件段，无匹配时 fallback 到<strong>第一个段</strong>的 target。</p>
+<p><strong>字段中的逗号</strong>：段内字段若本身含逗号，写法与 <code>question</code> 相同——用 <code>\,</code> 转义（<code>\\</code> 为字面反斜杠）。转义由引擎 <code>nb_next_field()</code> 统一处理，校验器与翻译提取器共用同一规则，详见 <a href="sc08-question.html">sc08 question 选择分支</a> §1.1。</p>
 
 <h2>3. 示例</h2>
 <pre><code>scene(003)                                          ← 无条件跳转 nbook003.nb

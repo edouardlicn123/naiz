@@ -1,6 +1,6 @@
 """devdoc 105 typewriter: settings.text_speed parse semantics + i18n parity.
 
-Mirrors settings.c pref_set_text_speed semantics (single source is the
+Mirrors prefs.c pref_set_text_speed semantics (single source is the
 engine — these tests keep the Python side honest and freeze the contract):
 - valid values are {0 (Instant), 16, 32, 64}; default 32;
 - unknown values fall back to the default;
@@ -37,7 +37,7 @@ DEFAULT_SPEED = 32
 
 
 def _parse_speed(text):
-    """Mirror of settings.c text_speed= handling (atoi + whitelist + default)."""
+    """Mirror of prefs.c text_speed= handling (atoi + whitelist + default)."""
     try:
         v = int(text)
     except (TypeError, ValueError):

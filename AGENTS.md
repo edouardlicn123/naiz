@@ -1,14 +1,14 @@
 # Naiz — AI 编程规则
 
-> **当前版本**: `0.3.013`（`projects/demo-a2/config.toml`）
+> **当前版本**: `0.3.017`（`projects/demo-a2/config.toml`）
 >
-> **最新条目**: `CHANGELOG.md` `c44` — i18n 译文宽度守卫：4/9 语言行标签 + 5 处值标签曾被静默裁剪（devdoc 119 §3.4/§5.1，0.3.013）。前序 `c43` devdoc 118 规格订正 + 文档一致性回归守卫 `test_devdoc_refs.py`（devdoc 119，0.3.012）。前序 `c42` 玩家偏好分家 `USER.CFG` + 游戏内设置扩展 7 行（三开关 / 双音量 / 阅读进度）+ 86 板 PCM 寄存器 refdoc（devdoc 118，0.3.011）。更前 `c41` 实机验证五禁（0.3.010）、`c40` 单页对白重复 arm 打字机根修（0.3.009）。
+> **最新条目**: `CHANGELOG.md` `c48` — 全部剧情脚本 9 语翻译补齐（28 键 ×9 语 0 空值）+ `Ira,not Neon` 转义标签入表（0.3.017）。前序 `c47` NB 字段逗号转义 `\,`（引擎/`i18n_gen`/`nb_validator` 三处同步）+ 常用问题选项归类 sys/game + `tr()` 守卫去注释误判（0.3.016）。前序 `c45` `settings.txt` 废止、`config.toml` 单一配置源 + 启动菜单语言根修（devdoc 120，0.3.014）。前序 `c42` 玩家偏好分家 `USER.CFG` + 游戏内设置扩展 7 行（三开关 / 双音量 / 阅读进度）+ 86 板 PCM 寄存器 refdoc（devdoc 118，0.3.011）。
 >
-> **开发历史已移至 [`CHANGELOG.md`](CHANGELOG.md)**: R1–R30、0.2.109–0.2.117 及动画工具链等全部 Bug 修复/功能演进记录均以条目形式存于根目录 `CHANGELOG.md`，**本文件（AGENTS.md）不承载任何开发历史摘要，只存规则与当前版本**；历史速查一律读 CHANGELOG.md（最新：实机验证五禁写入 AGENTS + HDI 新鲜度双守卫 + 守卫自证不变量测试/0.3.010），新条目追加到 CHANGELOG.md 顶部而**不是**本文件。
+> **开发历史已移至 [`CHANGELOG.md`](CHANGELOG.md)**: R1–R30、0.2.109–0.2.117 及动画工具链等全部 Bug 修复/功能演进记录均以条目形式存于根目录 `CHANGELOG.md`，**本文件（AGENTS.md）不承载任何开发历史摘要，只存规则与当前版本**；历史速查一律读 CHANGELOG.md（最新：全部剧情脚本 9 语翻译 /0.3.017），新条目追加到 CHANGELOG.md 顶部而**不是**本文件。
 >
 > **防复发机制**: 见 §十七 — 每次修改后必须对照 C16/P11/S7 等 39 条规则逐一检查；**写完 devdoc 另须过 §十「规格与实现的收敛责任」**（行号校准 + 声称逐条落地，pytest 全绿不算证据）。
 >
-> **构建验证**: `make -C core` — 0 errors, 0 warnings。Python 工具链全部 `.py` 文件语法通过（`tools/` 下 68 个含 `tools/diag/symbol_audit.py`，不含 venv）。
+> **构建验证**: `make -C core` + **`core/*.err` 全为空**——诊断走 `.err` 文件，**不在 stdout**（0.3.014 教训，见下）。Python 工具链全部 `.py` 文件语法通过（`tools/` 下 120 个，含 `tools/diag/symbol_audit.py`，不含 venv/`__pycache__`）。pytest **640 passed, 1 skipped**。
 
 ## 一、Git 限制
 
@@ -25,7 +25,8 @@
 
 核心验证命令：
 ```bash
-make -C core               # 引擎编译（0 errors / 0 warnings）
+make -C core               # 引擎编译
+find core -maxdepth 1 -name '*.err' -size +0   # 诊断在这里，不在 stdout（应无输出）
 tools/env_setup/venv/bin/python -m pytest tools/tests/   # Python 单元测试
 ./makegame.sh build <game>  # 数据构建（games/<game> 部署树，含字库/i18n）
 ./makegame.sh make <game>    # HDI 注入（承接 build 产物）
@@ -169,19 +170,21 @@ for(;;)                  → idle 死循环
 
 **新增文件/改名的规则**：运行相关文件名一律直接取 8.3 安全基名（如 `sys_*`/`role_*`/`game_*`、`nbook*.nb`），不得依赖注入层截断来"擦边"。
 
-### 玩家偏好文件 `USER.CFG`（0.3.011 起，禁止构建路径写入）
+### 配置分家：`config.toml`（项目）+ `USER.CFG`（玩家）（0.3.014 起）
 
-`games/<game>/` 下有两份配置，**归属方向相反**：
+`settings.txt` **已废止**（devdoc 120）。项目配置**不再经由任何运行时文件传递**：
 
-| 文件 | 归属 | 键 | build 行为 |
-|------|------|-----|-----------|
-| `settings.txt` | **项目** | `dlgstyle` `btnstyle` `version` `blacktitle` `blackdialog` + `lang` 默认 | **无条件覆盖**（`safe_copy2` + 从 `config.toml` 注入三键） |
-| `USER.CFG` | **玩家** | `lang` `text_speed` `bgm` `snd` `vc` `bgm_vol` `pcm_vol` | **只探测、只打印，绝不写入** |
+| 载体 | 归属 | 内容 | 到达引擎的方式 |
+|------|------|------|--------------|
+| `projects/<game>/config.toml` | **项目** | `[project] version`、`[dialog] style`、`[button] style`、`[blackletter] title/dialog`、`[i18n] default_lang` | `export_config.py` 生成 `core/engine/nb_config.h`（`NAIZ_*` 宏）→ **编译进引擎**，运行时零解析 |
+| `USER.CFG` | **玩家** | `lang` `text_speed` `bgm` `snd` `vc` `bgm_vol` `pcm_vol` | `prefs_load()` / `prefs_save()`，**全系统唯一的运行时写入点** |
 
-- **禁止在构建/注入路径复制、注入、清理或绑定变量名后删除 `USER.CFG`**——那会让每次 `build` 重置玩家设置。直接事故：0.3.010 之前 `settings_save()` 写 `settings.txt`，而 `build_game.py` 无条件覆盖它，玩家改的 Language / Text Speed 每次构建都被打回默认值（devdoc 118）。
-- 运行期写入只走 `settings_save()`；载入顺序 `settings.txt` → 叠加 `USER.CFG`（玩家优先）；缺文件为合法首启态。
-- 重置玩家设置 = 删除 `USER.CFG`。
-- **防呆**：`tools/tests/test_user_cfg_settings.py::test_build_never_writes_user_cfg` 逐行守卫（允许 `.exists()` 探测与日志行，**「先绑定变量名再 unlink」这种写法同样被拒**），删守卫或改坏即红。
+- **`lang` 键全系统只有一个，在 `USER.CFG`。** 项目默认叫 `[i18n] default_lang`（键名不同，故永不冲突）。**这不只是命名洁癖**：0.3.013 之前 `lang` 同时存在于 `settings.txt` 与 `USER.CFG`，而 `settings_get_lang()` 读前者、`settings_set_lang()` 写后者 → 开机菜单选繁体中文后仍以英语启动。**同键名横跨两个归属相反的文件 = getter/setter 可各自绑定不同副本**，是本轮实机故障的直接根因。
+- **禁止在构建/注入路径复制、注入、清理或绑定变量名后删除 `USER.CFG`**——那会让每次 `build` 重置玩家设置。直接事故：0.3.010 之前 `settings_save()` 写 `settings.txt`，而 `build_game.py` 无条件覆盖它（devdoc 118）。`build` 现在只**剪除**部署树里的死文件 `settings.txt`（`stale_settings.unlink()`），**只许 unlink，不许写**。
+- 运行期写入只走 `prefs_save()`；缺 `USER.CFG` 为合法首启态（回落 `NAIZ_DEFAULT_LANG` / `TEXT_SPEED_DEFAULT`）。
+- 重置玩家设置 = 删除 `USER.CFG`。改项目配置 = 改 `config.toml` 后重新 `build`（宏是编译期的，只 `build` 不 `make` 跑的是旧引擎，见 §八 五禁之二）。
+- **防呆**：`tools/tests/test_user_cfg_settings.py::test_build_never_writes_user_cfg` 逐行守卫（允许 `.exists()` 探测与日志行，**「先绑定变量名再 unlink」这种写法同样被拒**），删守卫或改坏即红；同文件另有「`settings.txt` 不得复现部署路径 + 必须存在 unlink」「`lang` 只存在于 `USER.CFG`」「`config.toml` 拥有全部项目键」三项守卫。
+- **访问器同源守卫**：`tools/tests/test_audio_settings_invariants.py` 断言 `prefs_get_lang()` 与 `prefs_set_lang()` 引用同一 struct 成员、且 getter 空值回落 `NAIZ_DEFAULT_LANG`。**任何新增的 `prefs_get_*`/`prefs_set_*` 对都必须登记进该守卫**——devdoc 118 已在 `audio_get_*` 上犯过一次，0.3.014 在 `lang` 上犯了第二次。
 
 ### 变更规则
 
@@ -231,6 +234,7 @@ naiz_midi / naiz_music 已作为独立项目移出到 `~/`。详见 `docs/B91-�
 6. **阻塞命令元数据是死的**：`nb_commands_dispatch()` 不读 `CMD_BLOCKING`/`CMD_NEEDS_INPUT`/`CMD_TOUCHES_AUDIO`/`CMD_TERMINATES_SCENE`（仅作文档用，`test_cmd_meta.py` 只强制 `CMD_TOUCHES_DISPLAY`）。阻塞命令**必须自建输入循环**，返回时脚本才可继续；引擎侧唯一暂停点是 `nb_process()` 的 `nb_dialog_pending()`。漏写自暂停 → 剩余脚本在单个 pass 内跑完（详见 CHANGELOG 0.3.008 / devdoc 116）
 7. **`cg`/`bg` 之后须紧跟对白行**：长耗时非阻塞显示操作后若不接对白页，剧本会在同一 pass 内连续跑过多条命令，玩家来不及看清新画面；对白页的 page-yield 同时是消费者的等待点。连写多个非对白命令（`cg` + `char` + `delay`）会跳过这个等待点。`playanima` 后接 `bg`/`cg` 亦须留意 `anim_stop()` 唤醒门控（0.3.008 起仅 `was_waiting` 时唤醒）
 8. **单页对白不 arm 打字机**（`0.3.009` 根修）：`dialog_show()` 中「能装进一页的整句」（`page_start == 0 && next < 0`）已被 `layer_dialog_render_page()` 完整绘制，**不得再进 typewriter 分支**——那会用空前缀覆盖整页再重打（视觉「一闪而过」），并使首击被 `nb_dialog_reveal_finish()` 吞成无效操作、需两下才翻页；多页行所有页（含末页）则保持打字机。`dialog_show()` 输出 `typewriter armed|off (single|paged page)` 标记，改动该处后**用 `tools/diag/np2kai_ab.py` 的 `--forbid` 判定，不要靠点击计数**（短句约 0.6s 打完，点击计数是竞态）
+9. **段内字段逗号须转义 `\,`**（`0.3.016`）：`question`/`scene` 的段内字段逗号分隔，字段内容含逗号写 `\,`（`\\`→字面反斜杠，其它 `\x` 原样保留）；问题标题（argv[0]）不切逗号、无需转义。逗号语义**只有一份实现**，任何新增的「取第 N 个字段」代码必须走 `nb_next_field()`/`nb_has_field_delim()`（C）或 `naiz_lib.nb_line.next_field()`/`has_field_delim()`/`option_fields()`（Python）——`nb_validator` 曾因自建 `seg.split(',')` 把合法 `Ira\, Jr.` 误判为「5 fields」，`nb_scene.c` 三处裸 `strchr(',')` 同型。`i18n_gen` 取键必须与引擎 `tr()` 查键逐字节一致，否则译文静默失效（`test_nb_field_escape.py` 守护）
 
 ### 菜单 UI 渲染（两阶段绘制）
 1. 入口全量绘制一次（`draw_rounded_emboss` 等昂贵原语只画一次），循环内只增量改文字颜色/指示符
@@ -290,7 +294,7 @@ make -C core && python -m py_compile tools/...file.py ...
 ### 编译带入
 
 - `makegame.sh build <game>` 中 `build_game.py` 自动从 `config.toml` 读取 version
-- 注入到 `settings.txt` 的 `version=` 行
+- `config.toml` 的 `[project] version` 经 `export_config.py` 编译成 `NAIZ_VERSION` 宏（**不再运行时解析**）
 - 引擎 `settings_load()` 解析后存入 `GameSettings`，`settings_get_version()` 供主菜单右上角显示
 - 此环节已就绪，无需额外修改
 
@@ -371,7 +375,11 @@ make -C core && python -m py_compile tools/...file.py ...
 
 ```bash
 # C 编译
-make -C core 2>&1 | grep -E 'Error|Warning'
+# 注意：wcl386 把诊断写进 core/<unit>.err，make 的 stdout 只有命令行。
+# 0.3.014 教训：`make -C core 2>&1 | grep -E 'Error|Warning'` 在一个刚
+# 报出 W131 的构建上照样输出 0 —— 假通过，且恰好伪造了本项要证明的东西。
+# 实测漏网：`nb_mainmenu.c(113) W131: No prototype found for 'bootmenu_run'`。
+make -C core && find core -maxdepth 1 -name '*.err' -size +0   # 应无输出
 
 # Python 语法
 for f in $(find tools -name '*.py'); do python -m py_compile "$f" 2>&1 | grep -v 'OK'; done

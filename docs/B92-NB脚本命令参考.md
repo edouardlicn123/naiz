@@ -22,7 +22,7 @@
 | `sceneconf` | `cmd_sceneconf` (nb_commands.c) | `sceneconf(){<title>[,type]}` | 场景配置：章节标题 + 类型（normal/cg/menu，默认 normal）。**仅花括号形态**（paren 别名已废止），随存档记录标题，type=menu 时禁用存档热键 |
 | `mainmenu` | `cmd_mainmenu` (nb_mainmenu.c) | `mainmenu <x> <y> <w> <h> <opt1> <opt2> ...` | 主菜单，"start"→game, "continue"→最新槽位, "load"→读档, "settings"→setting.nb（游戏内设置，见 `settingmenu`）, "exit"→end；"special"→special.nb，scenes/music/gallery 已迁入 special（保留桩） |
 | `specialmenu` | `cmd_specialmenu` (nb_special.c) | `specialmenu <opt1> <opt2> ...` | **Special 菜单（LOAD 范式全屏列表，0.2.140）**：凹刻行+分页+Back+focus_on_back，条目经 tr() 渲染；`gallery`→cgview.nb（回 special）、`scenes`→loadscen.nb（temp 快照回 special）、`music`→TODO 桩、Back/Esc→mainmenu.nb |
-| `question` | `cmd_question` (nb_question.c) | `question <text;opt,var,op,delta;...>` | 选项+变量操作(+/-/=)，结果存 nb.last_choice；鼠标/键盘两路经 `apply_option()` 合一（R21，含 INT_MIN 守卫 C22） |
+| `question` | `cmd_question` (nb_question.c) | `question <text;opt,var,op,delta;...>` | 选项+变量操作(+/-/=)，结果存 nb.last_choice；鼠标/键盘两路经 `apply_option()` 合一（R21，含 INT_MIN 守卫 C22）。**选项标签含逗号须写 `\,`**（见下「字段转义」） |
 | `var` | `cmd_var` (nb_commands.c) | `var <id> <=/+|/-> <value>` | 变量读写（赋值/加减），需在 variables.json 定义 |
 | `settingmenu` | `cmd_settingmenu` (nb_setting.c) | `settingmenu()` | 游戏内设置菜单（LOAD 范式全屏列表）：凹刻行 + 行内 `< 值 >` 调档 + Back + focus_on_back；`←→` 步进取值故无键盘翻页；当前仅 Text Speed（取值/标签同源同长 `SETTINGS_TEXT_SPEEDS`/`_LABELS`，均经 tr() 渲染），取值即时生效、退出时 `settings_save` 落盘；Back/Esc→`nb_get_menu_return()`（空则 mainmenu.nb）。**Language 不在此**（固定在开机 `startsetting`） |
 | `startsetting` | `cmd_startsetting` (nb_mainmenu.c:107) | `startsetting()` | **设置菜单（已实现）**：`settings_menu_run()` + `settings_save()`，语言变更时重载 CJK 字库/翻译表并按黑花体设置刷新 |
@@ -46,6 +46,19 @@
 - `cmd(arg1, arg2, ...)` — 括号参数
 - `cmd{text content}` 或 `cmd(){text content}` — 文本参数
 - **对象在花括号、括号=参数 ± keyword 指令**：资源对象（bg/cg/char/host/role 台词/bgm/sound/voice/playanima）均把**对象名写在花括号负载**，括号位仅承载参数或保留给未来参数设置；keyword 指令（`bg(hidedialog)`/`cg(hidedialog)`/`char(hideall)`/`bgm(stop)`）无负载。`cg(key)`/`char(name,..)`/`bg(key)` 等"括号承载对象"的形态被硬性拒绝。
+
+### 字段转义（逗号）
+
+`question`/`scene` 的段内字段以逗号分隔；字段内容本身需要逗号时用反斜杠转义：
+
+```
+question(Pick one?;Ira\, Jr.,bond_ira,+,1;Neon,bond_neon,+,1)
+```
+
+- `\,` → 字面逗号（留在字段内，不作分隔符）；`\\` → 字面反斜杠；其它 `\x` 原样保留（如 `C:\path` 不被吞）。
+- 字段首尾空白会被裁剪；`Yes ,v` 与 `Yes,v` 同键。
+- **问题标题（argv[0]）不参与逗号切分**，其中的逗号是字面量，无需转义。
+- 引擎实现 `nb_next_field()`/`nb_has_field_delim()`（core/engine/nb_commands.c）；`naiz_lib.nb_line.next_field()` 为逐字节镜像，`nb_validator` 与 `i18n_gen` 均经它取键，三者必须同步（`tools/tests/test_nb_field_escape.py` 守护）。
 
 ### 角色名映射
 

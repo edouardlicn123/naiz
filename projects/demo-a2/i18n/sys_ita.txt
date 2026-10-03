@@ -47,3 +47,4 @@ High=Alto
 Mid=Medio
 Low=Basso
 Read Progress=Avanzamento lettura
+[LOCKED]=[BLOCCATO]

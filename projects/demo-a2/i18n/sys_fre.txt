@@ -47,3 +47,4 @@ High=Élevé
 Mid=Moyen
 Low=Faible
 Read Progress=Progression
+[LOCKED]=[VERROUILLÉ]

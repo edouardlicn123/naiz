@@ -17,7 +17,8 @@
 #include "nb_saveload.h"
 #include "nb.h"
 #include "debug.h"
-#include "settings.h"
+#include "prefs.h"
+#include "bootmenu.h"
 #include "tr.h"
 #include "image.h"
 #include "scene_layers.h"
@@ -109,14 +110,14 @@ void cmd_startsetting(int argc, const char **argv, const char *cmd_name)
     const char *old_lang;
     (void)argc; (void)argv; (void)cmd_name;
 
-    old_lang = settings_get_lang();
-    settings_menu_run();
-    settings_save();
+    old_lang = prefs_get_lang();
+    bootmenu_run();
+    prefs_save();
 
-    if (strcmp(old_lang, settings_get_lang()) != 0) {
+    if (strcmp(old_lang, prefs_get_lang()) != 0) {
         /* nb_set_lang applies the full language-driven state (translation
          * table, CJK glyph font, blackletter style). */
-        nb_set_lang(settings_get_lang());
+        nb_set_lang(prefs_get_lang());
     }
 }
 

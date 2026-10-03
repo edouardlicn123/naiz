@@ -6,6 +6,10 @@
 
 | 条目 |
 |------|
+| [0.3.017 — 全部剧情脚本 9 语翻译补齐（28 键 ×9 语 0 空值）+ `Ira,not Neon` 转义标签入表](#c48) |
+| [0.3.016 — NB 字段逗号转义 `\,`（三处实现同步）+ 常用问题选项归类 sys/game + `tr()` 守卫去注释误判](#c47) |
+| [0.3.015 — 角色名 9 语种补全 + `[LOCKED]` 系统键缺失与 ORPHANED 陷阱 + 字形覆盖守卫](#c46) |
+| [0.3.014 — settings.txt 废止 / config.toml 单一配置源 + 启动菜单选繁体中文仍进英语根修（devdoc 120）](#c45) |
 | [0.3.013 — i18n 译文宽度守卫：4/9 语言行标签 + 5 处值标签曾被静默裁剪（devdoc 119 §3.4/§5.1）](#c44) |
 | [0.3.012 — devdoc 118 规格订正 + 文档一致性回归守卫 `test_devdoc_refs.py`（devdoc 119）](#c43) |
 | [0.3.011 — 玩家偏好分家 USER.CFG + 游戏内设置扩展 7 行（三开关/双音量/阅读进度）+ 86 板 PCM 寄存器 refdoc（devdoc 118）](#c42) |
@@ -50,6 +54,133 @@
 | [0.2.120 — 菜单 UI 整合落地（devdoc 102）](#c15) |
 | [0.2.119 — powered 资产归位 `common/logo/` + 资产键统一](#c16) |
 | [Bug 修复状态（R1–R30 综合摘要与历史子条目）](#c17) |
+
+---
+
+<a id="c48"></a>
+### 0.3.017 — 全部剧情脚本 9 语翻译补齐（28 键 ×9 语 0 空值）+ `Ira,not Neon` 转义标签入表
+
+**起因**：0.3.016 落地段内逗号转义后复核 `demo-a2` 的 `game_<lang>.txt`，发现剧情文本除韩文外**全为空**——9 语种中 8 语种的对白 / 旁白 / 章节标题 / 问题标题全部静默回落英文（`tr()` 对空值与缺键同样回落，这正是 AGENTS §八「静默失败」类）。
+
+**1. 剧情文本 9 语补齐**
+
+`game_<lang>.txt` 的 28 个故事键（对白 / `host` 旁白 / `sceneconf` 章节标题 / `question` 标题与选项标签）逐语翻译：chi / cht / jpn / fre / ger / ita / spa / por 八语种此前为空、本次补齐，韩文补新键。角色名按各语正字法与 `role_<lang>.txt` 保持一致（菲/艾拉/尼昂、フェイ/イラ/ネオン、페이/이라/네온、`Néon`/`Neón`…），**句内出现的角色名同样本地化**（如 `Good Morning,Fei.` → おはよう、フェイ。）。
+
+**2. 音频资源键必须留空**
+
+`sound(){chime}` 等 4 键（`chime`/`ding`/`hi`/`test1`）是资产名，`cmd_sound`/`cmd_bgm`/`cmd_voice` 不经 `tr()`、直接传给音频后端，翻译它们会让引擎去找不存在的音频文件。留空即按原名播放。**已知小瑕疵（本次未改）**：`i18n_gen.extract_texts()` 会把它们当可翻译键提取（与 `char/bg/cg` 的排除清单不同），故它们会以空值形式常驻 `game_<lang>.txt`。
+
+**3. `Ira,not Neon` 新键与 `Ira` 旧键清理**
+
+`nbook002.nb` 的问题选项标签由 `Ira` 改为 `Ira\,not Neon`（转义逗号）后，`i18n_gen` 保留了 `# ORPHANED: Ira=`；本次随内容重置清除，并补 `Ira,not Neon` 9 语译文。
+
+**验证**：9 语 `game_*` **0 空值 / 0 ORPHANED**，`role_*`/`sys_*` 亦 0 空值；`i18n_gen` 重跑 md5 不变（幂等，键与引擎 `tr()` 逐字节一致）；`./makegame.sh build demo-a2` 按新语料重建 9 语 CJK 字库、**0 缺失字形 WARN**；`./makegame.sh make demo-a2` 注入 HDI（29 new / 3 updated / 32 total）；pytest **640 passed, 1 skipped**。`bump_version` 0.3.016 → 0.3.017。
+
+---
+
+<a id="c47"></a>
+### 0.3.016 — NB 字段逗号转义 `\,`（三处实现同步）+ 常用问题选项归类 sys/game + `tr()` 守卫去注释误判
+
+**起因**：`question()` 的选项段是 `label,var,op,delta` 逗号分隔，标签本身需要逗号（如人名带称号 `Ira, Jr.`）时无处安放——`nb_next_field()` 用 `strchr(p, ',')` 一刀切，标签被截断、后续字段全部错位。
+
+**1. 字段转义 `\,`（引擎 + 提取器 + 校验器三处同步）**
+
+- 引擎 `core/engine/nb_commands.c: nb_next_field()`：定位分隔符时跳过每个反斜杠对，拷贝时折叠 `\,`→`,`、`\\`→`\`，其它 `\x` 原样保留（`C:\path` 不被吞）；同时**新增字段首尾空白裁剪**，修好一处既存分歧（此前引擎保留 `"Yes  "` 而 `i18n_gen` 已 `.strip()`，`Yes ,v` 会静默查不到译文）。
+- 新增 `nb_has_field_delim()`（C）与 `naiz_lib.nb_line.has_field_delim()`/`option_fields()`/`raw_fields()`（Python），把「是否还有未转义逗号」这一探测收口为单一 helper；`nb_scene.c` 三处裸 `strchr(',')`、`nb_validator.py` 两处 `split(',')` 全部改走它，消除与 `nb_next_field` 的语义分叉。
+- `i18n_gen.extract_texts()` 的问题段标签提取改用 `next_field()`，使提取出的键与引擎 `tr()` 查的键逐字节一致（否则译文静默失效）。
+- **问题标题（argv[0]）不参与逗号切分**，其中逗号是字面量、无需转义——已在 `i18n_gen` 注释与 B92 文档固化。
+
+**2. 常用问题选项归类 sys/game**
+
+`Yes`/`No`/`OK`/`Cancel`/`Back` 等 14 个通用词进 `COMMON_QUESTION_OPTS`，由 `i18n_gen` 归入 `sys_<lang>.txt`（跨场景复用）；问题标题与非通用答案仍归 `game_<lang>.txt`（剧情内容）。`demo-a2` 的问题更新为 `Go with whom?;Ira,...;Neon,...`，`Go?` 退为 ORPHANED、`Ira`/`Neon`/`Go with whom?` 补 9 语种译文。附带的意外收益：韩文答案由旧的 `응/아니` 统一到系统菜单既有语域 `예/아니오`。
+
+**3. `tr()` 字面量守卫去注释误判**
+
+`test_user_cfg_settings.py::_engine_tr_literals()` 原样扫描源码，注释里出现的 `tr("…")` 会被当成真实调用而误报。新增 `_strip_c_comments()`（识别字符串/字符字面量、`//`、`/* */`）后再扫描，守卫不再被注释文本左右。
+
+**验证**
+
+- 新增 `tools/tests/test_nb_field_escape.py`（36 项）：镜像 vs C 源逐项对齐、转义/未转义/双反斜杠/未知转义/空白、问题标题保留逗号、常用词归属、validator 接受合法转义且仍拒绝未转义/字段不足/坏变量/真空白、scene 目标解析。
+- 实机（NP2kai，临时插桩后已还原）：`question-label[0]: raw='Ira, the cat' tr='イラ, 猫'`——`\,` 正确还原且 `tr()` 命中键并渲染含逗号译文；`interact: keyboard sel=0` 选中后剧本推进到 `exec[7]`。探针 `--clicks 0/按键` 下报 `INPUT_NOT_SAMPLED`，该门控只认主对白分支的 `[INPUT] Key confirmed`，不覆盖 `ui_interact` 自建循环，故不以探针 PASS 为据。
+- `make -C core` + `core/*.err` 全空；pytest **640 passed, 1 skipped**；`.err` 诊断规则照旧。
+- `bump_version` 全部项目 → 0.3.016。
+- 文档同步：`docs/B92-NB脚本命令参考.md` 新增「字段转义（逗号）」节；guildbook `sc08-question.html`（新增 §1.1 转义 + §3 含逗号示例）、`sc04-scene.html`（字段转义说明）、`sc01-NB剧本概述.html`（格式约定）三页同步，并按 B91 §1 约定 `touch` 全部 guildbook 文件。
+
+---
+
+<a id="c46"></a>
+### 0.3.015 — 角色名 9 语种补全 + `[LOCKED]` 系统键缺失与 ORPHANED 陷阱 + 字形覆盖守卫
+
+**起因**：0.3.014 修好语言链路后实机复核，发现两件独立的事——（a）保存菜单译文其实**早已 9 语种齐全**（含 `Overwrite Slot %d?`），无需补；（b）**角色名一个都没翻**，`demo-a2` 的对白说话人名在所有语言下都回落英文。
+
+**1. 角色名补全（8 语种，韩文原本已有）**
+
+`characters.json` 的 `fei`/`ira`/`neon` 三个键，此前 `role_<lang>.txt` 只有 `role_kor.txt` 有值（페이/이라/네온），其余 8 语种全空。补齐：jpn フェイ/イラ/ネオン，chi 与 cht 菲/艾拉/尼昂，拉丁语族保留专有名词原形（fre/ger/ita 的 `Fei`/`Ira` 不变，仅 `Neon` 按各语正字法改为 `Néon`/`Neón`）。
+
+**2. `[LOCKED]` 此前根本不在译文系统里**
+
+`nb_cggallery.c` 用 `tr("[LOCKED]")` 渲染未解锁 CG 的格子标签，但该键**既未登记进 `i18n_gen.py` 的 `SYSTEM_UI_KEYS`，也不在任何 `sys_*.txt`**——即 9 语种全部回落英文 `[LOCKED]`。按 AGENTS §14.3 补登记 + 9 语种补译文（chi/cht `[未解锁]`/`[未解鎖]`、jpn `[ロック]`、kor `[잠김]`、fre `[VERROUILLÉ]`、ger `[GESPERRT]`、ita `[BLOCCATO]`、spa/por `[BLOQUEADO]`）。
+
+**这里的真陷阱**：不登记进 `SYSTEM_UI_KEYS`，则下次 `i18n_gen` 重生成会把它当 `# ORPHANED` **注释掉**——补了译文也会在下一次生成时静默失效。已实测：`i18n_gen` 重跑后 `sys_*.txt` **零差异**。
+
+**3. 根因级守卫（4 项，全部自证）**
+
+原 `test_new_ui_keys_registered` 只检查一份**手工维护的清单** `NEW_UI_KEYS`——没人记得加的键就永远漏掉，这正是 `[LOCKED]` 长期缺失却无人察觉的原因。改为**从 C 源码发现** `tr()` 字面量：
+
+- `test_every_engine_tr_literal_is_registered` —— 扫 `core/**/*.c` 的 `tr("…")`，全部须在 `SYSTEM_UI_KEYS`；
+- `test_every_engine_tr_literal_is_translated_in_every_language` —— 须**存在且非空**（整键缺失也报，因为缺失正是 ORPHANED 的产物；`tr.c` 对缺失与空值同样回落英文）；
+- `test_every_character_name_translated_in_every_language` —— `role_<lang>.txt` 键集须等于 `characters.json`，且无空值；
+- `test_deployed_font_covers_translations` / `test_deployed_font_not_older_than_translations`（`test_cjk_font.py`）—— **出货字库必须覆盖出货译文**：解析 `games/<game>/CJK_<LANG>.DT` 的 range 表（`'CJKF'` + LE u16 区间数 + `count×(start,end,offset)`），核对每个译文值里的非 ASCII 码点都有字形，且字库不比译文旧。这是「缺字 → 画成空框、不报错不告警」那类静默失败的常态化拦截（AGENTS §11）。
+
+四项均做了失败注入自证（摘 `SYSTEM_UI_KEYS` / 清空译文 / 删整键 / 塞字库没有的字 / 把字库时间戳改旧），逐个转红后还原。**其中「删整键」第一次注入时并未转红**——守卫当时只查「存在但为空」，漏了「整键不存在」这个更可能的形态，已补。
+
+**4. `[LOCKED]` 译文宽度**
+
+`[LOCKED]` 画在 `GAL_CELL_W`(144) 宽的画廊格子里，起点 `x+30`。按 `text_width()` 的字节高位规则实测 9 语种全部放得下（最宽法语 `[VERROUILLÉ]` 104px，界 114px）。已按 `test_i18n_label_width.py` 同规格加守卫（常量与几何全部从 `nb_cggallery.c` / `font.h` / `cjk.h` **读取**，不从 C 源码正则抠数字），并带失败注入自证。
+
+**5. 顺带发现，未改（需许可）**
+
+`nb_cggallery.c:173` 的 `draw_text(…, x + GAL_CELL_W - 30, …)` 把**绝对格坐标**传给了 `max_width`，而 `draw_text()` 内部按 `cx + 8 > x + max_width`（`x` = **文本自身**起点）使用它——坐标系不一致。故实际限宽是 `GAL_CELL_W - GAL_LABEL_INSET + cell_x`（首列 134px，且逐列不同），而非设计意图的 84px。当前所有译文都在两种解释下放得下，故不影响输出；但若有人「修正」这个调用而不同步缩短法语/西语/葡语译文，就会真的裁字。属显示管线（AGENTS §11 变更规则），**未擅自修改**，留待决策。另：`text_blackletter` 开启时拉丁字符按 16px 计（非默认），法语 `[VERROUILLÉ]` 将达 192px 溢出格子。
+
+**5. 顺带堵住的版本假通过**
+
+`bump_version` 只改 `config.toml`，而 `nb_config.h` 是 `export_config.py` 的**构建产物**、由 `make -C core` **不重新生成**。实测：`bump_version` 到 0.3.015 后跑 `make -C core`，`NAIZ_VERSION` 仍是 `"0.3.014"`，而 `test_version_sync.py` 照样全绿——因为它读的是 `config.toml`，从不读生成的头。已在 `test_version_sync.py` 加 `test_generated_nb_config_matches_project_version`（+ 自证），把「引擎报的版本号」与「项目版本号」绑在一起。
+
+**验证**：`make -C core` 0 错 0 警（查 `core/*.err`）；pytest **604 passed, 1 skipped**（+27）；`./start.sh fullaudit --no-make` 7 步全绿；`tools/` 下 120 个 `.py` 语法全通过；`i18n_gen` 重生成后 `i18n/` 目录零差异；9 语种出货字库对出货译文**零缺字**；NP2kai 实机 `--boot-arrows 3 --boot-only` 确认 `[LANG] nb_set_lang lang='cht'`。`bump_version` 0.3.014 → 0.3.015。
+
+---
+
+<a id="c45"></a>
+### 0.3.014 — settings.txt 废止 / config.toml 单一配置源 + 启动菜单选繁体中文仍进英语根修
+
+**起因**：实机反馈「启动菜单选繁体中文，进入正式游戏仍是英语」。**根因是访问器不对称**——`settings_get_lang()` 读 `g_settings.lang`（`settings.txt`，项目默认），而 `settings_set_lang()` 写 `g_pref.lang`（`USER.CFG`，玩家偏好）。两者永不相遇：开机菜单把 `lang=cht` **正确落盘**，但没有任何代码读它。更深一层，`lang` 这个键名**同时存在于两个归属相反的文件**，使 getter/setter 可以各自绑定不同副本且互不报错。
+
+**这不是补丁能解决的**：只要项目配置仍经由运行时文件传递、由 build 无条件覆盖，同型缺陷就还会长出来。故按 devdoc 120 拆解为「项目配置 / 玩家偏好」两条正交通道。
+
+**结构改动**
+
+- `settings.txt` **彻底废止**。项目配置只存于 `projects/<game>/config.toml`，经 `tools/naiz_build/export_config.py` 生成 `core/engine/nb_config.h` 的 `NAIZ_VERSION` / `NAIZ_DLGSTYLE` / `NAIZ_BTNSTYLE` / `NAIZ_BLACKLETTER_TITLE` / `NAIZ_BLACKLETTER_DIALOG` / `NAIZ_DEFAULT_LANG` **编译进引擎**，运行时零解析。样式键由 `[style]` 拆为 `[dialog] style` / `[button] style`；项目语言默认改用 `[i18n] default_lang`。
+- `USER.CFG` 成为**全系统唯一的运行时可写文件**（`prefs_load()` / `prefs_save()`）。`build` 不再注入任何项目键，只 `stale_settings.unlink()` 剪除部署树里的死 `settings.txt`（**只许 unlink，不许写**）。
+- 重命名：`settings.c/h` → `prefs.c/h`，`settings_menu.c/h` → `bootmenu.c/h`，`settings_load/save` → `prefs_load/save`，全部 `settings_get_*` / `settings_set_*` → `prefs_get_*` / `prefs_set_*`，`SETTINGS_*` 宏 → `PREFS_*`。
+
+**行为**：玩家在开机菜单确认语言后即固化，`default_lang` 后续变更不影响该玩家（删除 `USER.CFG` 恢复出厂默认）。
+
+**验证**
+
+- `make -C core` — 0 errors, 0 warnings。
+- `pytest tools/tests/` — **575 passed, 1 skipped**。
+- 导出器负例：`default_lang` 无译文、非法语言码、`button.style=9` 均明确报错并 exit 1。
+- **守卫自证**：把 `prefs_get_lang()` 改回读另一个字段后，`test_audio_settings_invariants.py` 立即 2 red（`test_prefs_lang_getter_and_setter_share_one_field` / `test_prefs_lang_falls_back_to_project_default`）——守卫确实测的是目标物，不是恒真断言。
+- 新增守卫：`test_settings_txt_is_gone_from_the_build_path`、`test_config_toml_owns_every_project_value`、`test_default_lang_has_translations`、`test_lang_lives_only_in_user_cfg`、`test_export_config_emits_every_project_macro`、`test_retired_truth_table_stays_declared_void`；`test_devdoc_refs.py` 新增 `RETIRED_FILE_QUOTES` 分类（改名前坐标**故意不解析**，否则等于默许失效行号继续冒充现状），现行真值表改为断言 devdoc 120 §九。
+- 顺带修掉 `test_devdoc_refs.py::test_cited_docs_exist` 的引用正则：原先用惰性 `[^`]+?` 匹配，遇到标题含 `.` 的文档名（`config.toml`）会截断成不存在的路径，报错指向错误原因，后人大概会去改文档名而不是改守卫。
+
+**文档订正（AGENTS.md §十 四步）**：devdoc 118 追加 0.3.014 ERRATA（§6.1 归属表整行作废、§三 键集失效、新增第 3 条「同型缺陷第二处」）；devdoc 119 追加 0.3.014 ERRATA（**§二 整张行号真值表因改名整体作废**、§3.2「设计门控不充分」）；接替文档 `devdocs/120-settings.txt废止与config.toml单一配置源与启动菜单语言根修.md` 承载订正后完整记录与**现行行号真值表 §九**；AGENTS.md §十一、B90、B91 就地订正。
+
+**实机 A/B（NP2kai + 串口 + XTEST，三轮）**：`np2kai_ab.py` 原先无法对启动期标记下断言（`--target`/`--forbid` 都从 `--advance-to` 匹配结束处起算，而语言标记在 `nb_init start` 之前发出），故新增 `--boot-expect` / `--boot-forbid` / `--boot-only`，并在 `nb_set_lang()`（`prefs_get_lang()` 在真实游戏路径上的唯一消费者）加确定性标记。轮次 A（`USER.CFG` 预置 `cht`）**PASS** exit 0；轮次 B（无 `USER.CFG`，菜单内 Right×3 选 `cht`）**PASS** exit 0；轮次 C（故意把 getter 改回读另一份）**BUG_SIGNATURE_PRESENT** exit 1，且复现原始症状 `bootmenu: enter (default lang=eng)`——证明前两轮不是恒真断言。顺带修掉探针两个真实缺陷：`--forbid` 声明可选却无条件传给 `_wait_for`，省略时 `TypeError` 崩掉整个探针；`_report` 在 `--boot-only` 下格式化 `None` 正则再崩一次。
+
+**⚠ 本轮未覆盖：`demo-a2` 中日韩剧本文本根本没翻。** 这是与「语言选择不生效」**相互独立**的第二个缺陷，A/B 全 PASS 之后剧情仍是英文——`game_jpn/chi/cht.txt` 各 37 键中 **36 键译文为空**，`role_*.txt` 3 键**全空**（仅 `sys_*.txt` 49 键已全译）。`tr()` 对空译文**回落源串**（`core/lib/tr.c:148-151`），故修好配置后开机菜单与设置界面确实是繁体中文，**但剧情台词与角色名仍是英文**。用户看到的现象只会从「菜单也是英文」变成「菜单中文、剧情英文」。补齐这些译文是**内容工作**，需要单独进行；详见 devdoc 120 §6.3。
+
+**新增长期规则**：新增 `prefs_get_*` / `prefs_set_*` 访问器对时，**必须**登记进 `test_audio_settings_invariants.py` 的同源守卫——devdoc 118 已在 `audio_get_*` 上犯过一次，0.3.014 在 `lang` 上犯了第二次，测试全绿并不能证明访问器绑定的是同一份状态。
 
 ---
 

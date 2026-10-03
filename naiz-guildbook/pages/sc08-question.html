@@ -13,7 +13,7 @@
 
 <h1>question 选择分支</h1>
 <hr>
-<blockquote><strong>创建</strong>：2026-07-27<strong>最后更新</strong>：2026-07-27</blockquote>
+<blockquote><strong>创建</strong>：2026-07-27<strong>最后更新</strong>：2026-10-03</blockquote>
 <p><code>question()</code> 命令用于显示选择分支，选项与变量联动。变量定义见 <a href="cf01-变量系统.html">cf01 变量系统</a>。</p>
 
 <h2>1. 语法</h2>
@@ -27,6 +27,18 @@
 <tr><td><code>op</code></td><td>操作符：<code>+</code>（加）、<code>-</code>（减）、<code>=</code>（赋值）</td></tr>
 <tr><td><code>delta</code></td><td>整数值</td></tr>
 </table>
+
+<h3>1.1 字段中的逗号（转义）</h3>
+<p>选项标签 <code>label</code> 本身需要逗号时，用反斜杠转义 <code>\,</code>：</p>
+<pre><code>question(Pick one?;Ira\, Jr.,bond_ira,+,1;Neon,bond_neon,+,1)</code></pre>
+<ul>
+<li><code>\,</code> → 字面逗号（留在标签内，不作为字段分隔符）</li>
+<li><code>\\</code> → 字面反斜杠</li>
+<li>其它 <code>\x</code> 原样保留（如 <code>C:\path</code> 不会被吞掉反斜杠）</li>
+<li>字段首尾空白会被裁剪：<code>Yes ,bond_ira,+,1</code> 与 <code>Yes,bond_ira,+,1</code> 等价</li>
+<li><strong>问题文本 <code>text</code>（第一段）不参与逗号切分</strong>，其中的逗号是字面量，无需转义</li>
+</ul>
+<p>转义由引擎 <code>nb_next_field()</code> 负责；剧本校验器与翻译提取器使用同一套规则，因此提取出的翻译键与运行时查找的键始终一致。</p>
 
 <h2>2. 限制</h2>
 <ul>
@@ -42,6 +54,11 @@
 <li>选 Forest → bond_fei += 5</li>
 <li>选 Cave → bond_ira = 10</li>
 <li>选 Town → bond_neon -= 3</li>
+</ul>
+<p>标签含逗号时（<code>\,</code> 转义）：</p>
+<pre><code>question(Go with whom?;Ira\, Jr.,bond_ira,+,1;Neon,bond_neon,+,1)</code></pre>
+<ul>
+<li>选项一显示为 <code>Ira, Jr.</code>；若写成 <code>Ira, Jr.,bond_ira,+,1</code> 不转义，则会被误切成 5 个字段，标签只剩 <code>Ira</code>，且后续字段全部错位</li>
 </ul>
 
 </main>

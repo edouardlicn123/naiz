@@ -28,7 +28,8 @@ from pathlib import Path
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
 
-from naiz_lib.nb_line import parse_nb_line, split_semi
+from naiz_lib.nb_line import (has_field_delim, next_field, option_fields, raw_fields,
+                               parse_nb_line, split_semi)
 
 
 # ── Known commands & their signatures ──────────────────────────────────────
@@ -186,11 +187,15 @@ def validate_scene(nb_path, ref):
                 f"{len(opts)} must be in [1,10]")
             return
         for i, seg in enumerate(opts, 1):
-            fields = [f.strip() for f in seg.split(',')]
-            if len(fields) != 4:
+            # Mirror cmd_question's read pattern (and nb_next_field's escape
+            # rules) instead of splitting on bare commas, so a label that
+            # legitimately contains an escaped comma is not counted twice.
+            fields = option_fields(seg)
+            if fields is None:
+                nfields = len(seg.split(',')) + 1
                 errors.append(
                     f"  {nb_path.name}:{lineno}: question: segment {i} "
-                    f"needs 'label,var,op,delta' (got {len(fields)} fields)")
+                    f"needs 'label,var,op,delta' (got {nfields} fields)")
                 continue
             label, vid, op, dlt = fields
             if not label:
@@ -236,7 +241,16 @@ def validate_scene(nb_path, ref):
         cmd, args, text, raw = parsed
 
         if raw is not None:
-            parts = [p for p in raw.split(',') if p]
+            # Multi-segment commands keep their args ';'-separated with each
+            # segment comma-delimited, so lint field-by-field using the
+            # engine's escape rules.  A bare split would read an escaped comma
+            # in "Ira\, Jr." as a boundary and flag the label's inner space.
+            # Gate on the command, not on ';' -- scene's single-segment forms
+            # (scene(003), scene(v,op,val,003)) are comma-delimited too.
+            if cmd in ('question', 'scene'):
+                parts = [f for seg in split_semi(raw) for f in raw_fields(seg)]
+            else:
+                parts = [p for p in raw.split(',') if p]
             for i, a in enumerate(parts):
                 a_stripped = a.strip()
                 if a != a_stripped:
@@ -383,7 +397,16 @@ def validate_scene(nb_path, ref):
             elif cmd == 'scene' and len(args) >= 1:
                 if raw and ';' in raw:
                     for seg in split_semi(raw):
-                        seg_target = seg.split(',')[-1].strip() if ',' in seg else seg.strip()
+                        # The target is the segment's final field, so walk the
+                        # fields with the engine's escape rules rather than
+                        # taking the last piece of a bare comma split.
+                        if has_field_delim(seg):
+                            tail = seg
+                            while has_field_delim(tail):
+                                _f, tail = next_field(tail)
+                            seg_target = tail.strip()
+                        else:
+                            seg_target = seg.strip()
                         if seg_target in ('end', 'logo', 'op', 'mainmenu'):
                             continue
                         found = False

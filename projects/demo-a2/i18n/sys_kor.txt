@@ -47,3 +47,4 @@ High=높음
 Mid=보통
 Low=낮음
 Read Progress=읽기 진행
+[LOCKED]=[잠김]

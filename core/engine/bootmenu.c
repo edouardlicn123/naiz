@@ -1,5 +1,5 @@
 /*
- * settings_menu.c — Pre-game settings menu (C-code rendered).
+ * bootmenu.c — Pre-game boot menu (C-code rendered): Language + Start Game.
  *
  * Always shown on startup. Pure ASCII, no CJK needed.
  * Uses render.h primitives directly (draw_text_outlined, fill_rect,
@@ -35,7 +35,7 @@
 #include "render.h"
 #include "ui.h"
 #include "scene_layers.h"
-#include "settings.h"
+#include "prefs.h"
 #include "hal.h"
 #include "debug.h"
 #include "image.h"
@@ -99,10 +99,10 @@ static void draw_text_outlined(const char *s, int byte_start,
     draw_text(s, byte_start, x, y, 640, 400, bold, color);
 }
 
-/* Find the current language index from settings, default to English */
+/* Find the current language index from prefs_get_lang(), default to English */
 static int find_lang_index(void)
 {
-    const char *cur = settings_get_lang();
+    const char *cur = prefs_get_lang();
     int i;
     if (!cur || !*cur) return 0;
     for (i = 0; i < N_LANGS; i++) {
@@ -113,7 +113,7 @@ static int find_lang_index(void)
 }
 
 /* Erase both focus-indicator strips and redraw the one for 'focus'. */
-static void settings_draw_indicator(int focus)
+static void bootmenu_draw_indicator(int focus)
 {
     menu_layer_erase_to_base(IND_CLEAR_X, IND_CLEAR_Y_FIELD, IND_SAVE_W, IND_SAVE_H);
     menu_layer_erase_to_base(IND_CLEAR_X, IND_CLEAR_Y_START, IND_SAVE_W, IND_SAVE_H);
@@ -141,12 +141,12 @@ static int menu_hittest(int mx, int my)
 }
 
 /* Draw menu.  full=1: initial full draw — the background is already blitted
- * to VRAM (settings_menu_run, before menu_layer_open) so it lands in the
+ * to VRAM (bootmenu_run, before menu_layer_open) so it lands in the
  * layer's base snapshot; title/static/dynamic content goes into the
  * composite.  full=2: language change — erase the dynamic areas back to the
  * base then redraw.  full=0: focus change — erase + redraw the indicator only.
  * Every change commits and blits the whole region. */
-static void settings_menu_draw(int lang_idx, int focus, int full)
+static void bootmenu_draw(int lang_idx, int focus, int full)
 {
     int tw;
 
@@ -159,7 +159,7 @@ static void settings_menu_draw(int lang_idx, int focus, int full)
         draw_text_outlined(tr("Naiz Settings"), 0, 20, 10, 1, PAL_WHITE);
         /* Version: 1x, top-right */
         {
-            const char *ver = settings_get_version();
+            const char *ver = prefs_get_version();
             if (ver && *ver)
                 draw_text_outlined(ver, 0, 580, 10, 0, PAL_WHITE);
         }
@@ -174,7 +174,7 @@ static void settings_menu_draw(int lang_idx, int focus, int full)
         tw = text_width(LANG_NAMES[lang_idx], 0);
         draw_text_outlined(LANG_NAMES[lang_idx], 0,
                            LABEL_CX - tw / 2, SEL_Y, 0, PAL_WHITE);
-        settings_draw_indicator(focus);
+        bootmenu_draw_indicator(focus);
     }
 
     if (full == 2) {
@@ -185,25 +185,25 @@ static void settings_menu_draw(int lang_idx, int focus, int full)
         tw = text_width(LANG_NAMES[lang_idx], 0);
         draw_text_outlined(LANG_NAMES[lang_idx], 0,
                            LABEL_CX - tw / 2, SEL_Y, 0, PAL_WHITE);
-        settings_draw_indicator(focus);
+        bootmenu_draw_indicator(focus);
     }
 
     if (full == 0) {
         /* Focus change: indicators only. */
-        settings_draw_indicator(focus);
+        bootmenu_draw_indicator(focus);
     }
 
     menu_layer_commit();
     menu_layer_blit();
 }
 
-void settings_menu_run(void)
+void bootmenu_run(void)
 {
     int lang_idx = find_lang_index();
     int focus = FOCUS_LANG;
     int prev_lang, prev_focus;
 
-    NB_DEBUG("settings_menu: enter (default lang=%s)\r\n", LANG_CODES[lang_idx]);
+    NB_DEBUG("bootmenu: enter (default lang=%s)\r\n", LANG_CODES[lang_idx]);
 
     input_drain_boundary();
     hal_mouse_set_pos(LAYER_SCREEN_W / 2, LAYER_SCREEN_H / 2);
@@ -223,7 +223,7 @@ void settings_menu_run(void)
     menu_layer_open(0, 0, LAYER_SCREEN_W, LAYER_SCREEN_H, 0);
 
     /* Initial full draw */
-    settings_menu_draw(lang_idx, focus, 1);
+    bootmenu_draw(lang_idx, focus, 1);
     hal_mouse_draw_cursor_force();
 
     for (;;) {
@@ -273,18 +273,18 @@ void settings_menu_run(void)
 
         /* Redraw: full=2 on language change, full=0 on focus change */
         if (lang_idx != prev_lang) {
-            settings_menu_draw(lang_idx, focus, 2);
+            bootmenu_draw(lang_idx, focus, 2);
             hal_mouse_draw_cursor_force();
         } else if (focus != prev_focus) {
-            settings_menu_draw(lang_idx, focus, 0);
+            bootmenu_draw(lang_idx, focus, 0);
             hal_mouse_draw_cursor_force();
         }
 
         hal_mouse_draw_cursor();
     }
 
-    settings_set_lang(LANG_CODES[lang_idx]);
+    prefs_set_lang(LANG_CODES[lang_idx]);
     menu_layer_close(1);
-    NB_DEBUG("settings_menu: selected lang=%s (%s)\r\n",
+    NB_DEBUG("bootmenu: selected lang=%s (%s)\r\n",
              LANG_NAMES[lang_idx], LANG_CODES[lang_idx]);
 }

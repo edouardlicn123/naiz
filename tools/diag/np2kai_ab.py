@@ -278,14 +278,18 @@ def run_probe(args):
             proc.terminate()
 
 
-def _report(args, verdict, action_mark, log_path):
+def _report(args, verdict, action_mark, log_path, extra=None):
     tail = _read(log_path, action_mark)
     print("=" * VERDICT_WIDTH)
     print(f"LABEL        = {args.label}")
-    print(f"TARGET after = {len(re.findall(args.target, tail))}"
+    n_target = len(re.findall(args.target, tail)) if args.target else 0
+    n_expect = len(re.findall(args.expect, tail)) if args.expect else 0
+    print(f"TARGET after = {n_target}"
           f"   (expected after {args.clicks} click(s))")
-    print(f"EXPECT after = {len(re.findall(args.expect, tail))}")
+    print(f"EXPECT after = {n_expect}")
     print(f"VERDICT      = {verdict}")
+    if extra:
+        print(f"GATE         = {extra}")
     print("=" * VERDICT_WIDTH)
     print("--- log since the action ([MOUSE] spam stripped) ---")
     print(_strip_mouse(tail))
@@ -305,10 +309,16 @@ def _drive(args, proc, log_path):
          f"{win['w']}x{win['h']}+{win['x']}+{win['y']}")
 
     # Phase 2 — leave the boot language/settings menu.  It accepts both
-    # Space/Enter/XFER (settings_menu.c) and a click on the highlighted row,
+    # Space/Enter/XFER (bootmenu.c) and a click on the highlighted row,
     # but xdotool's --window key events are XSendEvent synthetics that
     # wxWidgets frequently drops, so both are sent and either may win.
     _log("[ab] phase: passing boot language menu")
+    for _ in range(args.boot_arrows):
+        _focus(wid)
+        _press(win, "Right")
+        time.sleep(args.boot_settle)
+    if args.boot_arrows:
+        _log(f"[ab] sent {args.boot_arrows} Right press(es) in the boot menu")
     passed = False
     for _ in range(args.boot_presses):
         _focus(wid)
@@ -325,6 +335,35 @@ def _drive(args, proc, log_path):
                               _read(log_path, 0))))
         return _report(args, "STUCK_BOOT_MENU", 0, log_path)
     _log("[ab] engine reached nb_init")
+
+    # Phase 2b -- boot-time assertions.  Everything below this point searches
+    # from `since`/`adv_end`, both of which are taken *after* nb_init start, so
+    # a marker emitted during boot (prefs_get_lang's result, the boot menu's
+    # decision) is structurally unreachable by --target.  A config fix is
+    # invisible on screen and stable under no click count, so it gets its own
+    # gate here rather than being left unasserted.
+    # BOOT_MARKER is logged at nb.c:162 and nb_set_lang() runs a few lines
+    # later, so the log can lag the "menu left" signal by a poll interval.
+    # Wait for the expected marker rather than sampling once.
+    if args.boot_expect:
+        _wait_for(log_path, args.boot_expect, args.boot_timeout, since=0)
+    boot_log = _read(log_path, 0)
+    if args.boot_forbid and re.search(args.boot_forbid, boot_log):
+        m = re.search(args.boot_forbid, boot_log)
+        return _report(args, "BUG_SIGNATURE_PRESENT", 0, log_path,
+                       extra=f"boot gate matched {m.group(0)!r}")
+    if args.boot_expect and not re.search(args.boot_expect, boot_log):
+        return _report(args, "BOOT_ASSERT_FAILED", 0, log_path,
+                       extra=f"boot gate never matched {args.boot_expect!r}")
+    if args.boot_expect:
+        _log(f"[ab] boot gate ok: {args.boot_expect!r}")
+    if args.boot_only:
+        # Phases 3-6 measure a state that responds to synthetic input.  A
+        # boot/config fix has no such state: the marker is emitted before any
+        # input is possible, so running the click phases would only trip
+        # INPUT_NOT_SAMPLED (no input was ever sent) and mask a real PASS.
+        return _report(args, "PASS", 0, log_path,
+                       extra="boot-only: boot gates asserted, input phases skipped")
 
     # Phase 3 — click forward until the state under test is reached.  The
     # marker is re-checked over the whole window accumulated since this phase
@@ -390,7 +429,10 @@ def _drive(args, proc, log_path):
     # even in a broken build.  What is stable is the page-open branch itself,
     # which nb_dialog.c reports as "typewriter armed (single page)" — the
     # empty-prefix repaint plus the timing-dependent swallowed click.
-    forbidden = _wait_for(log_path, args.forbid, 0.0, since=adv_end)
+    # --forbid is optional; _wait_for compiles its pattern, so passing None
+    # raised TypeError and killed the run instead of skipping the gate.
+    forbidden = (_wait_for(log_path, args.forbid, 0.0, since=adv_end)
+                 if args.forbid else False)
     if forbidden:
         return _report(args, "BUG_SIGNATURE_PRESENT", adv_end, log_path)
 
@@ -418,12 +460,15 @@ def build_parser():
     p.add_argument("--game", required=True,
                    help="game directory name under games/ (e.g. demo-a2)")
     p.add_argument("--label", default="run", help="run label for the report")
-    p.add_argument("--advance-to", required=True,
-                   help="regex; click forward until it appears")
-    p.add_argument("--target", required=True,
-                   help="regex; the state under test (must appear on its own)")
-    p.add_argument("--expect", required=True,
-                   help="regex; appearing after the clicks = PASS")
+    p.add_argument("--advance-to",
+                   help="regex; click forward until it appears "
+                        "(required unless --boot-only)")
+    p.add_argument("--target",
+                   help="regex; the state under test (must appear on its own) "
+                        "(required unless --boot-only)")
+    p.add_argument("--expect",
+                   help="regex; appearing after the clicks = PASS "
+                        "(required unless --boot-only)")
     p.add_argument("--clicks", type=int, default=1,
                    help="inputs applied once the target is reached")
     p.add_argument("--forbid",
@@ -447,8 +492,28 @@ def build_parser():
                    help="silent seconds watched after the clicks")
     p.add_argument("--boot-presses", type=int, default=14,
                    help="max Space presses to leave the boot language menu")
+    p.add_argument("--boot-arrows", type=int, default=0,
+                   help="Right presses sent in the boot menu before the "
+                        "Space that confirms. Needed to reach the boot menu's "
+                        "own setter path: with a fresh USER.CFG the menu "
+                        "highlights the project default, so testing 'the menu "
+                        "writes cht' requires moving the cursor first.")
+    p.add_argument("--boot-only", action="store_true",
+                   help="assert only the boot gates and stop; skips the "
+                        "click-driven phases 3-6")
+    p.add_argument("--boot-timeout", type=float, default=10.0,
+                   help="seconds to wait for --boot-expect after the boot menu")
     p.add_argument("--boot-settle", type=float, default=0.6,
                    help="settle seconds after each boot Space press")
+    p.add_argument("--boot-expect",
+                   help="regex that must appear in the log once the boot menu "
+                        "is left. For boot/config fixes (devdoc 120): phases "
+                        "3-6 all search from --advance-to's match end, so a "
+                        "boot-time marker can never be --target. Asserting it "
+                        "here is the only way to gate such a fix.")
+    p.add_argument("--boot-forbid",
+                   help="regex that must NOT appear before --advance-to; its "
+                        "presence reports BUG_SIGNATURE_PRESENT")
     p.add_argument("--keep-log", action="store_true",
                    help="append to the existing serial log instead of wiping")
     return p
@@ -456,6 +521,13 @@ def build_parser():
 
 def main():
     args = build_parser().parse_args()
+    if not args.boot_only:
+        missing = [n for n in ("advance_to", "target", "expect")
+                   if getattr(args, n) is None]
+        if missing:
+            raise SystemExit(
+                "missing required argument(s): %s (or pass --boot-only)"
+                % ", ".join("--" + n.replace("_", "-") for n in missing))
     ok, gate, msg = preflight(args.game)
     if not ok:
         print("=" * VERDICT_WIDTH)

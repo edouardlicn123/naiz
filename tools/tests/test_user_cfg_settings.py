@@ -1,22 +1,29 @@
-"""devdoc 118: player preferences (USER.CFG) must survive a build.
+"""devdoc 118 / 120: player preferences (USER.CFG) must survive a build.
 
-The bug this guards: settings_save() wrote settings.txt, and build_game.py
-copied projects/<game>/scene/settings.txt over the deployed file
-unconditionally.  Every build therefore reset Language and Text Speed.
+The 0.3.011 bug this guards: prefs_save() wrote settings.txt, and
+build_game.py copied projects/<game>/scene/settings.txt over the deployed
+file unconditionally.  Every build therefore reset Language and Text Speed.
+
+The 0.3.014 bug this guards: USER.CFG held the only writable `lang` key, but
+prefs_get_lang() read a *different* struct, so the boot-menu choice was saved
+and then ignored.  `lang` used to exist in two files at once; now it exists
+only in USER.CFG and the project default is `[i18n] default_lang`.
 
 These tests freeze the *contract*, not the implementation:
 - USER.CFG is 8.3-safe and does not collide with any other runtime file;
 - build never copies/injects/clears it (it only reports that it was kept);
-- the project file still keeps its own five keys and the lang default;
-- the two files have disjoint ownership (no player key in settings.txt).
+- settings.txt is gone from the whole build path and from projects/;
+- config.toml owns every project value and exports it to nb_config.h;
+- there is exactly one `lang` key in the system, and it is the player's.
 
-They also mirror settings.c parse semantics for the audio preferences:
+They also mirror prefs.c parse semantics for the audio preferences:
 BGM volume snaps to the nearest ladder rung, PCM volume clamps to 0-15,
 switches are 0/1, and a hand-edited out-of-range value can never reach the
 menu (which only shows ladder entries).
 """
 
 import io
+import json
 import os
 import re
 import sys
@@ -26,18 +33,17 @@ ROOT = Path(__file__).resolve().parent.parent.parent
 sys.path.insert(0, str(ROOT))
 
 from naiz_lib import to_dos_name  # noqa: E402
+from naiz_lib.langdefs import LANG_CODE_SET  # noqa: E402
+from naiz_build.project_config import ProjectConfig  # noqa: E402
 
 USER_CFG = "USER.CFG"
 
-# settings.c: SETTINGS_BGM_VOL_LADDER / SETTINGS_PCM_VOL_LADDER
+# prefs.c: PREFS_BGM_VOL_LADDER / PREFS_PCM_VOL_LADDER
 BGM_VOL_LADDER = [0, 64, 127]
 PCM_VOL_MAX = 15
 
-# Keys the runtime writes to USER.CFG (settings.c settings_save).
+# Keys the runtime writes to USER.CFG (prefs.c prefs_save).
 PLAYER_KEYS = {"lang", "text_speed", "bgm", "snd", "vc", "bgm_vol", "pcm_vol"}
-
-# Keys build_game.py injects into settings.txt from config.toml.
-PROJECT_INJECTED = {"version", "blacktitle", "blackdialog"}
 
 SUPPORTED_SPEEDS = {0, 16, 32, 64}
 DEFAULT_SPEED = 32
@@ -115,11 +121,44 @@ def _build_game_source():
     return (ROOT / "tools" / "naiz_build" / "build_game.py").read_text("utf-8")
 
 
-def test_build_copies_settings_txt_unconditionally():
-    """The project file stays build-owned: still replaced every build."""
-    src = _build_game_source()
-    assert 'settings_src = proj_dir / "scene" / "settings.txt"' in src
-    assert 'safe_copy2(settings_src, game_dir / "settings.txt")' in src
+def test_settings_txt_is_gone_from_the_build_path():
+    """USER.CFG is now the only runtime file (devdoc 120).
+
+    Project configuration lives in config.toml and reaches the engine through
+    nb_config.h, compiled in. Nothing deploys, injects or parses settings.txt,
+    so a stale games/<game>/settings.txt can only confuse.
+    """
+    src = (ROOT / "tools" / "naiz_build" / "build_game.py").read_text("utf-8")
+    # The removed deploy/inject shapes must not come back.
+    for dead in ('scene" / "settings.txt"',
+                 'safe_copy2(settings_src',
+                 "settings_dst",
+                 'inject = {'):
+        assert dead not in src, (
+            f"build_game.py re-introduced the settings.txt deploy path: {dead!r}"
+        )
+    # The dead file must actually be pruned, not merely ignored.
+    assert 'stale_settings.unlink()' in src, (
+        "build_game.py must prune the deployed settings.txt so old games/ "
+        "trees do not keep a file the engine never reads"
+    )
+    for path in (ROOT / "tools" / "naiz_img" / "inject_common.py",
+                 ROOT / "makegame.sh"):
+        for lineno, line in enumerate(path.read_text("utf-8").split("\n"), 1):
+            if "settings.txt" in line:
+                raise AssertionError(
+                    f"{path.name}:{lineno} still references settings.txt: "
+                    f"{line.strip()}"
+                )
+    for proj in (ROOT / "projects").iterdir():
+        stale = proj / "scene" / "settings.txt"
+        assert not stale.is_file(), (
+            f"{stale} must be deleted: the engine no longer reads it"
+        )
+        deployed = ROOT / "games" / proj.name / "settings.txt"
+        assert not deployed.is_file(), (
+            f"{deployed} is a leftover from before devdoc 120; rebuild to clear it"
+        )
 
 
 # Every mention of USER.CFG in the build path must be one of these shapes.
@@ -164,31 +203,70 @@ def test_build_reports_kept_user_cfg():
     assert "玩家偏好" in src
 
 
-# --- project file keeps its own keys only ----------------------------------
+# --- config.toml is the single project-config source ----------------------
 
-def test_settings_txt_has_no_player_keys():
-    """settings.txt must not carry player preferences: the engine would read
-    them as a project default and build would keep resetting them."""
+def test_config_toml_owns_every_project_value():
+    """Every key the engine reads as project config must exist in config.toml.
+
+    The engine no longer parses a settings.txt, so a value that lives nowhere
+    in config.toml silently falls back to a built-in default at export time.
+    """
     for proj in (ROOT / "projects").iterdir():
-        f = proj / "scene" / "settings.txt"
-        if not f.is_file():
-            continue
-        for line in f.read_text("utf-8").splitlines():
-            line = line.strip()
-            if not line or line.startswith((";", "#")) or "=" not in line:
-                continue
-            key = line.split("=", 1)[0].strip()
-            assert key not in PLAYER_KEYS - {"lang"}, (
-                f"{proj.name}/settings.txt: player key {key!r} must live in "
-                f"{USER_CFG}, not the build-owned file"
+        cfg = proj / "config.toml"
+        assert cfg.is_file(), f"{proj.name}: config.toml is required"
+        raw = cfg.read_text("utf-8")
+        for section, key in (("dialog", "style"), ("button", "style"),
+                             ("blackletter", "title"), ("blackletter", "dialog"),
+                             ("i18n", "default_lang"), ("project", "version")):
+            assert f"[{section}]" in raw, f"{proj.name}/config.toml: [{section}] missing"
+            assert re.search(rf"^{key}\s*=", raw, re.M), (
+                f"{proj.name}/config.toml: [{section}].{key} missing"
             )
-        # 'lang' is allowed only as the project default.
 
 
-def test_project_injected_keys_still_declared():
-    src = _build_game_source()
-    for key in PROJECT_INJECTED:
-        assert f'"{key}"' in src, f"build no longer injects {key}"
+def test_default_lang_has_translations():
+    """[i18n].default_lang must resolve to a real language with translations,
+    or the shipping default silently degrades to English at first boot."""
+    for proj in (ROOT / "projects").iterdir():
+        cfg = ProjectConfig(proj)
+        lang = cfg.get_str("i18n", "default_lang", "eng")
+        assert lang in LANG_CODE_SET, f"{proj.name}: unknown default_lang {lang!r}"
+        available = set(cfg.get_list("i18n", "targets", None) or [])
+        available.add(cfg.get_str("i18n", "source_lang", "eng"))
+        assert lang in available, (
+            f"{proj.name}: default_lang={lang!r} has no translation "
+            f"(available: {sorted(available)})"
+        )
+
+
+def test_lang_lives_only_in_user_cfg():
+    """One `lang` key in the whole system, in USER.CFG only.
+
+    `lang` used to exist in both files; the getter/setter split across the two
+    is what made the boot-menu choice inert (devdoc 120). config.toml spells
+    the project default `default_lang`, so the two can never collide again.
+    """
+    prefs_c = (ROOT / "core" / "engine" / "prefs.c").read_text("utf-8")
+    prefs_h = (ROOT / "core" / "engine" / "prefs.h").read_text("utf-8")
+    assert '"lang"' in prefs_c, "USER.CFG's lang key must still be parsed"
+    for src, name in ((prefs_c, "prefs.c"), (prefs_h, "prefs.h")):
+        assert "default_lang" not in src.replace("NAIZ_DEFAULT_LANG", ""), (
+            f"{name} must not parse a project default_lang: it is a compile-time macro"
+        )
+    for proj in (ROOT / "projects").iterdir():
+        raw = (proj / "config.toml").read_text("utf-8")
+        assert not re.search(r"^lang\s*=", raw, re.M), (
+            f"{proj.name}/config.toml: use [i18n] default_lang, not a bare lang key"
+        )
+
+
+def test_export_config_emits_every_project_macro():
+    """The engine reads project config only through nb_config.h."""
+    src = (ROOT / "tools" / "naiz_build" / "export_config.py").read_text("utf-8")
+    for macro in ("NAIZ_VERSION", "NAIZ_DLGSTYLE", "NAIZ_BTNSTYLE",
+                  "NAIZ_BLACKLETTER_TITLE", "NAIZ_BLACKLETTER_DIALOG",
+                  "NAIZ_DEFAULT_LANG"):
+        assert macro in src, f"export_config.py no longer exports {macro}"
 
 
 # --- value contracts -------------------------------------------------------
@@ -244,6 +322,145 @@ def test_new_ui_keys_registered():
     from naiz_conv.i18n_gen import SYSTEM_UI_KEYS
     for k in NEW_UI_KEYS:
         assert k in SYSTEM_UI_KEYS, f"{k!r} missing from SYSTEM_UI_KEYS"
+
+
+# --- engine-side tr() literals must be registered (AGENTS.md §14.3) ---------
+#
+# NEW_UI_KEYS above is a hand-kept list, so a literal nobody remembered to add
+# sails through: tr("[LOCKED]") (nb_cggallery.c) was rendered for months with no
+# entry in SYSTEM_UI_KEYS and no sys_*.txt value, and the next i18n_gen run
+# would have commented the key out as # ORPHANED.  So discover the literals
+# instead of trusting the list.
+_TR_RE = re.compile(r'tr\(\s*"((?:[^"\\]|\\.)*)"\s*\)')
+
+
+def _strip_c_comments(src):
+    """Remove // and /* */ comments, leaving string/char literals intact.
+
+    Without this a comment that merely mentions tr("...") -- such as an
+    explanation of a key -- is scanned as if it were a call and fails a guard
+    that is supposed to be about real UI strings.
+    """
+    out = []
+    i, n = 0, len(src)
+    while i < n:
+        c = src[i]
+        if c == '"' or c == "'":
+            quote = c
+            out.append(c)
+            i += 1
+            while i < n:
+                out.append(src[i])
+                if src[i] == '\\' and i + 1 < n:
+                    out.append(src[i + 1])
+                    i += 2
+                    continue
+                if src[i] == quote:
+                    i += 1
+                    break
+                i += 1
+            continue
+        if c == '/' and i + 1 < n and src[i + 1] == '/':
+            while i < n and src[i] != '\n':
+                i += 1
+            continue
+        if c == '/' and i + 1 < n and src[i + 1] == '*':
+            i += 2
+            while i + 1 < n and not (src[i] == '*' and src[i + 1] == '/'):
+                i += 1
+            i = min(i + 2, n)
+            continue
+        out.append(c)
+        i += 1
+    return ''.join(out)
+
+
+def _engine_tr_literals():
+    keys = {}
+    for c in sorted((ROOT / "core").rglob("*.c")):
+        src = io.open(c, encoding="utf-8", errors="replace").read()
+        for m in _TR_RE.finditer(_strip_c_comments(src)):
+            keys.setdefault(m.group(1), set()).add(c.name)
+    return keys
+
+
+def test_every_engine_tr_literal_is_registered():
+    """Every system-UI literal wrapped in tr() must be in SYSTEM_UI_KEYS.
+
+    Otherwise i18n_gen rebuilds the key set from the .nb scripts plus
+    SYSTEM_UI_KEYS and orphans the key, silently deleting its translation.
+    """
+    from naiz_conv.i18n_gen import SYSTEM_UI_KEYS
+    missing = {k: v for k, v in _engine_tr_literals().items()
+               if k not in SYSTEM_UI_KEYS}
+    assert not missing, (
+        "tr() literal(s) missing from SYSTEM_UI_KEYS (they would be # ORPHANED "
+        "on the next i18n_gen run):\n"
+        + "\n".join(f"  {k!r} used in {', '.join(sorted(v))}"
+                    for k, v in sorted(missing.items()))
+    )
+
+
+def test_every_engine_tr_literal_is_translated_in_every_language():
+    """Registered is not enough: AGENTS.md §14.4 requires a value per language,
+    and tr() falls back to the English source both on an empty value and on an
+    absent key (tr.c).  Absent keys are the likelier failure mode: i18n_gen
+    comments them out as "# ORPHANED" on regeneration, which deletes them
+    outright -- so check presence AND non-emptiness, not just non-emptiness."""
+    literals = _engine_tr_literals()
+    for proj in sorted((ROOT / "projects").iterdir()):
+        i18n = proj / "i18n"
+        if not i18n.is_dir():
+            continue
+        for f in sorted(i18n.glob("sys_*.txt")):
+            entries = {}
+            with io.open(f, encoding="utf-8") as fh:
+                for line in fh:
+                    line = line.strip()
+                    if not line or line.startswith(("#", ";")) or "=" not in line:
+                        continue
+                    k, v = line.split("=", 1)
+                    entries[k] = v
+            absent = sorted(k for k in literals if k not in entries)
+            assert not absent, (
+                f"{proj.name}/i18n/{f.name}: missing key(s) {absent} "
+                "(tr() renders the English source; likely # ORPHANED by i18n_gen)"
+            )
+            blank = sorted(k for k in literals if not entries[k].strip())
+            assert not blank, (
+                f"{proj.name}/i18n/{f.name}: empty translation for {blank} "
+                "(tr() will render the English source)"
+            )
+
+
+def test_every_character_name_translated_in_every_language():
+    """characters.json is the key source; every role_<lang>.txt must carry a
+    non-empty value for each character, or the speaker name renders English."""
+    for proj in sorted((ROOT / "projects").iterdir()):
+        chars_file = proj / "characters.json"
+        i18n = proj / "i18n"
+        if not chars_file.is_file() or not i18n.is_dir():
+            continue
+        chars = json.loads(chars_file.read_text("utf-8"))["characters"]
+        keys = [c["key"] for c in chars]
+        names = {c["key"]: c["name"] for c in chars}
+        for f in sorted(i18n.glob("role_*.txt")):
+            entries = {}
+            for line in io.open(f, encoding="utf-8"):
+                line = line.strip()
+                if not line or line.startswith(("#", ";")) or "=" not in line:
+                    continue
+                k, v = line.split("=", 1)
+                entries[k] = v
+            assert set(entries) == set(keys), (
+                f"{proj.name}/i18n/{f.name}: keys {sorted(entries)} != "
+                f"characters.json {sorted(keys)}"
+            )
+            blank = sorted(k for k in keys if not entries[k].strip())
+            assert not blank, (
+                f"{proj.name}/i18n/{f.name}: untranslated character(s) {blank} "
+                f"({', '.join(names[k] for k in blank)})"
+            )
 
 
 def test_new_ui_keys_translated_everywhere():

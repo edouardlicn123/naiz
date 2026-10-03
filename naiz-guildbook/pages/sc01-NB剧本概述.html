@@ -14,7 +14,7 @@
 <h1>NB 剧本概述</h1>
 <hr>
 
-<blockquote><strong>创建</strong>：2026-07-27<br><strong>最后更新</strong>：2026-07-27</blockquote>
+<blockquote><strong>创建</strong>：2026-07-27<br><strong>最后更新</strong>：2026-10-03</blockquote>
 
 <h2>1. 概述</h2>
 <p>NB（Naiz Book）是 Naiz 引擎的高层剧本格式，采用 UTF-8 纯文本，每行一条命令。NB 文件由引擎直接加载执行，无需编译为字节码。</p>
@@ -40,7 +40,7 @@
 <li>每行一条命令</li>
 <li>以 <code>#</code> 开头的行为注释</li>
 <li>空行忽略</li>
-<li>参数间逗号分隔（<code>question</code> 和 <code>scene</code> 命令使用分号 <code>;</code> 作为顶层分隔符，子段内用逗号）</li>
+<li>参数间逗号分隔（<code>question</code> 和 <code>scene</code> 命令使用分号 <code>;</code> 作为顶层分隔符，子段内用逗号；字段内容含逗号时用 <code>\,</code> 转义，<code>\\</code> 为字面反斜杠，见 <a href="sc08-question.html">sc08 question</a>）</li>
 <li><code>()</code> 内为参数，<code>{}</code> 内为文本内容</li>
 </ul>
 

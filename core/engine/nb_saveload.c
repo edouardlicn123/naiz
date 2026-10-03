@@ -10,7 +10,7 @@
 #include "render.h"
 #include "ui.h"
 #include "scene_layers.h"
-#include "settings.h"
+#include "prefs.h"
 #include "hal.h"
 #include "nb_internal.h"
 #include "nb_dialog.h"
@@ -165,7 +165,7 @@ static void save_load_draw(int is_load, int page, int slot_idx, int focus_on_bac
         vblank_wait();
         {
             int drawn = 0;
-            if (settings_get_blackletter_title() && !nb_lang_is_cjk()) {
+            if (prefs_get_blackletter_title() && !nb_lang_is_cjk()) {
                 int tid = nb_asset_id(is_load ? "loadtitle" : "savetitle");
                 MagImage *m = (tid >= 0) ? image_load((unsigned short)tid) : NULL;
                 if (m) {

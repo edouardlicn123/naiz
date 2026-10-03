@@ -9,7 +9,7 @@
 #include "render.h"
 #include "ui.h"
 #include "scene_layers.h"
-#include "settings.h"
+#include "prefs.h"
 
 #include "hal.h"
 #include "tr.h"
@@ -270,8 +270,8 @@ int menu_show(int mx, int my, int cols, int argc, const char **argv)
      * layer stays closed and the draws fall back to plain VRAM. */
     menu_layer_open(0, 0, LAYER_SCREEN_W, LAYER_SCREEN_H, 0);
     menu_draw(mx, my, cols, btn_w, btn_h, argc, argv, sel);
-    if (settings_get_version()[0])
-        draw_text(settings_get_version(), 0, 544, 2, 96, 16, 0, PAL_RED);
+    if (prefs_get_version()[0])
+        draw_text(prefs_get_version(), 0, 544, 2, 96, 16, 0, PAL_RED);
     menu_layer_commit();
     menu_layer_blit();
     hal_mouse_set_pos(LAYER_SCREEN_W / 2, LAYER_SCREEN_H / 2);

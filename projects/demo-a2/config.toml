@@ -26,6 +26,17 @@ source_lang = "eng"
 # Target languages to generate translations for. Must not include source_lang.
 targets = ["chi", "jpn", "kor", "cht", "fre", "ger", "ita", "spa", "por"]
 
+# 出厂默认语言（首启无 USER.CFG 时使用），编译进引擎。
+# 已存在的玩家选择优先：玩家在开机菜单确认过语言后，本项不再对其生效，
+# 因此改动 default_lang 只影响尚未选择过语言的新玩家。
+# Shipping default language, used when a fresh install has no USER.CFG.
+# An existing player choice always wins: once the player confirms a language
+# in the boot menu this field no longer applies to them, so changing it only
+# affects players who have not chosen yet.
+# 必须与 source_lang 或 targets 中的某项一致，否则 build 报错。
+# Must match source_lang or one of targets, otherwise the build fails.
+default_lang = "eng"
+
 # ---- 项目信息 / Project info ----
 # 游戏基本信息；version 由工具自动维护，勿手改。
 # Basic game info; version is auto-maintained, do not edit.
@@ -40,7 +51,7 @@ description = "Naiz Engine 技术演示"
 
 # 版本号 X.Y.ZZZ —— 由 bump_version 自动维护，请勿手动修改
 # Version X.Y.ZZZ — auto-maintained by bump_version, do not edit by hand
-version = "0.3.013"
+version = "0.3.017"
 
 # ---- 场景转场 / Scene transition ----
 # 场景切换时的全屏视觉过渡，构建时编译进引擎（无需 settings.txt）。
@@ -70,6 +81,36 @@ type = "checker"
 # 细条越多步进越细，建议帧数 ≥ 条带数（20 条带 → 32 帧）
 # More strips = finer steps; recommend frames >= strip count (20 -> 32)
 frames = 16
+
+# ---- 对话框 / 按钮配色 ----
+# 运行时不再有 settings.txt：以下两项由 export_config.py 编译进引擎。
+# There is no settings.txt at runtime: both values below are compiled into
+# the engine by export_config.py.
+[dialog]
+# 对话框背景样式 (0-9)。编码规则 / Encoding:
+#   bit 0   = 抖动 dither（0=实心填充 solid, 1=75% PAT75 抖动 dithered）
+#   bits 1-3 = 颜色索引 colour index
+#
+#   颜色索引 / Colour indices:
+#     0 = 黑 black (0x00,0x00,0x00)    1 = 蓝 blue  (0x00,0x00,0xFF)
+#     2 = 深红 dark red (0x80,0x00,0x00)   3 = 绿 green (0x00,0x80,0x00)
+#     4 = 紫 purple (0x80,0x00,0x80)
+#
+#   常用值 / Common values:
+#     0 实心黑底   1 抖动黑底   2 实心蓝底   3 抖动蓝底   4 实心深红底
+#     5 抖动深红底 6 实心绿底   7 抖动绿底   8 实心紫底   9 抖动紫底
+#
+#   建议：奇数位开启抖动，可减少纯色块的突兀感。
+#   Odd values enable dithering, which softens flat colour blocks.
+style = 5
+
+[button]
+# 按钮配色方案 (0-4)
+#   0 = 黑 black  1 = 蓝 blue  2 = 深红 dark red  3 = 绿 green  4 = 紫 purple
+# 影响按钮填充色、高亮色和阴影色（阴影自动按 75% 亮度计算）。
+# Drives the button fill, highlight and shadow colours (shadow is computed at
+# 75% brightness).
+style = 2
 
 # ---- 黑花体 / Blackletter ----
 # 黑花体字型仅含拉丁字符；仅当运行时语言为 eng 等非 CJK 时生效，

@@ -58,7 +58,7 @@ KATAKANA = ("Katakana", 0x30A0, 0x30FF)
 CJK_IDEO = ("CJK Unified Ideographs", 0x4E00, 0x9FFF)
 HANGUL = ("Hangul Syllables", 0xAC00, 0xD7A3)
 
-# Preset keys follow the runtime language codes (settings_menu.c), uppercased.
+# Preset keys follow the runtime language codes (bootmenu.c), uppercased.
 # CJK file names therefore match what cjk_load_for_lang() builds: CJK_<LANG>.DAT.
 # ASI: ASCII is FONT.DAT-owned, so these are the multibyte-only blocks per family.
 LANG_RANGES = {

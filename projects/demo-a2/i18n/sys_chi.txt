@@ -47,3 +47,4 @@ High=高
 Mid=中
 Low=低
 Read Progress=阅读进度
+[LOCKED]=[未解锁]

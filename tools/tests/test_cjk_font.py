@@ -235,3 +235,91 @@ def test_validate_collect_lang():
         _validate_collect_lang("fra")  # non-runtime code
     with pytest.raises(ValueError):
         _validate_collect_lang("oops")
+
+
+# --- shipped fonts must cover the shipped translations ---------------------
+#
+# gen_cjk_font.py builds each language's font FROM that language's i18n values,
+# so the generator-level tests above cannot catch a deployed font that predates
+# a translation edit -- which is exactly the "glyph missing, draw_text emits a
+# blank box, no warning" failure (AGENTS.md §11 on system-UI rendering).
+import os  # noqa: E402
+from pathlib import Path  # noqa: E402
+
+REPO = Path(os.path.dirname(os.path.dirname(os.path.dirname(
+    os.path.abspath(__file__)))))
+DEPLOYED_LANGS = ("jpn", "chi", "cht", "kor", "fre", "ger", "ita", "spa", "por")
+
+
+def _cjk_ranges(dat: Path):
+    """Parse a deployed CJK_<LANG>.DAT range table (cjk.c: 'CJKF', LE u16 count
+    at offset 4, then count x (start, end, glyph_offset) LE u32 triples)."""
+    b = dat.read_bytes()
+    if b[:4] != b"CJKF":
+        raise RuntimeError("%s is not a CJKF container" % dat)
+    n = struct.unpack_from("<H", b, 4)[0]
+    return [struct.unpack_from("<II", b, 10 + i * 16)[:2] for i in range(n)]
+
+
+def _translation_chars(i18n_dir: Path, lang: str):
+    """Every non-ASCII codepoint in this language's translation VALUES.
+
+    Values only: keys are English source strings and are rendered from
+    FONT.DAT, so they must not pull CJK glyphs in (mirrors
+    collect_i18n_cps).
+    """
+    chars = set()
+    for f in sorted(i18n_dir.glob("*_%s.txt" % lang)):
+        for line in f.read_text("utf-8").splitlines():
+            line = line.strip()
+            if not line or line.startswith(("#", ";")) or "=" not in line:
+                continue
+            for ch in line.split("=", 1)[1]:
+                if ord(ch) > 0x7F:
+                    chars.add(ch)
+    return chars
+
+
+def _covered(cp: int, ranges) -> bool:
+    return any(s <= cp <= e for s, e in ranges)
+
+
+@pytest.mark.parametrize("lang", DEPLOYED_LANGS)
+def test_deployed_font_covers_translations(lang):
+    """Each deployed CJK_<LANG>.DAT must contain a glyph for every non-ASCII
+    character that language's translation files actually use."""
+    i18n = REPO / "projects/demo-a2/i18n"
+    dat = REPO / "games/demo-a2" / ("CJK_%s.DAT" % lang.upper())
+    if not dat.is_file():
+        pytest.skip("no deployed tree (run ./makegame.sh build demo-a2 first)")
+    ranges = _cjk_ranges(dat)
+    assert ranges, "%s has no ranges" % dat.name
+    chars = _translation_chars(i18n, lang)
+    missing = sorted(c for c in chars if not _covered(ord(c), ranges))
+    assert not missing, "%s missing glyphs for: %s" % (
+        dat.name, " ".join("U+%04X %s" % (ord(c), c) for c in missing))
+
+
+@pytest.mark.parametrize("lang", DEPLOYED_LANGS)
+def test_deployed_font_not_older_than_translations(lang):
+    """A font older than the i18n files is stale by definition, and would make
+    the coverage test above pass against a font nobody rebuilt."""
+    i18n = REPO / "projects/demo-a2/i18n"
+    dat = REPO / "games/demo-a2" / ("CJK_%s.DAT" % lang.upper())
+    if not dat.is_file():
+        pytest.skip("no deployed tree (run ./makegame.sh build demo-a2 first)")
+    newest = max(f.stat().st_mtime for f in i18n.glob("*_%s.txt" % lang))
+    assert dat.stat().st_mtime >= newest, (
+        "%s is older than the translations; rebuild before trusting the "
+        "coverage check" % dat.name)
+
+
+def test_range_parser_detects_uncovered_codepoint():
+    """Self-test: the coverage predicate must be able to fail.
+
+    A guard that cannot fail is the "print instead of exit 1" antipattern
+    (AGENTS.md §8, ban #4).  U+83EF (菲) is outside this toy table.
+    """
+    ranges = [(0x4E00, 0x4E20)]
+    assert _covered(0x4E05, ranges)
+    assert not _covered(0x83EF, ranges)

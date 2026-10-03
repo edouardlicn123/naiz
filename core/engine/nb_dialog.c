@@ -10,7 +10,7 @@
 #include "scene_layers.h"
 #include "hal.h"
 #include "nb_dialog.h"
-#include "settings.h"
+#include "prefs.h"
 #include "strutil.h"
 
 /* Debug logging — shared macro in debug.h */
@@ -178,7 +178,7 @@ void dialog_show(const char *charname, const char *text)
         {
             int single_page = (dialog_state.page_start == 0 && next < 0);
             dialog_state.reveal_active =
-                (settings_get_text_speed() != TEXT_SPEED_INSTANT &&
+                (prefs_get_text_speed() != TEXT_SPEED_INSTANT &&
                  !single_page) ? 1 : 0;
             /* Runtime-visible branch marker.  The typewriter is what makes a
              * single-page line repaint (full text -> empty prefix -> retype)
@@ -238,7 +238,7 @@ void nb_dialog_reveal_tick(void)
         return;
     }
 
-    speed = settings_get_text_speed();
+    speed = prefs_get_text_speed();
     if (speed <= 0) {
         nb_dialog_reveal_finish();
         return;

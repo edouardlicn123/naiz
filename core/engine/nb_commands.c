@@ -122,22 +122,68 @@ static int pos_to_x(char pos)
  *   On success: copies field into buf (truncated to bufsz), null-terminated;
  *   advances *s past comma + trailing whitespace; returns 1.
  *   On failure (no comma found): *s unchanged; returns 0.
+ *
+ * Escaping (added for question option labels that contain a comma):
+ *   ",\"  -> literal ',' inside the field, NOT a delimiter
+ *   "\\"  -> literal '\'
+ *   Any other "\x" is preserved verbatim (backslash included), so a label
+ *   like "C:\path" is not silently mangled.  Because the delimiter scan skips
+ *   every backslash pair, a comma can never hide behind an unknown escape.
+ *   Mirrored byte-for-byte by naiz_lib.nb_line.next_field() so the i18n
+ *   extractor derives exactly the keys the engine looks up.
  */
 int nb_next_field(const char **s, char *buf, size_t bufsz)
 {
-    const char *p = *s, *comma;
-    size_t len;
+    const char *p, *comma, *end;
+    size_t out = 0;
 
+    if (bufsz == 0) return 0;
+
+    p = *s;
     while (*p == ' ' || *p == '\t') p++;
-    comma = strchr(p, ',');
-    if (!comma) return 0;
-    len = comma - p;
-    if (len >= bufsz) len = bufsz - 1;
-    memcpy(buf, p, len);
-    buf[len] = '\0';
+
+    /* Locate the first delimiter: skip every backslash-escaped pair so an
+     * escaped comma is not mistaken for the field boundary. */
+    comma = p;
+    while (*comma) {
+        if (*comma == '\\' && comma[1]) { comma += 2; continue; }
+        if (*comma == ',') break;
+        comma++;
+    }
+    if (*comma != ',') return 0;
+
+    /* Trim trailing blanks so "Yes ,v" and "Yes,v" resolve to the same key.
+     * The i18n extractor has always stripped them; without this the engine
+     * would look tr("Yes  ") up and silently miss the translation. */
+    end = comma;
+    while (end > p && (end[-1] == ' ' || end[-1] == '\t')) end--;
+
+    /* Copy the field, collapsing the two defined escapes.  out + 1 < bufsz
+     * keeps room for the terminator on every write path. */
+    while (p < end && out + 1 < bufsz) {
+        if (*p == '\\' && (p[1] == ',' || p[1] == '\\')) p++;
+        buf[out++] = *p++;
+    }
+    buf[out] = '\0';
+
     *s = comma + 1;
     while (**s == ' ' || **s == '\t') (*s)++;
     return 1;
+}
+
+/*
+ * nb_has_field_delim — Does an unescaped ',' remain in this segment?
+ *   Mirrors nb_next_field()'s delimiter scan: every backslash pair is skipped,
+ *   so "a\,b,c" reports a delimiter (before 'c') while "a\,b" does not.
+ */
+int nb_has_field_delim(const char *s)
+{
+    while (*s) {
+        if (*s == '\\' && s[1]) { s += 2; continue; }
+        if (*s == ',') return 1;
+        s++;
+    }
+    return 0;
 }
 
 /*=== Command handlers ======================================================*/

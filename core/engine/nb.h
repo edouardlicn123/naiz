@@ -9,7 +9,7 @@
 
 /*
  * 初始化 NB 脚本引擎
- * 加载 settings.txt → tr_init 翻译表 → 加载 logo.nb
+ * 读取项目配置 (nb_config.h) 与玩家偏好 (USER.CFG) → tr_init 翻译表 → 加载 logo.nb
  * 返回值: 0=成功
  */
 int  nb_init(void);

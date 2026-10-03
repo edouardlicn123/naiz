@@ -82,7 +82,7 @@ void cmd_scene(int argc, const char **argv, const char *cmd_name)
 
     if (argc == 1) {
         /* Unconditional jump */
-        if (strchr(argv[0], ',')) {
+        if (nb_has_field_delim(argv[0])) {
             NB_DEBUG("WARN: scene: single arg '%s' contains ',' "
                      "(missing ';' separator?)\r\n", argv[0]);
         }
@@ -90,7 +90,7 @@ void cmd_scene(int argc, const char **argv, const char *cmd_name)
         return;
     }
 
-    has_explicit_default = (strchr(argv[argc - 1], ',') == NULL);
+    has_explicit_default = !nb_has_field_delim(argv[argc - 1]);
     cond_count = has_explicit_default ? argc - 1 : argc;
 
     /* Conditional chain (OR: first matching segment wins).
@@ -121,7 +121,7 @@ void cmd_scene(int argc, const char **argv, const char *cmd_name)
                 {
                     const char *tp = p;
                     while (*tp == ' ' || *tp == '\t') tp++;
-                    if (!strchr(tp, ',')) break;
+                    if (!nb_has_field_delim(tp)) break;
                 }
             }
             if (nt == 0) {

@@ -1,7 +1,7 @@
 """Runtime language table — single source of truth for the language list
 (codes + display names) shared by the engine and the toolchain.
 
-The engine owns the table in C (core/engine/settings_menu.c: LANG_CODES /
+The engine owns the table in C (core/engine/bootmenu.c: LANG_CODES /
 LANG_NAMES / N_LANGS).  This module mirrors it for the Python tools so
 code-gen (i18n_gen, gen_cjk_font) and runtime stay in sync;
 tools/tests/test_langdefs_sync.py cross-checks both against the C table

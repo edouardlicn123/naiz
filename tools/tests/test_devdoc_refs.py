@@ -34,8 +34,10 @@ SOURCE_INDEX = {
     "nb_audio.c": ROOT / "core/engine/nb_audio.c",
     "nb.c": ROOT / "core/engine/nb.c",
     "nb_asset_table.h": ROOT / "core/engine/nb_asset_table.h",
-    "settings.c": ROOT / "core/engine/settings.c",
-    "settings.h": ROOT / "core/engine/settings.h",
+    "prefs.c": ROOT / "core/engine/prefs.c",
+    "prefs.h": ROOT / "core/engine/prefs.h",
+    "bootmenu.c": ROOT / "core/engine/bootmenu.c",
+    "nb_menu.c": ROOT / "core/engine/nb_menu.c",
     "audio.c": ROOT / "core/engine/audio.c",
     "audio.h": ROOT / "core/engine/audio.h",
     "hal_audio.c": ROOT / "core/plat/hal_audio.c",
@@ -46,6 +48,7 @@ SOURCE_INDEX = {
     "nb_mainmenu.c": ROOT / "core/engine/nb_mainmenu.c",
     "build_game.py": ROOT / "tools/naiz_build/build_game.py",
     "render_text.c": ROOT / "core/engine/render_text.c",
+    "tr.c": ROOT / "core/lib/tr.c",
 }
 
 # References whose correctness is asserted with the symbol they must contain.
@@ -55,19 +58,11 @@ LINE_REF_WHITELIST = {
     ("nb_setting.c", 178): "setting_row_y",
     ("nb_setting.c", 227): "setting_draw_row",
     ("nb_setting.c", 107): "setting_progress_text",
-    ("nb_setting.c", 486): "settings_save",
+    ("nb_setting.c", 486): "prefs_save",
     ("nb_setting.c", 118): "sys_save_is_cg_unlocked",
     ("nb_setting.c", 121): "snprintf",
     ("nb_setting.c", 139): "Text Speed",
     ("nb_setting.c", 151): "Read Progress",
-    ("settings.c", 185): "settings_load",
-    ("settings.c", 202): "settings.txt",
-    ("settings.c", 235): "USER.CFG",
-    ("settings.c", 283): "USER.CFG",
-    ("settings.c", 281): "settings_save",
-    ("settings.c", 96): "pref_set_bgm_volume",
-    ("settings.c", 111): "pref_set_pcm_volume",
-    ("settings.c", 193): "TEXT_SPEED_DEFAULT",
     ("audio.c", 105): "g_bgm_on",
     ("audio.c", 233): "g_snd_on",
     ("audio.c", 242): "g_vc_on",
@@ -79,8 +74,8 @@ LINE_REF_WHITELIST = {
     ("nb_asset_table.h", 70): "CG_COUNT",
     ("save.h", 16): "CG_TOTAL",
     ("save_sys.c", 12): "SYSTEM.SAV",
-    ("main.c", 94): "settings_save",
-    ("nb_mainmenu.c", 114): "settings_save",
+    ("main.c", 94): "prefs_save",
+    ("nb_mainmenu.c", 115): "prefs_save",
     # devdoc 119 §3.4: the i18n width guard's geometry anchors.  These were
     # cited before they were registered, and the off-by-one that followed
     # (241 written as 240) passed silently -- see
@@ -88,12 +83,37 @@ LINE_REF_WHITELIST = {
     ("nb_setting.c", 167): "SET_LABEL_W",
     ("nb_setting.c", 170): "SET_VAL_W",
     ("nb_setting.c", 241): "draw_text",
-    ("settings.c", 44): "Instant",
     ("nb_saveload.c", 44): "clipped",
-    ("build_game.py", 474): "nb_asset_table.h",
+    ("build_game.py", 448): "nb_asset_table.h",
     ("render_text.c", 235): "text_width",
     # devdoc 119 §3.4 renamed this key; the row literal moved with it
     ("nb_setting.c", 149): "Sound & Voice Vol",
+    # devdoc 120 §9 -- the replacement truth table for the one retired above.
+    ("prefs.c", 33): "Instant",
+    ("prefs.c", 57): "prefs_get_lang",
+    ("prefs.c", 93): "pref_set_bgm_volume",
+    ("prefs.c", 108): "pref_set_pcm_volume",
+    ("prefs.c", 181): "prefs_load",
+    ("prefs.c", 187): "TEXT_SPEED_DEFAULT",
+    ("prefs.c", 195): "USER.CFG",
+    ("prefs.c", 242): "prefs_save",
+    ("prefs.c", 244): "USER.CFG",
+    ("prefs.c", 269): "prefs_set_lang",
+    ("prefs.h", 75): "prefs_get_version",
+    ("bootmenu.c", 103): "find_lang_index",
+    ("bootmenu.c", 200): "bootmenu_run",
+    ("bootmenu.c", 286): "prefs_set_lang",
+    ("main.c", 101): "LANG] boot",
+    ("main.c", 105): "cjk_load_for_lang",
+    ("nb.c", 166): "prefs_load",
+    ("nb.c", 171): "nb_set_lang",
+    ("nb.c", 337): "nb_set_lang",
+    ("nb_mainmenu.c", 117): "prefs_get_lang",
+    ("nb_menu.c", 273): "prefs_get_version",
+    ("tr.c", 148): "tr_table",
+    ("build_game.py", 325): "stale_settings.unlink",
+    ("build_game.py", 466): "export_config_py",
+    ("build_game.py", 470): "compile_engine",
 }
 
 # References a finished devdoc quotes on purpose, and which therefore must NOT
@@ -116,13 +136,52 @@ STALE_QUOTED_REFS = {
     ("hal_audio.c", 120), ("hal_audio.c", 131), ("nb_asset_table.h", 47),
     ("nb_setting.c", 49), ("nb_setting.c", 60), ("nb_setting.c", 71),
     ("nb_setting.c", 80), ("nb_setting.c", 99), ("nb_setting.c", 116),
-    ("nb_setting.c", 331), ("settings.c", 65), ("settings.c", 108),
-    ("settings.c", 115), ("settings.c", 144), ("settings.c", 151),
-    ("settings.c", 154), ("settings.h", 49),
-    # 2. mutation self-test table in 119 §5
-    ("settings.c", 80),
+    ("nb_setting.c", 331),
     # 3. devdoc 119 §5.1 quotes the WRONG value it made the same mistake twice
     ("nb_setting.c", 240),
+}
+
+# References to files RENAMED in 0.3.014.  devdocs 118/119 are finished and may
+# not be edited (AGENTS.md §10 step 1), so their `settings.c:N` / `settings.h:N`
+# / `settings_menu.c:N` citations still name a path that no longer exists.  They
+# are deliberately NOT resolved against current line numbers -- the line numbers
+# were valid for a different file.  devdoc 119 §2's truth table is voided by its
+# ERRATA; devdoc 120 §9 is the replacement, and LINE_REF_WHITELIST checks that
+# instead.  Renaming a *stem* here would silently unregister 118/119's textual
+# citations and let test_every_devdoc_ref_is_registered pass unnoticed.
+RETIRED_FILE_QUOTES = {
+    # devdoc 119 §2's truth table (right column) and §5's mutation targets
+    ("settings.c", 44), ("settings.c", 62), ("settings.c", 65),
+    ("settings.c", 80), ("settings.c", 96), ("settings.c", 108),
+    ("settings.c", 111), ("settings.c", 115), ("settings.c", 144),
+    ("settings.c", 151), ("settings.c", 154), ("settings.c", 185),
+    ("settings.c", 192), ("settings.c", 193), ("settings.c", 202),
+    ("settings.c", 235), ("settings.c", 281), ("settings.c", 283),
+    ("settings.c", 308), ("settings.h", 49), ("settings.h", 50),
+    ("settings_menu.c", 105), ("settings_menu.c", 162),
+    # devdoc 120 §2.2 cites bootmenu.c:105 in its pre-rename coordinate
+    # paragraph; find_lang_index now lives at 103 and is checked there.
+    ("bootmenu.c", 105),
+    # devdoc 118 §6.1 / devdoc 119 §2 last line: build_game.py's settings.txt
+    # deploy stage.  Removed in 0.3.014; the prune that replaced it is 120 §9.
+    ("build_game.py", 320),
+    # devdoc 119 §2 last row: the nb_asset_table.h export line, which 119
+    # recorded as correct at 474.  Deleting the settings deploy block above it
+    # shifted the file, so 474 no longer names that statement.  The line now
+    # carrying it is 448, registered in LINE_REF_WHITELIST for 120 §9.
+    ("build_game.py", 474),
+    # devdoc 120 §2.2 quotes main.c:97 as the pre-fix coordinate of
+    # `cjk_load_for_lang(settings_get_lang())`.  main.c still exists, but the
+    # symbol that claim rests on (settings_get_lang) is gone and the line has
+    # since moved, so it is a history quote, not a resolvable reference.
+    ("main.c", 97),
+    # devdoc 118 §六 cites nb_mainmenu.c:114.  Adding #include "bootmenu.h"
+    # there (0.3.014, to fix Watcom W131) shifted it to 115, which 120 §9
+    # registers.
+    ("nb_mainmenu.c", 114),
+    # devdoc 120 §2.2 quotes nb_mainmenu.c:116 in the pre-rename coordinate
+    # paragraph, alongside settings_get_lang() which no longer exists.
+    ("nb_mainmenu.c", 116),
 }
 
 # References verified correct and left untouched (devdoc 119 §2, last line).
@@ -131,11 +190,12 @@ KNOWN_GOOD_REFS = {
     ("nb_saveload.c", 386), ("nb_audio.c", 29), ("nb_audio.c", 40),
     ("nb_audio.c", 51), ("nb_audio.c", 43), ("nb.c", 300),
     ("audio.h", 13), ("audio.h", 20), ("save_sys.c", 66),
-    ("settings.h", 50), ("build_game.py", 320),
+    ("prefs.h", 50), ("prefs.h", 60),
 }
 
 DOC_118 = DEV_DOCS / "118-玩家偏好分家与音频开关音量设置场景.md"
 DOC_119 = DEV_DOCS / "119-用户偏好分家实装订正与设计门控与规格双源守恒.md"
+DOC_120 = DEV_DOCS / "120-settings.txt废止与config.toml单一配置源与启动菜单语言根修.md"
 TEST_TEXT_SPEED = ROOT / "tools/tests/test_text_speed_settings.py"
 TEST_USER_CFG = ROOT / "tools/tests/test_user_cfg_settings.py"
 TEST_AUDIO_INV = ROOT / "tools/tests/test_audio_settings_invariants.py"
@@ -197,15 +257,16 @@ def test_every_devdoc_ref_is_registered():
     the symbol it must contain), as verified-correct (KNOWN_GOOD_REFS), or as
     a deliberate quote of a superseded/incorrect value (STALE_QUOTED_REFS).
     """
-    registered = set(LINE_REF_WHITELIST) | set(KNOWN_GOOD_REFS) | STALE_QUOTED_REFS
-    for doc in (DOC_118, DOC_119):
+    registered = (set(LINE_REF_WHITELIST) | set(KNOWN_GOOD_REFS)
+                  | STALE_QUOTED_REFS | RETIRED_FILE_QUOTES)
+    for doc in (DOC_118, DOC_119, DOC_120):
         unknown = sorted(
             "%s:%d" % ref for ref in set(_devdoc_line_refs(doc)) - registered
         )
         assert not unknown, (
             "%s cites %d reference(s) that no test classifies: %s\n"
             "Add each to LINE_REF_WHITELIST (with the symbol it must contain), "
-            "KNOWN_GOOD_REFS, or STALE_QUOTED_REFS."
+            "KNOWN_GOOD_REFS, STALE_QUOTED_REFS, or RETIRED_FILE_QUOTES."
             % (doc.name, len(unknown), ", ".join(unknown))
         )
 
@@ -221,6 +282,27 @@ def test_devdoc_118_references_match_truth_table():
         assert f"{stem}:{lineno}" in text, (
             f"devdoc 119 must record the corrected location {stem}:{lineno}"
         )
+
+
+def test_retired_truth_table_stays_declared_void():
+    """devdoc 119 §2's line truth table was built on settings.c.  The 0.3.014
+    rename voided every row of it.  AGENTS.md §10: a known-wrong conclusion
+    left in place is unfinished work -- so 119 must keep an ERRATA naming the
+    void, and devdoc 120 must supply the replacement table."""
+    head = "\n".join(_lines(DOC_119)[:24])
+    assert "ERRATA" in head, (
+        "devdoc 119 lost its ERRATA block; its §2 truth table is void after "
+        "the settings.c -> prefs.c rename and must not read as current"
+    )
+    assert "120" in head, "the ERRATA block must point at devdoc 120"
+    text_120 = "\n".join(_lines(DOC_120))
+    assert "## 九、行号真值表" in text_120, (
+        "devdoc 120 must carry the replacement truth table"
+    )
+    assert "现行坐标" in text_120, (
+        "devdoc 120 must label its line numbers as the current coordinate set, "
+        "distinct from the pre-rename coordinates used in its own §2/§3"
+    )
 
 
 # --- 2. the corrected "what was actually changed" fact stays corrected ----
@@ -290,11 +372,16 @@ def test_finished_devdoc_has_no_pending_claims():
         )
 
 
-@pytest.mark.parametrize("doc", [DOC_118, DOC_119])
+@pytest.mark.parametrize("doc", [DOC_118, DOC_119, DOC_120])
 def test_cited_docs_exist(doc):
     """Every sibling devdoc/refdoc a document points at must be on disk."""
     text = "\n".join(_lines(doc))
-    for m in re.finditer(r"`((?:devdocs|docs|tools|logs)/[^`]+?)\.(?:md|py)`", text):
+    # Greedy up to the closing backtick: a devdoc title may itself contain a
+    # dot (devdoc 120's name cites settings.txt / config.toml).  A lazy
+    # `[^`]+?` stops at the first `.md` and resolves a truncated path, which
+    # reports a missing file that exists -- the guard then looks broken rather
+    # than wrong, and gets "fixed" by renaming documents.
+    for m in re.finditer(r"`((?:devdocs|docs|tools|logs)/[^`]+\.(?:md|py))`",
+                         text):
         target = ROOT / m.group(1)
-        target = target.with_suffix("." + m.group(0).rsplit(".", 1)[1].strip("`"))
         assert target.exists(), f"{doc.name} cites missing {target}"

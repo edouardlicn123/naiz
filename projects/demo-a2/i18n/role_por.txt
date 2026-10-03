@@ -1,3 +1,3 @@
-fei=
-ira=
-neon=
+fei=Fei
+ira=Ira
+neon=Néon

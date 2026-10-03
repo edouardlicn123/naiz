@@ -2,8 +2,9 @@
 """Unified read-only accessor for projects/<game>/config.toml.
 
 Single source of truth for reading project config. Consumers:
-  - build_game.py      (project.version, blackletter.*)
-  - export_config.py   (transition.*)
+  - build_game.py      (project.version)
+  - export_config.py   (project.version, dialog.*, button.*, blackletter.*,
+                        i18n.default_lang, transition.*)
   - i18n_gen.py        (i18n.*)
   - bump_version.py    (project.version, read-only)
 

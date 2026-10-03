@@ -10,7 +10,7 @@
  * Each registered setting is one row whose value is stepped in place with
  * the < > arrows — there is no second level: values apply immediately through
  * the row's commit callback (the next dialogue already runs at the new speed)
- * and settings_save() persists once when the scene is left.
+ * and prefs_save() persists once when the scene is left.
  *
  * Key bindings (deviating from the list menus on purpose):
  *   Up/Down        move focus (rows <-> Back button)
@@ -26,7 +26,7 @@
  * query, so a two-key binding could not be honoured reliably.
  *
  * Language is deliberately NOT registered here: the boot menu
- * (settings_menu.c) runs before the translation table and the CJK font are
+ * (bootmenu.c) runs before the translation table and the CJK font are
  * loaded, so language selection must happen there and only there.
  */
 #include <stdio.h>            /* debug.h's NB_DEBUG expands to snprintf */
@@ -34,7 +34,7 @@
 #include "ui.h"
 #include "scene_layers.h"
 #include "menu_layer.h"
-#include "settings.h"
+#include "prefs.h"
 #include "save.h"
 #include "nb_asset_table.h"
 #include "hal.h"
@@ -71,28 +71,28 @@ typedef struct {
 
 static int text_speed_current(void)
 {
-    return settings_get_text_speed();
+    return prefs_get_text_speed();
 }
 
 static void text_speed_commit(int value)
 {
-    settings_set_text_speed(value);
+    prefs_set_text_speed(value);
 }
 
 /* Switches: 1 = on, 0 = off. */
-static int bgm_on_current(void)   { return settings_get_bgm_enabled(); }
-static int snd_on_current(void)   { return settings_get_snd_enabled(); }
-static int vc_on_current(void)    { return settings_get_vc_enabled(); }
+static int bgm_on_current(void)   { return prefs_get_bgm_enabled(); }
+static int snd_on_current(void)   { return prefs_get_snd_enabled(); }
+static int vc_on_current(void)    { return prefs_get_vc_enabled(); }
 
-static void bgm_on_commit(int value)   { settings_set_bgm_enabled(value); }
-static void snd_on_commit(int value)   { settings_set_snd_enabled(value); }
-static void vc_on_commit(int value)    { settings_set_vc_enabled(value); }
+static void bgm_on_commit(int value)   { prefs_set_bgm_enabled(value); }
+static void snd_on_commit(int value)   { prefs_set_snd_enabled(value); }
+static void vc_on_commit(int value)    { prefs_set_vc_enabled(value); }
 
-static int bgm_vol_current(void)  { return settings_get_bgm_volume(); }
-static int pcm_vol_current(void)  { return settings_get_pcm_volume(); }
+static int bgm_vol_current(void)  { return prefs_get_bgm_volume(); }
+static int pcm_vol_current(void)  { return prefs_get_pcm_volume(); }
 
-static void bgm_vol_commit(int value) { settings_set_bgm_volume(value); }
-static void pcm_vol_commit(int value) { settings_set_pcm_volume(value); }
+static void bgm_vol_commit(int value) { prefs_set_bgm_volume(value); }
+static void pcm_vol_commit(int value) { prefs_set_pcm_volume(value); }
 
 /* Shared On/Off.  Labels are resolved through tr() at draw time. */
 static const int  g_onoff_values[2] = { 1, 0 };
@@ -126,27 +126,27 @@ static const char *setting_progress_text(void)
  * 0-127 (0% / 50% / 100%); PCM is the A466 attenuation 0-15, REVERSED, so
  * the ladder is ordered loudest-first and its labels are worded, not
  * percentage-based (devdoc 118 §6.4, F02 §4.2). */
-static const int  g_bgm_vol_values[SETTINGS_BGM_VOL_N] = SETTINGS_BGM_VOL_LADDER;
-static const int  g_pcm_vol_values[SETTINGS_PCM_VOL_N] = SETTINGS_PCM_VOL_LADDER;
-static const char *const g_bgm_vol_labels[SETTINGS_BGM_VOL_N] = {
+static const int  g_bgm_vol_values[PREFS_BGM_VOL_N] = PREFS_BGM_VOL_LADDER;
+static const int  g_pcm_vol_values[PREFS_PCM_VOL_N] = PREFS_PCM_VOL_LADDER;
+static const char *const g_bgm_vol_labels[PREFS_BGM_VOL_N] = {
     "0%", "50%", "100%"
 };
-static const char *const g_pcm_vol_labels[SETTINGS_PCM_VOL_N] = {
+static const char *const g_pcm_vol_labels[PREFS_PCM_VOL_N] = {
     "Max", "High", "Mid", "Low"
 };
 
 static SettingRow g_rows[] = {
-    { "Text Speed", ROW_ENUM, SETTINGS_TEXT_SPEEDS, SETTINGS_TEXT_SPEED_N,
-      SETTINGS_TEXT_SPEED_LABELS, 0, text_speed_current, text_speed_commit, NULL },
+    { "Text Speed", ROW_ENUM, PREFS_TEXT_SPEEDS, PREFS_TEXT_SPEED_N,
+      PREFS_TEXT_SPEED_LABELS, 0, text_speed_current, text_speed_commit, NULL },
     { "BGM", ROW_ENUM, g_onoff_values, 2,
       g_onoff_labels, 0, bgm_on_current, bgm_on_commit, NULL },
     { "Sound Effect", ROW_ENUM, g_onoff_values, 2,
       g_onoff_labels, 0, snd_on_current, snd_on_commit, NULL },
     { "Voice", ROW_ENUM, g_onoff_values, 2,
       g_onoff_labels, 0, vc_on_current, vc_on_commit, NULL },
-    { "BGM Volume", ROW_ENUM, g_bgm_vol_values, SETTINGS_BGM_VOL_N,
+    { "BGM Volume", ROW_ENUM, g_bgm_vol_values, PREFS_BGM_VOL_N,
       g_bgm_vol_labels, 0, bgm_vol_current, bgm_vol_commit, NULL },
-    { "Sound & Voice Vol", ROW_ENUM, g_pcm_vol_values, SETTINGS_PCM_VOL_N,
+    { "Sound & Voice Vol", ROW_ENUM, g_pcm_vol_values, PREFS_PCM_VOL_N,
       g_pcm_vol_labels, 0, pcm_vol_current, pcm_vol_commit, NULL },
     { "Read Progress", ROW_READOUT, NULL, 0,
       NULL, 0, NULL, NULL, setting_progress_text },
@@ -483,7 +483,7 @@ void cmd_settingmenu(int argc, const char **argv, const char *cmd_name)
     }
     menu_finish();
 
-    if (dirty && settings_save() != 0)
-        NB_DEBUG("WARN: settingmenu: settings_save failed\r\n");
+    if (dirty && prefs_save() != 0)
+        NB_DEBUG("WARN: settingmenu: prefs_save failed\r\n");
     setting_return_home();
 }

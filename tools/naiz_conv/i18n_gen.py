@@ -19,6 +19,8 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
 
 from naiz_build.project_config import ProjectConfig
 from naiz_lib.nb_line import parse_nb_line as naiz_parse_nb_line
+from naiz_lib.nb_line import next_field as nb_next_field
+from naiz_lib.nb_line import split_semi
 from naiz_lib.langdefs import LANG_CODE_SET as VALID_LANGS
 
 
@@ -39,10 +41,23 @@ SYSTEM_UI_KEYS = {
     "BGM Volume", "0%", "50%", "100%",
     "Sound & Voice Vol", "Max", "High", "Mid", "Low",
     "Read Progress",
-    "CG GALLERY", "No CGs available.",
+    "CG GALLERY", "No CGs available.", "[LOCKED]",
     "No save data.", "Load failed.",
     "SPECIAL",
 }
+
+# Common question option labels (English source) that are global UI vocabulary.
+# These may be reused across system UI and question dialogs; per-user choice,
+# they should be registered in sys_* rather than duplicated into game_*.
+COMMON_QUESTION_OPTS = {
+    "Yes", "No",
+    "[Yes]", "[No]",
+    "OK", "Cancel", "Okay",
+    "Back", "Return",
+    "Continue", "Retry",
+    "Quit", "Exit", "Close",
+}
+
 
 
 def parse_nb_line(line):
@@ -85,12 +100,22 @@ def extract_texts(nb_files):
                     # Engine re-splits question args with ';' as top-level
                     # delimiter: argv[0] is the prompt text, each following
                     # segment is "label,var,op,delta" (only label is text).
-                    segments = [s.strip() for s in raw.split(';')]
+                    segments = split_semi(raw)
                     if segments and segments[0]:
+                        # The prompt is argv[0] verbatim -- the engine never
+                        # comma-splits it, so a comma in the question text
+                        # needs no escaping and must not be stripped.
                         question_texts.add(segments[0])
                     for seg in segments[1:]:
-                        label = seg.split(',')[0].strip()
-                        if label:
+                        # nb_next_field mirrors the C parser, so a label that
+                        # escapes its comma ("Ira\, Jr.") yields the same key
+                        # the engine passes to tr().
+                        label, _rest = nb_next_field(seg)
+                        if not label:
+                            continue
+                        if label in COMMON_QUESTION_OPTS:
+                            menu_options.add(label)
+                        else:
                             question_texts.add(label)
 
                 if cmd in ('mainmenu', 'specialmenu'):

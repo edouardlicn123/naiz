@@ -47,3 +47,4 @@ High=大
 Mid=中
 Low=小
 Read Progress=読了割合
+[LOCKED]=[ロック]

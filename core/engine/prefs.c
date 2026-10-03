@@ -1,70 +1,67 @@
 /*
- * settings.c — Runtime game configuration (settings.txt) parser.
+ * prefs.c — Player preferences (USER.CFG) parser.
  *
- * Single source for game settings. Replaces nb.c read_settings(), which
- * wrote six cross-module globals (dialog/button style, version, lang,
- * blackletter flags) directly. The parsed values are owned here and
- * applied through accessors/setters.
+ * USER.CFG is the only file the engine writes at runtime.  Project-level
+ * configuration (version, dialog/button style, blackletter flags, the
+ * shipping default language) is not parsed here at all: it arrives as
+ * compile-time macros in nb_config.h, generated from config.toml by
+ * export_config.py (devdoc 120).  The split matters — anything the player
+ * changes must live in a file the build never overwrites (devdoc 118).
  */
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include "settings.h"
+#include "prefs.h"
 #include "audio.h"
 #include "scene_layers.h"
 #include "strutil.h"
 #include "hal.h"
 
-static GameSettings g_settings;      /* from settings.txt (build-owned) */
+static Prefs g_pref;
 
-/* Player preferences from USER.CFG.  Split from g_settings because the two
- * files have opposite owners: settings.txt is refreshed by every build, so
- * anything the player changed and that lives there is lost (devdoc 118). */
-static struct {
-    int text_speed;
-    int bgm_on;
-    int snd_on;
-    int vc_on;
-    int bgm_vol;                       /* CC7 0-127 */
-    int pcm_vol;                       /* A466 attenuation 0-15 */
-    char lang[8];
-} g_pref;
+static const int g_bgm_vol_ladder[PREFS_BGM_VOL_N] = PREFS_BGM_VOL_LADDER;
+static const int g_pcm_vol_ladder[PREFS_PCM_VOL_N] = PREFS_PCM_VOL_LADDER;
 
-static const int g_bgm_vol_ladder[SETTINGS_BGM_VOL_N] = SETTINGS_BGM_VOL_LADDER;
-static const int g_pcm_vol_ladder[SETTINGS_PCM_VOL_N] = SETTINGS_PCM_VOL_LADDER;
-
-/* Valid typewriter speeds (single source of truth; see settings.h). */
-const int SETTINGS_TEXT_SPEEDS[SETTINGS_TEXT_SPEED_N] = {
+/* Valid typewriter speeds (single source of truth; see prefs.h). */
+const int PREFS_TEXT_SPEEDS[PREFS_TEXT_SPEED_N] = {
     TEXT_SPEED_INSTANT, 16, TEXT_SPEED_DEFAULT, 64
 };
 
-/* Display labels, index-aligned with SETTINGS_TEXT_SPEEDS.  These are
+/* Display labels, index-aligned with PREFS_TEXT_SPEEDS.  These are
  * English tr() keys, resolved by the settings menu at draw time. */
-const char *const SETTINGS_TEXT_SPEED_LABELS[SETTINGS_TEXT_SPEED_N] = {
+const char *const PREFS_TEXT_SPEED_LABELS[PREFS_TEXT_SPEED_N] = {
     "Instant", "16/s", "32/s", "64/s"
 };
 
-const char *settings_get_version(void)
+const char *prefs_get_version(void)
 {
-    return g_settings.version;
+    return NAIZ_VERSION;
 }
 
-int settings_get_blackletter_title(void)
+int prefs_get_blackletter_title(void)
 {
-    return g_settings.blackletter_title;
+    return NAIZ_BLACKLETTER_TITLE;
 }
 
-int settings_get_blackletter_dialog(void)
+int prefs_get_blackletter_dialog(void)
 {
-    return g_settings.blackletter_dialog;
+    return NAIZ_BLACKLETTER_DIALOG;
 }
 
-const char *settings_get_lang(void)
+/* The effective language: the player's choice, else the project's shipping
+ * default.  Must read the SAME field prefs_set_lang() writes — the two were
+ * split across different structs in 0.3.011-0.3.013, so a boot-menu choice
+ * was written to USER.CFG and then read back as the build default
+ * (devdoc 120).
+ */
+const char *prefs_get_lang(void)
 {
-    return g_settings.lang;
+    if (g_pref.lang[0])
+        return g_pref.lang;
+    return NAIZ_DEFAULT_LANG;
 }
 
-int settings_get_text_speed(void)
+int prefs_get_text_speed(void)
 {
     return g_pref.text_speed;
 }
@@ -72,17 +69,17 @@ int settings_get_text_speed(void)
 /* The live switch/volume state lives in audio.c, so read it back from there
  * rather than from g_pref: one source of truth, and a menu redraw after an
  * in-flight change sees what the hardware was actually told. */
-int settings_get_bgm_enabled(void)  { return audio_get_bgm_enabled(); }
-int settings_get_snd_enabled(void)  { return audio_get_snd_enabled(); }
-int settings_get_vc_enabled(void)   { return audio_get_vc_enabled(); }
-int settings_get_bgm_volume(void)   { return audio_get_bgm_volume(); }
-int settings_get_pcm_volume(void)   { return audio_get_pcm_volume(); }
+int prefs_get_bgm_enabled(void)  { return audio_get_bgm_enabled(); }
+int prefs_get_snd_enabled(void)  { return audio_get_snd_enabled(); }
+int prefs_get_vc_enabled(void)   { return audio_get_vc_enabled(); }
+int prefs_get_bgm_volume(void)   { return audio_get_bgm_volume(); }
+int prefs_get_pcm_volume(void)   { return audio_get_pcm_volume(); }
 
 static void pref_set_text_speed(int speed)
 {
     int i;
-    for (i = 0; i < SETTINGS_TEXT_SPEED_N; i++) {
-        if (SETTINGS_TEXT_SPEEDS[i] == speed) {
+    for (i = 0; i < PREFS_TEXT_SPEED_N; i++) {
+        if (PREFS_TEXT_SPEEDS[i] == speed) {
             g_pref.text_speed = speed;
             return;
         }
@@ -97,7 +94,7 @@ static void pref_set_bgm_volume(int v)
 {
     int i, best = 0, bestd = -1, d;
 
-    for (i = 0; i < SETTINGS_BGM_VOL_N; i++) {
+    for (i = 0; i < PREFS_BGM_VOL_N; i++) {
         d = v - g_bgm_vol_ladder[i];
         if (d < 0) d = -d;
         if (bestd < 0 || d < bestd) {
@@ -111,39 +108,39 @@ static void pref_set_bgm_volume(int v)
 static void pref_set_pcm_volume(int step)
 {
     if (step < 0) step = 0;
-    if (step > SETTINGS_PCM_VOL_MAX) step = SETTINGS_PCM_VOL_MAX;
+    if (step > PREFS_PCM_VOL_MAX) step = PREFS_PCM_VOL_MAX;
     g_pref.pcm_vol = step;
 }
 
-void settings_set_text_speed(int speed) { pref_set_text_speed(speed); }
+void prefs_set_text_speed(int speed) { pref_set_text_speed(speed); }
 
 /* Setter side mirrors the getter: the value is applied to audio.c first and
- * then recorded in g_pref, which is what settings_save() writes. */
-void settings_set_bgm_enabled(int on)
+ * then recorded in g_pref, which is what prefs_save() writes. */
+void prefs_set_bgm_enabled(int on)
 {
     g_pref.bgm_on = on ? 1 : 0;
     audio_set_bgm_enabled(g_pref.bgm_on);
 }
 
-void settings_set_snd_enabled(int on)
+void prefs_set_snd_enabled(int on)
 {
     g_pref.snd_on = on ? 1 : 0;
     audio_set_snd_enabled(g_pref.snd_on);
 }
 
-void settings_set_vc_enabled(int on)
+void prefs_set_vc_enabled(int on)
 {
     g_pref.vc_on = on ? 1 : 0;
     audio_set_vc_enabled(g_pref.vc_on);
 }
 
-void settings_set_bgm_volume(int v)
+void prefs_set_bgm_volume(int v)
 {
     pref_set_bgm_volume(v);
     audio_set_bgm_volume(g_pref.bgm_vol);
 }
 
-void settings_set_pcm_volume(int step)
+void prefs_set_pcm_volume(int step)
 {
     pref_set_pcm_volume(step);
     audio_set_pcm_volume(g_pref.pcm_vol);
@@ -152,8 +149,7 @@ void settings_set_pcm_volume(int step)
 /*
  * Read one key=value line into *out.  Returns 1 when 'line' held a value
  * (after the comment / overlong-line handling), 0 when the line carried
- * nothing.  Both files share this so a malformed line behaves identically
- * in settings.txt and USER.CFG.
+ * nothing.  USER.CFG is the only file parsed with this.
  */
 static int read_kv(FILE *f, char *line, size_t line_sz,
                    char *key, size_t key_sz, char *val, size_t val_sz)
@@ -179,59 +175,23 @@ static int read_kv(FILE *f, char *line, size_t line_sz,
     return 1;
 }
 
-/* settings_load — project settings.txt, then the player's USER.CFG on top,
- * then apply styles and audio preferences.  Both files may be absent.
+/* prefs_load — parse USER.CFG (may be absent: legal first-boot state), then
+ * apply the compile-time project style and the audio preferences.
  */
-int settings_load(void)
+int prefs_load(void)
 {
     FILE *f;
     char line[64], key[32], val[48];
-    int ds, bs;
 
-    memset(&g_settings, 0, sizeof(g_settings));
     memset(&g_pref, 0, sizeof(g_pref));
     g_pref.text_speed = TEXT_SPEED_DEFAULT;
     g_pref.bgm_on = 1;
     g_pref.snd_on = 1;
     g_pref.vc_on = 1;
-    g_pref.bgm_vol = SETTINGS_BGM_VOL_MAX;
+    g_pref.bgm_vol = PREFS_BGM_VOL_MAX;
     g_pref.pcm_vol = 0;
 
-    /* Pass 1: settings.txt (project).  lang here is the project default and
-     * is superseded by USER.CFG whenever the player chose a language. */
-    f = fopen("settings.txt", "r");
-    if (f) {
-        while (fgets(line, sizeof(line), f)) {
-            if (!read_kv(f, line, sizeof(line), key, sizeof(key),
-                        val, sizeof(val)))
-                continue;
-
-            if (strcmp(key, "dlgstyle") == 0) {
-                ds = atoi(val);
-                if (ds >= 0 && ds <= 9)
-                    g_settings.dialog_style = (unsigned char)ds;
-            } else if (strcmp(key, "btnstyle") == 0) {
-                bs = atoi(val);
-                if (bs >= 0 && bs <= 4)
-                    g_settings.button_style = (unsigned char)bs;
-            } else if (strcmp(key, "lang") == 0) {
-                str_copy(g_settings.lang, sizeof(g_settings.lang), val);
-            } else if (strcmp(key, "version") == 0) {
-                str_copy(g_settings.version, sizeof(g_settings.version), val);
-            } else if (strcmp(key, "blacktitle") == 0) {
-                g_settings.blackletter_title = (atoi(val) != 0);
-            } else if (strcmp(key, "blackdialog") == 0) {
-                g_settings.blackletter_dialog = (atoi(val) != 0);
-            }
-            /* text_speed / audio keys are ignored here: they are player
-             * preferences and settings.txt must not set them. */
-        }
-        fclose(f);
-    } else {
-        hal_log("SET: no settings.txt (project defaults)\r\n");
-    }
-
-    /* Pass 2: USER.CFG (player) — wins over the project default. */
+    /* USER.CFG — the player's own choices, and the only file parsed here. */
     f = fopen("USER.CFG", "r");
     if (f) {
         while (fgets(line, sizeof(line), f)) {
@@ -261,11 +221,12 @@ int settings_load(void)
         hal_log("SET: no USER.CFG (defaults)\r\n");
     }
 
-    if (!g_pref.lang[0])
-        str_copy(g_pref.lang, sizeof(g_pref.lang), g_settings.lang);
+    /* g_pref.lang is left empty when the player has not chosen yet, so
+     * prefs_get_lang() falls through to the project's shipping default. */
 
-    dlg_set_style(g_settings.dialog_style);
-    btn_set_style(g_settings.button_style);
+    /* Dialog/button style are compile-time project config, not preferences. */
+    dlg_set_style(NAIZ_DLGSTYLE);
+    btn_set_style(NAIZ_BTNSTYLE);
 
     /* Applied in the same order the setters use: volume before the switch,
      * so a disabled channel still carries the volume the player chose (turning
@@ -278,7 +239,7 @@ int settings_load(void)
     return 0;
 }
 
-int settings_save(void)
+int prefs_save(void)
 {
     FILE *f = fopen("USER.CFG", "w");
     if (!f) {
@@ -305,8 +266,13 @@ int settings_save(void)
     return 0;
 }
 
-void settings_set_lang(const char *lang)
+void prefs_set_lang(const char *lang)
 {
-    if (!lang) lang = "eng";
+    /* NULL means "no preference"; leave the field empty so prefs_get_lang()
+     * falls back to the project default rather than pinning a language. */
+    if (!lang) {
+        g_pref.lang[0] = '\0';
+        return;
+    }
     str_copy(g_pref.lang, sizeof(g_pref.lang), lang);
 }

@@ -9,7 +9,7 @@
 #include "vm.h"
 #include "scene_layers.h"
 #include "render.h"
-#include "settings.h"
+#include "prefs.h"
 #include "hal.h"
 #include "tr.h"
 #include "nb_internal.h"
@@ -153,7 +153,7 @@ int nb_lang_is_cjk(void)
 
 /*
  * nb_init — NB engine initialization.
- * Sequence: clear state -> read settings -> init translation table
+ * Sequence: clear state -> read player prefs (USER.CFG) -> init translation table
  *   -> button/dialog palette -> load logo.nb
  * @return 0 (currently never fails)
  */
@@ -163,12 +163,12 @@ int nb_init(void)
     memset(&nb, 0, sizeof(nb));
     nb_dialog_reset();
 
-    settings_load();
+    prefs_load();
     /* Sync the language into the NB state (owned here). nb_set_lang then
      * applies the full language-driven rendering state: translation table,
      * CJK glyph font, and blackletter dialog style (Latin-only, so it
      * applies only for non-CJK languages). */
-    nb_set_lang(settings_get_lang());
+    nb_set_lang(prefs_get_lang());
 
     nb_var_init();
 
@@ -328,6 +328,13 @@ void nb_get_state(char *filename, int fn_size,
  * way). */
 void nb_set_lang(const char *lang)
 {
+    /* Deterministic marker for the language actually being applied.  It is the
+     * single consumer of prefs_get_lang() on the real game path, so it is the
+     * probe target for tools/diag/np2kai_ab.py.  devdoc 120's bug wrote the
+     * menu choice to USER.CFG and then read a different copy back, which no
+     * visual check and no click count could distinguish.  Do not remove this
+     * without a replacement marker. */
+    NB_DEBUG("[LANG] nb_set_lang lang='%s'\r\n", lang);
     str_copy(nb.lang, sizeof(nb.lang), lang);
     tr_init(nb.lang);
     if (tr_get_count() == 0 && strcmp(nb.lang, "eng") != 0) {
@@ -335,7 +342,7 @@ void nb_set_lang(const char *lang)
         tr_init("eng");
     }
     cjk_load_for_lang(nb.lang);
-    text_set_blackletter(settings_get_blackletter_dialog() && !nb_lang_is_cjk());
+    text_set_blackletter(prefs_get_blackletter_dialog() && !nb_lang_is_cjk());
 }
 
 /*
