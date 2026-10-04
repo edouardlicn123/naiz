@@ -53,7 +53,8 @@ static unsigned char *dialog_occluder = NULL;
  * the fresh underneath after a background change, so the dialog (box + text)
  * survives bg(){x}/cg(){x} (devdoc 96 ruling A, R19). */
 static char dialog_render_name[64];
-static char dialog_render_text[1024];
+#include "tr.h"
+static char dialog_render_text[TR_VAL_LEN];
 static int  dialog_render_off = 0;
 static unsigned char dialog_render_valid = 0;
 

@@ -13,7 +13,7 @@
 
 /*=== Constants ============================================================*/
 
-#define NB_LINE_MAX      256
+#define NB_LINE_MAX      1152
 #define NB_ARGS_MAX      20
 #define NB_BUF_SIZE      32768
 #define NB_FILENAME_MAX  64

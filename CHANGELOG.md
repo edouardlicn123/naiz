@@ -2,10 +2,23 @@
 
 自 R1 起全部 Bug 修复与功能演进记录（条目顺序沿用 AGENTS.md 既有历史排列）；`AGENTS.md` 仅保留当前版本与规则。**新条目约定**：每轮修复/演进完成后，在下方 `---` 分隔线之后（第一条位置）追加变更摘要，并在 AGENTS.md 头部同步「当前版本」。**条目格式**：每条以 `### <版本号> — <标题>` 开头（版本号化标题行 + `<a id="cN">` 锚点，N 按条目序递增），正文整段或分小节；历史速查直接读下方「版本索引」。
 
+<a id="c49"></a>
+### 0.3.018 — 翻译/脚本文本长度上限收口（5 对话框容量）+ tr 截断 fail-loud + 容量守卫（devdoc 121）
+
+- **容量上限抬升（单一事实源）**：`core/lib/tr.h` 新增 `TR_KEY_LEN 1024`、`TR_VAL_LEN 1280`、`TR_LINE_MAX`，`tr.c` 移除本地 128/256 定义改用 tr.h，行缓冲改 `char line[TR_LINE_MAX]`；`core/engine/nb_internal.h` `NB_LINE_MAX 256→1152`；`core/engine/nb_dialog.c` `dialog_text_buf[1024]→[TR_VAL_LEN]` 并补 `tr.h` include；`core/engine/layer_dialog.c` `dialog_render_text[1024]→[TR_VAL_LEN]` 并补 `tr.h` include（5 个对话框容量模型：key 855B→1024、value 1260B→1280）。
+- **fail-loud（静默→响亮）**：`core/lib/tr.c` 增 `tr_trunc_count`，`tr_init()` 重置、`load_file()` 在 key/value/行未换行/条目超限四处计数，新增 `tr_get_truncations()` 导出至 `tr.h`；`core/engine/nb.c::nb_set_lang()` 于语言切换后（eng 回退合流）检查 `tr_get_truncations()>0`，输出 `WARN: %d translation entries truncated` 并 `hal_log("WARN: translation truncated\r\n")`。
+- **容量守卫测试**：新增 `tools/tests/test_tr_capacity.py`（6 项），从源码读取常量断言 `TR_KEY_LEN≥1024`、`TR_VAL_LEN≥1280`、`NB_LINE_MAX≥1152`、两 dialog 缓冲≥TR_VAL_LEN、i18n 各行 key/val < 限额、`.nb` 行 < NB_LINE_MAX；先红后绿自证，配合现有容量无关守卫形成双层保护（pytest 全绿）。
+- **文档对齐**：修订 `devdocs/120-*.md` 中对 `tr()` 空值注释的行号引用（`148-151`→`168`），`tools/tests/test_devdoc_refs.py` 白名单同步修正；`AGENTS.md` 头部当前版本/最新条目更新至 `0.3.018`/`c49`；版本统一 bump 至 `0.3.018`（全项目同步）。
+
+验证：`make -C core` + `find core -maxdepth 1 -name '*.err' -size +0`（空）、`tools/tests/test_tr_capacity.py` + `test_devdoc_refs.py` 18 passed、`./start.sh fullaudit` 7/7 全绿（symbol_audit A/B --gate 通过）、`build && make` demo-a2 HDI 新鲜。按 devdoc 121 §八完成实现序列 1–4/7–9；其余实机验证（A/B `--forbid`）非本轮 CI 环境要求。
+
+
+
 ## 版本索引
 
 | 条目 |
 |------|
+| [0.3.018 — 翻译/脚本文本长度上限收口（5 对话框容量）+ tr 截断 fail-loud + 容量守卫（devdoc 121）](#c49) |
 | [0.3.017 — 全部剧情脚本 9 语翻译补齐（28 键 ×9 语 0 空值）+ `Ira,not Neon` 转义标签入表](#c48) |
 | [0.3.016 — NB 字段逗号转义 `\,`（三处实现同步）+ 常用问题选项归类 sys/game + `tr()` 守卫去注释误判](#c47) |
 | [0.3.015 — 角色名 9 语种补全 + `[LOCKED]` 系统键缺失与 ORPHANED 陷阱 + 字形覆盖守卫](#c46) |

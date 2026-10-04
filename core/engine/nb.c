@@ -341,6 +341,10 @@ void nb_set_lang(const char *lang)
         NB_DEBUG("WARN: no translations for lang='%s', falling back to 'eng'\r\n", nb.lang);
         tr_init("eng");
     }
+    if (tr_get_truncations() > 0) {
+        NB_DEBUG("WARN: %d translation entries truncated\r\n", tr_get_truncations());
+        hal_log("WARN: translation truncated\r\n");
+    }
     cjk_load_for_lang(nb.lang);
     text_set_blackletter(prefs_get_blackletter_dialog() && !nb_lang_is_cjk());
 }

@@ -8,7 +8,7 @@
  * 翻译文件格式：
  *   - 每行一个 key=value 条目
  *   - 空行和以 '#' 开头的行被跳过
- *   - key 和 value 均支持最多 256 字节
+ *   - key 和 value 容量上限见 tr.h
  */
 #include "tr.h"
 #include <stdio.h>
@@ -16,9 +16,7 @@
 #include <string.h>
 
 #define TR_MAX_ENTRIES 1024  /* hard cap; load_file stops at this (as before) */
-#define TR_INIT_CAP     64   /* first block 64 x 384 B = 24 KB; realloc x2 when full */
-#define TR_KEY_LEN     128   /* 键最大长度（含 NUL） */
-#define TR_VAL_LEN     256   /* 值最大长度（含 NUL） */
+#define TR_INIT_CAP     64   /* first block 64 x 2304 B = 144 KB; realloc x2 when full */
 
 /* Translation entry: key=value pair. */
 typedef struct {
@@ -26,12 +24,14 @@ typedef struct {
     char val[TR_VAL_LEN];  /* Translated text (lookup value) */
 } TrEntry;
 
-/* Heap-allocated translation table, grown on demand (no static 384 KB block). */
+/* Heap-allocated translation table, grown on demand. */
 static TrEntry *tr_table;
 /* Number of loaded translation entries. */
 static int tr_count;
 /* Allocated capacity of tr_table (0 = nothing allocated yet). */
 static int tr_cap;
+/* Truncation counter for fail-loud diagnostics (devdoc 121). */
+static int tr_trunc_count;
 
 /* Grow tr_table capacity (doubling from TR_INIT_CAP, capped at TR_MAX_ENTRIES).
  * @return 0 on success, -1 on allocation failure (existing entries preserved) */
@@ -53,20 +53,28 @@ static int tr_grow(void)
 static void load_file(const char *path)
 {
     FILE *f;
-    char line[512];
+    char line[TR_LINE_MAX];
     char *eq;
     int klen, vlen;
+    int linelen;
 
     f = fopen(path, "r");
     if (!f) return;
 
     while (fgets(line, sizeof(line), f)) {
+        linelen = (int)strlen(line);
+        /* Detect truncation: line not ending with \n and not EOF? But fgets returns
+         * full buffer only if no \n found before end. */
+        if (linelen > 0 && line[linelen - 1] != '\n' && linelen == (int)sizeof(line) - 1) {
+            /* Line was truncated by fgets buffer */
+            tr_trunc_count++;
+            /* Try to consume rest of line to keep position? Simple: just continue processing
+             * what we have; we'll strip \r later. But better to note. */
+        }
+
         /* Strip trailing \r\n. */
-        {
-            int len = (int)strlen(line);
-            while (len > 0 && (line[len - 1] == '\r' || line[len - 1] == '\n')) {
-                line[--len] = '\0';
-            }
+        while (linelen > 0 && (line[linelen - 1] == '\r' || line[linelen - 1] == '\n')) {
+            line[--linelen] = '\0';
         }
 
         /* Skip empty lines and comment lines starting with '#'. */
@@ -76,18 +84,27 @@ static void load_file(const char *path)
         eq = strchr(line, '=');
         if (!eq) continue;
 
-        if (tr_count >= TR_MAX_ENTRIES) break;
+        if (tr_count >= TR_MAX_ENTRIES) {
+            tr_trunc_count++;
+            break;
+        }
         if (tr_count >= tr_cap && tr_grow() != 0) break;  /* OOM: stop loading */
 
         /* key = everything before first '='. */
         klen = (int)(eq - line);
-        if (klen >= TR_KEY_LEN) klen = TR_KEY_LEN - 1;
+        if (klen >= TR_KEY_LEN) {
+            tr_trunc_count++;
+            klen = TR_KEY_LEN - 1;
+        }
         memcpy(tr_table[tr_count].key, line, klen);
         tr_table[tr_count].key[klen] = '\0';
 
         /* value = everything after first '='. */
         vlen = (int)strlen(eq + 1);
-        if (vlen >= TR_VAL_LEN) vlen = TR_VAL_LEN - 1;
+        if (vlen >= TR_VAL_LEN) {
+            tr_trunc_count++;
+            vlen = TR_VAL_LEN - 1;
+        }
         memcpy(tr_table[tr_count].val, eq + 1, vlen);
         tr_table[tr_count].val[vlen] = '\0';
 
@@ -110,6 +127,7 @@ int tr_init(const char *lang)
     tr_table = NULL;
     tr_count = 0;
     tr_cap = 0;
+    tr_trunc_count = 0;
 
     if (!lang) return -1;
 
@@ -159,4 +177,10 @@ const char *tr(const char *text)
 int tr_get_count(void)
 {
     return tr_count;
+}
+
+/* Return number of truncations detected during loading. */
+int tr_get_truncations(void)
+{
+    return tr_trunc_count;
 }

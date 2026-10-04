@@ -21,7 +21,7 @@
 /* Typewriter text speed (chars/sec). 0 = Instant (typewriter disabled).
  * Valid values: TEXT_SPEED_INSTANT / 16 / 32 / 64. */
 #define TEXT_SPEED_INSTANT  0
-#define TEXT_SPEED_DEFAULT  32
+#define TEXT_SPEED_DEFAULT  0
 
 /* Audio preference ranges (devdoc 118).  BGM is MIDI CC7 0-127 ascending;
  * PCM is the A466 attenuation 0-15 REVERSED (0 = loudest).  They are

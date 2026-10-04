@@ -17,7 +17,8 @@
 #include "debug.h"
 
 /* Dialog text buffer (max 1KB). */
-static char dialog_text_buf[1024];
+#include "tr.h"
+static char dialog_text_buf[TR_VAL_LEN];
 
 /* Dialog paging state — private to this module. */
 typedef struct {

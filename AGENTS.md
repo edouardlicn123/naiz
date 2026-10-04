@@ -1,10 +1,10 @@
 # Naiz — AI 编程规则
 
-> **当前版本**: `0.3.017`（`projects/demo-a2/config.toml`）
+> **当前版本**: `0.3.018`（`projects/demo-a2/config.toml`）
 >
-> **最新条目**: `CHANGELOG.md` `c48` — 全部剧情脚本 9 语翻译补齐（28 键 ×9 语 0 空值）+ `Ira,not Neon` 转义标签入表（0.3.017）。前序 `c47` NB 字段逗号转义 `\,`（引擎/`i18n_gen`/`nb_validator` 三处同步）+ 常用问题选项归类 sys/game + `tr()` 守卫去注释误判（0.3.016）。前序 `c45` `settings.txt` 废止、`config.toml` 单一配置源 + 启动菜单语言根修（devdoc 120，0.3.014）。前序 `c42` 玩家偏好分家 `USER.CFG` + 游戏内设置扩展 7 行（三开关 / 双音量 / 阅读进度）+ 86 板 PCM 寄存器 refdoc（devdoc 118，0.3.011）。
+> **最新条目**: `CHANGELOG.md` `c49` — 翻译/脚本文本长度上限收口（5 对话框容量）+ tr 截断 fail-loud + 容量守卫（devdoc 121，0.3.018）。前序 `c48` 全部剧情脚本 9 语翻译补齐（28 键 ×9 语 0 空值）+ `Ira,not Neon` 转义标签入表（0.3.017）。前序 `c47` NB 字段逗号转义 `\,`（引擎/`i18n_gen`/`nb_validator` 三处同步）+ 常用问题选项归类 sys/game + `tr()` 守卫去注释误判（0.3.016）。前序 `c45` `settings.txt` 废止、`config.toml` 单一配置源 + 启动菜单语言根修（devdoc 120，0.3.014）。
 >
-> **开发历史已移至 [`CHANGELOG.md`](CHANGELOG.md)**: R1–R30、0.2.109–0.2.117 及动画工具链等全部 Bug 修复/功能演进记录均以条目形式存于根目录 `CHANGELOG.md`，**本文件（AGENTS.md）不承载任何开发历史摘要，只存规则与当前版本**；历史速查一律读 CHANGELOG.md（最新：全部剧情脚本 9 语翻译 /0.3.017），新条目追加到 CHANGELOG.md 顶部而**不是**本文件。
+> **开发历史已移至 [`CHANGELOG.md`](CHANGELOG.md)**: R1–R30、0.2.109–0.2.117 及动画工具链等全部 Bug 修复/功能演进记录均以条目形式存于根目录 `CHANGELOG.md`，**本文件（AGENTS.md）不承载任何开发历史摘要，只存规则与当前版本**；历史速查一律读 CHANGELOG.md（最新：c49 / 0.3.018），新条目追加到 CHANGELOG.md 顶部而**不是**本文件。
 >
 > **防复发机制**: 见 §十七 — 每次修改后必须对照 C16/P11/S7 等 39 条规则逐一检查；**写完 devdoc 另须过 §十「规格与实现的收敛责任」**（行号校准 + 声称逐条落地，pytest 全绿不算证据）。
 >
