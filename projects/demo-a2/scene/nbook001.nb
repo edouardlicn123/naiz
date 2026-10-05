@@ -9,8 +9,8 @@ ira(){Good Morning,Fei.}
 char(l,smile,face){fei}
 fei(){Now I feel happy that I have finished my homework.}
 voice(){hi}
-sound(){ding}
 ira(){Really?You Forgot the exam on next week,you have to have great effort to solve it.It is a very important test as we know.And more,you have lots of house work,including washing dishes,cleaning floor,cut the weeds.And more...}
+sound(){ding}
 char(l,sad,face){fei}
 fei(){Oh,NO!}
 fei(){No way,I am planing to the beach.}

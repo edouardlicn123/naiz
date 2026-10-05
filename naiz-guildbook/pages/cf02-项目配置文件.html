@@ -15,7 +15,7 @@
 <hr>
 <blockquote><strong>创建</strong>：2026-08-04</blockquote>
 
-<p>每个项目根目录有 <code>config.toml</code>，集中管理项目级全局配置（语言、标题、版本、过渡、黑花字开关）。构建时由多段工具读取并分配到 <code>settings.txt</code>、引擎头文件等。</p>
+<p>每个项目根目录有 <code>config.toml</code>，集中管理项目级全局配置（语言、标题、版本、过渡、黑花字开关）。构建时由多段工具读取并生成 <code>core/engine/nb_config.h</code> 的 <code>NAIZ_*</code> 宏，<strong>编译进引擎</strong>；运行时不再部署也不再解析任何项目配置文件。</p>
 
 <h2>1. 值类型约定</h2>
 <table>
@@ -135,8 +135,8 @@ dialog = false</code></pre>
 </tr>
 <tr>
   <td><code>project</code> / <code>blackletter</code></td><td><code>title</code>、<code>version</code>、<code>title</code> / <code>dialog</code></td>
-  <td><code>tools/naiz_build/build_game.py</code></td>
-  <td>注入到 <code>settings.txt</code>（<code>version=</code> / <code>blacktitle=</code> / <code>blackdialog=</code>）。</td>
+  <td><code>tools/naiz_build/export_config.py</code></td>
+  <td>生成 <code>nb_config.h</code> 的 <code>NAIZ_VERSION</code> / <code>NAIZ_BLACKLETTER_TITLE</code> / <code>NAIZ_BLACKLETTER_DIALOG</code> 宏，<strong>编译进引擎</strong>。</td>
 </tr>
 <tr>
   <td><code>transition</code></td><td><code>type</code>、<code>frames</code></td>
@@ -161,7 +161,7 @@ dialog = false</code></pre>
 
 <h2>6. 运行链路</h2>
 <ul>
-  <li><strong>设置类</strong>（version / 黑花字等）：<code>config.toml</code> → <code>build_game.py</code> 注入 <code>settings.txt</code> → 引擎 <code>settings_load()</code> 解析到 <code>GameSettings</code>（settings.c/settings.h）。</li>
+  <li><strong>项目级配置</strong>（version / 对话框 / 按钮 / 黑花字 / 语言默认值 / 转场）：全部走<strong>编译期宏</strong>——<code>config.toml</code> → <code>export_config.py</code> → <code>nb_config.h</code> 的 <code>NAIZ_*</code> 宏 → 编译进引擎，<strong>运行时零解析</strong>。原先的 <code>settings.txt</code> 及其解析代码（<code>settings.c</code> / <code>settings.h</code>）<strong>已全部删除</strong>；构建时只会把残留的 <code>settings.txt</code> 从部署目录<strong>删掉</strong>。</li>
   <li><strong>编译期类</strong>（转场）：<code>config.toml</code> → <code>export_config.py</code> → <code>nb_config.h</code> 宏 → 引擎编译期内嵌。</li>
 </ul>
 

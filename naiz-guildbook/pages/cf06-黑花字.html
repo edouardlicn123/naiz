@@ -56,15 +56,15 @@ dialog = true</code></pre>
 <p>修改后重新构建游戏即可：</p>
 <pre><code>./makegame.sh build &lt;game&gt;</code></pre>
 <ol>
-  <li><code>build_game.py</code> 读取 <code>config.toml</code> 的黑花字开关，写入 <code>settings.txt</code> 的 <code>blacktitle=</code> / <code>blackdialog=</code>。</li>
-  <li>引擎启动时读取 <code>settings.txt</code>，得到两个开关。</li>
+  <li><code>export_config.py</code> 读取 <code>config.toml</code> 的黑花字开关，生成 <code>core/engine/nb_config.h</code> 的 <code>NAIZ_BLACKLETTER_TITLE</code> / <code>NAIZ_BLACKLETTER_DIALOG</code> 宏，<strong>编译进引擎</strong>。</li>
+  <li>引擎<strong>运行时零解析</strong>——两个开关在编译期已成常量，故改开关必须重新编译。</li>
   <li>运行时语言为非 CJK 时生效；为 CJK 时自动回退原字体。</li>
 </ol>
 
 <h2>5. 与其它设置的关系</h2>
 <ul>
   <li>黑花字作用于<strong>拉丁文字</strong>；CJK 文字始终走 CJK 点阵字库，不受影响。</li>
-  <li>对话框样式（<code>dlgstyle</code>）、字体等设置与黑花字相互独立，可同时使用。</li>
+  <li>对话框样式（<code>config.toml</code> 的 <code>[dialog] style</code>）、字体等设置与黑花字相互独立，可同时使用。</li>
   <li>完整配置格式见 <a href="cf02-项目配置文件.html">cf02 项目配置文件</a>。</li>
 </ul>
 
@@ -72,7 +72,7 @@ dialog = true</code></pre>
 <ul>
   <li>黑花体字型偏装饰、可读性低于默认字体，长句正文建议保持默认，仅在标题或短句使用。</li>
   <li>开关仅影响非 CJK 语言；多语言发布时，CJK 玩家看到的仍是原字体，属预期行为。</li>
-  <li>修改开关后需重新 <code>makegame.sh build</code> 才会部署到 <code>settings.txt</code>。</li>
+  <li>修改开关后需重新 <code>makegame.sh build</code>（生成 <code>nb_config.h</code>）<strong>并 <code>makegame.sh make</code></strong>（注入 HDI）才会生效——宏是编译期的，只 build 不 make 跑的还是旧引擎。</li>
 </ul>
 
 </main>

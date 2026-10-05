@@ -1,7 +1,7 @@
 {
   "version": 2,
-  "git_head": "4f21c61",
-  "checked_at": "2026-10-04T14:16:41",
+  "git_head": "e66c81f",
+  "checked_at": "2026-10-05T13:37:29",
   "files": {
     "core/build.sh": {
       "sha256": "0e6bb3f41cae8f6c5a014a49767f93990ddd3e2c461a85ec991c01b40b66b11e",
@@ -309,7 +309,7 @@
       "findings": []
     },
     "core/engine/nb_config.h": {
-      "sha256": "4221d10cf45849422c87da7fdbf478c15161627f97ade20b56a8423469800b82",
+      "sha256": "9629dfdc8e17428acfdc965ddaf250fa00a5f5e381b9c59976475fcdd7e58528",
       "violations": 0,
       "candidates": 0,
       "findings": []
@@ -985,13 +985,13 @@
       "findings": []
     },
     "tools/naiz_audio/pack_audio.py": {
-      "sha256": "ee5f2d8c8ba5b550ec8bc6d38f5198135b7297542d583ade0e4fb527371935c1",
+      "sha256": "f8b72d0df6e51173edf0e5c46a285c36f2ae1d716397b3208f8f2d0b47dd1e67",
       "violations": 0,
       "candidates": 0,
       "findings": []
     },
     "tools/naiz_audio/wav_convert.py": {
-      "sha256": "96d4b213479445abe3d2063d97af906bc94096c6d5253106c9209ff88ddb70fa",
+      "sha256": "2c1ee8bf5446d19dddf48a88dca1324e33f1f0663e200a8a81719b82a0fd68b4",
       "violations": 0,
       "candidates": 0,
       "findings": []
@@ -1033,7 +1033,7 @@
       "findings": []
     },
     "tools/naiz_build/build_game.py": {
-      "sha256": "72f6fa199a973d106bc553bbe03e51f085cd1900bc400c43eb9cd1edface73d3",
+      "sha256": "2ceb7b6ad6f58978759531b791fdb43c76ed24fa9aabe511d743cbfc17855264",
       "violations": 0,
       "candidates": 1,
       "findings": [
@@ -1285,7 +1285,7 @@
       "findings": []
     },
     "tools/naiz_lib/__init__.py": {
-      "sha256": "5c9a25900a1773f68808a8182a35ca04e752568540ebe1ae312a51d39e0de176",
+      "sha256": "d88084b4dc72f8669206dc56cf99e47199f909e6937bd3f6e26b3e0287b54a6e",
       "violations": 0,
       "candidates": 0,
       "findings": []
@@ -1431,8 +1431,8 @@
   },
   "summary": {
     "files": 193,
-    "changed": 1,
-    "skipped": 192,
+    "changed": 0,
+    "skipped": 193,
     "out_of_scope": 0,
     "violations": 0,
     "candidates": 46,

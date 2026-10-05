@@ -20,6 +20,8 @@
     '<a class="nav-item" href="' + pp + 'mc03-图层渲染与换装机制.html">图层渲染与换装</a>',
     '<a class="nav-item" href="' + pp + 'mc04-MAG图片机制.html">MAG 图片机制</a>',
     '<a class="nav-item" href="' + pp + 'mc05-动画机制.html">动画机制</a>',
+    '<a class="nav-item" href="' + pp + 'mc06-音频通路机制.html">音频通路机制</a>',
+    '<a class="nav-item" href="' + pp + 'mc07-音频平台与工具.html">音频平台与工具</a>',
     '<div class="sidebar-section">配置</div>',
     '<a class="nav-item" href="' + pp + 'cf01-变量系统.html">变量系统</a>',
     '<a class="nav-item" href="' + pp + 'cf02-项目配置文件.html">项目配置文件</a>',

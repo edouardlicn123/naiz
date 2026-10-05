@@ -223,7 +223,7 @@ def pack_images(proj_dir: Path, game_dir: Path):
 
 
 def pack_audio(proj_dir: Path, game_dir: Path):
-    """Pack registered BGM/SND/VC assets into games/<game>/AUDIO.DAT."""
+    """Pack assets/<game>/ BGM/SND/VC into games/<game>/AUDIO.DAT."""
     _pack_audio(str(proj_dir), str(game_dir))
 
 

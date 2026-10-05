@@ -17,9 +17,14 @@ masters output volume — the knob is left at full, shaping happens here.
 Usage:
     wav_convert.py <project_dir> <src.wav> <dst.pcm> --type SND|VC --name <key> [--vol 0.9]
 
-Registers the new .pcm in ASSETS.DB img_map (type SND/VC) so the asset
-table and AUDIO.DAT pick it up:
-    INSERT INTO img_map (filename, type, name) VALUES (<dst>, <type>, <key>);
+<dst.pcm> must live under assets/<project>/ (naiz_lib.project_assets_dir) —
+the same source root as the images.map PNGs and the anim/ frames.  Only the
+packed AUDIO.DAT reaches games/<project>/, so nothing under projects/ is a
+valid destination.  Registers the new .pcm in ASSETS.DB img_map (type SND/VC)
+so the asset table and AUDIO.DAT pick it up; the stored `filename` is
+normalized to be relative to that assets root:
+    INSERT INTO img_map (filename, type, name) VALUES (<dst relative to the
+                                                       assets root>, <type>, <key>);
 """
 
 import argparse
@@ -28,6 +33,10 @@ import sqlite3
 import struct
 import sys
 from pathlib import Path
+
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
+
+from naiz_lib import project_assets_dir
 
 # 86-board PCM rate code -> actual sample rate (Hz).  Order matters: the
 # code is the index, so the list is indexed by the 3-bit field (devdoc 101
@@ -142,9 +151,15 @@ def wav_to_pcm(src, vol):
     return rate_code, bytes(hdr) + bytes(pcm)
 
 
-def register_asset(project_dir, dst_pcm, asset_type, name):
+def register_asset(project_dir, dst_pcm, asset_type, name, assets_dir=None):
     """INSERT the .pcm into ASSETS.DB img_map (SND or VC).  Idempotent:
-    an existing row with the same filename updates name/type instead."""
+    an existing row with the same filename updates name/type instead.
+
+    dst_pcm must resolve under assets/<project>/; the column stores the path
+    relative to that root so pack_audio resolves it the same way regardless
+    of where the converter was invoked from.  A destination outside the root
+    is rejected here rather than surfacing as a missing file at build time.
+    """
     db_path = os.path.join(project_dir, 'ASSETS.DB')
     if not os.path.isfile(db_path):
         print(f"ERROR: ASSETS.DB not found: {db_path}")
@@ -152,21 +167,31 @@ def register_asset(project_dir, dst_pcm, asset_type, name):
     if asset_type not in ('SND', 'VC'):
         raise ValueError(f"audio asset type must be SND or VC, got {asset_type}")
 
+    if assets_dir is None:
+        assets_dir = project_assets_dir(project_dir)
+    root = Path(assets_dir).resolve()
+    dst_abs = Path(dst_pcm).resolve()
+    try:
+        rel_name = dst_abs.relative_to(root).as_posix()
+    except ValueError:
+        print(f"ERROR: audio source must live under {root}: {dst_pcm}")
+        sys.exit(1)
+
     db = sqlite3.connect(db_path)
     try:
         row = db.execute(
             "SELECT id FROM img_map WHERE filename=? AND type IN ('SND','VC')",
-            (dst_pcm,)).fetchone()
+            (rel_name,)).fetchone()
         if row is not None:
             db.execute(
                 "UPDATE img_map SET type=?, name=? WHERE id=?",
                 (asset_type, name, row[0]))
-            print(f"  ASSETS.DB: updated id={row[0]} → {dst_pcm} ({asset_type})")
+            print(f"  ASSETS.DB: updated id={row[0]} → {rel_name} ({asset_type})")
         else:
             cur = db.execute(
                 "INSERT INTO img_map (filename, type, name) VALUES (?,?,?)",
-                (dst_pcm, asset_type, name))
-            print(f"  ASSETS.DB: registered id={cur.lastrowid} {dst_pcm} ({asset_type})")
+                (rel_name, asset_type, name))
+            print(f"  ASSETS.DB: registered id={cur.lastrowid} {rel_name} ({asset_type})")
         db.commit()
     finally:
         db.close()

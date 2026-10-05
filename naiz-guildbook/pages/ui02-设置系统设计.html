@@ -12,27 +12,58 @@
 <main class="main">
 <h1>设置系统设计</h1>
 <blockquote><strong>创建</strong>：2026-06-27<br><strong>最后更新</strong>：2026-07-01</blockquote>
-<p>本文说明游戏设置系统的脚本层面设计，包括 <code>settings.txt</code> 配置文件和 <code>settingmenu</code> 命令。</p>
+<p>本文说明游戏设置系统的配置层面设计，包括两份<strong>各管各的</strong>配置文件（<code>config.toml</code> 与 <code>USER.CFG</code>）和 <code>settingmenu</code> 命令。</p>
 <hr>
 
-<h2>1. settings.txt</h2>
-<p>纯文本键值对文件，每行 <code>key=value</code>。由 NB 解释器在初始化阶段读取，设置引擎全局状态。</p>
-<pre><code>dlgstyle=3
-btnstyle=0
-lang=eng</code></pre>
+<h2>1. 配置文件分家</h2>
+<div class="note-box"><strong>关键概念：配置分「项目」和「玩家」两份，归属相反。</strong>以前有个 <code>settings.txt</code> 把两者混在一起，<strong>现已废止</strong>——引擎运行时不再解析任何项目配置文件。</div>
+
+<table>
+<thead>
+<tr><th>载体</th><th>归属</th><th>放什么</th><th>怎么到引擎</th></tr>
+</thead>
+<tbody>
+<tr>
+  <td><code>config.toml</code></td>
+  <td><strong>项目</strong></td>
+  <td>对话框样式、按钮配色、黑花字开关、语言默认值、版本号、标题、转场</td>
+  <td><strong>构建时编译进引擎</strong>：<code>export_config.py</code> 生成 <code>nb_config.h</code> 里的 <code>NAIZ_*</code> 宏 → <strong>运行时零解析</strong></td>
+</tr>
+<tr>
+  <td><code>USER.CFG</code></td>
+  <td><strong>玩家</strong></td>
+  <td><code>lang</code> <code>text_speed</code> <code>bgm</code> <code>snd</code> <code>vc</code> <code>bgm_vol</code> <code>pcm_vol</code></td>
+  <td>运行时由 <code>prefs_load()</code> 读取、<code>prefs_save()</code> 写回，<strong>全系统唯一的运行时写入点</strong></td>
+</tr>
+</tbody>
+</table>
+
+<p><code>USER.CFG</code> 是纯文本键值对，每行 <code>key=value</code>：</p>
+<pre><code>lang=chi
+text_speed=2
+bgm=1
+bgm_vol=8</code></pre>
+
+<p><strong>为什么必须分开</strong>：<code>lang</code> 这个键<strong>全系统只存在于 <code>USER.CFG</code></strong>。以前它同时存在于两个文件里，而读它的函数和写它的函数各绑一个副本——玩家在开机菜单选了繁体中文，开机仍以英语启动。键名相同但归属相反，正是这种错配的温床，所以项目侧的键名一律不同（<code>default_lang</code> 而非 <code>lang</code>）。</p>
+
+<p><strong>改配置的两种方式</strong>：改项目配置 → 改 <code>config.toml</code> 后重新构建（宏是编译期的）；重置玩家设置 → 删掉 <code>USER.CFG</code>。</p>
+
+<div class="note-box"><strong>为什么 <code>config.toml</code> 不在运行时读？</strong>因为项目配置在玩家拿到游戏之前就已经定死了，没有任何运行时变动的理由。编译进引擎省掉了解析代码，也让「配置写错」在构建期就暴露，而不是等玩家进游戏看到花屏。</div>
 
 <hr>
 
-<h2>2. dlgstyle — 对话框样式</h2>
-<pre><code>dlgstyle=N</code></pre>
-<p>指定对话框背景样式。<code>N</code> 为 0–9 整数，对应 10 种预设方案。每种方案定义底色、边框颜色和半透明处理方式。</p>
+<h2>2. 对话框样式（config.toml 的 <code>[dialog] style</code>）</h2>
+<pre><code>[dialog]
+style = 5</code></pre>
+<p>指定对话框背景样式。<code>style</code> 为 0–9 整数，对应 10 种预设方案。每种方案定义底色、边框颜色和半透明处理方式。</p>
 <p>完整方案参考 <a href="cf03-对话框样式方案.html">cf03-对话框样式方案</a>。</p>
 
 <hr>
 
-<h2>3. btnstyle — 按钮配色</h2>
-<pre><code>btnstyle=N</code></pre>
-<p>指定菜单按钮配色。<code>N</code> 为 0–4 整数：</p>
+<h2>3. 按钮配色（config.toml 的 <code>[button] style</code>）</h2>
+<pre><code>[button]
+style = 2</code></pre>
+<p>指定菜单按钮配色。<code>style</code> 为 0–4 整数：</p>
 <table>
 <thead>
 <tr><th>值</th><th>配色</th></tr>
@@ -49,27 +80,35 @@ lang=eng</code></pre>
 
 <hr>
 
-<h2>4. lang — 多语言切换</h2>
-<pre><code>lang=eng</code></pre>
-<p><code>lang</code> 指定游戏显示语言，支持：</p>
+<h2>4. lang — 多语言切换（USER.CFG 的 <code>lang</code>）</h2>
+<pre><code>lang=chi</code></pre>
+<p><code>lang</code> 指定游戏显示语言，写在 <code>USER.CFG</code> 里。这是玩家自己的选择，<strong>不属于项目配置</strong>——所以它不在 <code>config.toml</code> 里。支持全部 9 种语言：</p>
 <table>
 <thead>
 <tr><th>值</th><th>语言</th></tr>
 </thead>
 <tbody>
-<tr><td><code>eng</code></td><td>English</td></tr>
+<tr><td><code>eng</code></td><td>English（英文）</td></tr>
 <tr><td><code>chi</code></td><td>简体中文</td></tr>
+<tr><td><code>cht</code></td><td>繁體中文</td></tr>
 <tr><td><code>jpn</code></td><td>日本語</td></tr>
 <tr><td><code>kor</code></td><td>한국어</td></tr>
+<tr><td><code>fre</code></td><td>Français</td></tr>
+<tr><td><code>ger</code></td><td>Deutsch</td></tr>
+<tr><td><code>ita</code></td><td>Italiano</td></tr>
+<tr><td><code>spa</code></td><td>Español</td></tr>
+<tr><td><code>por</code></td><td>Português</td></tr>
 </tbody>
 </table>
+<p>没有 <code>USER.CFG</code> 是正常的首次运行状态，此时回落到 <code>config.toml</code> 的 <code>default_lang</code>。</p>
+<div class="note-box"><strong>语言必须在开机菜单选，不能在游戏内改。</strong>开机菜单运行在翻译表载入<em>之前</em>，只能纯 ASCII 绘制；而语言必须在翻译表存在<em>之前</em>就选定，所以进了游戏已经改不了了。这就是开机菜单那一行 Language 永久留在那里的原因。</div>
 <p>引擎在显示命令文本时通过 <code>tr()</code> 查找对应语言的翻译文件 <code>i18n/*_&lt;lang&gt;.txt</code>。</p>
 
 <hr>
 
 <h2>5. settingmenu 命令</h2>
 <pre><code>settingmenu()</code></pre>
-<p>设置菜单命令，当前为预留 stub，尚无实际效果。未来将提供运行时设置界面，允许玩家在游戏中修改 <code>dlgstyle</code>、<code>btnstyle</code>、<code>lang</code> 等选项。</p>
+<p>设置菜单命令，当前为预留 stub，尚无实际效果。未来将提供运行时设置界面，允许玩家在游戏中修改语言与音量等<strong>玩家级</strong>偏好（<code>USER.CFG</code>）——项目级样式（<code>config.toml</code>）不在此范围 等选项。</p>
 
 </main>
 </body>

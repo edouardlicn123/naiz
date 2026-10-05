@@ -86,23 +86,54 @@ def test_wav_convert_bad_file_raises(tmp_path):
 def test_wav_convert_register_asset_idempotent(tmp_path):
     proj = tmp_path / "proj"
     proj.mkdir()
+    asset_root = tmp_path / "assets" / "proj"
+    (asset_root / "se").mkdir(parents=True)
+    dst = asset_root / "se" / "ding.pcm"
+    dst.write_bytes(_pcm_bytes())
     db = sqlite3.connect(proj / "ASSETS.DB")
     db.execute("CREATE TABLE img_map (id INTEGER PRIMARY KEY, filename TEXT, "
                "type TEXT, name TEXT DEFAULT '')")
     db.commit()
     db.close()
 
-    dst = "se/ding.pcm"
-    wav_convert.register_asset(str(proj), dst, "SND", "ding")
-    wav_convert.register_asset(str(proj), dst, "SND", "ding2")
+    wav_convert.register_asset(str(proj), str(dst), "SND", "ding",
+                               str(asset_root))
+    wav_convert.register_asset(str(proj), str(dst), "SND", "ding2",
+                               str(asset_root))
 
     db = sqlite3.connect(proj / "ASSETS.DB")
     rows = db.execute("SELECT id, filename, type, name FROM img_map").fetchall()
     db.close()
     assert len(rows) == 1
-    assert rows[0][1] == dst
+    # stored relative to the assets root, so pack_audio resolves it the same way
+    assert rows[0][1] == "se/ding.pcm"
     assert rows[0][2] == "SND"
     assert rows[0][3] == "ding2"
+
+
+def test_wav_convert_register_asset_rejects_outside_assets_root(tmp_path):
+    """A destination outside assets/<project>/ is refused, not registered."""
+    proj = tmp_path / "proj"
+    proj.mkdir()
+    asset_root = tmp_path / "assets" / "proj"
+    asset_root.mkdir(parents=True)
+    db = sqlite3.connect(proj / "ASSETS.DB")
+    db.execute("CREATE TABLE img_map (id INTEGER PRIMARY KEY, filename TEXT, "
+               "type TEXT, name TEXT DEFAULT '')")
+    db.commit()
+    db.close()
+
+    outside = proj / "se" / "stray.pcm"
+    outside.parent.mkdir(parents=True)
+    outside.write_bytes(_pcm_bytes())
+    with pytest.raises(SystemExit):
+        wav_convert.register_asset(str(proj), str(outside), "SND", "stray",
+                                   str(asset_root))
+
+    db = sqlite3.connect(proj / "ASSETS.DB")
+    rows = db.execute("SELECT id FROM img_map").fetchall()
+    db.close()
+    assert rows == []
 
 
 # ---------------------------------------------------------------------------
@@ -131,13 +162,21 @@ def test_gen_test_midi_byte_vector():
 # ---------------------------------------------------------------------------
 
 def _make_project(tmp_path, assets):
+    """Create a project dir with an ASSETS.DB plus the payload sources.
+
+    Payloads live under assets/<project>/ (the real source root pack_audio
+    reads), so the fixture mirrors the production layout and hands the
+    caller the assets_dir to pass through.
+    """
     proj = tmp_path / "proj"
     proj.mkdir()
+    asset_root = tmp_path / "assets" / "proj"
+    asset_root.mkdir(parents=True)
     db = sqlite3.connect(proj / "ASSETS.DB")
     db.execute("CREATE TABLE img_map (id INTEGER PRIMARY KEY, filename TEXT, "
                "type TEXT, name TEXT DEFAULT '')")
     for i, (rel, atype, name) in enumerate(assets):
-        path = proj / rel
+        path = asset_root / rel
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_bytes(rel.encode() + b"DATA" if rel.endswith(".mid") else
                          _pcm_bytes())
@@ -145,7 +184,7 @@ def _make_project(tmp_path, assets):
                    "VALUES (?,?,?,?)", (i, rel, atype, name))
     db.commit()
     db.close()
-    return proj
+    return proj, asset_root
 
 
 def _pcm_bytes(rate=0):
@@ -153,14 +192,14 @@ def _pcm_bytes(rate=0):
 
 
 def test_pack_audio_roundtrip(tmp_path):
-    proj = _make_project(tmp_path, [
+    proj, asset_root = _make_project(tmp_path, [
         ("bgm/test1.mid", "BGM", "test1"),
         ("se/chime.pcm", "SND", "chime"),
         ("voice/hi.pcm", "VC", "hi"),
     ])
     out = tmp_path / "out"
     out.mkdir()
-    pack_audio.pack_audio(str(proj), str(out))
+    pack_audio.pack_audio(str(proj), str(out), str(asset_root))
 
     dat = (out / "AUDIO.DAT").read_bytes()
     toc = list(image_dat.iter_image_dat_toc(dat))
@@ -175,11 +214,12 @@ def test_pack_audio_roundtrip(tmp_path):
 def test_pack_audio_pcm_header_validated(tmp_path):
     proj = tmp_path / "proj"
     proj.mkdir()
+    asset_root = tmp_path / "assets" / "proj" / "se"
+    asset_root.mkdir(parents=True)
+    (asset_root / "bad.pcm").write_bytes(b"NOTPCM" + b"\x00" * 20)
     db = sqlite3.connect(proj / "ASSETS.DB")
     db.execute("CREATE TABLE img_map (id INTEGER PRIMARY KEY, filename TEXT, "
                "type TEXT, name TEXT DEFAULT '')")
-    (proj / "se").mkdir()
-    (proj / "se" / "bad.pcm").write_bytes(b"NOTPCM" + b"\x00" * 20)
     db.execute("INSERT INTO img_map (filename, type, name) VALUES "
                "('se/bad.pcm','SND','bad')")
     db.commit()
@@ -187,19 +227,31 @@ def test_pack_audio_pcm_header_validated(tmp_path):
     out = tmp_path / "out"
     out.mkdir()
     with pytest.raises((RuntimeError, SystemExit)):
-        pack_audio.pack_audio(str(proj), str(out))
+        pack_audio.pack_audio(str(proj), str(out),
+                              str(tmp_path / "assets" / "proj"))
+
+
+def test_pack_audio_missing_source_is_fatal(tmp_path):
+    """A row pointing at a nonexistent payload must not silently pack."""
+    proj, asset_root = _make_project(tmp_path, [("bgm/t.mid", "BGM", "t")])
+    (asset_root / "bgm" / "t.mid").unlink()
+    out = tmp_path / "out"
+    out.mkdir()
+    with pytest.raises(SystemExit):
+        pack_audio.pack_audio(str(proj), str(out), str(asset_root))
+    assert not (out / "AUDIO.DAT").exists()
 
 
 def test_pack_audio_collision_rejected(tmp_path):
     # long base names both truncate to the same 8.3 short name
-    proj = _make_project(tmp_path, [
+    proj, asset_root = _make_project(tmp_path, [
         ("bgm/verylongone.mid", "BGM", "verylongone"),
         ("bgm/verylongtwo.mid", "BGM", "verylongtwo"),
     ])
     out = tmp_path / "out"
     out.mkdir()
     with pytest.raises((RuntimeError, SystemExit)):
-        pack_audio.pack_audio(str(proj), str(out))
+        pack_audio.pack_audio(str(proj), str(out), str(asset_root))
 
 
 def test_pack_audio_empty(tmp_path):
@@ -212,15 +264,15 @@ def test_pack_audio_empty(tmp_path):
     db.close()
     out = tmp_path / "out"
     out.mkdir()
-    pack_audio.pack_audio(str(proj), str(out))
+    pack_audio.pack_audio(str(proj), str(out), str(tmp_path / "assets" / "proj"))
     assert not (out / "AUDIO.DAT").exists()
 
 
 def test_pack_audio_reuses_make_toc_archive_roundtrip(tmp_path):
-    proj = _make_project(tmp_path, [("bgm/t.mid", "BGM", "t")])
+    proj, asset_root = _make_project(tmp_path, [("bgm/t.mid", "BGM", "t")])
     out = tmp_path / "out"
     out.mkdir()
-    pack_audio.pack_audio(str(proj), str(out))
+    pack_audio.pack_audio(str(proj), str(out), str(asset_root))
     dat = (out / "AUDIO.DAT").read_bytes()
     _count, _name, eoff, esz = list(image_dat.iter_image_dat_toc(dat))[0]
     assert dat[eoff:eoff + esz] == b"bgm/t.midDATA"

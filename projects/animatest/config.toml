@@ -15,7 +15,7 @@ default_lang = "eng"
 [project]
 title = "animatest"
 description = "Naiz 动画功能测试项目"
-version = "0.3.018"
+version = "0.3.021"
 
 # 运行时不再有 settings.txt，以下两项编译进引擎。
 # There is no settings.txt at runtime; both values are compiled into the engine.

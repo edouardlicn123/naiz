@@ -110,9 +110,9 @@
 <p>构建管线：<code>expressions.json</code> → <code>export_asset_table.py</code> → <code>nb_asset_table.h</code>（<code>expr_map[]</code>：(char_id, expr)→asset_id 查找表）。</p>
 
 <h2>4. config.toml — 项目配置</h2>
-<p>项目级全局配置，涵盖语言、标题、版本和过渡效果。构建时自动注入到 <code>settings.txt</code> 中。采用 TOML 格式，支持 <code>#</code> 注释；<code>version</code> 行由工具自动维护。完整说明见 <a href="cf02-项目配置文件.html">cf02 项目配置文件</a>。</p>
+<p>项目级全局配置，涵盖语言、标题、版本和过渡效果。构建时<strong>编译进引擎</strong>，运行时零解析。采用 TOML 格式，支持 <code>#</code> 注释；<code>version</code> 行由工具自动维护。完整说明见 <a href="cf02-项目配置文件.html">cf02 项目配置文件</a>。</p>
 
-<p>构建管线：<code>config.toml</code> → <code>export_config.py</code> → <code>nb_config.h</code>（过渡相关宏）；版本号 → <code>build_game.py</code> → 注入到 <code>settings.txt</code>。</p>
+<p>构建管线：<code>config.toml</code> → <code>export_config.py</code> → <code>nb_config.h</code>（<code>NAIZ_*</code> 宏，含过渡、样式、黑花字、语言默认值、版本号）。</p>
 
 <h2>5. 构建管线总览</h2>
 <table>

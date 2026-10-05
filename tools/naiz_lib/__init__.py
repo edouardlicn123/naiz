@@ -80,6 +80,23 @@ def read_u16_le(data, offset):
     return int.from_bytes(data[offset:offset+2], "little")
 
 
+def project_assets_dir(project_dir, repo_root=None):
+    """Resolve the per-project source-asset root that BGM/SND/VC payloads
+    live under, i.e. assets/<project>/.
+
+    Audio sources share the root that already holds the images.map PNG
+    sources and the anim/ frame material: assets/<project>/ is where source
+    material goes, projects/<project>/ is where the build writes and keeps
+    scripts.  The ASSETS.DB img_map.filename column is relative to the
+    directory returned here, so callers must not re-derive the path.
+
+    repo_root overrides the repository root (tests pass a tmp_path).
+    """
+    root = repo_root or PROJECT_ROOT
+    name = os.path.basename(os.path.normpath(project_dir))
+    return os.path.join(root, 'assets', name)
+
+
 def to_dos_name(name):
     """Convert 'FILE.EXT' to (base8, ext3) padded DOS 8.3 name bytes."""
     name = name.upper()

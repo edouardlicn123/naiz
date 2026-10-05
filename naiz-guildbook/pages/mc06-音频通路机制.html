@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>音频通路机制 — Naiz Guildbook</title>
+<link rel="stylesheet" href="../style.css">
+</head>
+<body>
+<nav class="sidebar" id="sidebar-nav"></nav>
+<script src="../sidebar-reference.js"></script>
+<main class="main">
+
+<h1>音频通路机制</h1>
+<blockquote><strong>创建</strong>：2026-10-05<br><strong>最后更新</strong>：2026-10-05</blockquote>
+<p>你想给游戏做一首 BGM，于是要面对一个现实问题：<strong>PC-98 上有三个能发声的部分</strong>。它们像三台互不相干的播放器，各有各的限制——其中一个<strong>一次只能播一个声音</strong>，另外两个却可以同时响。</p>
+<p>搞清楚这三条限制，音乐素材才知道<strong>该做成什么形状、该放进哪一条路</strong>。本文只讲机制：硬件怎么分、什么样的音乐文件能存下来、哪些转换在原理上根本做不到。<strong>用什么平台和软件去做出这些文件，见 <a href="mc07-音频平台与工具.html">mc07 音频平台与工具</a></strong>；脚本里怎么写音频命令，见 <a href="sc10-audio.html">sc10 音频指令</a>；素材怎么登记，见 <a href="cf07-图片登记.html">cf07 图片登记</a>。</p>
+<hr>
+
+<h2>1. 三个能发声的部分</h2>
+<p>先记住分工：<strong>BGM（背景音乐）走 FM，音效和语音走 PCM</strong>。</p>
+<table>
+<tr><th>部分</th><th><strong>适合放什么</strong></th><th>是什么</th><th>能同时播几个</th><th>限制</th></tr>
+<tr><td><strong>FM 音源</strong></td><td><strong>BGM（背景音乐）</strong>。本项目唯一一条能<strong>一边放音乐、一边放语音和音效</strong>的通路</td><td>YM2608，主板自带</td><td>6 个 FM + 3 个方波 / 噪声</td><td>它内部有四块：6 通道 4 算子 FM（8 种算法）、3 通道 SSG（YM2149 方波 / 噪声源）、<strong>单通道 4-bit ADPCM（2–55 kHz）</strong>、6 通道鼓组</td></tr>
+<tr><td><strong>PCM 采样</strong></td><td><strong>音效和语音</strong>（<code>sound</code> / <code>voice</code>）。<strong>不能拿来放 BGM</strong>——会跟音效语音抢那唯一一条通道</td><td>86 板上的 YM3433B</td><td><strong>只有 1 个</strong></td><td>音效和语音<strong>共用这一条 FIFO</strong>，后播的把先播的盖掉</td></tr>
+<tr><td>MIDI 音源</td><td><strong>本项目走不通</strong>——本机没装这张卡</td><td>MPU-401，一张<strong>要另外装上去</strong>的扩展卡</td><td>16 个通道</td><td><strong>没装这张卡就完全没有这个通路</strong>，跟主板自带的声音是两码事</td></tr>
+</table>
+<p>两条结论直接从这张表里掉出来：</p>
+<ul>
+<li><strong>背景音乐走 FM，可以和语音、音效同时响。</strong>因为它们根本不是同一个部件，各走各的。这就是<strong>背景音乐该走 FM 的根本理由</strong>——不是为了音质，而是为了<strong>不跟别人抢</strong>。</li>
+<li><strong>音效和语音不能连着放。</strong>只有一条通道，两条命令背靠背执行时，后一条会在 1 毫秒内把前一条顶掉，实际发声短到听不见。<strong>中间必须隔一页对白。</strong></li>
+</ul>
+<div class="note-box">
+<p><strong>补充（只给要翻手册的人）：</strong>两组的端口也不重叠——PCM 走 <code>A4xx</code>，FM 走 <code>0188h–018Fh</code>（DIP 可选 <code>0288h</code>）。这就是上面第一条结论的硬件依据。</p>
+</div>
+
+<h2>2. 音乐文件有哪几种</h2>
+<div class="note-box">
+<p><strong>先纠正一个常见误会：「FM」不是文件格式，是一种合成方式。</strong>大家说「用 FM 做 BGM」，指的是「声音由 YM2608 这颗芯片合成出来」，<strong>不是</strong>某种文件后缀名。真正能存进磁盘、能在工具之间传来传去的，是下面这张表里的东西——FM 只出现在「谁负责把声音做出来」那一列。</p>
+</div>
+<table>
+<tr><th>种类</th><th>它到底装了什么</th><th>谁会给你</th><th>我们要做的事</th></tr>
+<tr><td>MIDI（<code>.mid</code>）</td><td>一张<strong>清单</strong>：什么时候弹哪个音、用什么音色、调哪些参数。<strong>里面没有声音</strong>，所以跟具体硬件无关</td><td>几乎所有作曲软件、tracker、大部分 AI 平台</td><td>写一层「MIDI → YM2608」的翻译：音色对照表 + 通道怎么分 + 音区怎么换算</td></tr>
+<tr><td>MML</td><td><strong>用文字写的谱子</strong>（<code>@0</code>、<code>c4</code>、<code>l16</code> 这类记号）</td><td>手写，或者让 AI 生成</td><td><strong>本项目不用它</strong>（§3 方案 C 已降为备选）：它没有力度、没有弯音，而 §1 那条现成的 MIDI 通路已经能读这些</td></tr>
+<tr><td>S98</td><td>MML 翻译出来的<strong>机器码</strong></td><td><code>mml2mdx</code> 这类编译器</td><td>写一个能执行它的虚拟机</td></tr>
+<tr><td>VGM</td><td>一串「<strong>往芯片的哪个旋钮上写多少</strong>」的指令，能精确还原</td><td>tracker 导出、libOPNMIDI 的 dumper</td><td>要处理它的节拍指令和流水式延时；文件比 MIDI 大</td></tr>
+<tr><td>WOPN</td><td>YM2608 的<strong>音色库</strong>（一组音色参数）</td><td>音色编辑器、社区音色库</td><td>它只是「音色」，<strong>不是「曲子」</strong>，不能当 BGM 文件用</td></tr>
+<tr><td><code>.pcm</code></td><td>裸采样，就是录音本身</td><td>本仓 <code>wav_convert.py</code></td><td>引擎能直接读，但它占用 PCM 那唯一的一个通道</td></tr>
+<tr><td>ADPCM：<code>PC8</code> / <code>P86</code> / <code>PPC</code></td><td><strong>压缩过</strong>的采样</td><td>pc98sndpmdtools</td><td>要写解码器</td></tr>
+<tr><td><code>2608_*.WAV</code></td><td>鼓组和 ADPCM 模式要用的采样素材——<strong>只是模拟器要，真机不要</strong></td><td>NP2kai 自带，不必另找</td><td><strong>只影响 NP2kai</strong>：缺了它模拟器的鼓通道没声音，FM 通道照样响</td></tr>
+</table>
+<p>一句话总结：<strong>能当「曲子」的是 MIDI / MML / VGM</strong>；WOPN 只是音色素材，<code>.pcm</code> 与 ADPCM 是采样素材。这几种具体由哪个工具产出，见 <a href="mc07-音频平台与工具.html">mc07</a>。</p>
+
+<h2>3. 引擎要吃哪种音乐</h2>
+<p>引擎拿到音乐有四条路，<strong>已经选定第一条（A）</strong>。另外两条（B 精确回放、C 文字谱）留着备用，第四条（D）已经排除。</p>
+<table>
+<tr><th>方案</th><th>大致做法</th><th>费不费劲</th><th>还原度</th><th>说明</th></tr>
+<tr><td><strong>A. 让引擎认 MIDI ✅已选定</strong></td><td>引擎本来就会读 MIDI 文件，在那基础上加一层翻译：FM 音色对照表、6 个通道怎么分、音区怎么换算</td><td>中</td><td>高</td><td>跟现在的 BGM 通路是同一条路，MIDI 那套生态全部能用</td></tr>
+<tr><td>B. 直接播放 VGM</td><td>引擎里做一个 VGM 播放器，照着指令逐条设置芯片</td><td>中</td><td>最高（逐条精确还原）</td><td>要处理它的节拍指令；可以拿来精确回放或对照调试。产出工具见 <a href="mc07-音频平台与工具.html">mc07</a></td></tr>
+<tr><td>C. 让引擎读 MML / S98<br><span style="font-size:0.85em;opacity:0.75">（备选，暂不做）</span></td><td>写一个能把文字谱翻译成音乐的转换器或虚拟机</td><td>大</td><td>中</td><td>好处是纯文本、读得懂、好比对版本差异；<strong>但它没有力度、没有弯音</strong>，而现成的 MIDI 解析器两样都已经有了，所以暂不做</td></tr>
+<tr><td>D. 桌面端先渲染成 WAV，走 PCM</td><td>在电脑上用 FM 渲染器把曲子导成 WAV，打包成 <code>.pcm</code></td><td>小</td><td>高（离线的）</td><td>❌ <strong>行不通</strong>：PCM 只有一条通道，背景音乐会跟语音互顶、还占掉唯一那条通道，正是 §1 要避开的问题</td></tr>
+</table>
+<p><strong>已选定 A</strong>，也可以和 B 组合：A 负责接收 MIDI，B 用来精确回放和对照行为。D 无论离线渲染得多保真，都因为抢通道而排除。</p>
+<div class="note-box"><strong>为什么是 MIDI</strong>：现成的 MIDI 读取通路<strong>已经把力度、弯音、踏板都留下来了</strong>，这几样换成 FM 音色几乎是白捡的（力度直接对应音量的衰减程度）。换成文字谱（MML）就得从零写一套解析器，还会把力度和弯音全丢掉。<br><br><strong>一个要知道的差别</strong>：引擎会<strong>自动判断</strong>——机器上装了 MIDI 卡就走 MIDI，没装就走 FM 音源。所以同一条 <code>bgm</code> 指令，<strong>装了卡的玩家和没装的玩家听到的音色会不一样</strong>。这是这条路的固有代价，不是故障。</div>
+
+<h2>4. WAV 能转成 MIDI 吗？</h2>
+<p>这是最常被问到的问题：手里有一段 WAV（或者 MP3），能不能直接转成 MIDI？<strong>能</strong>，而且有成熟工具可用——这条路原理上就走得通。工具见 <a href="mc07-音频平台与工具.html">mc07 §1.4</a>。</p>
+<p>但有一条边界必须分清：<strong>能转成「音符」，不能转成「FM 音色」</strong>。这两件事常被混为一谈，一混就会得出「AI 出的音频全都没用」这个错误结论。</p>
+<div class="note-box">
+<table>
+<tr><th>想做的事</th><th>为什么</th><th>结论</th></tr>
+<tr><td>WAV / 音频 → <strong>MIDI</strong>（音符：音高 / 时长 / 分轨）</td><td>音高检测是很成熟的信号处理问题，答案是<strong>唯一的</strong></td><td>✅ <strong>做得到</strong>，这就叫「自动音乐转写」（AMT；数学上叫适定问题）</td></tr>
+<tr><td>WAV / 音频 → <strong>FM 音色</strong>（patch）</td><td>FM 音色是<strong>一组参数</strong>，而声音是<strong>一条波形</strong>。同一条波形可以由无数组不同的参数生成出来，所以<strong>反推不出唯一答案</strong></td><td>❌ <strong>做不到</strong>。没有可靠的无损反推办法（数学上叫「欠定的逆问题」）</td></tr>
+</table>
+<p><strong>关键区别：音符是「乐谱」，音色是「乐器」。</strong>只有后者才是那道无解的题。所以业界做法其实是<strong>反着来</strong>的——先按 FM 音色作曲，再<strong>导出</strong>成 MIDI 或别的格式。完整做法见 <a href="mc07-音频平台与工具.html">mc07</a>。</p>
+<p>唯一的例外是学术界的 <a href="https://github.com/magenta/ddsp">DDSP</a>（Apache-2.0），但它做的是<strong>另一个方向</strong>：用参数合成出声音，不是从声音反推参数。</p>
+<p>所以实践上：<strong>只能下载音频的平台并不是死路</strong>——它的产物可以转写成音符。可用的转写工具、以及「先分轨、再转写」的顺序，见 <a href="mc07-音频平台与工具.html">mc07 §1.4</a>。</p>
+</div>
+
+<h2>5. 容易踩的坑</h2>
+<ul>
+<li><strong>FM 只有 6 个通道（6 复音），MIDI 有 16 个。</strong>得先定好哪个声部占哪个通道、挤不下时先牺牲哪个，否则多声部会直接丢音。</li>
+<li><strong>鼓组（Rhythm）的声音是芯片内置的，不用准备素材。</strong>6 声道打击乐读的是 YM2608 芯片里的 ROM，<strong>真机上什么都不用备</strong>。只有在 <strong>NP2kai 模拟器</strong>上才需要 <code>2608_*.WAV</code> 这几个文件（模拟器手里没有那段 ROM），NP2kai 自带；缺了也只是鼓通道没声音，FM 通道照样响。<br><strong>更省事的做法是用 FM + SSG 自己合成鼓</strong>——SSG 那 3 个通道本身就是方波和噪声源，做底鼓、踩镲、军鼓足够了（§3 方案 A 第一版就走这条路）。</li>
+<li><strong>GM 音色 ≠ FM 音色。</strong>MIDI 里的 General MIDI 音色号是「钢琴」「小提琴」这类<strong>乐器名字</strong>，而 YM2608 只有 128 个 4 算子 patch；同一个 patch 换不同算法和包络，可以完全不像原乐器。硬按名字一对一对应，出来的就是典型的「机器人音」。</li>
+<li><strong>AI 出的 MIDI 不能直接当 BGM。</strong>这是上一条的直接后果：通用的 GM MIDI 必须在 tracker 里<strong>换音色、改织体、删掉用不上的声部</strong>以适配 6 通道。当「旋律草稿」，不要当「成品」。怎么落地见 <a href="mc07-音频平台与工具.html">mc07</a>。</li>
+<li><strong>别因为「WAV 转不成 FM 音色」，就顺带认为「WAV 也转不成 MIDI」。</strong>见 §4：前者无解，后者有解。</li>
+<li><strong>PCM 只有一条通道。</strong>背景音乐如果走 PCM，就会跟音效和语音抢道。这是选 FM 而不是 PCM 的根本理由。</li>
+<li><strong>素材音量一直不变，会让音量测试测不出东西。</strong>如果测试用的采样是恒定幅度合成的，「音量测试没结论」<strong>不能</strong>推断通路有问题。要改用「通路通不通、阻尼、衰减差异」这类确定的判断标准。</li>
+</ul>
+
+</main>
+</body>
+</html>

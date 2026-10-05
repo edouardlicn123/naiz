@@ -10,8 +10,15 @@ DOS 8.3 and be unique after `to_dos_name()` (same hard rule as SCENE.DAT,
 R25).  Missing source files are fatal — an archive entry whose payload is
 missing would fail at runtime silently.
 
+Source payloads are read from assets/<project>/ (naiz_lib.project_assets_dir),
+the same root as the images.map PNG sources and the anim/ frame material;
+the `filename` column is relative to it, not to the project directory.
+Only the packed AUDIO.DAT reaches games/<game>/ — audio sources are never
+copied or injected as loose files, so they carry no DOS 8.3 obligation
+(only the TOC entry `name` does, checked below).
+
 Usage:
-    pack_audio.py <project_dir> <out_dir>
+    pack_audio.py <project_dir> <out_dir> [assets_dir]
 """
 
 import os
@@ -22,7 +29,7 @@ from pathlib import Path
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
 
-from naiz_lib import to_dos_name
+from naiz_lib import project_assets_dir, to_dos_name
 from naiz_lib.toc_archive import make_toc_archive
 
 # .pcm header validity check (magic + rate code range), mirrors the engine
@@ -40,11 +47,14 @@ def _validate_pcm(data, fname):
         raise RuntimeError(f"{fname}: .pcm rate code {rate} out of range")
 
 
-def pack_audio(project_dir, out_dir):
+def pack_audio(project_dir, out_dir, assets_dir=None):
     db_path = os.path.join(project_dir, 'ASSETS.DB')
     if not os.path.isfile(db_path):
         print("pack_audio: no ASSETS.DB, skipping")
         return
+
+    if assets_dir is None:
+        assets_dir = project_assets_dir(project_dir)
 
     db = sqlite3.connect(db_path)
     try:
@@ -58,6 +68,8 @@ def pack_audio(project_dir, out_dir):
     if not rows:
         print("pack_audio: no BGM/SND/VC assets registered, skipping")
         return
+
+    print(f"  audio sources: {assets_dir}")
 
     entries = []
     seen = {}
@@ -76,9 +88,11 @@ def pack_audio(project_dir, out_dir):
                 f"{seen[short]} and {filename} both map to {short}")
         seen[short] = filename
 
-        path = os.path.join(project_dir, filename)
+        path = os.path.join(assets_dir, filename)
         if not os.path.isfile(path):
             print(f"ERROR: audio asset file missing: {path}")
+            print(f"  BGM/SND/VC sources live under {assets_dir}; "
+                  "the img_map.filename column is relative to it.")
             sys.exit(1)
         data = Path(path).read_bytes()
         if asset_type != 'BGM':
@@ -102,6 +116,6 @@ def pack_audio(project_dir, out_dir):
 
 if __name__ == '__main__':
     if len(sys.argv) < 3:
-        print("Usage: pack_audio.py <project_dir> <out_dir>")
+        print("Usage: pack_audio.py <project_dir> <out_dir> [assets_dir]")
         sys.exit(1)
-    pack_audio(sys.argv[1], sys.argv[2])
+    pack_audio(sys.argv[1], sys.argv[2], sys.argv[3] if len(sys.argv) > 3 else None)

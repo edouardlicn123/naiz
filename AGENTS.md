@@ -1,14 +1,14 @@
 # Naiz — AI 编程规则
 
-> **当前版本**: `0.3.018`（`projects/demo-a2/config.toml`）
+> **当前版本**: `0.3.021`（`projects/demo-a2/config.toml`）
 >
-> **最新条目**: `CHANGELOG.md` `c49` — 翻译/脚本文本长度上限收口（5 对话框容量）+ tr 截断 fail-loud + 容量守卫（devdoc 121，0.3.018）。前序 `c48` 全部剧情脚本 9 语翻译补齐（28 键 ×9 语 0 空值）+ `Ira,not Neon` 转义标签入表（0.3.017）。前序 `c47` NB 字段逗号转义 `\,`（引擎/`i18n_gen`/`nb_validator` 三处同步）+ 常用问题选项归类 sys/game + `tr()` 守卫去注释误判（0.3.016）。前序 `c45` `settings.txt` 废止、`config.toml` 单一配置源 + 启动菜单语言根修（devdoc 120，0.3.014）。
+> **最新条目**: `CHANGELOG.md` `c52` — **第十三轮：用户拍板 FM 通路输入格式 = MIDI + 新建 `devdocs/123-MIDI转FM通路实现计划.md`（12 章，计划中，零代码）+ 清三处遗留错误描述**。四项决策：**输入 = MIDI**（复用 `core/lib/midi.c` 不新写解析器）、**后端 = 自动检测**（有 MPU-401 走 MIDI，无则走 FM）、**v1 = FM 6 通道 + SSG 3 通道（RHYTHM 推迟）**、**音色内容另开 devdoc**。**devdoc 123 关键项**：M1 `fmopn` / M2 `fmseq` 落 `core/lib/` **零 `outb()` 可主机穷举单测**（最大风险削减点——绝大部分验证不需模拟器）；**S0（消解 `0188h`–`018Fh` 逐端口分工）只卡 S2 不卡 S1**（寄存器语义不依赖端口映射，调研等待期不阻塞主线）；**§2.4 架构级发现：`F02:100-101` 的 `A466h` 有 FM 音量路径（VOL1/VOL2）⇒ `bgm_vol` 对 FM 生效无需新增任何 pref 或设置项**（step 编码未实测，S5 确认）；**§2.3 代码级既存陷阱：`hal_audio.c:143` 的 `A460h ← 0x01` bit1 = 强制 OPNA 静音 —— 改 PCM 代码误动该值会静默静音整条 FM 通路而 PCM 一切正常**；FM 侧必须复用 `hal_wallclock_smooth_ms()`（devdoc 107 修过裸墙钟追帧音爆）。**文档修正四处**：**F03 §4.6 重写**（初稿自相矛盾：「只需换输出后端」紧接「解析器不能复用」，两句分属不同输入格式）、F03 §1.2 已决化、**mc06 订正 `2608_*.WAV` 归因**（是 **NP2kai 侧**补 YM2608 内置 ROM 的文件，**真机零素材依赖**；原写「PC-98 要另外备、缺了完全没声音」会让创作者误判工作量）、mc06 方案 A 已选定 / C 降备选 + 1b 交付代价 note、**devdoc 122 仅头部追加 `⚠ ERRATA`（190→280 行，正文一字未改）**，走 §十 四步路径 —— §5.2 推荐的「导出 WAV 进管线」**与本文自身根因二（PCM 单通道）直接冲突**且 `mc06` §3 方案 D 早已判死，两处结论长期互斥；另有 SSG 通道数错（2608=3 / 2612=9，非 6）、FM 音色「基本通用」过强、patch 许可断言无来源、`:213` 已收敛。`manual.html` ui02 的 `settings.txt` → `config.toml` + `USER.CFG`。**`mc07` 经核查无需改**（§3 工作流图末尾已是 `└─▶ 引擎（YM2608 后端）`）。**⚠ 另发现并已清理的更大范围错误**：`settings.txt` 已废止，但 guildbook **共 7 页 15+ 处仍在描述它**（初扫只报 5 页，**漏 `cf04` 补漏 2 处与 `cf06` 整页 3 处**）。据用户指示「按现状修正」已全部清理：**先取代码依据再改文档**——`settings.c`/`settings.h` **已不存在**、`settings_load()`/`GameSettings` **全仓零命中**，现状是 `config.toml` 经 `export_config.py` → `nb_config.h` 的 `NAIZ_*` 宏**编译进引擎、运行时零解析**（项目级）＋ `USER.CFG` 七键经 `prefs_load()`/`prefs_save()`（玩家级），语言实为 **9 种**（原 `ui02` 表只有 4 种）。`ui02` §1 整节重构为「配置文件分家」对照表、`cf01` 2 处、`cf02` 3 处（含**工具列 `build_game.py`→`export_config.py` 亦错**、删除已不存在的 `settings_load()` 链路）、`cf03` 1 处、`cf04` 4 处、`cf06` 3 处（初扫整页漏掉，`:75` 已补「**`make` 也要跑**」，见 §八 五禁之二），另顺带 `mc04:51` 与 `manual.html:47` 两处旧键名 `dlgstyle`/`btnstyle`。**残留复查**：`settings.txt` 仅剩 3 处且**全部是刻意说明其已废止**，旧键名零残留。**遗留未清（既存非本轮引入）**：`fd01` 一张表格行宽 2/3 不一致。前序  `docs/refdocs/F03_opna_fm_and_bgm_routes.md`（BGM 通路选型 + OPNA FM 寄存器参考，382 行，纯文档零代码）**：§1 四条通路（PCM/MIDI/FM/PMD）在**实机 vs NP2kai** 的对照与**待决**选型建议——**主线走自研 FM(OPNA) 后端、MIDI 降级为「检测到 MPU-401 才启用」的可选通路、不引入 PMD 作为运行时依赖**；三条硬理由：**OPNA 是板载标配而 MIDI 需扩展卡**（本仓 `F01:100-102` 板卡清单里 Qvision MidiMaster 标注为「WaveMaster 子卡」、`F02:33`「MIDI(BGM)在另一块卡上」）、**PMD 需从 32 位保护模式切回实模式调 INT 60h 撞 `B91` §3 禁止表且独占 OPNA**、**`hal_audio.c:143` 已在写 OPNA mask 寄存器**（bit1 = 强制 FM 静音 ⇒ 现成的 FM 静音通路已存在）；并厘清「借用 PMD」只借 **MML 记谱法**不借代码（`libopenpmd` 自述 WIP 且**只解析不管芯片输出**）。**纠正四个流传很广的错误前提**：YM2203 是 **3** 个 FM 通道不是 6 个（只有 YM2608 是 6）、**FM 通道 7/8 不存在于 OPN/OPNA**（属 YM2610）、**OPNA 无 LFO 波形选择**、**OPNA 无 `D2L`/`DT2L`**（OPN 是 `AR/D1R/D2R/SL/RR`）；**订正 FMP 官方文档**：其 SR 范围写 0–15 有误，实为 0–31（以 ymfm 为准）。§5 **证伪「S98 `.DAT` 音色库」**（S98 是寄存器转储日志，OPN 版 VGM），现存为 PMD `.FF`/MUCOM88 `.DAT`/Inst. Editor `.DAT`/FMP 内嵌；**未找到任何 CC0/公有领域 OPN patch 库且工具许可≠数据许可 ⇒ 建议自研 32 字节音色格式**；另记算子顺序被置换 **1/3/2/4**（错则静默音高全错）与 DT 编码跨格式不一致。§4.5 收录 **PMD 手册自身的 CPU 警告**（时值种类越多播放越耗 CPU，**游戏场景 BGM 尤其**）⇒ 建议 `#Zenlen` 取小值。**并订正第十一轮「无 PMD 可用 MIDI→MML 工具」的过宽表述**——ConvFMML 确以 PMD 为输出目标，结论改为「已停止维护 + 只转序列」故仍不可依赖。**§7 列 10 条未确认项，其中 `0188h`–`018Fh` 逐端口分工为「动手前硬阻塞项」（未取得可靠出处，猜错则 FM 通路静默无声）**。前序 **按用途拆为两页**：`mc06-音频通路机制`（机制解释（第八轮已改为人话、第九轮调整章节顺序）：三个能发声的部分 / 音乐文件有哪几种 / 引擎要吃哪种音乐 / **边界（第十轮改题）：WAV 能转 MIDI（适定、有解），但转不成 FM 音色（欠定逆问题、无解）** / 容易踩的坑）+ `mc07-音频平台与工具`（选型事实，第八轮已改为人话：Mureka 两路 / Magenta Studio / **免费档为何帮不上忙（Suno 按档位区分：Premier 的 Studio 已证实可 Get MIDI）** / 开源模型门槛 / AMT basic-pitch / tracker 工具 / 推荐工作流 / 许可须知；原 §5「选型陷阱」已于第八轮删除）。**AIVA 已按用户判定退出方案并从全部页面彻底移除**（免费档 MIDI 只挂旧版界面、入口实测无法复现、legacy 有下架风险 = 不可依赖）；调查与错误推断的留痕保留在 CHANGELOG 前三轮。**Mureka 官方证实 MIDI/WAV 导出为 Premier 专属**；API `Export Stem Audio` **$0.2/首可拿 `wav+midi`**、无需订阅，Premier 价格官方页面 JS 渲染查不到故不写入。**独立修正 Magenta RealTime 2 错标**：它是 `text-to-audio`、MIDI 是输入而非输出；本地产出 MIDI 的是 `magenta/magenta-studio`（Apache-2.0，需 Ableton）。**第十一轮 `mc07` §1.2 纠错（据 Gemini 材料逐条外部核对）**：**官方证实 Suno Studio 可 Get MIDI**（Stems 面板先拆最多 12 轨 → 右键单轨 *Get MIDI*，**10 credits/次**），故**修正「Suno ❌ 不提供 MIDI 输出」这一既有错误结论**、小节改为按档位区分、流程图 ① 补入 Suno Studio，并新增性质提醒（**Get MIDI 属转写非原始谱**，与 basic-pitch / Mureka 同类，受 mc06 §4 上限约束）；「两条未核实线索」缩为只剩 Veena；**否决 6 项错误或未证实内容**（`pmd2mml` 方向反、`mid2mml` 无 PC-98 版、`pmd.com` 未证实、完整 MML/PMD 流程与方案 A 冲突且属未决架构选型、「每声道单音」表述误导、量化建议依附已否决流程）；并按用户指示为山寨站警告补一个具体实例（仿冒站声称 $24-30/月，未证实故不写入）。前序 **第十轮 `mc06` 两处按用户指示修改**（§1 导语三句缩为一句、被删的「硬件上分开」论点核对无丢失；§4 主题由「有两件事」改为「**WAV 能转成 MIDI 吗？**」——导语改为先给答案再划边界、表格按 ✅ 在前 ❌ 在后调换行序、§5 与 mc07 §1.4 措辞对齐、note-box 末句补链接；**新增 mc06 → mc07 §1.4 编号引用**）。前序 **第九轮 `mc06` 三处按用户指示修改**（§1 表格新增「适合放什么」列、行序改为 FM→PCM→MIDI、表前加结论句；§3 与 §4 对调为「先选格式、再讲原理」；「产出工具见 mc07」补链接，连带修正 3 处因对调失效的编号引用）。前序 **第八轮 `mc07` 同样改写为人话并删除原 §5「选型陷阱」段**（4 条陷阱逐条核对确认已在 §1.2 / §1.3 / §2.1 有更完整表述故无信息丢失，§1.2 中指向已删 §5 的悬空引用已修正；随段消失的 Amper 案例与山寨站具体报价未保留，如需复现需另加；106 条特征事实改写前后校验全部保留；连带订正第六轮记错的跨页引用计数 3→4、5→6）。前序 **第七轮 `mc06` 改写为人话**（面向素材创作者、去掉实现腔：术语换说法不换事实，`FIFO`/`6 复音`/`欠定的逆问题` 等作为括注保留，50 条特征事实改写前后校验全部保留；当轮 `mc07` 未改，后于第八轮改造）。前序 `c52` 六轮 **`mc06` 核心论点为「分轨 → 单轨转写」的顺序**（Mureka 分轨恰好满足 basic-pitch「一次一件乐器」前提）。**第五轮精简**：原 253 行页面中同一论点最多重复陈述三次，§3.4 三个 note-box 合并为两个、§8 与 §3.2/§3.3 的重复删除、§5 流程图按 `east_asian_width` 实算列位重绘（原先竖线全部悬空）、「§8 陷阱 3」这类**按编号引用改为按名引用**（清单增删即失效）。前序 `c51` — 002 场景补 BGM + `voice`/`sound` 单通道争用根修（`hi` 被相邻 `ding` 瞬顶）+ 音频 key 登记守卫（devdoc 122，0.3.020）。前序 `c50` 音频源资产迁至 `assets/<项目>/`（BGM/SE/voice 三目录统一）+ guildbook 音频页 stub 描述订正（0.3.019）。前序 `c49` 翻译/脚本文本长度上限收口（5 对话框容量）+ tr 截断 fail-loud + 容量守卫（devdoc 121，0.3.018）。前序 `c48` 全部剧情脚本 9 语翻译补齐（28 键 ×9 语 0 空值）+ `Ira,not Neon` 转义标签入表（0.3.017）。前序 `c47` NB 字段逗号转义 `\,`（引擎/`i18n_gen`/`nb_validator` 三处同步）+ 常用问题选项归类 sys/game + `tr()` 守卫去注释误判（0.3.016）。
 >
-> **开发历史已移至 [`CHANGELOG.md`](CHANGELOG.md)**: R1–R30、0.2.109–0.2.117 及动画工具链等全部 Bug 修复/功能演进记录均以条目形式存于根目录 `CHANGELOG.md`，**本文件（AGENTS.md）不承载任何开发历史摘要，只存规则与当前版本**；历史速查一律读 CHANGELOG.md（最新：c49 / 0.3.018），新条目追加到 CHANGELOG.md 顶部而**不是**本文件。
+> **开发历史已移至 [`CHANGELOG.md`](CHANGELOG.md)**: R1–R30、0.2.109–0.2.117 及动画工具链等全部 Bug 修复/功能演进记录均以条目形式存于根目录 `CHANGELOG.md`，**本文件（AGENTS.md）不承载任何开发历史摘要，只存规则与当前版本**；历史速查一律读 CHANGELOG.md（最新：c52 / 0.3.021），新条目追加到 CHANGELOG.md 顶部而**不是**本文件。
 >
 > **防复发机制**: 见 §十七 — 每次修改后必须对照 C16/P11/S7 等 39 条规则逐一检查；**写完 devdoc 另须过 §十「规格与实现的收敛责任」**（行号校准 + 声称逐条落地，pytest 全绿不算证据）。
 >
-> **构建验证**: `make -C core` + **`core/*.err` 全为空**——诊断走 `.err` 文件，**不在 stdout**（0.3.014 教训，见下）。Python 工具链全部 `.py` 文件语法通过（`tools/` 下 120 个，含 `tools/diag/symbol_audit.py`，不含 venv/`__pycache__`）。pytest **640 passed, 1 skipped**。
+> **构建验证**: `make -C core` + **`core/*.err` 全为空**——诊断走 `.err` 文件，**不在 stdout**（0.3.014 教训，见下）。Python 工具链全部 `.py` 文件语法通过（`tools/` 下 120 个，含 `tools/diag/symbol_audit.py`，不含 venv/`__pycache__`）。pytest **642 passed, 1 skipped**。
 
 ## 一、Git 限制
 
@@ -18,6 +18,22 @@
 
 参考数据（目录树、guildbook 更新约定）已移至 `docs/B91-构建环境与参考速查.md §1`。
 要点：代码严格按 core/tools/games/docs/devdocs 归类；`devdocs/` 为历史存档——**已完成的文档禁止修改**（头部状态标记完结/归档），未完成的文档（计划中/规划中/细化中）可继续修订。
+
+### 源素材在 `assets/`，构建产物与脚本在 `projects/`（0.3.019 起）
+
+`assets/<项目>/` 是**源素材唯一位置**（构建只读，不进部署树、不注入 HDI），与 `images.map` 的 PNG 源、`anim/` 帧素材同根：
+
+| 素材 | 源位置 | 构建产物 |
+|---|---|---|
+| 位图 | `assets/<项目>/png/`（+ `images.map`） | `projects/<项目>/images/*.MAG` → `IMAGE.DAT` |
+| BGM | `assets/<项目>/bgm/*.mid` | `AUDIO.DAT` |
+| 音效 | `assets/<项目>/se/*.pcm` | `AUDIO.DAT` |
+| 语音 | `assets/<项目>/voice/*.pcm` | `AUDIO.DAT` |
+| 剧本 / i18n / config | — | `projects/<项目>/{scene,i18n}/`、`config.toml`（手写源，留在此处） |
+
+- **`ASSETS.DB` 的 `filename` 列对 BGM/SND/VC 相对 `assets/<项目>/`**（`naiz_lib.project_assets_dir()` 单一事实源），对 IMG/SPR/CG/THUMB/ANI 仍相对 `projects/<项目>/`。`pack_audio()` **只认 assets 根**，不在项目目录回落；`wav_convert.register_asset()` 拒绝落在该根之外的目标。
+- **音频源文件不注入 HDI**，故不受 §十一 的 DOS 8.3 约束（8.3 只作用于 `AUDIO.DAT` 的 TOC 条目名 = `name` 列，由 `pack_audio` 硬拒碰撞）。
+- **防呆**：`tools/tests/test_audio_asset_paths.py` 断言 ①每行都能在 `assets/<项目>/` 解析到实际文件 ②`projects/*/` 下不得再有 `bgm|se|voice` ③`name` 非空且 8.3 截断后互异 ④源根推导不漂移。
 
 ## 三、构建与测试
 
@@ -263,6 +279,24 @@ naiz_midi / naiz_music 已作为独立项目移出到 `~/`。详见 `docs/B91-�
 ### 对话框文字清除
 - 标准方法：`layer_dialog_restore()`，禁止 `fill_rect` / `fill_rect_pattern` / `scene_draw_dialog()`
 - 原理：快照 `dialog_snapshot[]` 按 `g_dialog_style` 恢复，无 ghost 残留
+
+### 音频通路（PCM 单通道，devdoc 122）
+
+三条通路硬件不同，**「有声音」不能推出「BGM 通路正常」**，排障时先分流：
+
+| 通路 | 硬件 | 引擎 | 现状 |
+|---|---|---|---|
+| BGM | **MIDI over MPU-401**（PC-98 扩展卡） | `core/lib/midi.*` + `hal_midi_out()` | 本地静音（宿主无 MIDI 设备，`hal_audio_detect()` 返回 0） |
+| BGM（**规划中**） | **FM over 86 板 OPNA**（板载标配） | **未实现** —— 计划见 `devdocs/123` | HAL 至今**无任何 YM2203/YM2608 端口访问**，FM 通路不存在；`0188h`–`018Fh` 逐端口分工未证（动手前硬阻塞项） |
+| SE / 语音 | **86 板 YM3433B PCM**（标配） | `pcm_play()` + FIFO 泵 | 可闻 |
+
+1. **86 板只有一条 PCM FIFO，`sound` 与 `voice` 共享、后到覆盖**（`audio.c` 单一 `g_pcm_buf`；`docs/B92` §命令表）。**`voice`/`sound` 不得相邻两行**——两者非阻塞（§十四.6/§十四.7），会在同一 pass 内背靠背执行，后者把前者顶掉、实际发声 <1 ms。中间至少隔一个对白页。反面教材：`nbook001.nb` 的 `voice(){hi}` 曾被紧邻的 `sound(){ding}` 瞬顶（`hi` 0.50 s / `ding` 0.40 s，PCM 单通道，devdoc 122 §三）。
+2. **BGM 静音先看串口有没有 `AUD MPU OK`**（`audio.c` init 成功分支）。见到 `AUD WARN: no MPU-401` 即已定性，**不必再怀疑脚本、key 登记或 `AUDIO.DAT`**。BGM 在无 MPU 环境静音是**设计内降级**，不是 bug。
+3. **BGM 不可走 PCM 循环**：单通道会被任意 SE 掐断且不自动恢复（规则 1 的推广）；且 `pcm_play()` 硬编码 `loop=0`，脚本 `sound(){<key>}` 无 flags 参数。
+4. **内容与格式的对应是硬约束**：语音/音效**必须** PCM（人声波形复杂，FM 只能合成「机器人音」）；BGM 理应 FM（PC-98 原生即 FMP/PMD 用 OPM 音源出曲 + PCM 驱动出语音，见 `docs/refdocs/F01_sound_boards.md`）。当前 HAL **无任何 YM2203/YM2608 端口访问**，FM 通路不存在。
+5. **不存在可用的 WAV→FM 自动转换**：FM 是参数化模型、WAV 是任意波形，反推是欠定的逆问题、无唯一解。业界方向是反向——用 tracker（如 FamiTracker，YM2612 与 PC-98 YM2608 的 FM 核心同源）按 FM 音色作曲并导出 WAV/MIDI，**使音乐资产与引擎播放通路解耦**。详见 devdoc 122 §五。
+6. **`scene()` 会停所有音频**（`scene_switch()` → `audio_stop_all()`）。不要指望 BGM/语音跨场景延续，也不要在每个场景末尾堆 `bgm(stop)`（`scene()` 本就会停）。
+7. **音频 key 必须登记**：脚本里每个 `bgm`/`sound`/`voice` 的花括号 key 都要有 `ASSETS.DB` 中 `type` 为 `BGM`/`SND`/`VC` 的行。`tools/naiz_build/nb_validator.py` 只校验 `IMG`/`ANI`/`CG`，**不查音频 key**——未登记的 key 能通过 `build`，只在实机表现为一行 `BGM WARN: '…' is not a registered BGM asset`。防呆：`tools/tests/test_audio_asset_paths.py::test_scene_audio_keys_are_registered`。
 
 ## 十五、Token 管理
 

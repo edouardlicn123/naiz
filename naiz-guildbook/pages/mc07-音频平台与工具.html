@@ -1,0 +1,169 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>音频平台与工具 — Naiz Guildbook</title>
+<link rel="stylesheet" href="../style.css">
+</head>
+<body>
+<nav class="sidebar" id="sidebar-nav"></nav>
+<script src="../sidebar-reference.js"></script>
+<main class="main">
+
+<h1>音频平台与工具</h1>
+<blockquote><strong>创建</strong>：2026-10-05<br><strong>最后更新</strong>：2026-10-05</blockquote>
+<p>上一页讲了机制——<strong>音乐该做成什么形状</strong>。这一页讲现实：<strong>用什么平台、用什么软件，能真的做出那种形状的东西来</strong>。列的都是实际核对过条款与许可的选项，包括价格和踩坑点。</p>
+<p>硬件与原理见 <a href="mc06-音频通路机制.html">mc06 音频通路机制</a>；脚本里怎么写音频命令，见 <a href="sc10-audio.html">sc10 音频指令</a>；素材怎么登记，见 <a href="cf07-图片登记.html">cf07 图片登记</a>。</p>
+<hr>
+
+<h2>1. AI 作曲平台</h2>
+<p>挑平台只看一件事：<strong>它能不能给你 MIDI 文件或者写好的乐谱</strong>。能给的才接得上 FM 通路，给不了的——哪怕曲子再好听——也进不来。</p>
+<table>
+<tr><th>平台</th><th>怎么用</th><th>说明</th></tr>
+<tr><td><a href="https://www.mureka.ai/">Mureka</a></td><td>商业服务，<strong>在云上跑，本机零负担</strong></td><td><strong>官方明确写了 MIDI 导出是 Premier 会员专属</strong>；另外还有<strong>按量付钱的 API 路径</strong>，<strong>$0.2 一首</strong>就能拿到 <code>wav + midi</code>，不用订阅 —— 详见 §1.1</td></tr>
+<tr><td><a href="https://github.com/magenta/magenta-studio">Magenta Studio</a></td><td>开源（Apache-2.0），本机跑</td><td>5 个模型，各自作用在<strong>你已有的 MIDI 小片段</strong>上，出来的还是 MIDI。需要 <strong>Ableton Live 10.1 以上</strong>，或它单独运行的版本</td></tr>
+<tr><td><a href="https://github.com/ElectricAlexis/NotaGen">NotaGen</a></td><td>开源（MIT），本机跑</td><td>生成<strong>乐谱</strong>，可以再导成 MIDI</td></tr>
+<tr><td><a href="https://github.com/slSeanWU/MIDI-LLM">MIDI-LLM</a></td><td>开源，但<strong>许可需自己核对</strong>（没有标准声明）</td><td>把 MIDI 当文字来学的模型，进什么出什么，可以接着往下续写旋律</td></tr>
+</table>
+<p>下面这些<strong>不能直接用来生成 MIDI</strong>——它们只吐音频波形，没有 MIDI 也没有乐谱：Suno、Udio、MusicGen、ACE-Step、YuE、Stable Audio、DiffRhythm，<strong>还有 <a href="https://magenta.withgoogle.com/magenta-realtime-2">Magenta RealTime 2</a></strong>（<strong>经常被列错</strong>：它官方模型卡上标的类别是 <strong><code>text-to-audio</code></strong>，也就是「文字生成音频」。MIDI 是它的<strong>输入</strong>——它把 MIDI 编成一个 128 维的数字向量再喂进去——而不是输出。模型文件约 15.6 GB。真正能在本地产出 MIDI 的是另一个项目 Magenta Studio，就在上表里）。</p>
+<p><strong>但「不能直接用」不等于「完全没用」</strong>：这些工具的<strong>音频</strong>可以拿去<strong>转写成音符</strong>（见 §1.4），甚至可以<strong>先拆成单轨再转写</strong>，避开混音互相遮蔽的问题。</p>
+
+<h3>1.1 Mureka：拿到 MIDI 的两条路</h3>
+<p><a href="https://www.mureka.ai/">Mureka</a> 是目前<strong>唯一一个在官方页面上白纸黑字写明「MIDI 导出」确实存在</strong>的商业平台。它的 MIDI <strong>不在免费档</strong>，但有两条价钱差很远的路可以走。</p>
+<h4>路 A：Premier 会员（网页版）</h4>
+<p>官方订阅页原文：「通过对 Mureka Studio 和 <strong>MIDI/WAV 导出的独家访问权限</strong>，Premier 提供了专业音乐工作流所需的终极控制力和高保真制作能力。」据此可确认三档的能力边界：</p>
+<table>
+<tr><th>档位</th><th>能不能导 MIDI / WAV</th><th>还有什么</th></tr>
+<tr><td>免费档</td><td>❌ <strong>不能</strong></td><td>0 金币</td></tr>
+<tr><td>Pro</td><td>❌ <strong>不能</strong></td><td>更高级的模型（V9.5 / V9 / V8 / O2）+ 商业版权 + 曲子延长与编辑</td></tr>
+<tr><td><strong>Premier</strong></td><td>✅ <strong>能</strong>（MIDI + WAV）</td><td>12 轨分离、任意风格混音、任意声音当 AI 演唱者</td></tr>
+</table>
+<p><strong>⚠️ Premier 到底多少钱，本页查不到</strong>——官方页面上的价格是网页脚本动态画上去的，抓下来只有能力表，没有数字。坊间流传的说法（比如 $27 一个月）<strong>没有得到官方证实，别当事实</strong>；要付费之前请自己打开官网订阅页确认。</p>
+<h4>路 B：API 按量付钱（推荐给「只想做几首草稿」的人）</h4>
+<p>官方 <code>platform.mureka.ai</code> 的 <strong>Export Stem Audio</strong>（导出分轨音频）这个能力，把 MIDI 做成了<strong>按首计价的商品</strong>，<strong>不需要订阅</strong>：</p>
+<table>
+<tr><th>模型</th><th>给你什么</th><th>单价</th><th>拆成几轨</th></tr>
+<tr><td>V1</td><td><code>wav</code></td><td>$0.06 / 首</td><td>5</td></tr>
+<tr><td><strong>V3</strong></td><td><strong><code>wav, midi</code></strong></td><td><strong>$0.2 / 首</strong></td><td>2（人声 + 伴奏）</td></tr>
+<tr><td><strong>V2</strong></td><td><strong><code>wav, midi</code></strong></td><td><strong>$0.7 / 首</strong></td><td>12（人声 / 贝斯 / 鼓 / 吉他 / 钢琴 / 长笛 / 音效 / 弦乐 / 合成器 / 键盘 / 铜管与木管 / 其他）</td></tr>
+</table>
+<p>官方 FAQ 另确认：<strong>下载曲子本身免费</strong>，只有<strong>拆轨（stems）这个功能要另外付费</strong>。</p>
+<div class="note-box">
+<p><strong>⚠️ 走 API 要知道的三件事</strong>（都出自官方 FAQ）：① <strong>API 和网站会员是两套完全独立的账本、不互通</strong>，想充值得单独买；② <strong>充进去的点数，从最近一次充值那天算起 12 个月有效，过期没花完一律作废</strong>；③ <strong>一律不退款</strong>——官方原文「所有 API 服务一经购买即视为已消耗」。</p>
+<p><strong>怎么选</strong>：只想试几首 BGM 草稿 → <strong>路 B</strong>（10 首才 $2，没有月费、也没有过期压力）；长期做、还经常需要 12 轨分离 → 才考虑 Premier。</p>
+<p><strong>用之前先想明白一件事：它的 MIDI 本质是「先拆轨、再转写」，不是真的在写谱</strong>——所以它的质量上限<strong>和 §1.4 的转写工具一样高</strong>，不会更好。而 V2/V3 <strong>刚好把伴奏单独拆出来给你</strong>，正好满足「一次一件乐器」的前提。详见 §1.4。</p>
+</div>
+<h3>1.2 免费档为什么帮不上忙</h3>
+<p>这是个有点反直觉但很关键的点：Suno 和 Udio 都有 $0 免费档、生成量还很大，但<strong>免费档拿不到 MIDI</strong>——能不能拿到，取决于你订到哪一档：<strong>Suno 要订 Premier 的 Studio 才有</strong>，而 <strong>Udio 是任何档都拿不到</strong>。卡法完全不一样，所以得分开看。</p>
+<table>
+<tr><th>平台</th><th>免费档（官方定价页）</th><th>能拿到文件吗</th><th>对本项目</th></tr>
+<tr><td><a href="https://suno.com/pricing">Suno</a></td><td><strong>$0</strong>，每天 50 点（大概 10 首），只能用 <strong>v4.5-all</strong> 模型，<strong>没有商用权</strong></td><td>免费档：能下音频（下载次数另外有限制），<strong>没有 MIDI</strong></td><td>⚠️ <strong>看档位</strong>：<strong>Premier 的 Studio 能导 MIDI</strong>（见下），<strong>免费档不能</strong></td></tr>
+<tr><td><a href="https://udio.com/pricing">Udio</a></td><td><strong>$0</strong>，每天 10 点、每月 100 点，完整长度（2 分 10 秒），但<strong>每天只限 3 首</strong></td><td>❌ <strong>下载已经被彻底关掉了</strong>（见下）</td><td>❌ <strong>任何档都拿不到文件</strong>，自然也没有 MIDI</td></tr>
+</table>
+<div class="note-box">
+<p><strong>Udio 的下载是被服务条款<strong>禁止</strong>的，不只是功能下线。</strong>2025-10-29（与 Universal Music Group 和解的同一天）起关掉了音频 / 视频 / 分轨的下载，条款里明文写着「<em>You may not download copies of any Output</em>」（你不许下载任何输出），<strong>付费档同样不行</strong>。一个不给你文件的工具，对做素材来说等于零。</p>
+</div>
+<p>所以挑这类工具，<strong>「能不能给你 MIDI」比「便不便宜」重要得多</strong>——Suno 的 MIDI 锁在 Premier，Udio 则是彻底没有，两者都跟免费档的吸引力无关。而 Suno 的 Premier 也正说明了这件事：<strong>它靠的不是降价，是加档</strong>。反过来说，免费档拿不到 MIDI 时还有 §1.4 的转写这条路，所以「只出音频」只是<strong>不能直连</strong>，不是<strong>没有价值</strong>。</p>
+<div class="note-box">
+<p><strong>Suno Studio 能导 MIDI（已由官方证实）</strong>——早前这里写着「未核实」，现已确认，<a href="https://help.suno.com/en/articles/8128193">Suno 官方帮助中心</a>原文说明导出方式：</p>
+<ul>
+<li><strong>先用 Stems 面板把曲子拆成最多 12 条独立音轨</strong>，再<strong>右键其中一条 → <em>Get MIDI</em>，每次消耗 10 credits</strong>，Studio 分析该音轨并生成 <code>.mid</code>。官方还列出用途：换乐器重弹旋律、分析和声进行、把生成结果重新编曲、连同音频一起做成 sample pack。</li>
+<li>官方产品页（<a href="https://suno.com/landing/audio-editor">suno.com/landing/audio-editor</a>）同样写明可导出 stem 级 WAV 与 MIDI。</li>
+<li>它还是<strong>双向</strong>的：Studio 2.0（2026-08-13）另加了 <strong>MIDI 导入、录音、钢琴卷帘</strong>，并能把 MIDI 片段<strong>当作生成时的提示</strong>用——也就是除了「导出」，还能「喂进去让它续写」。</li>
+</ul>
+<div class="note-box">
+<p><strong>但请注意它的性质：Get MIDI 是「拿音频反推音符」，不是把 AI 内部真正的作曲数据交给你。</strong>所以它和 basic-pitch、Mureka 的分轨导出<strong>属同一类</strong>——<strong>质量上限受转写精度限制</strong>（原理见 <a href="mc06-音频通路机制.html">mc06 §4</a>），单音旋律与干净的贝斯转得准，复杂和弦和人声会有错音、幻影和弦，要手工修。</p>
+<p><strong>顺序上它天然对路</strong>：必须<strong>先拆轨再逐条 Get MIDI</strong>，正好满足「一次只处理一件乐器」这个前提（见 §1.4）。</p>
+</div>
+<p><strong>还剩一条没核实的线索</strong>（<strong>没拿到官方页面确认，别当成已验证的选项</strong>；要用之前请自己去核对官方条款和导出格式）：<strong>Veena</strong> 被第三方对比文章说成免费档就带 MIDI。这条说法<strong>出自竞品自己的营销页</strong>，可不可信要自己验。</p>
+<p>怎么核实：直接去各家<strong>官方主域名</strong>看定价页和导出格式说明，不要采信对比文章。还有一条实操经验：搜「某平台 + pricing」会冒出一堆<strong>山寨站</strong>，域名像、却报互相矛盾的价格，能力表用空列打勾，还会编出不存在的型号。<strong>实例</strong>：本次核对时遇到一个<strong>域名多一个 n 的仿冒站</strong>，声称「Premier 约 $24–30 / 月」并罗列了 Studio 2.0 的细节，看起来极其可信——<strong>该价格未证实，因此不写入本文</strong>。<strong>只认官方主域名</strong>，其余一律不信。</p>
+</div>
+<h3>1.3 开源模型：要什么条件才跑得动</h3>
+<p>NotaGen 和 MIDI-LLM 都得<strong>在你自己电脑上跑</strong>，而且对显卡显存的要求比一般桌面电脑高不少。跑之前先核对这三项，缺一项就白搭：</p>
+<table>
+<tr><th>项目</th><th>要多少显存</th><th>Python</th><th>还要装什么</th></tr>
+<tr><td><a href="https://github.com/slSeanWU/MIDI-LLM">MIDI-LLM</a><br>（音乐信息检索会议 2026 的成果，基于 Llama 3.2 1B）</td><td><strong>16 GB 以上</strong>，需要 CUDA 12.x</td><td>3.11（用 conda 环境）</td><td><code>vllm</code>、<code>anticipation</code>、FluidR3 GM 音源；<strong>CPU 想跑得快还需要 AVX512 支持</strong></td></tr>
+<tr><td><a href="https://github.com/ElectricAlexis/NotaGen"><br>NotaGen</a><br>（中央音乐学院）</td><td>NotaGen-X <strong>8 GB</strong>；NotaGen-large <strong>24 GB</strong></td><td>3.10（用 conda 环境）</td><td><code>torch==2.3.0</code> / cuda 11.8、<code>accelerate</code>、<code>optimum</code></td></tr>
+</table>
+<p><strong>4 GB 级别的显卡（GTX 1650 这一档）两个都跑不动</strong>——NotaGen-X 差一倍，large 差六倍，MIDI-LLM 差四倍。这不是「慢一点」，是<strong>显存装不下直接失败</strong>。</p>
+<p>另外提醒：NotaGen 出来的是<strong>用 ABC 记谱法写的古典乐谱</strong>（不是 MIDI），用途更偏「生成乐谱素材」，跟 FM BGM 通路不是同一条路；MIDI-LLM 的示例提示词明确要你写 electric guitar（电吉他）、church organ（管风琴）、saxophone（萨克斯）这类常见编制，而 YM2608 只有 6 个通道和 128 个 4 算子音色，转过去多半是「机器人音」（见 <a href="mc06-音频通路机制.html">mc06「GM 音色 ≠ FM 音色」</a>）。</p>
+<div class="note-box">
+<p><strong>确实要跑的话：</strong>① 先确认硬盘有 <strong>10–20 GB</strong> 空闲（环境和模型文件，<strong>硬盘往往比显卡更早成为瓶颈</strong>）；② 用 Google Colab 免费档之类<strong>按小时租一张 16 GB 显卡</strong>的实例，本机只留下 tracker 那一步；③ 硬盘不够时，另用外置存储或者清理包缓存腾地方——<strong>不要</strong>为了腾空间去删本仓的资源（<code>assets/</code> 与 <code>disks/</code> 尤其不能动）。</p>
+</div>
+<h3>1.4 转写这条路：音频 → MIDI</h3>
+<p>前面几个平台是「<strong>无中生有</strong>」，这条路是「<strong>把已有的音频还原成音符</strong>」。它有一个前面都没有的好处：<strong>不依赖任何平台、不用账号、不用订阅</strong>，而且<strong>什么音频都能喂进去</strong>。为什么 WAV 转 MIDI 原理上就成立、而「从声音倒推 FM 音色」不成立，见 <a href="mc06-音频通路机制.html">mc06 §4</a>。</p>
+<table>
+<tr><th>工具</th><th>许可</th><th>怎么用 / 要注意什么</th></tr>
+<tr><td><a href="https://github.com/spotify/basic-pitch">basic-pitch</a><br>（Spotify 音频智能实验室）</td><td><strong>Apache-2.0 或 GPL-3.0 双许可</strong>，取 Apache-2.0 那个就行</td><td><code>pip install basic-pitch</code> 装上，命令行用法 <code>basic-pitch &lt;输出目录&gt; &lt;输入音频&gt;</code>；ICASSP 2022 的模型，支持多个音同时响，也支持弯音（pitch bend）。<strong>默认不装 TensorFlow</strong>，而是按你的系统挑一个更轻的推理库（Linux 用 TensorFlowLite、Windows 用 ONNX、macOS 用 CoreML）；真需要完整的 TensorFlow 就装 <code>basic-pitch[tf]</code></td></tr>
+<tr><td><a href="https://basicpitch.spotify.com/">basic-pitch 在线 demo</a></td><td>同上（免费）</td><td><strong>在浏览器里跑</strong>，把音频拖进去就出 MIDI，<strong>不用装东西、也不用占硬盘</strong></td></tr>
+</table>
+<div class="note-box">
+<p><strong>这一节最要紧的是顺序：先拆轨、再转写，别直接拿整首混音去转。</strong></p>
+<p>basic-pitch 有一条硬限制，官方原话是「<strong>一次只处理一件乐器效果最好</strong>」——整首管弦乐混音里好几个声部互相遮蔽，转出来的东西会乱。而 §1.1 的 Mureka <strong>Export Stem Audio V3 / V2 给你的正是拆好的轨</strong>（V3 = 人声 + 伴奏，V2 = 12 轨），<strong>把伴奏单独拆出来</strong>再做单轨转写，刚好满足这个前提。所以对「手里只有一首多乐器混音」这个最常见的情况，正确顺序是：</p>
+<p><strong>生成（用什么工具都行）→ 拆轨 → 单轨转写 → MIDI → tracker</strong></p>
+<p>这不是「可选的优化」，是<strong>决定成败的前提</strong>。反过来说，<strong>自己哼一段单音旋律仍然是最干净的做法</strong>——demo 页自己就写着「按下录音，对着麦克风哼一段小调」。旋律想清楚之后哼一遍转成 MIDI，比任何生成式工具都快也更准。</p>
+</div>
+
+<h2>2. 软件工具</h2>
+<p>下面这些许可都逐个核对过仓库的 LICENSE 或官方站点。它们各自产出什么格式，见 <a href="mc06-音频通路机制.html">mc06 §2</a>。</p>
+<table>
+<tr><th>工具</th><th>许可</th><th>干什么用的 / 注意什么</th></tr>
+<tr><td><a href="https://github.com/BambooTracker/BambooTracker">BambooTracker</a></td><td>GPL-2.0-or-later</td><td><strong>专门为 PC-88/98 的 YM2608（OPNA）做的</strong>作曲软件（Win / macOS / Linux 都有），而且还在持续开发。做 PC-98 音乐的首选</td></tr>
+<tr><td><a href="https://github.com/tildearrow/furnace">Furnace Tracker</a></td><td>GPL-2.0 / GPL-3.0 双许可</td><td>明确支持 YM2608（OPNA）；<strong>能导入 MIDI</strong>（用 RtMidi）；能导出 VGM</td></tr>
+<tr><td><a href="https://github.com/Wohlstand/libOPNMIDI">libOPNMIDI</a></td><td>LGPL-3.0</td><td>把 MIDI 渲染成 OPN2 / OPNA 声音的库，<strong>自带一个「MIDI 转 VGM 指令」的导出器</strong>——这才是「真正的 MIDI → FM」那条路</td></tr>
+<tr><td>OPNplug</td><td>随 libOPNMIDI 一起</td><td>libOPNMIDI 的 VST / LV2 插件形式，用来在软件里试听</td></tr>
+<tr><td><a href="https://github.com/nobuyukinyuu/bambooCopy">bambooCopy</a></td><td>MIT</td><td>把 YM2151（OPM）的音色转成 YM2608 能用的；2019 年之后就没更新了</td></tr>
+<tr><td><a href="https://github.com/vampirefrog/mdxtools">mdxtools</a></td><td>GPL-3.0</td><td><code>mml2mdx</code> 编译器，X68000 的 MDX 圈子在用，走 MML / S98 那条路</td></tr>
+<tr><td><a href="https://github.com/gameblabla/pc98sndpmdtools">pc98sndpmdtools</a></td><td>非标准声明，要自己读 LICENSE</td><td>把 WAV 转成 <code>PC8</code> / <code>P86</code> / <code>PPC</code> 这种 ADPCM，配合 PMD 用；做语音素材的老办法</td></tr>
+<tr><td><a href="https://mml-guide.readthedocs.io">MML 语法参考</a></td><td>文档</td><td>MML 这套记谱法的语法定义</td></tr>
+</table>
+<h3>2.1 两个容易踩的坑</h3>
+<div class="note-box">
+<p><strong>FamiTracker 不适合干这件事。</strong>它官网自己写着是「a free <em>windows</em> tracker for producing music for the <em>NES/Famicom</em>-systems」（一个给任天堂红白机做音乐用的免费 Windows 作曲软件），最后一版是 <strong>0.4.6（2015-02-04）</strong>，GPL。有两个事实特别容易搞混：</p>
+<ul>
+<li>官网确实还挂着「MIDI input devices are supported」（支持 MIDI 输入设备）——但那说的是<strong>接 MIDI 键盘实时弹</strong>，<strong>不是</strong>导入 <code>.mid</code> 文件；</li>
+<li><strong>导入 MIDI 的功能在 0.4.3（2014-06-07）就被删掉了</strong>（更新日志原文「Removed MIDI import」），而且它<strong>根本没有 MIDI 导出</strong>——能导出的是 NSF / WAV / 文本格式。</li>
+</ul>
+<p>也就是说，想用 FamiTracker 走「AI 生成 MIDI → FM」这条路，<strong>两头都缺</strong>：进不去 MIDI，也出不来 MIDI。</p>
+</div>
+<div class="note-box">
+<p><strong>FamiStudio 也不支持 YM2612。</strong>它常被误当成「支持多种音源的 tracker」。它只管任天堂那一侧：2A03、VRC6 / VRC7、FDS、N163、MMC5、5E01 等，<strong>不支持 YM2612 / YM2608</strong>。</p>
+</div>
+
+<h2>3. 推荐工作流</h2>
+<pre><code>① Mureka Premier / Suno Studio / Magenta Studio ──▶ MIDI  ┐
+② 任意工具 ──▶ 分轨 ──▶ 单轨转写 ──▶ MIDI   ┤
+③ 自己哼一段 ──▶ 单轨转写 ──▶ MIDI          ┘
+                                            │
+                                            ▼
+tracker（BambooTracker / Furnace）          │
+├─────▶ libOPNMIDI dumper ──▶ VGM ──▶ OPNplug 试听（试听闭环）
+                                            ▼
+└─────▶ 引擎（YM2608 后端）</code></pre>
+<pre><code>旁支（音效 / 语音）：
+任意 WAV ──wav_convert.py──▶ .pcm ──▶ 引擎（占 PCM 单通道）</code></pre>
+<ul>
+<li><strong>MIDI 是「交换用」的格式，FM 只负责把声音做出来。</strong>这是上面所有 AI 工具能接进来的唯一前提——<strong>别指望 AI 直接给你 FM 音色，它没这个本事</strong>（原因见 <a href="mc06-音频通路机制.html">mc06 §4</a>）。</li>
+<li>音色可以从 WOPN 或社区音色库起步，但<strong>要一个个核实许可</strong>（见 §4）。</li>
+<li>tracker 的 GPL 只管软件本身，<strong>用它做出来的音乐数据不会被传染</strong>（见 §4）。</li>
+<li>音效和语音走 PCM 那条旁支时，<strong>两者之间必须隔一页对白</strong>（因为 PCM 只有一个通道，见 <a href="mc06-音频通路机制.html">mc06 §1</a>）。</li>
+</ul>
+<div class="note-box">
+<p><strong>AI 该放在哪：它省的是「想旋律」的工夫，不是「出成品」的工夫。</strong>AI 给你的是<strong>通用的 GM MIDI</strong>，而 YM2608 只有 6 个通道、128 个 4 算子音色，直接转过去多半是「机器人音」（见 <a href="mc06-音频通路机制.html">mc06「GM 音色 ≠ FM 音色」</a>）。</p>
+<p>所以 AI 出来的 MIDI 必须在 tracker 里<strong>重做一遍</strong>：换 FM 音色、改织体、<strong>删掉用不上的声部</strong>来适配 6 个通道。把它当「旋律草稿」，别当「成品」。要是打算干脆不用 AI、直接在 tracker 里作曲，零成本零依赖，做出来的东西质量反而更高——<strong>AI 不是必需品</strong>。</p>
+<p><strong>三个入口按花多少钱排</strong>（按本机 4 GB 显存、没有 AVX512 的情况）：<strong>③ 零成本零依赖</strong>——旋律想清楚了直接哼一遍；<strong>② 几乎零成本</strong>——Mureka API 的 V3 一首 $0.2；<strong>① 最贵或者最折腾</strong>——Premier 要月费，Magenta Studio 要 Ableton。<strong>先走③，别一上来就订阅。</strong></p>
+<p>顺便分清两件事：作曲类 AI 是「<strong>无中生有</strong>」，给你一段从来没存在过的旋律；转写是「<strong>把已有音频还原成音符</strong>」，<strong>它不省「想旋律」的工夫，只省「把旋律敲进 tracker」的工夫</strong>（见 §1.4）。</p>
+</div>
+
+<h2>4. 许可须知</h2>
+<ul>
+<li><strong>GPL 的「传染」只对代码生效，不对产出的数据生效。</strong>FamiTracker、BambooTracker、Furnace、mdxtools 都是 GPL，但<strong>用它们做出来的音乐可以放进任何引擎里发布，不必因此开源你的引擎</strong>。</li>
+<li><strong>「参考它的代码」是另一回事。</strong><code>libOPNMIDI</code> 主体是 LGPL-3.0，但里面嵌了许可不兼容的第三方核心（MAME 的 YM2612 / OPN 核心、Genesis Plus GX）。要参考或移植它的代码，必须<strong>逐个文件核对顶部的 SPDX 许可声明</strong>，不能只看仓库最外层那个 LICENSE。</li>
+<li>从社区音色库取音色参数时，<strong>如果库本身没写许可，就按「来源不明」处理</strong>，核实之后再用。</li>
+<li>本项目的规定见 <code>AGENTS.md</code> §十：GPL v2 的代码不能直接复制；复制代码必须附上来源项目 + GitHub 地址 + 许可证注释。</li>
+</ul>
+
+</main>
+</body>
+</html>

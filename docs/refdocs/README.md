@@ -43,6 +43,7 @@ Naiz 引擎项目整理的外部 PC-98 知识参考资料。
 |------|------|
 | `F01_sound_boards.md` | PC-9801-26K (OPN) + PC-9801-86 (OPNA) 声卡：跳线、DIP、兼容性 |
 | `F02_86pcm_registers.md` | 86 板 PCM(86PCM)寄存器级参考：A460/A466/A468/A46A/A46C/A66E 位域、A46A 双用途陷阱、本项目现状对照与未确认项 |
+| `F03_opna_fm_and_bgm_routes.md` | **选型决策 + FM 通路调研**：BGM 四条通路（PCM/MIDI/FM/PMD）在实机与 NP2kai 的对照与建议；OPNA 寄存器参考（bank 选择/逐算子/逐通道/SSG/RHYTHM/ADPCM/OPNA mask）；MML 记谱法子集（**备选参考，非本项目输入格式**——已定输入为 MIDI）；4-op 音色格式与许可结论；陷阱清单与 10 条未确认项 |
 
 ### G — 编程参考 (Programming Reference)
 
@@ -83,6 +84,12 @@ Naiz 引擎项目整理的外部 PC-98 知识参考资料。
 | Quick Guide Hardware | https://web.archive.org/web/20210413232841/https://www.retropc.net/mm/pc88/98quick/index.html | HTML 文档 |
 | 吉崎 PC-9801 技巧 | https://web.archive.org/web/19990224092301/http://www.asahi-net.or.jp/~FZ6Y-YMTR/ | 汇编技巧 |
 | FUGA RPG 开发 | https://web.archive.org/web/20021206125421/http://www.asahi-net.or.jp/~KC2H-MGR/rpg/source/ | RPG 编程资料 |
+| Yamaha YM2608 OPNA Application Manual(英译) | http://nemesis.hacking-cult.org/MegaDrive/Documentation/YM2608J%20Translated.PDF | PDF |
+| ymfm(YM FM 模拟核,MAME 所用) | https://github.com/aaronsgiles/ymfm | 源码(BSD-3-Clause) |
+| FMP 官方文档 | http://fmpdoc.fmp.jp/ | HTML 文档 |
+| PMD MML 手册英译(PMD 4.8) | https://pigu-a.github.io/pmddocs/pmdmml.htm | HTML 文档 |
+| mml-guide PMD 篇 | https://mml-guide.readthedocs.io/pmd/ | HTML 文档 |
+| Battle of the Bits PMD Effects | https://battleofthebits.org/lyceum/View/Professional%20Music%20Driver%20Effects%20Commands | HTML 文档 |
 | bauxite wiki | https://bauxite.sakura.ne.jp/ | 技术 Wiki |
 
 ## 使用说明
