@@ -1,6 +1,6 @@
 """Repository guards for the audio source-asset layout.
 
-BGM/SND/VC payloads are the one asset class whose sources live under
+BGM/SND/VC/FMP payloads are the one asset class whose sources live under
 assets/<project>/ rather than projects/<project>/: only the packed
 AUDIO.DAT reaches games/<game>/, so the project directory has nothing to
 do with them (pack_audio.py reads them from naiz_lib.project_assets_dir).
@@ -42,7 +42,7 @@ def _projects_with_audio():
         try:
             rows = db.execute(
                 "SELECT id, filename, type, name FROM img_map "
-                "WHERE type IN ('BGM','SND','VC') ORDER BY id"
+                "WHERE type IN ('BGM','SND','VC','FMP') ORDER BY id"
             ).fetchall()
         finally:
             db.close()

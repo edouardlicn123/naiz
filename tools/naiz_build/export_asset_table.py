@@ -213,6 +213,23 @@ def generate(project_dir, output_path):
         lines.append('};')
         lines.append('')
 
+        # -- fmp_map: YM2608 FM patches in controller-file order (type='FMP') --
+        # ID order must match AUDIO.DAT entry order (pack_audio reads the same
+        # table with the same ORDER BY id), so the engine's patch table lines
+        # up with the fmseq family table.
+        lines.append('/* FM patch key->ID lookup; index order == AUDIO.DAT order */')
+        lines.append('static const AudioAssetMap fmp_map[] = {')
+        fmp_rows = list(db.execute(
+            "SELECT id, name FROM img_map WHERE type='FMP' ORDER BY id"
+        ))
+        if not fmp_rows:
+            lines.append('    {"__dummy__", 0},')
+        for row in fmp_rows:
+            lines.append('    {"%s", %d},' % (escape(row[1]), row[0]))
+        lines.append('    {NULL, 0}')
+        lines.append('};')
+        lines.append('')
+
         lines.extend(header_footer('NB_ASSET_TABLE_H'))
 
         try:
@@ -224,7 +241,7 @@ def generate(project_dir, output_path):
         if db:
             db.close()
     return len(img_rows), len(chars), len(exprs), len(spr_rows), len(cg_rows), \
-        len(bgm_rows), len(snd_rows), len(vc_rows)
+        len(bgm_rows), len(snd_rows), len(vc_rows), len(fmp_rows)
 
 
 if __name__ == '__main__':
@@ -232,6 +249,6 @@ if __name__ == '__main__':
         print("Usage: export_asset_table.py <project_dir> <output_path>")
         sys.exit(1)
 
-    n_img, n_char, n_expr, n_spr, n_cg, n_bgm, n_snd, n_vc = generate(sys.argv[1], sys.argv[2])
-    print("export_asset_table: %d img, %d spr, %d cg, %d bgm, %d snd, %d vc, %d chars, %d expressions -> %s" % (
-        n_img, n_spr, n_cg, n_bgm, n_snd, n_vc, n_char, n_expr, sys.argv[2]))
+    n_img, n_char, n_expr, n_spr, n_cg, n_bgm, n_snd, n_vc, n_fmp = generate(sys.argv[1], sys.argv[2])
+    print("export_asset_table: %d img, %d spr, %d cg, %d bgm, %d snd, %d vc, %d fmp, %d chars, %d expressions -> %s" % (
+        n_img, n_spr, n_cg, n_bgm, n_snd, n_vc, n_fmp, n_char, n_expr, sys.argv[2]))

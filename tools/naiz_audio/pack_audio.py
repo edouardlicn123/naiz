@@ -1,9 +1,13 @@
 #!/usr/bin/env python3
-"""Pack registered BGM/SND/VC assets into AUDIO.DAT (devdoc 101).
+"""Pack registered BGM/SND/VC/FMP assets into AUDIO.DAT (devdocs 101/123).
 
-Reads ASSETS.DB img_map rows with type BGM / SND / VC and writes a single
-AUDIO.DAT archive using the same TOC layout as IMAGE.DAT / SCENE.DAT
+Reads ASSETS.DB img_map rows with type BGM / SND / VC / FMP and writes a
+single AUDIO.DAT archive using the same TOC layout as IMAGE.DAT / SCENE.DAT
 (shared writer: tools/naiz_lib/toc_archive.py).
+
+FMP rows — YM2608 FM patches (devdoc 123 S3) — are compiled from their text
+form at pack time by tools/naiz_audio/fm_patch.py into a 32-byte binary,
+so authors edit text and the binary layout stays a build artifact.
 
 TOC entry name = the asset `name` column (the script key), must satisfy
 DOS 8.3 and be unique after `to_dos_name()` (same hard rule as SCENE.DAT,
@@ -29,8 +33,9 @@ from pathlib import Path
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
 
-from naiz_lib import project_assets_dir, to_dos_name
-from naiz_lib.toc_archive import make_toc_archive
+from naiz_lib import project_assets_dir, to_dos_name  # noqa: E402
+from naiz_lib.toc_archive import make_toc_archive  # noqa: E402
+from naiz_audio import fm_patch  # noqa: E402
 
 # .pcm header validity check (magic + rate code range), mirrors the engine
 # checks in core/engine/audio.c.
@@ -60,13 +65,13 @@ def pack_audio(project_dir, out_dir, assets_dir=None):
     try:
         rows = db.execute(
             "SELECT id, filename, type, name FROM img_map "
-            "WHERE type IN ('BGM','SND','VC') ORDER BY id"
+            "WHERE type IN ('BGM','SND','VC','FMP') ORDER BY id"
         ).fetchall()
     finally:
         db.close()
 
     if not rows:
-        print("pack_audio: no BGM/SND/VC assets registered, skipping")
+        print("pack_audio: no BGM/SND/VC/FMP assets registered, skipping")
         return
 
     print(f"  audio sources: {assets_dir}")
@@ -91,12 +96,23 @@ def pack_audio(project_dir, out_dir, assets_dir=None):
         path = os.path.join(assets_dir, filename)
         if not os.path.isfile(path):
             print(f"ERROR: audio asset file missing: {path}")
-            print(f"  BGM/SND/VC sources live under {assets_dir}; "
+            print(f"  BGM/SND/VC/FMP sources live under {assets_dir}; "
                   "the img_map.filename column is relative to it.")
             sys.exit(1)
-        data = Path(path).read_bytes()
-        if asset_type != 'BGM':
-            _validate_pcm(data, filename)
+        if asset_type == 'FMP':
+            try:
+                data = fm_patch.compile_source(path)
+            except fm_patch._PatchError as e:
+                print(f"ERROR: {path}:\n  {e}")
+                sys.exit(1)
+            if len(data) != 32:
+                print(f"ERROR: {filename}: compiled {len(data)} bytes, "
+                      "FMP patches are exactly 32 bytes")
+                sys.exit(1)
+        else:
+            data = Path(path).read_bytes()
+            if asset_type != 'BGM':
+                _validate_pcm(data, filename)
         entries.append((short, data))
 
     if not entries:
