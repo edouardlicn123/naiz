@@ -1,0 +1,7 @@
+# ethnic — GM 104..111 (sitar/banjo/koto/kalimba).  Plucked zither with
+# detuned string partials (alg 4), fast attack, medium decay, wet buzz.
+alg=4 fb=2 pan=0xc0
+op=1 dt=1 mul=2  tl=44 ks=1 ar=27 am=0 d1r=6  d2r=5  sl=3 rr=6
+op=3 dt=0 mul=6  tl=44 ks=1 ar=27 am=0 d1r=6  d2r=5  sl=3 rr=6
+op=2 dt=1 mul=3  tl=40 ks=1 ar=27 am=0 d1r=7  d2r=5  sl=3 rr=6
+op=4 dt=0 mul=1  tl=32 ks=1 ar=28 am=0 d1r=5  d2r=4  sl=3 rr=6

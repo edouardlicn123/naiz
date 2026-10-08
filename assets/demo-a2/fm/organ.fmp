@@ -1,0 +1,8 @@
+# organ — GM 16..23 organ family.  Four parallel drawbars with feedback
+# (alg 7, fb 2); steady envelope holds at sustain the whole note (d1r=d2r=0,
+# sl=15), so only release decides the tail.
+alg=7 fb=2 pan=0xc0
+op=1 dt=0 mul=1  tl=42 ks=1 ar=20 am=0 d1r=0  d2r=0  sl=15 rr=4
+op=3 dt=0 mul=1  tl=42 ks=1 ar=20 am=0 d1r=0  d2r=0  sl=15 rr=4
+op=2 dt=0 mul=2  tl=52 ks=1 ar=20 am=0 d1r=0  d2r=0  sl=15 rr=4
+op=4 dt=0 mul=4  tl=56 ks=1 ar=20 am=0 d1r=0  d2r=0  sl=15 rr=4

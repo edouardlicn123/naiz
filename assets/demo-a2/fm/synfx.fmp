@@ -1,0 +1,8 @@
+# synfx — GM 96..103 synth FX (sweeps/metal/goody).  Wild inharmonic stack
+# with heavy feedback (alg 7, fb 7), loud vibrato shading, slow sweep,
+# falling away from sustain.
+alg=7 fb=7 pan=0xc0
+op=1 dt=0 mul=1  tl=40 ks=1 ar=16 am=0 d1r=4  d2r=3  sl=8 rr=8
+op=3 dt=0 mul=7  tl=40 ks=1 ar=16 am=1 d1r=4  d2r=3  sl=8 rr=8
+op=2 dt=0 mul=5  tl=44 ks=1 ar=16 am=1 d1r=4  d2r=3  sl=8 rr=8
+op=4 dt=0 mul=1  tl=34 ks=1 ar=16 am=0 d1r=4  d2r=3  sl=8 rr=8

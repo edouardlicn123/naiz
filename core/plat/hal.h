@@ -35,6 +35,7 @@
  *   - hal_audio_detect()   探测 MPU-401（BGM 后端）
  *   - hal_midi_out()       MPU-401 UART 字节输出
  *   - hal_pcm_play/tick/stop()  86 板 PCM FIFO（sound/voice）
+ *   - hal_fm_detect/init/shutdown/write_reg() 86 板 OPNA FM（BGM，devdocs/123）
  *   - hal_wallclock_ms()   毫秒时钟（MIDI 时序调度 / PCM 泵节流）
  *
  * 约束（详见 AGENTS.md §5.1）：
@@ -171,6 +172,21 @@ void hal_pcm_tick(void);
 void hal_pcm_stop(void);
 int  hal_pcm_active(void);
 void hal_pcm_set_volume(int step);
+
+/* 86 板 OPNA FM（devdocs/123 M3）：
+ *   - hal_fm_detect()   通过能力 ID 回读（0xFF -> 1）探测 OPNA
+ *   - hal_fm_init()     确保 A460 bit0=1（选 OPNA + 不强制静音），
+ *                       否则扩展窗口 0x18C/0x18E 不路由；并把 FM 音量
+ *                       路径 VOL1/VOL2 初始化为满音量
+ *   - hal_fm_write_reg(bank,addr,val)  bank 0 -> 0x188/0x18A（普通组），
+ *                       bank 1 -> 0x18C/0x18E（扩展组，FM ch4-6）
+ *   - hal_fm_shutdown() 所有 FM 声道 KEYOFF + SSG 全静音
+ *   - hal_fm_set_volume(atten)  A466 VOL1（FM 直接）衰减，0（最响）~15 */
+int  hal_fm_detect(void);
+void hal_fm_init(void);
+void hal_fm_shutdown(void);
+void hal_fm_write_reg(int bank, uint8_t addr, uint8_t val);
+void hal_fm_set_volume(int atten);
 
 /*============================================================================
  * 键盘扫描码常量（PC-98 硬件标准）

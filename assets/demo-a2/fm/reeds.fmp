@@ -1,0 +1,8 @@
+# reeds — GM 64..71 (clarinets/oboes/sax).  Odd-harmonic third modulators
+# (mul 5/9) over a strong odd fundamental for a woodwind clarinet body;
+# moderate feedback, sustained.
+alg=1 fb=2 pan=0xc0
+op=1 dt=0 mul=5  tl=40 ks=1 ar=20 am=0 d1r=3  d2r=3  sl=12 rr=6
+op=3 dt=0 mul=1  tl=38 ks=1 ar=20 am=0 d1r=3  d2r=3  sl=12 rr=6
+op=2 dt=0 mul=9  tl=46 ks=1 ar=20 am=0 d1r=3  d2r=3  sl=12 rr=6
+op=4 dt=0 mul=1  tl=32 ks=1 ar=22 am=0 d1r=4  d2r=3  sl=12 rr=6

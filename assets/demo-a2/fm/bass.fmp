@@ -1,0 +1,7 @@
+# bass — GM 32..39 bass family.  Strong fundamentals (two mul=1 carriers),
+# light 2nd-harmonic shading, moderate feedback for edge; punchy decay.
+alg=0 fb=3 pan=0xc0
+op=1 dt=0 mul=1  tl=30 ks=1 ar=25 am=0 d1r=6  d2r=5  sl=4 rr=5
+op=3 dt=0 mul=1  tl=32 ks=1 ar=25 am=0 d1r=6  d2r=5  sl=4 rr=5
+op=2 dt=1 mul=2  tl=44 ks=1 ar=24 am=0 d1r=5  d2r=4  sl=2 rr=5
+op=4 dt=0 mul=2  tl=42 ks=1 ar=24 am=0 d1r=5  d2r=4  sl=2 rr=5

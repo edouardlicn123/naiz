@@ -104,7 +104,8 @@ void fmseq_stop(Fmseq *seq, const FmseqSink *sink);
 /* Number of currently sounding FM voices. */
 int fmseq_fm_voices(const Fmseq *seq);
 
-/* Count of keyed-on keys across FM voices. */
-uint8_t fmseq_keymask(const Fmseq *seq, int ch);
+/* 1 once the whole loaded event stream has been dispatched.  The engine
+ * uses this as its loop point: rewind to the start of the last seek. */
+int fmseq_finished(const Fmseq *seq);
 
 #endif /* LIB_FMSEQ_H */

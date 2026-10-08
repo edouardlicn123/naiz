@@ -1,0 +1,7 @@
+# synpad — GM 88..95 synth pads.  Detuned two-pair stack (alg 6), slow
+# attack for a swelling pad, sustained, long tail.
+alg=6 fb=0 pan=0xc0
+op=1 dt=1 mul=2  tl=44 ks=1 ar=14 am=0 d1r=2  d2r=2  sl=13 rr=8
+op=3 dt=0 mul=2  tl=44 ks=1 ar=14 am=0 d1r=2  d2r=2  sl=13 rr=8
+op=2 dt=1 mul=1  tl=42 ks=1 ar=14 am=0 d1r=2  d2r=2  sl=13 rr=8
+op=4 dt=0 mul=1  tl=40 ks=1 ar=14 am=0 d1r=2  d2r=2  sl=13 rr=8

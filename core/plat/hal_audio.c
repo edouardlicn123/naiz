@@ -10,7 +10,7 @@
  *     byte to the data port (UART passthrough).
  *
  * PCM (86-board YM3433B FIFO, fixed ports):
- *   - A460 bit0: board enable
+ *   - A460: bit0 selects OPNA, bit1 set forces FM silent (init writes 0x01)
  *   - A468: bit7 output enable, bit5 A46A-select (1=fifosize, 0=dactrl),
  *           bit3 buffer reset, bits2-0 PCM rate code
  *   - A46A: fifosize ((val+1)<<7; 0xFF -> 0x7FFC) or dactrl (0x50=8bit mono R)
@@ -202,4 +202,86 @@ void hal_pcm_stop(void)
     outb(PCM_CTRL_PORT, PCM_CTRL_BUF_RESET);
     g_pcm.data = NULL;
     g_pcm.active = 0;
+}
+
+/* --- 86-board OPNA FM (devdocs/123 M3, F03 §3.8) --- */
+
+/* Port pair for the ordinary register group (SSG / RHYTHM / system / FM
+ * ch1-3).  A write to the address latch selects a register for the next
+ * data access; the data port both writes that register and reads it back. */
+#define FM_ADDR_LATCH       0x0188
+#define FM_DATA_PORT        0x018A
+
+/* Port pair for the extended register group (FM ch4-6, ADPCM).  It only
+ * routes through when A460 bit0 selects the OPNA (hal_fm_init below, and
+ * hal_pcm_play already raises it). */
+#define FM_EXT_ADDR_LATCH   0x018C
+#define FM_EXT_DATA_PORT    0x018E
+
+#define FM_FM_CHANNELS      6   /* YM2608 FM voices (F03 §3.3) */
+#define FM_SSG_MIX_SILENT   0x3F  /* reg7: every bit 0 disables that output */
+
+/* Per-write register trace (devdocs/123 §1.5 判据 5): audit every
+ * (port, addr, val) on the serial channel.  Compile-time switch — a 60Hz
+ * register pump would spam the trace during normal use, so flip this to 1
+ * and rebuild (then ./makegame.sh make) only for a trace session. */
+#define FM_TRACE_ENABLED 0
+
+int hal_fm_detect(void)
+{
+    /* Capability ID read (F03 §3.8 fact 3): latch 0xFF, then read back.
+     * An OPNA answers 1; an empty bus reads 0xFF. */
+    outb(FM_ADDR_LATCH, 0xFF);
+    return inb(FM_DATA_PORT) == 1;
+}
+
+void hal_fm_init(void)
+{
+    /* A460 bit0 selects the OPNA; without it the extended window
+     * 0x18C/0x18E never routes (F03 §3.8 fact 1).  bit1=0 keeps the FM
+     * voice unmuted (AGENTS §十四 音频通路 note 3). */
+    outb(PCM_ID_PORT, 0x01);
+    /* Prime the FM volume paths at full loudness (F02 §4.2: each path has
+     * its own 4-bit attenuation; 000b = VOL1, 001b = VOL2). */
+    outb(PCM_STATUS_PORT, 0x00);
+    outb(PCM_STATUS_PORT, 0x20);
+}
+
+void hal_fm_set_volume(int atten)
+{
+    /* A466 VOL1 (FM direct) attenuation, reversed 0 (loudest) .. 15. */
+    if (atten < 0)
+        atten = 0;
+    if (atten > PCM_VOL_ATTEN_MAX)
+        atten = PCM_VOL_ATTEN_MAX;
+    outb(PCM_STATUS_PORT, (uint8_t)atten);
+}
+
+void hal_fm_shutdown(void)
+{
+    int ch;
+
+    /* Key off every FM voice: $28 carries the channel bits (bit2 selects
+     * FM4-6, F03 §3.8 fact 2) and a zero key mask. */
+    for (ch = 0; ch < FM_FM_CHANNELS; ch++)
+        hal_fm_write_reg(0, 0x28, (uint8_t)((ch >= 3 ? 4 : 0) | (ch % 3)));
+    /* SSG: disable every mixer output. */
+    hal_fm_write_reg(0, 0x07, FM_SSG_MIX_SILENT);
+}
+
+void hal_fm_write_reg(int bank, uint8_t addr, uint8_t val)
+{
+    if (bank == 0) {
+        outb(FM_ADDR_LATCH, addr);
+        outb(FM_DATA_PORT, val);
+#if FM_TRACE_ENABLED
+        hal_logf("FM %04X.%02X=%02X\r\n", FM_ADDR_LATCH, addr, val);
+#endif
+    } else {
+        outb(FM_EXT_ADDR_LATCH, addr);
+        outb(FM_EXT_DATA_PORT, val);
+#if FM_TRACE_ENABLED
+        hal_logf("FM %04X.%02X=%02X\r\n", FM_EXT_ADDR_LATCH, addr, val);
+#endif
+    }
 }

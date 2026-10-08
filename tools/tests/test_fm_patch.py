@@ -6,6 +6,7 @@ the engine will enforce, not just against a parallel Python check.
 """
 
 import ctypes
+import glob
 import os
 import sys
 
@@ -141,3 +142,21 @@ def test_patch_library_function_stable():
         hdr = f.read()
     # sanity: the C side pins the same permutation in its comment
     assert "1-3-2-4" in hdr or "file order" in hdr.lower()
+
+
+def test_project_patch_library_compiles():
+    """Every demo-a2 FM family source compiles and passes the C validator.
+
+    Devdoc 124 S6 default family set: 15 .fmp files under assets/demo-a2/fm/.
+    Coverage/order vs ASSETS.DB is guarded by test_gm_map.py; here we only
+    prove each shipped source is a valid 32-byte patch the engine will load.
+    """
+    lib = _validator()
+    pats = sorted(glob.glob(os.path.join(REPO_ROOT, 'assets', 'demo-a2',
+                                         'fm', '*.fmp')))
+    assert len(pats) >= 1
+    for p in pats:
+        blob = fm_patch.compile_source(p)
+        assert len(blob) == 32, f"{p}: compiled size must be 32"
+        arr = (ctypes.c_uint8 * 32).from_buffer_copy(blob)
+        assert lib.fmopn_patch_validate(arr) == 0, f"{p}: fails C validator"

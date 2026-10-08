@@ -1,0 +1,7 @@
+# strings — GM 40..46, 48..54 (violin/cello/harp/choir voices).  Warm
+# parallel stack (alg 7), slow attack, near-steady sustain, long release.
+alg=7 fb=0 pan=0xc0
+op=1 dt=0 mul=1  tl=40 ks=2 ar=16 am=0 d1r=2  d2r=2  sl=13 rr=7
+op=3 dt=0 mul=1  tl=40 ks=2 ar=16 am=0 d1r=2  d2r=2  sl=13 rr=7
+op=2 dt=1 mul=2  tl=50 ks=1 ar=16 am=0 d1r=2  d2r=2  sl=13 rr=7
+op=4 dt=0 mul=3  tl=52 ks=1 ar=16 am=0 d1r=2  d2r=2  sl=13 rr=7

@@ -63,10 +63,10 @@ LINE_REF_WHITELIST = {
     ("nb_setting.c", 121): "snprintf",
     ("nb_setting.c", 139): "Text Speed",
     ("nb_setting.c", 151): "Read Progress",
-    ("audio.c", 105): "g_bgm_on",
-    ("audio.c", 233): "g_snd_on",
-    ("audio.c", 242): "g_vc_on",
-    ("audio.c", 147): "audio_bgm_stop",
+    ("audio.c", 209): "g_bgm_on",
+    ("audio.c", 347): "g_snd_on",
+    ("audio.c", 356): "g_vc_on",
+    ("audio.c", 258): "audio_bgm_stop",
     ("hal_audio.c", 88): "PCM_CTRL_A46A_IRQ",
     ("hal_audio.c", 94): "PCM_IRQ_INTERVAL_MAX",
     ("hal_audio.c", 121): "hal_pcm_set_volume",
@@ -140,6 +140,15 @@ STALE_QUOTED_REFS = {
     ("nb_setting.c", 331),
     # 3. devdoc 119 §5.1 quotes the WRONG value it made the same mistake twice
     ("nb_setting.c", 240),
+}
+
+# audio.c line citations from devdoc 119 §2's truth table, voided when the
+# file gained the FM backend (devdocs/123 M4, audio.c shifted by dozens of
+# lines).  devdoc 119 is finished and may not be edited, so the old numbers
+# are registered as superseded; the CURRENT locations are checked in
+# LINE_REF_WHITELIST instead.
+SUPERSEDED_AUDIO_LINE_REFS = {
+    ("audio.c", 105), ("audio.c", 147), ("audio.c", 233), ("audio.c", 242),
 }
 
 # References to files RENAMED in 0.3.014.  devdocs 118/119 are finished and may
@@ -259,7 +268,8 @@ def test_every_devdoc_ref_is_registered():
     a deliberate quote of a superseded/incorrect value (STALE_QUOTED_REFS).
     """
     registered = (set(LINE_REF_WHITELIST) | set(KNOWN_GOOD_REFS)
-                  | STALE_QUOTED_REFS | RETIRED_FILE_QUOTES)
+                  | STALE_QUOTED_REFS | RETIRED_FILE_QUOTES
+                  | SUPERSEDED_AUDIO_LINE_REFS)
     for doc in (DOC_118, DOC_119, DOC_120):
         unknown = sorted(
             "%s:%d" % ref for ref in set(_devdoc_line_refs(doc)) - registered

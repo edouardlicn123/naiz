@@ -18,6 +18,7 @@ import os
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
 
+from naiz_audio import gm_families
 from naiz_build.c_header import escape, header_preamble, header_footer
 from naiz_build.cg_thumb import THUMB_SUFFIX, THUMB_TYPE
 
@@ -227,6 +228,29 @@ def generate(project_dir, output_path):
         for row in fmp_rows:
             lines.append('    {"%s", %d},' % (escape(row[1]), row[0]))
         lines.append('    {NULL, 0}')
+        lines.append('};')
+        lines.append('')
+
+        # -- fmp_gm_map: GM program 0..127 -> FM family index (devdoc 124 S6) --
+        # The family index is the position of the family name in fmp_rows
+        # (== fmp_map order == AUDIO.DAT order == the engine's g_fm_patches
+        # table), so it must be generated from the SAME fmp_rows listing, not
+        # from the tool's cluster table alone.  gm_families.build_gm_map is
+        # the data source and fails loudly on any gap / order mismatch.
+        lines.append('/* GM program 0..127 -> FM family index (devdoc 124 S6) */')
+        lines.append('static const uint8_t fmp_gm_map[128] = {')
+        if not fmp_rows:
+            lines.append('    /* no FMP assets: every program falls to family 0 */')
+            gm_values = [0] * 128
+        else:
+            order = [name for _id, name in fmp_rows]
+            try:
+                gm_values = gm_families.build_gm_map(order)
+            except ValueError as e:
+                raise RuntimeError(f"fmp_gm_map: {e}")
+        for i in range(0, 128, 16):
+            chunk = ', '.join('0x%02X' % v for v in gm_values[i:i + 16])
+            lines.append('    ' + chunk + ',')
         lines.append('};')
         lines.append('')
 

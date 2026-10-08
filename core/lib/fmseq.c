@@ -293,9 +293,9 @@ static void ssg_note_on(Fmseq *seq, const FmseqSink *sink, int midi_ch,
             fmopn_bend_ratio(seq->bend[FMSEQ_PERCUSSION_MIDI_CH], &blk, &fn);
         freq = ((double)((long)fn << blk)) * FMSEQ_CLOCK / 150994944.0;
         period = period_of_freq(freq);
-        w(sink, 0, (uint8_t)(ssg_ch * 2), (uint8_t)(period & 0xFF));
+        w(sink, 0, (uint8_t)(ssg_ch * 2), fmopn_ssg_period_fine(period));
         w(sink, 0, (uint8_t)(ssg_ch * 2 + 1),
-          (uint8_t)((period >> 8) & 0x0F));
+          fmopn_ssg_period_coarse(period));
     }
     if (mode == FMSEQ_SSG_NOISE || mode == FMSEQ_SSG_TONE_NOISE)
         w(sink, 0, 0x06, noise_period);
@@ -390,9 +390,9 @@ static void fm_apply_bend(Fmseq *seq, const FmseqSink *sink, int midi_ch)
                 freq = ((double)((long)fn << blk)) * FMSEQ_CLOCK /
                        150994944.0;
                 period = period_of_freq(freq);
-                w(sink, 0, (uint8_t)(i * 2), (uint8_t)(period & 0xFF));
+                w(sink, 0, (uint8_t)(i * 2), fmopn_ssg_period_fine(period));
                 w(sink, 0, (uint8_t)(i * 2 + 1),
-                  (uint8_t)((period >> 8) & 0x0F));
+                  fmopn_ssg_period_coarse(period));
             }
         }
     }
@@ -541,13 +541,7 @@ int fmseq_fm_voices(const Fmseq *seq)
     return n;
 }
 
-uint8_t fmseq_keymask(const Fmseq *seq, int ch)
+int fmseq_finished(const Fmseq *seq)
 {
-    uint8_t mask = 0;
-
-    if (ch < 0 || ch >= FMSEQ_MELODY_FM_CH)
-        return 0;
-    if (seq->fm[ch].active)
-        mask = 0x0F;
-    return mask;
+    return seq->cursor >= seq->count;
 }

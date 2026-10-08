@@ -1,0 +1,7 @@
+# synlead — GM 80..87 synth leads.  Bright parallel saw-ish stack with
+# feedback (alg 7, fb 3), fast attack, sustained with a short tail.
+alg=7 fb=3 pan=0xc0
+op=1 dt=0 mul=1  tl=38 ks=1 ar=25 am=0 d1r=3  d2r=2  sl=13 rr=5
+op=3 dt=0 mul=2  tl=42 ks=1 ar=25 am=0 d1r=3  d2r=2  sl=13 rr=5
+op=2 dt=0 mul=4  tl=46 ks=1 ar=25 am=0 d1r=3  d2r=2  sl=13 rr=5
+op=4 dt=0 mul=1  tl=34 ks=1 ar=25 am=0 d1r=3  d2r=2  sl=13 rr=5

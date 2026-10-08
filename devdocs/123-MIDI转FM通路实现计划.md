@@ -1,11 +1,27 @@
 # 123 — MIDI 转 FM 通路实现计划（SMF 解析器复用 + 6 声部分配 + 自研 32 字节音色格式）
 
-> **状态**：**计划中**（本文写于**零实现**之时——未新增任何 `.c`/`.h`/`.py`/`.nb`，`hal_fm_*` 一行未写）
+> **状态**：**实现在完成中**（S0–S5 代码已落地，S7 实机/NP2kai 验证待做；详见下方实现记录）
 > **日期**：2026-10-05
-> **关联版本**：`0.3.021`（纯文档轮次，**不 bump 版本**）
+> **关联版本**：`0.3.022`（S0–S5 落地轮）
 > **前置**：`devdocs/122-BGM本地静音根因与音频通路取舍.md`（其 §5.2 与 `:213` 由本文接替，见 §一）、`docs/refdocs/F03_opna_fm_and_bgm_routes.md`（通路选型与寄存器调研，本文为其落地计划）
 > **参考**：`docs/refdocs/F01_sound_boards.md`、`docs/refdocs/F02_86pcm_registers.md`、`docs/B92-NB脚本命令参考.md`
 > **行号坐标系**：本文写于 `0.3.021` 现行坐标。**实现落地后 §二 的全部行号必须重校**（§十「规格与实现的收敛责任」）
+>
+> ## 📌 实现记录（0.3.022 追加；正文按 AGENTS.md §十 所述「计划中」允许修订，本轮以追加为主）
+>
+> | 阶段 | 落地 | 位置 | 主机测试 |
+> |------|------|------|------|
+> | **S0** | 端口分工（0.3.022 文档轮完成） | `F03` §3.8 | — |
+> | **S1** | M1 `fmopn` 完成 | `core/lib/fmopn.{h,c}` | `tools/tests/test_fmopn.py`（12 项）✅ |
+> | **S3** | M5 音色编译器 + `FMP` 打包 + `fmp_map` | `tools/naiz_audio/fm_patch.py`、`pack_audio.py`、`tools/naiz_build/export_asset_table.py` | `tools/tests/test_fm_patch.py` + 更多 ✅ |
+> | **S2** | M3 `hal_fm_*` 端口层 | `core/plat/hal_audio.c`（`hal_fm_detect/init/shutdown/write_reg/set_volume`，`0188h–018Fh` 唯一写处） | ❌ 需硬件/S7 |
+> | **S4** | M2 `fmseq` 分配器 | `core/lib/fmseq.{h,c}`（+`fmseq_finished` loop 辅助） | `tools/tests/test_fm_seq.py`（14 项）✅ |
+> | **S5** | M4 引擎接线 | `core/engine/audio.c`（后端自动检测、FM 泵、loop、音量、patch 装载兜底） | ❌ 需硬件/S7 |
+| **S6** | 默认音色内容 + GM→族映射 | `assets/demo-a2/fm/*.fmp`（15 族）、`tools/naiz_audio/gm_families.py`、`export_asset_table.py` 生成 `fmp_gm_map[128]`、`audio.c` 接线 | `test_fm_patch.py` + `test_gm_map.py` ✅ |
+>
+> **本轮关键订正**（见 §2.4）：A466 各音量通路（VOL1/VOL2/VOL6）**各持独立 4-bit 衰减寄存器**（MAME 解码 `m_vol[line_select]`），写入只改所选路径，**「两个路径互相覆盖」的担心不成立**——FM 写 `000b|atten`、PCM 写 `101b|atten（0xA0|step）` 互不影响，无需统一入口。
+> **§ 十 检查**：S1/S3/S4 测试计数与实现记录一致；`audio.c` 行号已随 M4 位移，`tools/tests/test_devdoc_refs.py` 的 `LINE_REF_WHITELIST` 已更新为现行行、含 devdoc 119 过期行号的 `SUPERSEDED_AUDIO_LINE_REFS` 分类。
+> **遗留（仅 S7）**：VOL1/VOL2 step 曲线实测；§1.5 五条判据实机验证；音色试听（S6 已交付 15 族默认值，见 `devdocs/124`，逐族微调归 S7）。S6（内容 + gm_map）已完成，历史终态「`gm_map=NULL` 全映射 family 0」不再成立。
 
 ---
 
@@ -119,13 +135,13 @@ YM2608 的 RHYTHM 6 通道鼓声读**芯片内置 ROM**，实机零素材依赖�
 |---|---|
 | `000b` | VOL1 —— FM 音源**直接**输出电平 |
 | `001b` | VOL2 —— FM 音源**间接**输出电平 |
-| `100b`(`0xA0`) | PCM 路径（现 `pcm_vol` 已实现，`hal_audio.c:155`） |
+| `101b`(`0xA0`) | VOL6 —— PCM 路径（现 `pcm_vol` 已实现，`hal_audio.c` 写 `101b`） |
 
-⇒ **`bgm_vol` 对 FM 生效不需要新的 pref、不需要新的设置界面项**：`bgm_vol` → `A466h` VOL1/VOL2，`pcm_vol` → `0xA0|step`，同端口不同路径码。
+⇒ **`bgm_vol` 对 FM 生效不需要新的 pref、不需要新的设置界面项**：`bgm_vol` → `A466h` VOL1/VOL2，`pcm_vol` → `101b`，同端口不同路径码。
 
 > **⚠ 待实测确认**：VOL1/VOL2 的**具体 step 编码与衰减曲线**未实测（F03 §7 未覆盖此项）。S5 阶段必须实测，不能照抄 PCM 的「0=最响..15=最轻」倒序假设。
 >
-> **⚠ 写入冲突**：两条路径共用 `A466h`。`hal_pcm_play()` 与 FM 音量写**不得互相覆盖**——需统一收口到一个音量写入口（AGENTS §九.10 先借后造）。
+> **⚠ 已消解（0.3.023）：两条路径不存在互相覆盖。** A466 的 bit7–5 **选择**通路，各通路**各自独立的 4-bit 衰减寄存器**（MAME 解码 `line_select = data >> 5; m_vol[line_select] = data & 0x0f`）。FM 写 `000b|atten`、PCM 写 `101b|atten` 只改各自路径，**无需统一收口**。`hal_fm_set_volume()` 现已写 `000b|atten`，`hal_pcm_set_volume()` 保持写 `0xA0|step`。
 
 ### 2.5 资产管线（音色库要接进来）
 
@@ -182,7 +198,7 @@ YM2608 的 RHYTHM 6 通道鼓声读**芯片内置 ROM**，实机零素材依赖�
 
 ## 四、模块分解
 
-> **⚠ 本章列出的全部文件路径（`core/lib/fmopn.h` `core/lib/fmopn.c` `core/lib/fmseq.h` `core/lib/fmseq.c` `tools/naiz_audio/fm_patch.py` `tools/tests/test_fmopn.py` `tools/tests/test_fm_seq.py`）均为**待建**——本文写于**零实现**之时，它们当前不存在**。**本章是规格不是现状**：AGENTS §十 要求「完结」devdoc 的 `file:line` 与代码一致，而本文状态为**计划中**，故此处记的是**计划路径**。**实现落地后必须逐条校准，并把状态改为完结。**
+> **⚠ 本章列出的全部文件路径在 0.3.023 前均为**待建**——本文写于**零实现**之时，它们当时不存在。**S0–S5 落地后本章即规格**：`core/lib/fmopn.{h,c}`、`core/lib/fmseq.{h,c}`、`tools/naiz_audio/fm_patch.py`、`tools/tests/{test_fmopn,test_fm_seq,test_fm_patch}.py` 均已创建；`core/plat/hal_audio.c` 增补 `hal_fm_*`、`core/engine/audio.c` 接线 FM 后端。M6（`assets/<项目>/fm/*.fmp`）与 §1.2 的 GM→族映射**内容**属 S6，未落地。**本章后续未逐条校准的 `file:line` 以代码为准**（AGENTS §十）。
 
 | 模块 | 文件 | 职责 | 依赖 | 主机单测 |
 |---|---|---|---|---|

@@ -90,8 +90,6 @@ def lib():
     lib.fmseq_stop.argtypes = [ctypes.c_void_p, ctypes.POINTER(SinkT)]
     lib.fmseq_fm_voices.argtypes = [ctypes.c_void_p]
     lib.fmseq_fm_voices.restype = ctypes.c_int
-    lib.fmseq_keymask.argtypes = [ctypes.c_void_p, ctypes.c_int]
-    lib.fmseq_keymask.restype = ctypes.c_uint8
     lib.fmopn_note_ratio.argtypes = [ctypes.c_int, ctypes.c_void_p,
                                      ctypes.c_void_p]
     lib.fmopn_bend_ratio.argtypes = [ctypes.c_int, ctypes.c_void_p,

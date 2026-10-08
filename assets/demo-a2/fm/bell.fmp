@@ -1,0 +1,7 @@
+# bell — GM 8..15 chromatic percussion (celesta/glock/marimba).  High
+# inharmonic partials (mul 2/5/8), very fast attack, long ringing decay.
+alg=4 fb=0 pan=0xc0
+op=1 dt=0 mul=2  tl=34 ks=2 ar=27 am=0 d1r=4  d2r=3  sl=4 rr=9
+op=3 dt=1 mul=5  tl=36 ks=1 ar=27 am=0 d1r=4  d2r=3  sl=4 rr=8
+op=2 dt=0 mul=8  tl=30 ks=1 ar=27 am=0 d1r=3  d2r=3  sl=5 rr=9
+op=4 dt=0 mul=1  tl=40 ks=1 ar=27 am=0 d1r=3  d2r=3  sl=4 rr=8

@@ -2,6 +2,60 @@
 
 自 R1 起全部 Bug 修复与功能演进记录（条目顺序沿用 AGENTS.md 既有历史排列）；`AGENTS.md` 仅保留当前版本与规则。**新条目约定**：每轮修复/演进完成后，在下方 `---` 分隔线之后（第一条位置）追加变更摘要，并在 AGENTS.md 头部同步「当前版本」。**条目格式**：每条以 `### <版本号> — <标题>` 开头（版本号化标题行 + `<a id="cN">` 锚点，N 按条目序递增），正文整段或分小节；历史速查直接读下方「版本索引」。
 
+<a id="c54"></a>
+### 0.3.023 — devdocs/124 MIDI→FM 通路 S6：默认音色内容（15 族 FMP patch + GM program→族映射数据 gm_map）
+
+**动机与验收**：`c53` 遗留的 S6（音色内容 + `gm_map` 数据）本轮兑现。验收 = 15 个 `.fmp` 逐一遍过 C 校验器（`test_fm_patch.py`）+ 数据契约测试（新 `test_gm_map.py`）+ 全量 pytest **713 passed / 1 skipped** + `makegame.sh build` 后 `fmp_map` 15 行无 `__dummy__` + `fullaudit` 7/7 全绿。**音质试听明确归 S7**（NP2kai/实机），本轮只交付「结构合理、范围合法、许可干净」的默认值起点。
+
+**1. 15 族默认 patch（`assets/demo-a2/fm/*.fmp`，文本单一事实源，族索引 = 注册序）**
+- 按 GM 聚类覆盖 128 个 program、零空档：`piano`(0–7) `bell`(8–15) `organ`(16–23) `guitar`(24–31) `bass`(32–39) `strings`(40–46+48–54) `brass`(56–63) `reeds`(64–71) `flute`(72–79) `synlead`(80–87) `synpad`(88–95) `synfx`(96–103) `ethnic`(104–111) `perc`(47+55+112–119) `sfx`(120–127)。
+- 每族设计依据（devdoc 124 §三）：谐波骨架（和声性 vs 打击性的 mul/dt）、反馈（并联堆过载边缘）、包络形状（ar 区分拨弦瞬起/持续慢起、d1r/d2r/sl 定衰减与恒持、rr 定收尾）、TL 摊配（近合成谐波低 TL 有效调制、纯音旁路高 TL 防失真）。
+- 15 ≤ `FM_FAMILY_MAX`(16)；名字 ≤8 字符且 `to_dos_name` 互异。
+
+**2. gm_map 数据（128 项 GM→族索引，与代码分离）**
+- 新 `tools/naiz_audio/gm_families.py`：`FAMILIES` 聚类表（族名 → GM program 列表）+ `build_gm_map(order)`——**序必须恰为 FAMILIES 序**、128 项全覆盖、无重复，任一违例 `ValueError`（宁错勿错映射，禁止静默回落 patch 0）。
+- `export_asset_table.py`：由与 `fmp_map` **同一次** `SELECT ... type='FMP' ORDER BY id` 生成 `fmp_gm_map[128]` 进 `nb_asset_table.h`（无 FMP 资产的项目全 0，等价旧行为）。
+- 接线一行：`audio.c:466` `fmseq_init(..., fmp_gm_map, fm_unmapped, NULL)`——历史终态「`gm_map=NULL` 全映射 family 0」告终。
+
+**3. 测试与防复发**
+- `test_fm_patch.py` 增 `test_project_patch_library_compiles`（全部 15 源编译 32B + C 校验器）。
+- 新 `test_gm_map.py`：FMP 行序 == FAMILIES 序、128 覆盖、族数 ≤ 引擎 `FM_FAMILY_MAX`（读 audio.c 宏）、8.3 唯一、DB filename ↔ fm 目录一致、`build_gm_map` 序错/空档/重复三路拒绝。
+- 引擎侧 family 选择/越界回落沿用 `test_fm_seq.py::test_gm_family_selection`（c53 已证）。
+
+**遗留（S7 实机/NP2kai）**：VOL1/VOL2 step 曲线、§1.5 五条判据、`FM TRACE` 宏开启的寄存器序列、15 族逐族音质试听与微调。`bump_version`：0.3.022 → **0.3.023**（全部项目同步）。
+
+<a id="c53"></a>
+### 0.3.022 — devdocs/123 MIDI→FM 通路 S0–S5 代码落地（fmopn/fmseq 主机可穷举 + hal_fm_* 端口层 + 音频引擎 FM 后端）
+
+**动机与验收**：`c52` 拍板的 FM 通路（输入 = MIDI、后端 = 自动检测、v1 = FM 6 + SSG 3）进入实施。验收 = 每阶段主机测试（`pytest` 704 passed / 1 skipped）+ 引擎编译零 `.err` + `fullaudit` 7/7 全绿；其余判据（§1.5 五条、VOL step 曲线）属 S7 实机验证，接续。
+
+**1. 最大风险削减点兑现：M1 `fmopn` + M2 `fmseq` 落 `core/lib/`，零 `outb()` 主机可穷举**
+- `core/lib/fmopn.{h,c}`（12 单测 `test_fmopn.py`）：YM2608 FM 寄存器抽象纯逻辑层——F-number 编码（`freq×18432/975`，A4=4/520、C4=3/618、钳位 1023/7）、bend 相对当前 blk/fnum、算子内插（`base+3*(r&1)+8*(r>>1)+ch%3`）、keyon/安全 keyoff 值、32 字节 patch 解码与校验（错误位 `FMOPN_E_*`）、SSG 周期编码器。
+- `core/lib/fmseq.{h,c}`（14 单测 `test_fm_seq.py`）：MIDI 事件→FM 声音分配器——16 声部（元数据）/6 FM + 3 SSG（`FMSEQ_MELODY_FM_CH=6`）；`Fmseq` 生命周期 `size/init/deinit` 暴露对齐；单声道→单 FM 声部双声道分配、SSG 固定声部、鼓（kick/hat/snare → SSG ch A/C/B）+ 音高 + bend + patch 装载 + pedal 语义（sustain_pending/breathe）；**抢声 free→pedal-pending→oldest（强制抢声先 keyoff，无残留 key 位）**；SSG 衰减 `FMSEQ_SSG_DECAY_PER_SEC`；`gm_family_selection`（family mask + clamp，128% family0 回落）。新增 `fmseq_finished()`（`cursor>=count`）作引擎 loop 点。
+- **新教训（ctypes 段错误根因）**：`gm_family_selection` 崩溃 = `_UNMAPPED_FN(self._on_unmapped)` 内联创建未存 `self` → 被 GC → C 指针悬垂段错误。修复：`Seq.__init__` 存 `self._unmapped_cb`（`self._cb` 同型已有）。ad-hoc 脚本不设 `argtypes` 会 32 位截断指针同样崩溃，以 pytest 为准。
+
+**2. M3 `hal_fm_*` 端口层（S2，`core/plat/hal_audio.c`）——引擎链路上 `outb()` 唯一出处**
+- 端口宏：`FM_ADDR_LATCH 0x0188` / `FM_DATA_PORT 0x018A`（普通组：SSG/RHYTHM/系统/FM ch1–3）、`FM_EXT_ADDR_LATCH 0x018C` / `FM_EXT_DATA_PORT 0x018E`（扩展组：FM ch4–6/ADPCM）。
+- `hal_fm_detect()`：能力 ID 回读（0xFF → 读回 1）探测 OPNA，不猜端口。`hal_fm_init()`：A460 bit0=1（2023 年起实机多为常开，写保险）+ VOL1/VOL2 初始满音量。`hal_fm_write_reg(bank,addr,val)`：bank0→0x188/0x18A、bank1→0x18C/0x18E。`hal_fm_shutdown()`：6 声道全 KEYOFF（`$28` 带 bit2 选 k3 组）+ SSG reg7 `0x3F` 全静音。`hal_fm_set_volume(atten)`：A466 写 `000b|atten`（VOL1 = FM 直接路径）。
+- **A466 关键订正**：各路音量通路**各持独立 4-bit 衰减寄存器**（MAME 解码 `line_select=data>>5; m_vol[line_select]=data&0x0f`）——VOL1(000b)/VOL2(001b)/PCM(101b, `0xA0`) **互不覆盖**，「两条路径共用 A466 需统一收口」的担心不成立（devdoc 123 §2.4 旧结论推翻）。
+- trace 改为**编译期 `FM_TRACE_ENABLED` 宏**（`hal_fm_set_trace` 运行时 API 删除，判据 5 排障重编译开启，避免 60Hz 刷屏）。
+
+**3. M4 音频引擎接线（S5，`core/engine/audio.c`）**
+- **后端自动检测**：`audio_init` 先 MPU-401 后 OPNA（`hal_fm_detect`）；MPU 在位走 MIDI 后端，无 MPU 且 FM 在位走 FM 后端（`g_bgm.fm=1`），都缺 → `AUD WARN` fail-loud + BGM 忽略。
+- FM 泵走 `hal_wallclock_smooth_ms()`（devdoc 107 节拍安全，杜绝裸墙钟追帧音爆）；loop 经 `fmseq_finished()` 回绕（`wall0=now; fmseq_stop`）并报告残响（`fmseq_fm_voices` 行 `FM loop: N voices still ringing`）。
+- patch 装载 `fm_load_patches()`：逐行 `fmp_map`（`core/engine/nb_asset_table.h`，`./makegame.sh build` 生成）→ `farchive_lookup_name` → size==`FMOPN_PATCH_BYTES`(32) → `fmopn_patch_validate`；跳过 `__dummy__`；全失败/无 FMP → 兜底 `g_fm_default_patch`（4 op MUL=1/TL=0/AR=31/RR=15、反馈/算法 0x01、pan 0xC0）。
+- 音量：`bgm_apply_volume` FM 分支 `atten=(g_bgm_vol*15)/AUDIO_BGM_VOL_MAX; hal_fm_set_volume(15-atten)`（衰减倒序 0 最响；S7 实测 step 曲线）。
+- `audio_stop_all` 增 `hal_fm_shutdown()`（消除死导出）；`BgmState` 增 `fm` 标志。
+- fmseq 的 SSG 周期写区改用 `fmopn_ssg_period_fine/coarse` 编码器（单一事实源）→ 消 A 节候选。
+
+**4. 文档/防复发同步**
+- devdoc 123（允许修订的计划中）：状态「计划中」→「实现在完成中」，头部追加 `📌 实现记录` 表（M1/M2/S2/S3/S4/S5 逐项落地位置+测试数）、§2.4 写「A466 各路独立衰减已消解 + PCM 路径 `100b`→`101b` 订正」、§四「待建」注记改为「规格即现状」。
+- `test_devdoc_refs.py`：whitelist 更新为现行行（audio.c:`209 g_bgm_on` / `258 audio_bgm_stop` / `347 g_snd_on` / `356 g_vc_on`）；新增 `SUPERSEDED_AUDIO_LINE_REFS` = {audio.c 105/147/233/242}（devdoc 119 正文不可改的历史行引用，并入 registered 不再红）。
+- W138：`fmopn.h/fmseq.h/fmopn.c` 补文件尾换行。
+- 上 `./makegame.sh build` 重建 `nb_config.h`（NAIZ_VERSION=0.3.022）/`nb_asset_table.h`（`fmp_map={"__dummy__",0}`），test_version_sync 依赖此步。
+
+**遗留**：S6（FMP 音色内容 + `gm_map` 数据——现回落 family 0，纯内容轮）；S7（实机/NP2kai：VOL1/VOL2 step 曲线、§1.5 五条判据、`FM TRACE` 宏开启的寄存器序列验证）。`bump_version`：0.3.021 → **0.3.022**（全部项目同步）。
+
 <a id="c52"></a>
 ### 0.3.021 — guildbook 新增 mc06「音频素材与 FM 通路」（格式 / AI 平台 / 软件工具集 + 引擎方案对比）
 
@@ -243,6 +297,8 @@
 
 | 条目 |
 |------|
+| [0.3.023 — devdocs/124 MIDI→FM 通路 S6：默认音色内容（15 族 FMP patch + GM→族映射 gm_map 数据）](#c54) |
+| [0.3.022 — devdocs/123 MIDI→FM 通路 S0–S5 代码落地（fmopn/fmseq 主机可穷举 + hal_fm_* 端口层 + 音频引擎 FM 后端）](#c53) |
 | [0.3.021 — guildbook 新增 mc06「音频素材与 FM 通路」（格式 / AI 平台 / 软件工具集 + 引擎方案对比）](#c52) |
 | [0.3.020 — 002 场景补 BGM + `voice`/`sound` 单通道争用根修 + 音频 key 登记守卫（devdoc 122）](#c51) |
 | [0.3.019 — 音频源资产迁至 `assets/<项目>/`（BGM/SE/voice 三目录统一）+ guildbook 音频页 stub 描述订正](#c50) |

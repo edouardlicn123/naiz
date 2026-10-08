@@ -1,0 +1,8 @@
+# flute — GM 72..79 (flute/recorder/pan/whistle).  Simple single-modulator
+# body (alg 2), very weak modulation (high TL sidetones) for a near-sine
+# pure tone; gentle attack, holds at sustain.
+alg=2 fb=0 pan=0xc0
+op=1 dt=0 mul=1  tl=30 ks=1 ar=18 am=0 d1r=2  d2r=2  sl=14 rr=6
+op=3 dt=0 mul=1  tl=42 ks=1 ar=18 am=0 d1r=2  d2r=2  sl=14 rr=6
+op=2 dt=0 mul=2  tl=50 ks=1 ar=18 am=0 d1r=2  d2r=2  sl=14 rr=6
+op=4 dt=0 mul=4  tl=54 ks=1 ar=18 am=0 d1r=2  d2r=2  sl=14 rr=6

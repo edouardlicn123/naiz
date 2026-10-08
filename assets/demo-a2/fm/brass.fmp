@@ -1,0 +1,7 @@
+# brass — GM 56..63 brass family.  Bright parallel stack with heavy feedback
+# (alg 7, fb 5), fast brass-ish attack, sustained, quick-ish release.
+alg=7 fb=5 pan=0xc0
+op=1 dt=0 mul=1  tl=36 ks=1 ar=22 am=0 d1r=4  d2r=3  sl=12 rr=6
+op=3 dt=0 mul=3  tl=44 ks=1 ar=22 am=0 d1r=4  d2r=3  sl=12 rr=6
+op=2 dt=0 mul=5  tl=48 ks=1 ar=22 am=0 d1r=4  d2r=3  sl=12 rr=6
+op=4 dt=0 mul=1  tl=30 ks=1 ar=22 am=0 d1r=4  d2r=3  sl=12 rr=6
