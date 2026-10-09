@@ -18,13 +18,19 @@ Subcommands:
             clears the screen once at startup (skipped when stdout is not a TTY)
   get       download one or more named packs (exact dir / suffix kind)
   get-all   download every pack
+  sync      bring selected packs (default: all) up to date with the remote;
+            adds new files, re-downloads changed ones (git blob-sha diff,
+            no full re-fetch), keeps up-to-date files, and optionally prunes
+            local files that no longer exist remotely (--purge).
 
 Common flags (on any subcommand): --repo --ref --dest --config --dry-run.
-Files whose destination path already exists are skipped; pass --force to
-re-download and overwrite them.
+For get / get-all / menu, files whose destination path already exists are
+skipped; pass --force to re-download and overwrite them. sync differs: it
+compares content hashes every run and only rewrites changed files.
 """
 
 import argparse
+import hashlib
 import json
 import os
 import sys
@@ -81,6 +87,16 @@ def _fetch_bytes(url):
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
+
+def _git_blob_sha(data):
+    """Git object id of a raw blob (sha1 of 'blob <len>\\0' + content).
+
+    Matches the 'sha' field GitHub's git/trees API returns for blob entries,
+    so local files can be freshness-checked against the remote without any
+    extra downloads.
+    """
+    return hashlib.sha1(b"blob %d\0" % len(data) + data).hexdigest()
+
 
 def human_size(num):
     num = float(num)
@@ -143,14 +159,23 @@ class Market:
 
     def packs(self):
         """Return {top_level_dir: sorted [(path, size), ...]}."""
-        blobs = [(e["path"], int(e.get("size") or 0))
+        return {directory: [(p, s) for p, s, _ in blobs]
+                for directory, blobs in self.packs_detailed().items()}
+
+    def packs_detailed(self):
+        """Return {top_level_dir: sorted [(path, size, blob_sha), ...]}.
+
+        blob_sha is the git blob object id from the tree API, used by sync()
+        to diff local content against the remote without downloads.
+        """
+        blobs = [(e["path"], int(e.get("size") or 0), e.get("sha") or "")
                  for e in self.fetch_tree() if e.get("type") == "blob"]
         grouped = {}
-        for path, size in blobs:
+        for path, size, sha in blobs:
             if "/" not in path:
                 continue          # root-level files (README/LICENSE) are not packs
             top = path.split("/", 1)[0]
-            grouped.setdefault(top, []).append((path, size))
+            grouped.setdefault(top, []).append((path, size, sha))
         return {directory: sorted(files)
                 for directory, files in sorted(grouped.items())}
 
@@ -245,6 +270,104 @@ class Market:
         print(f"Done: {len(directories)} packs · {total_files} files · "
               f"{human_size(total_bytes)} -> {self.dest}/")
         return total_files
+
+    def _download_blob(self, target, path, size):
+        """Fetch a raw blob into target (atomic .part + replace), size-checked."""
+        qref = urllib.parse.quote(self.ref, safe="")
+        qpath = urllib.parse.quote(path, safe="/")
+        url = f"{RAW_ROOT}/{self.repo}/{qref}/{qpath}"
+        data = _fetch_bytes(url)
+        if len(data) != size:
+            raise MarketError(
+                f"size mismatch for {path}: expected {size}, got {len(data)}")
+        target.parent.mkdir(parents=True, exist_ok=True)
+        part = target.with_name(target.name + ".part")
+        part.write_bytes(data)
+        os.replace(part, target)
+
+    def sync_packs(self, directories, purge=False):
+        """Bring dest packs up to date with the remote (git blob-sha diff).
+
+        Adds missing files, re-downloads files whose content changed, leaves
+        byte-identical files untouched, and (with purge=True) removes files
+        that exist locally under a synced pack dir but no longer exist on the
+        remote. Root-level files (LICENSE/README) and pack dirs outside
+        `directories` are never pruned.
+        """
+        all_packs = self.packs_detailed()
+        for directory in directories:
+            if directory not in all_packs:
+                raise MarketError(f"pack not found: {directory}")
+        counts = {"added": 0, "updated": 0, "unchanged": 0,
+                  "pruned": 0, "stale": 0}
+        for directory in directories:
+            remote = {path: (sha, size)
+                      for path, size, sha in all_packs[directory]}
+            local_dir = self.dest / directory
+            print(f"[{self.display_name(directory)}] -> {local_dir}/")
+            for path, size, sha in all_packs[directory]:
+                target = safe_target(self.dest, path)
+                existing = target.read_bytes() if target.exists() else None
+                if existing is None:
+                    label = "ADDED"
+                    counts["added"] += 1
+                elif len(existing) != size or _git_blob_sha(existing) != sha:
+                    label = "UPDATED"
+                    counts["updated"] += 1
+                else:
+                    label = "OK (unchanged)"
+                    counts["unchanged"] += 1
+                if not self.dry_run and label != "OK (unchanged)":
+                    self._download_blob(target, path, size)
+                if self.dry_run:
+                    print(f"  {target.name:<40} {human_size(size)}  "
+                          f"{label} (dry-run)")
+                else:
+                    print(f"  {target.name:<40} {human_size(size)}  {label}")
+            if local_dir.is_dir():
+                for cur in sorted(local_dir.rglob("*")):
+                    if not cur.is_file():
+                        continue
+                    rel = cur.relative_to(self.dest).as_posix()
+                    if rel in remote:
+                        continue
+                    if purge:
+                        if not self.dry_run:
+                            cur.unlink()
+                        print(f"  {cur.name:<40}  PRUNE (removed from remote)"
+                              + (" (dry-run)" if self.dry_run else ""))
+                        counts["pruned"] += 1
+                    else:
+                        print(f"  {cur.name:<40}  "
+                              "STALE (removed from remote; use --purge)")
+                        counts["stale"] += 1
+        changed = 0
+        for entry in self.fetch_tree():
+            if entry.get("type") != "blob" or entry["path"] != "LICENSE":
+                continue
+            target = safe_target(self.dest, entry["path"])
+            size = int(entry.get("size") or 0)
+            sha = entry.get("sha") or ""
+            existing = target.read_bytes() if target.exists() else None
+            label = ("UPDATED" if existing is None
+                     else ("UPDATED" if len(existing) != size
+                           or _git_blob_sha(existing) != sha
+                           else "OK (unchanged)"))
+            if not self.dry_run and label != "OK (unchanged)":
+                self._download_blob(target, entry["path"], size)
+                changed += 1
+            print(f"LICENSE -> {self.dest}/LICENSE  {label}"
+                  + (" (dry-run)" if self.dry_run else ""))
+            break
+        summary = (f"Done: {len(directories)} packs · "
+                   f"added {counts['added']} · updated {counts['updated']} · "
+                   f"unchanged {counts['unchanged']}")
+        if purge:
+            summary += f" · pruned {counts['pruned']}"
+        elif counts["stale"]:
+            summary += f" · stale {counts['stale']} (rerun with --purge to remove)"
+        print(f"{summary} -> {self.dest}/")
+        return counts["added"] + counts["updated"] + changed
 
     def copy_license(self):
         target = None
@@ -417,6 +540,12 @@ def build_parser():
     sp.add_argument("packs", nargs="+", help="pack refs: exact dir / suffix kind")
     sp = sub.add_parser("get-all", help="download every pack")
     add_common(sp)
+    sp = sub.add_parser("sync", help="bring selected packs up to date with the remote")
+    add_common(sp)
+    sp.add_argument("packs", nargs="*",
+                    help="pack refs: exact dir / suffix kind (default: every pack)")
+    sp.add_argument("--purge", action="store_true",
+                    help="delete local files that no longer exist on the remote")
     return parser
 
 
@@ -445,6 +574,16 @@ def main(argv=None):
         if cmd == "get-all":
             directories = list(market.packs())
             market.download_packs(directories)
+            return 0
+        if cmd == "sync":
+            all_packs = market.packs()
+            directories = []
+            for arg in getattr(ns, "packs", None) or []:
+                directory, _ = market.resolve_pack(arg, all_packs)
+                directories.append(directory)
+            if not directories:
+                directories = list(all_packs)
+            market.sync_packs(directories, purge=bool(getattr(ns, "purge", False)))
             return 0
         raise MarketError(f"unknown command {cmd!r}")
     except MarketError as e:

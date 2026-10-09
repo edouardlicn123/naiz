@@ -12,4 +12,11 @@
  * Returns dst. */
 char *str_copy(char *dst, size_t n, const char *src);
 
+/* Convert a script asset key to the compact 8.3 TOC name stored in packed
+ * archives (AUDIO.DAT): uppercase, base before the last '.', capped at 8
+ * characters, no trailing padding — the engine-side mirror of the toolchain
+ * to_dos_name()[0].rstrip().  dst capacity must be at least 9 bytes.  Returns
+ * dst. */
+char *str_toc8(char *dst, size_t n, const char *src);
+
 #endif

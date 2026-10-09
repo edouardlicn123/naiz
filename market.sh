@@ -9,7 +9,10 @@
 #   market.sh cats                仅包显示名 + 计数
 #   market.sh get <包>...         命令行整包下载（原始目录名 或 后缀种类名）
 #   market.sh get-all             下载全部包
+#   market.sh sync [<包>...]      按 git blob-sha 差分同步：增/改/未变/（--purge 清理
+#                                 远程已删文件）；不带包参数 = 全部包；--dry-run 只预览
 #   通用参数: --repo/--ref/--dest/--config/--dry-run（置于子命令后）
+#   sync 专属: --purge
 #
 # 配置: 根目录 market.toml 的 [market] repo / ref / dest。
 

@@ -19,6 +19,7 @@
 
 #include "hal.h"
 #include "farchive.h"
+#include "strutil.h"
 #include "midi.h"
 #include "fmopn.h"
 #include "fmseq.h"
@@ -134,10 +135,14 @@ static void fm_load_patches(void)
             continue;
         if (n >= FM_FAMILY_MAX)
             break;
-        if (farchive_lookup_name(&g_arc, m->name, &off, &size, NULL) != 0) {
-            hal_logf("FM WARN: patch '%s' missing in %s\r\n", m->name,
-                     AUDIO_ARCHIVE);
-            continue;
+        {
+            char k8[9];
+            str_toc8(k8, sizeof k8, m->name);
+            if (farchive_lookup_name(&g_arc, k8, &off, &size, NULL) != 0) {
+                hal_logf("FM WARN: patch '%s' missing in %s\r\n", m->name,
+                         AUDIO_ARCHIVE);
+                continue;
+            }
         }
         if (size != FMOPN_PATCH_BYTES) {
             hal_logf("FM WARN: patch '%s' has %ld bytes, need %d\r\n",
@@ -222,9 +227,13 @@ void audio_bgm_start(const char *key)
         hal_logf("BGM WARN: '%s' is not a registered BGM asset\r\n", key);
         return;
     }
-    if (farchive_lookup_name(&g_arc, key, &off, &size, NULL) != 0) {
-        hal_logf("BGM WARN: '%s' missing in %s\r\n", key, AUDIO_ARCHIVE);
-        return;
+    {
+        char k8[9];
+        str_toc8(k8, sizeof k8, key);
+        if (farchive_lookup_name(&g_arc, k8, &off, &size, NULL) != 0) {
+            hal_logf("BGM WARN: '%s' missing in %s\r\n", key, AUDIO_ARCHIVE);
+            return;
+        }
     }
     raw = farchive_read_alloc(&g_arc, off, size, NULL);
     if (!raw) {
@@ -311,9 +320,13 @@ static void pcm_play(const AudioAssetMap *map, const char *key, int chan)
         hal_logf("PCM WARN: '%s' is not a registered audio asset\r\n", key);
         return;
     }
-    if (farchive_lookup_name(&g_arc, key, &off, &size, NULL) != 0) {
-        hal_logf("PCM WARN: '%s' missing in %s\r\n", key, AUDIO_ARCHIVE);
-        return;
+    {
+        char k8[9];
+        str_toc8(k8, sizeof k8, key);
+        if (farchive_lookup_name(&g_arc, k8, &off, &size, NULL) != 0) {
+            hal_logf("PCM WARN: '%s' missing in %s\r\n", key, AUDIO_ARCHIVE);
+            return;
+        }
     }
     raw = farchive_read_alloc(&g_arc, off, size, NULL);
     if (!raw) {

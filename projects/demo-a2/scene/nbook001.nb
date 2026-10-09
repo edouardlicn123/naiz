@@ -1,6 +1,6 @@
 sceneconf(){A normal day, normal}
 bg(normal){homeday}
-bgm(){test1}
+bgm(){melody_town}
 host(){Ira,Fei and Neon living in a ancent house.}
 sound(){chime}
 char(l,normal,body){fei}

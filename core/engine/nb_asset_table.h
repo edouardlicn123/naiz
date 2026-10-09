@@ -83,7 +83,8 @@ typedef struct { const char *name; int id; } AudioAssetMap;
 
 /* BGM asset key->ID lookup (for bgm command) */
 static const AudioAssetMap bgm_map[] = {
-    {"test1", 24},
+    {"melody_town", 45},
+    {"icy_garden", 46},
     {NULL, 0}
 };
 

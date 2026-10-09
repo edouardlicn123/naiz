@@ -4,7 +4,7 @@
 #ifndef NAIZ_CONFIG_H
 #define NAIZ_CONFIG_H
 
-#define NAIZ_VERSION "0.3.023"
+#define NAIZ_VERSION "0.3.026"
 #define NAIZ_DLGSTYLE 5
 #define NAIZ_BTNSTYLE 2
 #define NAIZ_BLACKLETTER_TITLE 0

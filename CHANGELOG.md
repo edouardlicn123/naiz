@@ -2,6 +2,55 @@
 
 自 R1 起全部 Bug 修复与功能演进记录（条目顺序沿用 AGENTS.md 既有历史排列）；`AGENTS.md` 仅保留当前版本与规则。**新条目约定**：每轮修复/演进完成后，在下方 `---` 分隔线之后（第一条位置）追加变更摘要，并在 AGENTS.md 头部同步「当前版本」。**条目格式**：每条以 `### <版本号> — <标题>` 开头（版本号化标题行 + `<a id="cN">` 锚点，N 按条目序递增），正文整段或分小节；历史速查直接读下方「版本索引」。
 
+<a id="c57"></a>
+### 0.3.026 — 引擎按 8.3 短名解析音频键（str_toc8）：修 AUDIO.DAT 截断名失配 + 全素材面同名风险审计
+
+**动机与验收**：`c56` 换上的正式 BGM 在实机**无声**，串口只看到 `BGM WARN: 'melody_town' missing in AUDIO.DAT`。根因：`pack_audio` 把 AUDIO.DAT 的 TOC 条目名写成 `name` 列的 **8.3 短名大写**（`melody_town → MELODY_T`，契约在 `pack_audio.py` docstring），而引擎三处查表拿**全名**直接调 `farchive_lookup_name()`，`farchive_name_match` 只大写不截断 → `MELODY_TOWN`(11) 对 `MELODY_T`(8) 逐字节失配。此前全部音频键（test1/chime/hi/piano 等）≤8 字符从不触发，`melody_town`/`icy_garden` 是首个踩中者。验收 = 引擎公式 ≡ 打包公式（新 `test_strutil.py`）+ pytest **741 passed / 1 skipped** + 实机复测 BGM 可播。
+
+**1. 引擎新增 `str_toc8`（`core/lib/strutil.{c,h}`）**：脚本音频键 → AUDIO.DAT TOC 名的忠实镜像（大写 → 取最后一个 `.` 前的 base → 截 8 → 紧凑不补空格），与工具侧 `to_dos_name()[0].strip()` 逐字节一致；`core/engine/audio.c` 三处查表（`:137` FM patch 装载、`:225` `audio_bgm_start`、`:314` `pcm_play`）先 `str_toc8` 归一再查 `farchive_lookup_name`；WARN 仍打印原始键、注册校验 `audio_map_find` 保持全名。`nb.c` scene 查表与 image 查表**不动**。audio.c 净 +13 行，`test_devdoc_refs.py` whitelist 的 audio.c 行号重校（209/258/347/356 → 214/267/360/369）。
+
+**2. 全素材面同名风险审计（结论：仅 AUDIO 有此类问题）**
+- **IMAGE.DAT**（IMG/SPR/ANI/CG/THUMB）：引擎按 `farchive_lookup_id`（id 索引）取数，名字纯装饰 → 免疫。
+- **SCENE.DAT**：按名查，但 TOC 名 = `{base8}.NB` 大写紧凑（`build_game.py`），场景基名 ≤8 强约束（§十一 + `test_dos_shortname`）+ 大写已有 `farchive_name_match` 归一 → 安全。
+- **FONT.DAT/CJK.DAT**：单文件固定名直读、无 TOC → 不涉。
+- **AUDIO.DAT**（BGM/SND/VC/FMP）：键可 >8，archives 按全名查 → **唯一有此 bug 的面，本轮修复**。
+
+**3. 防复发守卫**：新 `tools/tests/test_strutil.py`（host gcc 编 strutil.c + ctypes），对键矩阵（melody_town/icy_garden/恰 8 字符/9 字符/带点多段/全大写/空串/短缓冲 NUL 终止）断言 `str_toc8` 输出 == `to_dos_name()[0].strip()` —— 钉死「引擎解析公式 ≡ 打包公式」；`test_audio_toolchain.py` 新增 `test_pack_audio_long_name_stored_as_8_3_toc_key`：长名键打包后 TOC 条目必须仍是 8.3 短名（两边永不漂移）。
+
+**4. 文档同步**：AGENTS §二新增「音频三层命名与引擎归一」小节（源文件名 → 脚本键缩写 → DOS 8.3 TOC 名；引擎查 AUDIO.DAT 必须先 `str_toc8`）。`bump_version`：0.3.025 → **0.3.026**（全部项目同步）。
+
+<a id="c56"></a>
+### 0.3.025 — demo-a2 换用正式 BGM：场景 001/002 melody_town、003/004 icy_garden（去掉 test1/test2）
+
+**动机与验收**：用户在 `assets/demo-a2/bgm/` 新增两首正式 BGM（`Melody Town Theme.mid`、`Icy Garden.mid`），要求插入场景——001/002 用「melody」、003/004 用「Icy」；同时删除占位的 `test1.mid`/`test2.mid` 与其登记。验收 = pytest 全绿（音频 key 登记守卫、8.3 短名、版本同步）。
+
+**1. 资产侧**：删除 `assets/demo-a2/bgm/test1.mid`、`test2.mid`（git 跟踪删除）；`ASSETS.DB` 删除 `test1` 登记行（`test2` 从未登记无行可删）；幂等登记 `bgm/Melody Town Theme.mid` → `BGM/melody_town`、`bgm/Icy Garden.mid` → `BGM/icy_garden`（8.3 截断 `melody_to`/`icy_gard` 与既有名互异，`pack_audio` 未来构建不拒）。音频登记沿用 `wav_convert.register_asset`/`fm_patch.register_patch` 同源「查无则 INSERT」幂等模式。
+
+**2. 场景侧（4 文件 NB 语法）**：`nbook001.nb:3`、`nbook002.nb:3` `bgm(){test1}` → `bgm(){melody_town}`（001 末尾 `bgm(stop)` 保留）；`nbook003.nb`、`nbook004.nb` 的 `bg(normal){beach1}` 后新增 `bgm(){icy_garden}`（`scene()`/`scene(end)` 自动停音频，无需 stop 行）。
+
+**3. 构建留待用户**：本轮**只改源不构建**（用户自定手工 build）——`AUDIO.DAT` 下次 `./makegame.sh build demo-a2` 时由 `pack_audio` 自动带上两首新曲（登记已入库）。`bump_version`：0.3.024 → **0.3.025**（全部项目同步）。
+
+验证：`tools/tests/test_audio_asset_paths.py`（每登记行可解析 + 场景音频 key 全登记 + 源根不漂移）、`test_dos_shortname.py`、`test_version_sync.py` 全绿。
+
+<a id="c55"></a>
+### 0.3.024 — 资产市场 `sync` 子命令：git blob-sha 差分同步（增/改/未变/可选 `--purge` 清孤儿）
+
+**动机与验收**：市场仓库（`edouardlicn123/naiz_assets`）远程更新后，既有 `market.sh` 只是「下载器 + 跳过已存在」，被改过的已存在文件会静默 `SKIP (exists)` 停留在旧版、远程已删文件永不清理，不构成真正的「同步更新」。本轮给 `tools/naiz_market/market.py` 新增 `sync` 子命令，按 Git blob-sha 逐文件差分。验收 = `test_naiz_market.py` **35 passed**（既有 23 + 新增 12）+ 真实远程 `sync --dry-run` 预览 = `6 packs · added 125 · updated 0 · unchanged 42` + 全量 pytest + `fullaudit` 7/7。**本轮只升级脚本不下载**（用户自定手工拉包），`assets_samples/` 零写入。
+
+**1. 差分依据 = tree API 的 blob-sha（零额外下载）**
+- GitHub `git/trees` 每个 blob 自带 `sha` = git 对象 id（`sha1(b"blob <len>\0" + 内容)`）；新增 `_git_blob_sha()` 对本地文件算同名哈希即可精确判定「未变/已改」，无需全量重下。已知值 `_git_blob_sha(b"abc") == f2ba8f…` 硬编码断言防实现漂移。
+- `packs()`（`(path, size)` 二元组）不动，新增 `packs_detailed()`（`(path, size, blob_sha)` 三元组）——既有调用/测试零破坏。
+
+**2. `sync` 行为**
+- 逐文件状态：`ADDED`（本地缺）/ `UPDATED`（size 或 sha 不同）/ `OK (unchanged)`（逐字节相同）。变更文件走既有 `.part` 原子写 + size 校验。
+- 可选 `--purge`：清理「本次同步包目录内」已从远程删除的本地文件；**决不触及** dest 根文件（README/LICENSE）与未在同步集合的其它包目录；默认只报 `STALE (removed from remote; use --purge)` 不删。
+- 包参数空 = 全部包；`--dry-run` 只预览不写入；LICENSE 随 sync 一并做 sha 差分刷新。`get`/`get-all`/`menu` 的「默认跳过」语义不受影响（AGENTS §13 既有强制规律与测试钉死）。
+
+**3. 测试防复发（全 monkeypatch，不触网）**
+- 新增 12 项：`_git_blob_sha` 已知值、`packs_detailed` 带 sha、sync 缺文件 ADDED、同字节跳过、同 size 异内容 UPDATED、异 size UPDATED、dry-run 零写入、未知包拒绝、无 `--purge` 保留 + 提示、`--purge` 删除、**purge 不碰根文件与其他包目录**、默认全包（LICENSE 随写）。
+
+**4. 文档/规约同步**：`market.sh` 用法注释补 `sync`（+`--purge`）；AGENTS §13 市场块新增 sync 语义段落；`docs/B90` 资产市场行补 `sync`。`bump_version`：0.3.023 → **0.3.024**（全部项目同步）。
+
 <a id="c54"></a>
 ### 0.3.023 — devdocs/124 MIDI→FM 通路 S6：默认音色内容（15 族 FMP patch + GM program→族映射数据 gm_map）
 
@@ -297,6 +346,9 @@
 
 | 条目 |
 |------|
+| [0.3.026 — 引擎按 8.3 短名解析音频键（str_toc8）：修 AUDIO.DAT 截断名失配 + 全素材面同名风险审计](#c57) |
+| [0.3.025 — demo-a2 换用正式 BGM：场景 001/002 melody_town、003/004 icy_garden（去掉 test1/test2）](#c56) |
+| [0.3.024 — 资产市场 `sync` 子命令：git blob-sha 差分同步（增/改/未变/可选 `--purge` 清孤儿）](#c55) |
 | [0.3.023 — devdocs/124 MIDI→FM 通路 S6：默认音色内容（15 族 FMP patch + GM→族映射 gm_map 数据）](#c54) |
 | [0.3.022 — devdocs/123 MIDI→FM 通路 S0–S5 代码落地（fmopn/fmseq 主机可穷举 + hal_fm_* 端口层 + 音频引擎 FM 后端）](#c53) |
 | [0.3.021 — guildbook 新增 mc06「音频素材与 FM 通路」（格式 / AI 平台 / 软件工具集 + 引擎方案对比）](#c52) |

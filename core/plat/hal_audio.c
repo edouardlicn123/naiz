@@ -225,7 +225,7 @@ void hal_pcm_stop(void)
  * (port, addr, val) on the serial channel.  Compile-time switch — a 60Hz
  * register pump would spam the trace during normal use, so flip this to 1
  * and rebuild (then ./makegame.sh make) only for a trace session. */
-#define FM_TRACE_ENABLED 0
+#define FM_TRACE_ENABLED 1
 
 int hal_fm_detect(void)
 {
@@ -243,8 +243,8 @@ void hal_fm_init(void)
     outb(PCM_ID_PORT, 0x01);
     /* Prime the FM volume paths at full loudness (F02 §4.2: each path has
      * its own 4-bit attenuation; 000b = VOL1, 001b = VOL2). */
-    outb(PCM_STATUS_PORT, 0x00);
-    outb(PCM_STATUS_PORT, 0x20);
+    outb(PCM_STATUS_PORT, 0x0F);
+    outb(PCM_STATUS_PORT, 0x2F);
 }
 
 void hal_fm_set_volume(int atten)
@@ -254,7 +254,7 @@ void hal_fm_set_volume(int atten)
         atten = 0;
     if (atten > PCM_VOL_ATTEN_MAX)
         atten = PCM_VOL_ATTEN_MAX;
-    outb(PCM_STATUS_PORT, (uint8_t)atten);
+    outb(PCM_STATUS_PORT, 0x0F);
 }
 
 void hal_fm_shutdown(void)

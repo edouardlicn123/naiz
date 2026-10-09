@@ -211,6 +211,27 @@ def test_pack_audio_roundtrip(tmp_path):
         assert len(payload) == esz
 
 
+def test_pack_audio_long_name_stored_as_8_3_toc_key(tmp_path):
+    """TOC entries keep the 8.3 short name even for keys longer than 8 ch.
+
+    The engine resolves the full script key through str_toc8 before the
+    farchive lookup (test_strutil.py asserts the formulas agree); packing
+    must never store the full key, or the two sides would drift.
+    """
+    proj, asset_root = _make_project(tmp_path, [
+        ("bgm/melody_town.mid", "BGM", "melody_town"),
+        ("bgm/icy_garden.mid", "BGM", "icy_garden"),
+    ])
+    out = tmp_path / "out"
+    out.mkdir()
+    pack_audio.pack_audio(str(proj), str(out), str(asset_root))
+
+    dat = (out / "AUDIO.DAT").read_bytes()
+    names = {t[1].rstrip(b'\0').decode().upper() for t in
+             image_dat.iter_image_dat_toc(dat)}
+    assert names == {"MELODY_T", "ICY_GARD"}
+
+
 def test_pack_audio_pcm_header_validated(tmp_path):
     proj = tmp_path / "proj"
     proj.mkdir()

@@ -1,7 +1,7 @@
 {
   "version": 2,
-  "git_head": "cda6604",
-  "checked_at": "2026-10-08T14:42:57",
+  "git_head": "800d035",
+  "checked_at": "2026-10-08T17:46:40",
   "files": {
     "core/build.sh": {
       "sha256": "0e6bb3f41cae8f6c5a014a49767f93990ddd3e2c461a85ec991c01b40b66b11e",
@@ -320,7 +320,7 @@
       "findings": []
     },
     "core/engine/nb_config.h": {
-      "sha256": "5b5511a16dfd42d19e9559206cf4f234e6b755ed008260a58d68eab313272889",
+      "sha256": "828f7b50a99df084dd5305280ecac411b6c659a7f447ae030cb8d28cd139f934",
       "violations": 0,
       "candidates": 0,
       "findings": []
@@ -1416,12 +1416,12 @@
       "findings": []
     },
     "tools/naiz_market/market.py": {
-      "sha256": "61cfc564d2a57d36d860a5f16f61d23013e79c34380c4d096c0b044c3a43e525",
+      "sha256": "63e1f7ff296ffc222ed02ccd469b4dd21fa0e99f87b3f88f3f142ca8c209bc82",
       "violations": 0,
       "candidates": 1,
       "findings": [
         {
-          "line": 379,
+          "line": 502,
           "rule": "P8",
           "level": "HEUR"
         }
@@ -1484,13 +1484,13 @@
   },
   "summary": {
     "files": 199,
-    "changed": 1,
-    "skipped": 198,
+    "changed": 2,
+    "skipped": 197,
     "out_of_scope": 0,
     "violations": 0,
     "candidates": 49,
     "fresh_violations": 0,
-    "fresh_candidates": 0,
+    "fresh_candidates": 1,
     "verified": 22,
     "stale": 2,
     "open": 25

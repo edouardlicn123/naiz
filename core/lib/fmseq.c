@@ -58,10 +58,12 @@ static void w(const FmseqSink *sink, int bank, uint8_t reg, uint8_t val)
     sink->write(sink->ctx, bank, reg, val);
 }
 
-/* Register address of op slot r (register slot) for class base (0x30..0x80). */
+/* Register address of op slot r (register slot) for class base (0x30..0x80).
+ * Per ymfm/OPN the operator is selected by register address bits 2-3 and the
+ * channel by bits 0-1, so a channel's four operators sit at base+{0,4,8,12}. */
 static void fm_op_addr(int ch, int r, uint8_t base, int *bank, uint8_t *addr)
 {
-    uint8_t reg = (uint8_t)(base + 3 * (r & 1) + 8 * (r >> 1));
+    uint8_t reg = (uint8_t)(base + 4 * r);
     fmopn_op_addr(ch, reg, bank, addr);
 }
 

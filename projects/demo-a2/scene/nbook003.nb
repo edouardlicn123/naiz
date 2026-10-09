@@ -1,5 +1,6 @@
 sceneconf(){Come with me, normal}
 bg(normal){beach1}
+bgm(){icy_garden}
 char(r,swimming,body){fei}
 char(l,normal,body){ira}
 fei(){What a good day!}

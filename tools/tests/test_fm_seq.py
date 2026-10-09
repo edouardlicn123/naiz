@@ -213,13 +213,14 @@ def test_note_on_program(lib):
     assert log[-1] == (0, 0x28, 0xF0)          # keyon ch0 all-ops
     # block4/fnum520 for A4 across the two freq regs
     assert (0, 0xA4, 0x22) in log and (0, 0xA0, 0x08) in log
-    # op TLs land at their reordered addresses.  Register-slot r sits at
-    # base + 3*(r&1) + 8*(r>>1); files are reordered 1-3-2-4, i.e. chip
-    # slots 0,1,2,3 read file slots 0,2,1,3 whose TLs are 40,42,44,46.
-    assert (0, 0x40, 40) in log                # chip0
-    assert (0, 0x43, 42) in log                # chip1
-    assert (0, 0x48, 44) in log                # chip2
-    assert (0, 0x4B, 46) in log                # chip3
+    # op TLs land at their register-slot addresses.  Register-slot r sits
+    # at base + 4*r (per ymfm/OPN, operator = address bits 2-3, channel =
+    # bits 0-1); files are reordered 1-3-2-4, i.e. chip slots 0,1,2,3 read
+    # file slots 0,2,1,3 whose TLs are 40,42,44,46.
+    assert (0, 0x40, 40) in log                # chip0 (file op1)
+    assert (0, 0x44, 42) in log                # chip1 (file op2)
+    assert (0, 0x48, 44) in log                # chip2 (file op3)
+    assert (0, 0x4C, 46) in log                # chip3 (file op4)
     assert (0, 0xB0, (5 << 3) | 4) in log      # FB=5 AL=4
     assert (0, 0xB4, 0xC0) in log              # pan both
     # full program: 24 op regs + B0 + B4 + A4 + A0 + keyon
