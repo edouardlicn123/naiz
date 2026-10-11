@@ -15,7 +15,7 @@
 #include "tr.h"
 #include "font.h"
 #include "nb_internal.h"
-
+#include "frame.h"
 /*=== Debug ================================================================*/
 
 #include "debug.h"
@@ -278,6 +278,7 @@ int menu_show(int mx, int my, int cols, int argc, const char **argv)
     hal_mouse_flush();
 
     for (;;) {
+            engine_frame_pump();  /* keep BGM/PCM + clock ticking while menu open */
             hal_kbd_update();
             hal_mouse_update();
 

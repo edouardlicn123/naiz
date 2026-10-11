@@ -42,6 +42,7 @@
 #include "nb_commands.h"
 #include "nb.h"
 #include "tr.h"
+#include "frame.h"
 #include "debug.h"
 #include "input_boundary.h"
 
@@ -375,6 +376,7 @@ void cmd_settingmenu(int argc, const char **argv, const char *cmd_name)
         for (i = 0; i < rows; i++)
             prev_cur[i] = g_rows[setting_row_abs(page, i)].cur;
 
+        engine_frame_pump();  /* keep BGM/PCM + clock ticking while menu open */
         hal_kbd_update();
 
         if (focus_on_back) {

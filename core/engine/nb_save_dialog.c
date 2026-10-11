@@ -16,6 +16,7 @@
 #include "save.h"
 #include "tr.h"
 #include "strutil.h"
+#include "frame.h"
 #include "input_boundary.h"
 
 /* Save dialog menu: in-place UI within dialog area. */
@@ -132,6 +133,7 @@ void save_dialog_menu(void)
     while (running) {
         prev_row = row; prev_col = col;
 
+        engine_frame_pump();  /* keep BGM/PCM + clock ticking while dialog open */
         hal_kbd_update();
 
         if (confirm) {

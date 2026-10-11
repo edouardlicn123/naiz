@@ -19,6 +19,7 @@
 #include "hal.h"
 #include "nb_internal.h"
 #include "tr.h"
+#include "frame.h"
 
 /* Debug logging — shared macro in debug.h */
 #include "debug.h"
@@ -81,6 +82,7 @@ int ui_interact(const UiRequest *req)
             return -1;
         }
 
+        engine_frame_pump();  /* keep BGM/PCM + clock ticking while waiting */
         hal_kbd_update();
         hal_mouse_update();
         hal_mouse_recenter_if_idle();

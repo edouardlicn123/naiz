@@ -116,7 +116,20 @@ static unsigned long smooth_clock_total = 0;
 static unsigned long smooth_raw_prev = 0;
 static int           smooth_inited = 0;
 
-unsigned long hal_wallclock_smooth_ms(void)
+/*
+ * Advance the virtual clock by exactly one frame (devdoc 129).
+ *
+ * Ownership rule: this is the ONLY writer.  The engine frame pump
+ * (engine_frame_pump) calls it once per main-loop pass; every other consumer
+ * (BGM scheduler / typewriter reveal / animation) calls the read-only
+ * hal_wallclock_smooth_ms().  Before devdoc 129 the advance lived inside
+ * hal_wallclock_smooth_ms(), so the clock rate was the product of the number
+ * of consumers and the pass frequency — blocking ops slowed it, reveal+anim
+ * sped it up.  Splitting writer from reader makes the per-frame elapsed time
+ * independent of how many subsystems poll it, which also makes audio_tick()
+ * idempotent within a frame (safe to pump repeatedly during a long decode).
+ */
+void hal_wallclock_smooth_advance(void)
 {
     unsigned long raw = hal_wallclock_ms();
     unsigned long delta;
@@ -124,7 +137,7 @@ unsigned long hal_wallclock_smooth_ms(void)
     if (!smooth_inited) {
         smooth_raw_prev = raw;
         smooth_inited = 1;
-        return 0UL;    /* baseline pass, no advancement */
+        return;    /* baseline pass, no advancement */
     }
 
     delta = raw - smooth_raw_prev;   /* raw total is monotonic */
@@ -134,6 +147,11 @@ unsigned long hal_wallclock_smooth_ms(void)
     else if (delta > SMOOTH_CLOCK_MAX_MS) delta = SMOOTH_CLOCK_MAX_MS;
 
     smooth_clock_total += delta;
+}
+
+/* Read-only view of the virtual clock.  No side effects (devdoc 129). */
+unsigned long hal_wallclock_smooth_ms(void)
+{
     return smooth_clock_total;
 }
 

@@ -24,6 +24,7 @@
 #include "debug.h"
 #include "nb_asset_table.h"
 #include "tr.h"
+#include "frame.h"
 #include "input_boundary.h"
 
 /* Cell grid geometry.  GAL_CELL_W/GAL_CELL_H are the thumbnail pixel size
@@ -325,6 +326,7 @@ void cmd_cgvmenu(int argc, const char **argv, const char *cmd_name)
         draw_text(tr("No CGs available."), 0, 200, 190, 440, 210, 1, GAL_FG);
         hal_mouse_draw_cursor_force();
         for (;;) {
+            engine_frame_pump();  /* keep BGM/PCM + clock ticking while open */
             hal_kbd_update();
             hal_mouse_update();
             if (hal_kbd_is_down(KC_ESC) || hal_kbd_is_down(KC_SPACE) ||
@@ -355,6 +357,7 @@ void cmd_cgvmenu(int argc, const char **argv, const char *cmd_name)
         int prev_sel = sel, prev_fb = focus_on_back;
         int abs_sel = page * GAL_CELLS + sel;
 
+        engine_frame_pump();  /* keep BGM/PCM + clock ticking while open */
         hal_kbd_update();
 
         if (view == GAL_VIEW_GRID) {

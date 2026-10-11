@@ -23,6 +23,7 @@
 #include "prefs.h"
 #include "bootmenu.h"
 #include "audio.h"
+#include "frame.h"
 
 /* Debug logging — shared macro in debug.h */
 #include "debug.h"
@@ -121,12 +122,9 @@ int main(void)
         int st;
 #ifdef AUTOEXIT
         for (;;) {
-            vblank_wait();  /* 60Hz heartbeat: paces anim_tick/vm_delay/input */
+            engine_frame_pump();  /* vblank + clock + anim + audio + reveal */
             hal_kbd_update();
             hal_mouse_update();
-            anim_tick();  /* advance animation frame */
-            audio_tick();  /* advance BGM cursor + pump PCM FIFO */
-            nb_dialog_reveal_tick();  /* advance typewriter reveal (no-op off) */
             /* Headless build: keep processing each frame regardless of any
              * dialog/wait that cleared VMFLAG_PROCESS. */
             vm_request_process();
@@ -137,12 +135,9 @@ int main(void)
         }
 #else
         for (;;) {
-            vblank_wait();  /* 60Hz heartbeat: paces anim_tick/vm_delay/input */
+            engine_frame_pump();  /* vblank + clock + anim + audio + reveal */
             hal_kbd_update();
             hal_mouse_update();
-            anim_tick();  /* advance animation frame */
-            audio_tick();  /* advance BGM cursor + pump PCM FIFO */
-            nb_dialog_reveal_tick();  /* advance typewriter reveal (no-op off) */
             if (vm_delay_tick())
                 vm_request_process();
             if (!anim_waiting())
@@ -158,11 +153,8 @@ int main(void)
                 NB_DEBUG("[MAIN] Entering input waiting\r\n");
                 input_drain_boundary();
                 for (;;) {
-                    vblank_wait();  /* 60Hz heartbeat (same pace as outer loop) */
+                    engine_frame_pump();  /* vblank + clock + anim + audio + reveal */
                     hal_kbd_update();
-                    anim_tick();  /* keep any active animation playing while waiting */
-                    audio_tick();  /* keep BGM/PCM playing while waiting for input */
-                    nb_dialog_reveal_tick();  /* pace the page reveal (no-op off) */
                     /* A pending waitanima hold ended on its own (once playback
                      * finished): leave immediately so the script resumes. */
                     if (wait_anim && !anim_waiting())

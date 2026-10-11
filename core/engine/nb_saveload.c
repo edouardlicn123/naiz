@@ -21,6 +21,7 @@
 #include "nb_saveload.h"
 #include "tr.h"
 #include "strutil.h"
+#include "frame.h"
 
 /* Debug logging — shared macro in debug.h */
 #include "debug.h"
@@ -273,6 +274,7 @@ static void save_load_menu(int is_load, int from_mainmenu)
         int abs_slot = slot_abs(page, slot_idx);
         int prev_slot = slot_idx, prev_focus = focus_on_back, prev_cyes = confirm_yes;
 
+        engine_frame_pump();  /* keep BGM/PCM + clock ticking while menu open */
         hal_kbd_update();
 
         if (confirm) {

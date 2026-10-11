@@ -54,40 +54,40 @@ SOURCE_INDEX = {
 # References whose correctness is asserted with the symbol they must contain.
 # devdoc 119 §2 holds the full truth table for the 118 set.
 LINE_REF_WHITELIST = {
-    ("nb_setting.c", 159): "SETTING_ROWS",
-    ("nb_setting.c", 178): "setting_row_y",
-    ("nb_setting.c", 227): "setting_draw_row",
-    ("nb_setting.c", 107): "setting_progress_text",
-    ("nb_setting.c", 486): "prefs_save",
-    ("nb_setting.c", 118): "sys_save_is_cg_unlocked",
-    ("nb_setting.c", 121): "snprintf",
-    ("nb_setting.c", 139): "Text Speed",
-    ("nb_setting.c", 151): "Read Progress",
-    ("audio.c", 214): "g_bgm_on",
-    ("audio.c", 360): "g_snd_on",
-    ("audio.c", 369): "g_vc_on",
-    ("audio.c", 267): "audio_bgm_stop",
+    ("nb_setting.c", 160): "SETTING_ROWS",
+    ("nb_setting.c", 179): "setting_row_y",
+    ("nb_setting.c", 228): "setting_draw_row",
+    ("nb_setting.c", 108): "setting_progress_text",
+    ("nb_setting.c", 488): "prefs_save",
+    ("nb_setting.c", 119): "sys_save_is_cg_unlocked",
+    ("nb_setting.c", 122): "snprintf",
+    ("nb_setting.c", 140): "Text Speed",
+    ("nb_setting.c", 152): "Read Progress",
+    ("audio.c", 215): "g_bgm_on",
+    ("audio.c", 361): "g_snd_on",
+    ("audio.c", 370): "g_vc_on",
+    ("audio.c", 268): "audio_bgm_stop",
     ("hal_audio.c", 88): "PCM_CTRL_A46A_IRQ",
     ("hal_audio.c", 94): "PCM_IRQ_INTERVAL_MAX",
-    ("hal_audio.c", 121): "hal_pcm_set_volume",
-    ("hal_audio.c", 155): "PCM_VOL_PATH_PCM",
+    ("hal_audio.c", 122): "hal_pcm_set_volume",
+    ("hal_audio.c", 156): "PCM_VOL_PATH_PCM",
     ("nb_asset_table.h", 70): "CG_COUNT",
     ("save.h", 16): "CG_TOTAL",
     ("save_sys.c", 12): "SYSTEM.SAV",
-    ("main.c", 94): "prefs_save",
+    ("main.c", 95): "prefs_save",
     ("nb_mainmenu.c", 115): "prefs_save",
     # devdoc 119 §3.4: the i18n width guard's geometry anchors.  These were
     # cited before they were registered, and the off-by-one that followed
     # (241 written as 240) passed silently -- see
     # test_every_devdoc_ref_is_registered.
-    ("nb_setting.c", 167): "SET_LABEL_W",
-    ("nb_setting.c", 170): "SET_VAL_W",
-    ("nb_setting.c", 241): "draw_text",
-    ("nb_saveload.c", 44): "clipped",
+    ("nb_setting.c", 168): "SET_LABEL_W",
+    ("nb_setting.c", 171): "SET_VAL_W",
+    ("nb_setting.c", 242): "draw_text",
+    ("nb_saveload.c", 45): "clipped",
     ("build_game.py", 448): "nb_asset_table.h",
     ("render_text.c", 235): "text_width",
     # devdoc 119 §3.4 renamed this key; the row literal moved with it
-    ("nb_setting.c", 149): "Sound & Voice Vol",
+    ("nb_setting.c", 150): "Sound & Voice Vol",
     # devdoc 120 §9 -- the replacement truth table for the one retired above.
     ("prefs.c", 33): "Instant",
     ("prefs.c", 57): "prefs_get_lang",
@@ -103,8 +103,8 @@ LINE_REF_WHITELIST = {
     ("bootmenu.c", 103): "find_lang_index",
     ("bootmenu.c", 200): "bootmenu_run",
     ("bootmenu.c", 286): "prefs_set_lang",
-    ("main.c", 101): "LANG] boot",
-    ("main.c", 105): "cjk_load_for_lang",
+    ("main.c", 102): "LANG] boot",
+    ("main.c", 106): "cjk_load_for_lang",
     ("nb.c", 166): "prefs_load",
     ("nb.c", 171): "nb_set_lang",
     ("nb.c", 337): "nb_set_lang",
@@ -149,6 +149,23 @@ STALE_QUOTED_REFS = {
 # LINE_REF_WHITELIST instead.
 SUPERSEDED_AUDIO_LINE_REFS = {
     ("audio.c", 105), ("audio.c", 147), ("audio.c", 233), ("audio.c", 242),
+}
+
+# Citations whose line numbers drifted by a line or two when 0.3.027 added the
+# unified frame pump and the mag decode progress hook (devdocs/129: one extra
+# #include and one engine_frame_pump() call per polling loop).  devdocs
+# 118/119/120 are finished and may not be edited (AGENTS.md §10 step 1), so the
+# numbers they print are registered here as superseded; the CURRENT locations
+# of the same symbols are checked in LINE_REF_WHITELIST instead.  Without this
+# set the drift would silently unregister the citations and let
+# test_every_devdoc_ref_is_registered pass unnoticed.
+SUPERSEDED_SHIFTED_LINE_REFS = {
+    ("main.c", 94), ("nb_saveload.c", 44),
+    ("nb_setting.c", 107), ("nb_setting.c", 139), ("nb_setting.c", 149),
+    ("nb_setting.c", 151), ("nb_setting.c", 159), ("nb_setting.c", 170),
+    ("nb_setting.c", 178), ("nb_setting.c", 227), ("nb_setting.c", 241),
+    ("nb_setting.c", 486), ("hal_audio.c", 158),
+    ("main.c", 101), ("main.c", 105),
 }
 
 # References to files RENAMED in 0.3.014.  devdocs 118/119 are finished and may
@@ -269,7 +286,8 @@ def test_every_devdoc_ref_is_registered():
     """
     registered = (set(LINE_REF_WHITELIST) | set(KNOWN_GOOD_REFS)
                   | STALE_QUOTED_REFS | RETIRED_FILE_QUOTES
-                  | SUPERSEDED_AUDIO_LINE_REFS)
+                  | SUPERSEDED_AUDIO_LINE_REFS
+                  | SUPERSEDED_SHIFTED_LINE_REFS)
     for doc in (DOC_118, DOC_119, DOC_120):
         unknown = sorted(
             "%s:%d" % ref for ref in set(_devdoc_line_refs(doc)) - registered
@@ -289,7 +307,7 @@ def test_devdoc_118_references_match_truth_table():
     a reader following 118 is redirected rather than misled."""
     text = "\n".join(_lines(DOC_119))
     for stem, lineno in (("nb_setting.c", 159), ("settings.c", 185),
-                         ("audio.c", 147), ("hal_audio.c", 155)):
+                         ("audio.c", 147), ("hal_audio.c", 158)):
         assert f"{stem}:{lineno}" in text, (
             f"devdoc 119 must record the corrected location {stem}:{lineno}"
         )

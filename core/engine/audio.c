@@ -23,6 +23,7 @@
 #include "midi.h"
 #include "fmopn.h"
 #include "fmseq.h"
+#include "mag.h"
 #include "audio.h"
 #include "nb_asset_table.h"
 
@@ -445,8 +446,11 @@ int audio_get_pcm_volume(void) { return g_pcm_vol; }
 
 /*=== Lifecycle ==========================================================*/
 
+void audio_tick(void);
+
 void audio_init(void)
 {
+    mag_set_progress_hook(audio_tick);
     if (farchive_open(&g_arc, AUDIO_ARCHIVE, AUDIO_MAX_ENTRIES) != 0) {
         hal_logf("AUD WARN: no %s (audio disabled)\r\n", AUDIO_ARCHIVE);
         g_arc_ok = 0;

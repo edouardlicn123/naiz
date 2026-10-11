@@ -11,6 +11,15 @@
 #include <stdlib.h>
 #include <string.h>
 
+#define MAG_PROGRESS_STRIDE 2048
+
+static void (*g_mag_progress_hook)(void) = 0;
+
+void mag_set_progress_hook(void (*fn)(void))
+{
+    g_mag_progress_hook = fn;
+}
+
 /*=== Shared decode helpers ===============================================*/
 /*
  * Strip per-row left/right padding by copying crop_width bytes from each
@@ -292,7 +301,7 @@ int mag_decode(const uint8_t *data, int size, MagImage **out) {
 
     {
         int decode_ok = 1;
-
+        int _prog = 0;
     while (out_pos + 1 < output_total) {
         int a, ab, nib, n, ref_off, src;
         uint16_t v;
@@ -361,6 +370,11 @@ int mag_decode(const uint8_t *data, int size, MagImage **out) {
                 }
             }
             out_pos += 2;  /* 前进 2 字节（对应 2/4 像素） */
+            _prog += 2;
+            if (g_mag_progress_hook && _prog >= MAG_PROGRESS_STRIDE) {
+                g_mag_progress_hook();
+                _prog = 0;
+            }
         }
     }
 
@@ -383,6 +397,9 @@ int mag_decode(const uint8_t *data, int size, MagImage **out) {
         for (i = 0; i < pixel_width * pixel_height; i++) {
             int byte_idx = i / 2;
             final_pixels[i] = (i & 1) ? (output[byte_idx] >> 4) : (output[byte_idx] & 0x0F);
+            if (g_mag_progress_hook && (i % MAG_PROGRESS_STRIDE) == (MAG_PROGRESS_STRIDE - 1)) {
+                g_mag_progress_hook();
+            }
         }
         free(output);
         output = final_pixels;
@@ -676,7 +693,7 @@ int mag_decode_into(const uint8_t *data, int size,
 
     {
         int decode_ok = 1;
-
+        int _prog = 0;
     while (out_pos + 1 < output_total) {
         int a, ab, nib, n, ref_off, src;
         uint16_t v;
@@ -727,6 +744,11 @@ int mag_decode_into(const uint8_t *data, int size,
                 }
             }
             out_pos += 2;
+            _prog += 2;
+            if (g_mag_progress_hook && _prog >= MAG_PROGRESS_STRIDE) {
+                g_mag_progress_hook();
+                _prog = 0;
+            }
         }
     }
 
@@ -741,6 +763,9 @@ int mag_decode_into(const uint8_t *data, int size,
         for (i = 0; i < pixel_width * pixel_height; i++) {
             int byte_idx = i / 2;
             final_pixels[i] = (i & 1) ? (output[byte_idx] >> 4) : (output[byte_idx] & 0x0F);
+            if (g_mag_progress_hook && (i % MAG_PROGRESS_STRIDE) == (MAG_PROGRESS_STRIDE - 1)) {
+                g_mag_progress_hook();
+            }
         }
         output = final_pixels;
     } else {

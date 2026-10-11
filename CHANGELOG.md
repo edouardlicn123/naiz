@@ -4,6 +4,24 @@
 
 <a id="c57"></a>
 ### 0.3.026 — 引擎按 8.3 短名解析音频键（str_toc8）：修 AUDIO.DAT 截断名失配 + 全素材面同名风险审计
+<a id="c58"></a>
+### 0.3.027 — BGM 在菜单/询问/立绘加载期间卡顿与中断根修：时钟单点化 + 统一帧泵 + mag 分块泵
+
+**动机与验收**：`c56` 换上正式 BGM 后实机可闻，但有三个新症状——音乐**严重卡顿**（节拍不稳）、**打开 question 即被打断**直到做出选择、**首次立绘加载被打断**。三处根因相互独立，需分别修。验收 = `engine_frame_pump()` 覆盖全部 9 个自含输入循环 + `hal_wallclock_smooth_ms()` 只读 + `mag_decode` 四路解码均接分块泵 + 新 `test_frame_pump.py` 9 项契约守卫（已用变异验证）+ pytest **750 passed / 1 skipped** + `make -C core` 0 err/0 warn + `fullaudit` 全绿。**实机验证未完成**（见 `devdocs/129-BGM在菜单询问立绘加载期间卡顿与中断根修.md` §7）。
+
+**1. 根因一：自含输入循环从不泵音频。** `audio_tick()`（`audio.c:496`）是 FM/PCM 推进唯一入口，接入前只被 `main.c` 调用；而 `nb_interact.c`（question）、`nb_menu.c`、`nb_setting.c`、`nb_saveload.c`、`nb_save_dialog.c`、`nb_cggallery.c`、`nb_special.c` 七个自含输入循环**既无 `audio_tick()` 也无 `vblank_wait()`**——循环期间 `nb_process()` 不返回、外循环不转 ⇒ BGM 完全冻结直至退出该界面。这是「question 打断音乐」的确证。
+
+**2. 根因二：耗时解码阻塞单个 pass。** 外循环顺序是帧泵 → `nb_process()`，后者返回前不推进音频。首次 `char`/`cg` 走 `layer_sprite.c:207 → image.c:145 → mag.c:147`，缓存未命中时整段 RLE 解码阻塞当前 pass；场景开场连续加载 bg + 多张立绘可累计数百 ms 音频空洞。修法：`mag.c` 加**进度钩子**（`mag.h:void mag_set_progress_hook(void(*)(void))`），在主 RLE 循环与 4bpp 展开循环按 `MAG_PROGRESS_STRIDE=2048`（`mag.c:14`）调用，**共 4 个调用点**（heap `:374/:400`、pool `:747/:766`，覆盖 `mag_decode` 与 `mag_decode_into` 两条所有权路径）；`audio_init()`（`audio.c:453`）注册 `audio_tick` 为钩子。`mag.c` 是平台无关 lib 不得直连 engine，故用回调而非直接调用。
+
+**3. 根因三（最隐蔽）：平滑虚拟时钟的节拍由「调用者数量」决定。** `hal_wallclock_smooth_ms()` 原设计是**每次调用按 [40,100]ms 有界前进**，而 `audio_tick()`、`nb_dialog_reveal_tick()`（`nb_dialog.c:257`）、`anim_tick()`（`nb_anim.c:568`）三个消费方都在轮询它 ⇒ BGM 节拍 ≡ （每 pass 调用次数）× pass 频率：菜单阻塞段零调用则钟滞后（音乐后移），打字机/动画同轮询则每 pass 2–3 次调用、钟加速（音乐变快）。这正是「严重卡顿」。**它也决定了修法**：不能只在菜单循环里塞 `audio_tick()`——紧凑自旋循环会高频调用它使钟狂飙、卡顿更糟。
+
+**4. Phase 1 时钟单点化（`hal.h:149` / `hal_pc98.c:132/149/154`）**：前进逻辑拆入新 `hal_wallclock_smooth_advance()`（**唯一写入方**），`hal_wallclock_smooth_ms()` 改为**只读**返回累计值。**新约定：前进点唯一化，由帧泵每帧调用一次 advance；任何其它位置禁止写钟**（某帧漏调 ⇒ 时钟停滞，BGM/打字机/动画全停）。收益是 `audio_tick()` 变成**帧内幂等**，这才让 Phase 3 的解码钩子安全（分块循环内反复调用不追速）。
+
+**5. Phase 2 统一帧泵（新 `core/engine/frame.{c,h}`）**：`engine_frame_pump()` = `vblank_wait(); hal_wallclock_smooth_advance(); anim_tick(); audio_tick(); nb_dialog_reveal_tick();`。**不含键盘轮询、不含鼠标**——各循环原有输入时序语义不动，只补上心跳。`main.c` 三处循环与 §1 七个循环全部接入（`nb_interact.c:85`、`nb_menu.c:281`、`nb_setting.c:379`、`nb_saveload.c:277`、`nb_save_dialog.c:136`、`nb_cggallery.c:329/360`、`nb_special.c:143`）。`ui_interact` 的 `q_timeout=600` 由「迭代次数」改为「帧」语义，数值不变。
+
+**6. 防复发**：新 `tools/tests/test_frame_pump.py`（9 项）守护三项契约——读钟不得再前进且 `advance()` 独占写入；帧泵五步序列 + 全部 9 个循环的接入计数（缺一处 = 该界面 BGM 冻结）；解码钩子恰好 4 个调用点且 heap/pool 各 2、stride 守卫存在、`_prog` 复位、`audio_init()` 已注册。四项变异逐一验证转红（删钩子点 / 删 `audio_tick` / 删循环接入 / 读钟重新前进）。`test_devdoc_refs.py` 新增 `SUPERSEDED_SHIFTED_LINE_REFS` 登记本次 +1/~+2 行漂移使 118/119/120 的引用不静默脱注。
+
+**7. 遗留**：实机复测三项症状 + 回归打字机/动画时长（时钟语义已变）；`devdocs/129` 状态仍是「进行中」，实机通过后才标完结。**原计划给 devdoc 107 追加 ERRATA 未执行**——本仓 `devdocs/` 只保留 116 起（00–115 已归档进 `0.1/0.2版开发文档总结.html`），107 不在树内，时钟语义变更由 devdoc 129 §2.3/§3 承载。
 
 **动机与验收**：`c56` 换上的正式 BGM 在实机**无声**，串口只看到 `BGM WARN: 'melody_town' missing in AUDIO.DAT`。根因：`pack_audio` 把 AUDIO.DAT 的 TOC 条目名写成 `name` 列的 **8.3 短名大写**（`melody_town → MELODY_T`，契约在 `pack_audio.py` docstring），而引擎三处查表拿**全名**直接调 `farchive_lookup_name()`，`farchive_name_match` 只大写不截断 → `MELODY_TOWN`(11) 对 `MELODY_T`(8) 逐字节失配。此前全部音频键（test1/chime/hi/piano 等）≤8 字符从不触发，`melody_town`/`icy_garden` 是首个踩中者。验收 = 引擎公式 ≡ 打包公式（新 `test_strutil.py`）+ pytest **741 passed / 1 skipped** + 实机复测 BGM 可播。
 
@@ -346,6 +364,7 @@
 
 | 条目 |
 |------|
+| [0.3.027 — BGM 在菜单/询问/立绘加载期间卡顿与中断根修：时钟单点化 + 统一帧泵 + mag 分块泵](#c58) |
 | [0.3.026 — 引擎按 8.3 短名解析音频键（str_toc8）：修 AUDIO.DAT 截断名失配 + 全素材面同名风险审计](#c57) |
 | [0.3.025 — demo-a2 换用正式 BGM：场景 001/002 melody_town、003/004 icy_garden（去掉 test1/test2）](#c56) |
 | [0.3.024 — 资产市场 `sync` 子命令：git blob-sha 差分同步（增/改/未变/可选 `--purge` 清孤儿）](#c55) |

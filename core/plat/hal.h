@@ -140,6 +140,19 @@ unsigned long hal_wallclock_ms(void);
 #define SMOOTH_CLOCK_MIN_MS 40UL   /* stall floor: virtual ms per pass while
                                     * raw reports delta==0 (NP2kai pass ~40ms) */
 #define SMOOTH_CLOCK_MAX_MS 100UL  /* catch-up ceiling: one real pass cadence */
+
+/*
+ * Advance the virtual clock by exactly one frame (devdoc 129).
+ * Sole writer — called once per pass by engine_frame_pump().  Do NOT call
+ * this from arbitrary subsystems; they must use the read-only reader below.
+ */
+void hal_wallclock_smooth_advance(void);
+
+/*
+ * Read-only view of the virtual clock (devdoc 129).  No side effects: the
+ * elapsed time between two reads reflects only frame-pump advances, so the
+ * rate no longer depends on how many subsystems poll it.
+ */
 unsigned long hal_wallclock_smooth_ms(void);
 
 /*

@@ -22,6 +22,7 @@
 #include "nb_saveload.h"
 #include "nb.h"
 #include "tr.h"
+#include "frame.h"
 #include "debug.h"
 #include "input_boundary.h"
 
@@ -139,6 +140,7 @@ void cmd_specialmenu(int argc, const char **argv, const char *cmd_name)
         int abs = page * SPECIAL_ROWS + sel;
         int prev_sel = sel, prev_focus = focus_on_back;
 
+        engine_frame_pump();  /* keep BGM/PCM + clock ticking while menu open */
         hal_kbd_update();
 
         if (focus_on_back) {

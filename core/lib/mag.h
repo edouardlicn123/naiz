@@ -50,7 +50,10 @@ typedef struct {
  * @param out   输出指针，成功时指向分配的 MagImage
  * @return 0=成功，1=失败
  */
+void mag_set_progress_hook(void (*fn)(void));
+
 int  mag_decode(const uint8_t *data, int size, MagImage **out);
+
 
 /*
  * mag_decode_into — Decode MAG data using a pre-allocated work buffer.
@@ -67,6 +70,7 @@ int  mag_decode(const uint8_t *data, int size, MagImage **out);
  */
 int  mag_decode_into(const uint8_t *data, int size,
                      uint8_t *buf, int buf_size, MagImage **out);
+
 
 /*
  * mag_read_palette — 仅读取 MAG 调色板（不解码像素）
