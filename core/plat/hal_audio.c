@@ -97,6 +97,7 @@ void hal_midi_out(uint8_t b)
  * output), bit3-0 are the attenuation — REVERSED, 0 = loudest and 15 still
  * audible.  True PCM mute is A66E bit0, not this register. */
 #define PCM_VOL_PATH_PCM    0xA0
+#define FM_VOL_PATH_VOL1    0x00
 #define PCM_VOL_ATTEN_MAX   15
 
 #define PCM_TICK_MAX_BYTES 2048
@@ -225,7 +226,7 @@ void hal_pcm_stop(void)
  * (port, addr, val) on the serial channel.  Compile-time switch — a 60Hz
  * register pump would spam the trace during normal use, so flip this to 1
  * and rebuild (then ./makegame.sh make) only for a trace session. */
-#define FM_TRACE_ENABLED 1
+#define FM_TRACE_ENABLED 0
 
 int hal_fm_detect(void)
 {
@@ -241,10 +242,8 @@ void hal_fm_init(void)
      * 0x18C/0x18E never routes (F03 §3.8 fact 1).  bit1=0 keeps the FM
      * voice unmuted (AGENTS §十四 音频通路 note 3). */
     outb(PCM_ID_PORT, 0x01);
-    /* Prime the FM volume paths at full loudness (F02 §4.2: each path has
-     * its own 4-bit attenuation; 000b = VOL1, 001b = VOL2). */
-    outb(PCM_STATUS_PORT, 0x0F);
-    outb(PCM_STATUS_PORT, 0x2F);
+    /* Prime FM VOL1 at full loudness (attenuation 0). */
+    outb(PCM_STATUS_PORT, (uint8_t)(FM_VOL_PATH_VOL1 | 0x00));
 }
 
 void hal_fm_set_volume(int atten)
@@ -254,7 +253,7 @@ void hal_fm_set_volume(int atten)
         atten = 0;
     if (atten > PCM_VOL_ATTEN_MAX)
         atten = PCM_VOL_ATTEN_MAX;
-    outb(PCM_STATUS_PORT, 0x0F);
+    outb(PCM_STATUS_PORT, (uint8_t)(FM_VOL_PATH_VOL1 | (atten & 0x0F)));
 }
 
 void hal_fm_shutdown(void)
