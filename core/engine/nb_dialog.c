@@ -42,14 +42,15 @@ static DialogState dialog_state;
  * per-char accumulator — so a single stalled pass cannot freeze the reveal and the
  * value is monotonic (only advances toward page_end).
  *
- * The elapsed input is the HAL virtual clock hal_wallclock_smooth_ms(): its
- * per-pass delta is bounded to [SMOOTH_CLOCK_MIN_MS, SMOOTH_CLOCK_MAX_MS]
- * (hal.h), so NP2kai's chunked DOS system time (frozen 3-6s, then
- * +1000..+6000ms jumps) neither stalls the reveal during the holes nor bursts
- * the page on catch-up.  Previously these bounds lived here as
- * REVEAL_PASS_MIN/MAX_MS (0.2.133); the single source of truth is now the
- * shared HAL clock, and the floor keeps flowing at pass cadence for every
- * micro-rhythm consumer (typewriter / animation / BGM). */
+ * The elapsed input is the HAL virtual clock hal_wallclock_smooth_ms().  Its
+ * per-pass delta is not a clamp but a smoothly slewed step toward the rate the
+ * DOS clock actually measures (core/lib/vclock, devdoc 130), so NP2kai's
+ * chunked DOS system time (frozen 3-6s, then +1000..+6000ms jumps) neither
+ * stalls the reveal during the holes nor bursts the page on catch-up.  An
+ * earlier generation clamped the delta to a fixed floor/ceiling (0.2.133
+ * REVEAL_PASS_*, then 0.2.134 SMOOTH_CLOCK_* in the HAL); that clamp was
+ * removed in 0.3.028 because its alternating step sizes were the BGM flutter.
+ * */
 static unsigned long reveal_page_ms = 0;    /* virtual clock at page baseline */
 static unsigned long reveal_char_count = 0; /* chars revealed on this page */
 static int           reveal_armed = 0;      /* 0 = next pass records baseline */

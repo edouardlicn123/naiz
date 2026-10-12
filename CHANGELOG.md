@@ -4,6 +4,21 @@
 
 <a id="c57"></a>
 ### 0.3.026 — 引擎按 8.3 短名解析音频键（str_toc8）：修 AUDIO.DAT 截断名失配 + 全素材面同名风险审计
+<a id="c59"></a>
+### 0.3.028 — BGM 颤动根修：虚拟时钟废止 floor/ceiling 钳制，改平滑变步进（`lib/vclock`）
+
+**动机与验收**：`c58` 的帧泵修好了「question/立绘加载打断 BGM」，但用户实机复测**仍有卡顿、方式变成颤动**（节拍不稳而非停表）。根因：帧泵把 `hal_wallclock_smooth_advance()` 收敛为「每 pass 一次」后，0.2.134 的 floor/ceiling 钳制（`SMOOTH_CLOCK_MIN/MAX_MS = 40/100`）的**单步量化误差直接暴露**——NP2kai DOS 时钟秒级量化下，秒内各 pass 吐 40ms 步、秒落地那拍吐 100ms 步，**2.5:1 交替即颤动**。这不是新缺陷，是既有缺陷从「被 3 个消费方平均掉」变成「直接可闻」。验收 = 相邻 advance 差 ≤1ms + 冻结仍推进 + 大跳变不倾泻 + 15–30Hz 追踪真实时间；主机穷举 9 项 + 4 组变异；pytest **760 passed / 1 skipped**、`make -C core` 0 err/0 warn、`fullaudit` 7/7。**实机试听待用户执行**。
+
+**1. 关键判断：BGM 是闭环播放，只有速率重要、相位不重要。** MIDI 表从 t=0 播到 end、无外部同步源，因此步长允许平滑变化，不必追逐瞬时相位误差——这是把「钳制」换成「平滑变步进」的立足点。
+
+**2. 新模块 `core/lib/vclock.{c,h}`（纯整型、零 I/O、零平台调用）**：`step` 以 1/16ms 为单位向「窗口实测速率」平滑收敛（每 pass 最多 `VCLOCK_SLEW_UNITS`=8 单位=0.5ms，单步再受 `VCLOCK_MAX_ADVANCE_MS=100` 封顶）。一个「窗口」= 两次平台时钟移动间的所有 pass，闭合时以 `delta/passes` 反推真实每 pass 速率。三条性质正好覆盖三类故障：**相邻步差 ≤0.5ms（不颤）**、冻结时钟吐固定 idle 步（**不停，守住 c58 的修复**）、大跳变摊到覆盖 pass（不爆）。`hal_pc98.c` 只保留 wiring + writer/reader 切分；`hal.h` 的 `SMOOTH_CLOCK_MIN/MAX_MS` **已删除**（留常量就有人再引）。
+
+**3. 防复发（`tools/tests/test_vclock.py`，9 项 + 4 组变异）**：主机 `gcc -shared` 编译 ctypes 驱动——相邻 advance 差 ≤1ms（钉的正是缺陷本身）、冻结仍稳定推进、`[0]*24+[1000]` 跳变不单拍倾泻、15/20/25/30Hz 长期 ±5% 内、倒退不同步。变异验证：去掉 slew 有界 → `test_rate_change_converges_without_lurch` 红；恢复钳制 → `test_tempo_at_various_pass_rates` 红；冻结不推进 → `test_long_run_*` 红；删写入 → 编译失败。
+
+**4. 文档订正**：新 `devdocs/130-BGM颤动根修虚拟时钟改平滑变步进.md`；`devdocs/129` 状态改为「冻结已修，颤动见 130」；`B19` §3.1 契约从「钳制 [40,100]」重写为「vclock 平滑变步进」并删旧代码块；`B90` 函数索引补 `vclock_*`；`nb_dialog.c` 头注释订正。既有 `test_reveal_final_page.py::test_smooth_wallclock_bounds_in_hal` 断言从「钳制定居 HAL」改为「钳制常量不得复现 + vclock slew 有界」；`test_frame_pump.py` 改守 writer/reader 切分而非 `smooth_clock_total +=`。
+
+**5. 遗留**：实机音质（速率/音高/无颤动）与打字机/动画时长回归**均未执行**——三者共用此时钟，语义已变，需一并复测（devdoc 130 §4.3）。`VCLOCK_SLEW_UNITS` 是新的平滑/收敛权衡旋钮（过小收敛慢、过大步差上界升）；真机 60Hz 下 `VCLOCK_INIT_STEP_UNITS` 需重标定。
+
 <a id="c58"></a>
 ### 0.3.027 — BGM 在菜单/询问/立绘加载期间卡顿与中断根修：时钟单点化 + 统一帧泵 + mag 分块泵
 
@@ -364,6 +379,7 @@
 
 | 条目 |
 |------|
+| [0.3.028 — BGM 颤动根修：虚拟时钟废止 floor/ceiling 钳制，改平滑变步进（`lib/vclock`）](#c59) |
 | [0.3.027 — BGM 在菜单/询问/立绘加载期间卡顿与中断根修：时钟单点化 + 统一帧泵 + mag 分块泵](#c58) |
 | [0.3.026 — 引擎按 8.3 短名解析音频键（str_toc8）：修 AUDIO.DAT 截断名失配 + 全素材面同名风险审计](#c57) |
 | [0.3.025 — demo-a2 换用正式 BGM：场景 001/002 melody_town、003/004 icy_garden（去掉 test1/test2）](#c56) |

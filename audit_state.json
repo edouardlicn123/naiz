@@ -1,7 +1,7 @@
 {
   "version": 2,
-  "git_head": "8a42aae",
-  "checked_at": "2026-10-11T15:32:14",
+  "git_head": "bd2093e",
+  "checked_at": "2026-10-12T11:22:31",
   "files": {
     "core/build.sh": {
       "sha256": "0e6bb3f41cae8f6c5a014a49767f93990ddd3e2c461a85ec991c01b40b66b11e",
@@ -332,13 +332,13 @@
       "findings": []
     },
     "core/engine/nb_config.h": {
-      "sha256": "8929f5fd7612d6941a2a5da1a3090c0ab905ab7f4722659c8db83014f377f3ee",
+      "sha256": "38a8fbf62d046289f601b4dbe9d309e1194425fcfb50c6ba4cd84e45d07904e9",
       "violations": 0,
       "candidates": 0,
       "findings": []
     },
     "core/engine/nb_dialog.c": {
-      "sha256": "4358f938560f51021ff1e4c68c6cde9b4eecdc0596c1255f02d51198d156878d",
+      "sha256": "28b0e1e815d0868846e37201526ce9b6bb1e68cc676ae3b8758f4723b17f4afd",
       "violations": 0,
       "candidates": 0,
       "findings": []
@@ -798,6 +798,18 @@
       "candidates": 0,
       "findings": []
     },
+    "core/lib/vclock.c": {
+      "sha256": "f30d4ae4dff567cf2d1f343a67c2bcb0aa905a5bb7b3046f528fd7630aa5eb77",
+      "violations": 0,
+      "candidates": 0,
+      "findings": []
+    },
+    "core/lib/vclock.h": {
+      "sha256": "7cd7536aac66dea8a7e24bede978fe1316b80dee635874b4e425e4bdf69a8186",
+      "violations": 0,
+      "candidates": 0,
+      "findings": []
+    },
     "core/plat/gdc.c": {
       "sha256": "5ad3bf78f5e8dc5a9fe3ec3690d52b0e88a6c3df304b6c2d48194c439f381479",
       "violations": 0,
@@ -811,7 +823,7 @@
       "findings": []
     },
     "core/plat/hal.h": {
-      "sha256": "de9feeb30a69a699dd2fcba1e9d1bfc386b273119af8db3da9256557ff2df1e3",
+      "sha256": "49ac86cb401e44370b4e81bebf83c36d2452ee3b1cdc16a1e99ef03135dacf5a",
       "violations": 0,
       "candidates": 0,
       "findings": []
@@ -835,7 +847,7 @@
       "findings": []
     },
     "core/plat/hal_pc98.c": {
-      "sha256": "805071e46ec4014606ab96d95724213c3b075c020a1238ad07478987fc859e10",
+      "sha256": "6a54f316b414112fb13a3b67844df9eef98da233fc24c8beb2ad26d831abe632",
       "violations": 0,
       "candidates": 0,
       "findings": []
@@ -1495,9 +1507,9 @@
     }
   },
   "summary": {
-    "files": 201,
-    "changed": 1,
-    "skipped": 200,
+    "files": 203,
+    "changed": 0,
+    "skipped": 203,
     "out_of_scope": 0,
     "violations": 0,
     "candidates": 49,

@@ -21,6 +21,7 @@
 #include "pc98.h"
 #include "serial.h"
 #include "gdc.h"
+#include "vclock.h"
 #include <i86.h>
 #include <stdarg.h>
 #include <stdio.h>
@@ -51,13 +52,31 @@ static int          wallclock_inited = 0;
 #define WALLCLOCK_DOS_TIME_INT  0x21
 #define WALLCLOCK_DOS_AH_GET_TIME 0x2C
 
+/* Virtual wall clock (devdoc 107 / 0.2.134, devdoc 129 follow-up).
+ *
+ * hal_wallclock_ms() is MACRO-accurate but its single-call delta is coarse:
+ * the DOS 2Ch reading is second-quantised and delivered in clusters (frozen
+ * 3-6s, then +1000..+6000ms), which froze the naive consumers and burst them
+ * on catch-up.  The original answer (0.2.134) clamped the per-pass delta to
+ * a fixed floor/ceiling; devdoc 129's frame pump then exposed that
+ * clamp's flaw: with the advance happening once per pass, the
+ * clamp alternates a 40ms floor step and a 100ms ceiling step, and that
+ * uneven step size is the BGM flutter.
+ *
+ * The smoothing therefore lives in lib/vclock, which slews its step size
+ * toward the rate the DOS clock actually measures instead of clamping it.
+ * HAL's remaining job is ownership: vclock_advance() is the sole writer (the
+ * frame pump) and hal_wallclock_smooth_ms() only reads.
+ */
+static VClock g_vclock;
+
 /*
  * Platform initialization.
  *
  * PC-98 implementation: initializes uPD8251 serial port (COM1, 9600 8N1)
  * as the debug log output channel.
  */
-void hal_init(void) { serial_init(); }
+void hal_init(void) { serial_init(); vclock_init(&g_vclock); }
 
 unsigned long hal_wallclock_ms(void)
 {
@@ -91,68 +110,14 @@ unsigned long hal_wallclock_ms(void)
     return wallclock_ms_total;
 }
 
-/* Virtual wall clock (devdoc 107 / 0.2.134).
- *
- * hal_wallclock_ms() is a MACRO-accurate clock: the accumulated total is
- * monotonic and second-correct across NP2kai's clock holes, but a single-call
- * delta is chunked — the DOS 2Ch reading on NP2kai is whole-second quantized
- * (dl=0 every sample) and delivered in clusters (frozen 3-6 real seconds, then
- * +1000..+6000ms in one jump).  Any consumer that derives a micro-beat from
- * consecutive raw deltas stalls during a hole and bursts on catch-up.
- *
- * This virtual clock bounds the per-pass delta to
- * [SMOOTH_CLOCK_MIN_MS, SMOOTH_CLOCK_MAX_MS], so it advances at main-loop pass
- * cadence through the holes (NP2kai's only smooth tick is ~20-28Hz pass rate)
- * and discards the catch-up surplus.  Macro seconds stay correct up to one
- * clamp per hole; the microscopic beat is smooth and monotonic.
- *
- * Calibration note: MIN_MS=40 is coupled to the pass rate — it is the nominal
- * pass interval under NP2kai (~25Hz -> ~1s/s inside holes).  On real 60Hz
- * hardware the floor inflates the virtual clock when raw reads delta==0; retune
- * SMOOTH_CLOCK_MIN_MS in hal.h if native hardware is ever targeted (has no
- * effect under DOS/4GW+NP2kai where the DOS clock ticks at ~55ms and only the
- * ceiling guard path is ever active). */
-static unsigned long smooth_clock_total = 0;
-static unsigned long smooth_raw_prev = 0;
-static int           smooth_inited = 0;
-
-/*
- * Advance the virtual clock by exactly one frame (devdoc 129).
- *
- * Ownership rule: this is the ONLY writer.  The engine frame pump
- * (engine_frame_pump) calls it once per main-loop pass; every other consumer
- * (BGM scheduler / typewriter reveal / animation) calls the read-only
- * hal_wallclock_smooth_ms().  Before devdoc 129 the advance lived inside
- * hal_wallclock_smooth_ms(), so the clock rate was the product of the number
- * of consumers and the pass frequency — blocking ops slowed it, reveal+anim
- * sped it up.  Splitting writer from reader makes the per-frame elapsed time
- * independent of how many subsystems poll it, which also makes audio_tick()
- * idempotent within a frame (safe to pump repeatedly during a long decode).
- */
-void hal_wallclock_smooth_advance(void)
-{
-    unsigned long raw = hal_wallclock_ms();
-    unsigned long delta;
-
-    if (!smooth_inited) {
-        smooth_raw_prev = raw;
-        smooth_inited = 1;
-        return;    /* baseline pass, no advancement */
-    }
-
-    delta = raw - smooth_raw_prev;   /* raw total is monotonic */
-    smooth_raw_prev = raw;
-
-    if (delta == 0)            delta = SMOOTH_CLOCK_MIN_MS;
-    else if (delta > SMOOTH_CLOCK_MAX_MS) delta = SMOOTH_CLOCK_MAX_MS;
-
-    smooth_clock_total += delta;
-}
-
-/* Read-only view of the virtual clock.  No side effects (devdoc 129). */
 unsigned long hal_wallclock_smooth_ms(void)
 {
-    return smooth_clock_total;
+    return vclock_ms(&g_vclock);
+}
+
+void hal_wallclock_smooth_advance(void)
+{
+    vclock_advance(&g_vclock, hal_wallclock_ms());
 }
 
 /*

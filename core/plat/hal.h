@@ -127,19 +127,19 @@ void hal_vblank_wait(void);
 unsigned long hal_wallclock_ms(void);
 
 /*
- * 虚拟时钟毫秒数（逐 pass 增量钳制，devdoc 107 / 0.2.134）
+ * 虚拟时钟毫秒数（平滑步进，devdoc 107 / 0.2.134，devdoc 129 订正）
  *
  * 供微秒级节拍消费方（打字机 reveal / 动画 / BGM MIDI 调度）使用的单一
  * 事实源。hal_wallclock_ms() 的宏观累计值秒级正确，但 NP2kai 上单次调用
  * delta 成块交付（冻结 3-6s 后一次 +1000..+6000ms 跳），直接吃 raw delta
- * 的消费方会冻结-爆发。本接口把每两次调用间的增量钳制到
- * [SMOOTH_CLOCK_MIN_MS, SMOOTH_CLOCK_MAX_MS]，宏观≈raw、微观单调平滑。
- * 首 pass 返回 0（基线）。MIN_MS 与主循环 pass 率耦合（NP2kai ~25Hz 下洞内
- * 恰以 1s/s 推进）；真机 60Hz 会偏快，详见 hal_pc98.c 校准注记。
+ * 的消费方会冻结-爆发。
+ *
+ * 平滑策略在 lib/vclock（0.3.028，devdoc 129 follow-up）：不再把每 pass 增
+ * 量钳制到固定上下限，而是让步进大小向 DOS 时钟实测出的速率平滑收敛
+ * （每 pass 最多挪 VCLOCK_SLEW_UNITS）。订正原因：帧泵把 advance 收敛为
+ * 「每 pass 一次」后，旧的 floor/ceiling 钳制会在洞内吐 40ms 步、在秒落地
+ * 的哪一拍吐 100ms 步，2.5:1 交替即为可闻的 BGM 颤动。首 pass 返回 0（基线）。
  */
-#define SMOOTH_CLOCK_MIN_MS 40UL   /* stall floor: virtual ms per pass while
-                                    * raw reports delta==0 (NP2kai pass ~40ms) */
-#define SMOOTH_CLOCK_MAX_MS 100UL  /* catch-up ceiling: one real pass cadence */
 
 /*
  * Advance the virtual clock by exactly one frame (devdoc 129).

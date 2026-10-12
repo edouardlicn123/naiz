@@ -43,6 +43,7 @@ FRAME_H = ROOT / "core" / "engine" / "frame.h"
 MAG_C = ROOT / "core" / "lib" / "mag.c"
 MAG_H = ROOT / "core" / "lib" / "mag.h"
 AUDIO_C = ROOT / "core" / "engine" / "audio.c"
+VCLOCK_H = ROOT / "core" / "lib" / "vclock.h"
 
 # Every self-contained input loop from devdoc 129 §2.1 plus main.c's three.
 # A loop missing here is a loop that freezes BGM.
@@ -84,26 +85,41 @@ def _func_body(src, name):
 # --- 1. clock ownership: one writer, readers side-effect free ---------------
 
 def test_smooth_advance_is_the_only_clock_writer():
-    """hal_wallclock_smooth_ms() must be a plain read of the accumulator.
-
-    If it still adds a delta, the tempo is again a function of how many
-    consumers poll it (devdoc 129 §2.3).
-    """
-    c = _src("core/plat/hal_pc98.c")
+    """The reader must be a plain read of vclock, and the writer must go
+    through it.  The accumulator itself moved into lib/vclock (devdoc 129
+    follow-up); what must hold is the split, not where the += lives."""
+    c = HAL_PC98_C.read_text(encoding="utf-8")
     body = _func_body(c, "hal_wallclock_smooth_ms")
-    assert "smooth_clock_total" in body, "reader must return the accumulator"
-    for bad in ("+=", "delta", "hal_timer_ms", "rand"):
+    assert "vclock_ms" in body, "reader must delegate to vclock"
+    for bad in ("+=", "delta", "hal_wallclock_ms", "vclock_advance"):
         assert bad not in body, (
             f"hal_wallclock_smooth_ms() still moves the clock ({bad!r})"
         )
 
 
-def test_smooth_advance_owns_the_increment():
-    c = _src("core/plat/hal_pc98.c")
+def test_smooth_advance_owns_the_step():
+    c = HAL_PC98_C.read_text(encoding="utf-8")
     body = _func_body(c, "hal_wallclock_smooth_advance")
-    assert "smooth_clock_total +=" in body, (
-        "hal_wallclock_smooth_advance() must be the accumulator's only writer"
+    assert "vclock_advance" in body, (
+        "hal_wallclock_smooth_advance() must be the only writer path"
     )
+    # exactly one vclock state, and nothing else pokes the accumulator
+    assert c.count("VClock g_vclock") == 1, "vclock state must be a single instance"
+    assert "vclock_advance" in body, "advance must go through vclock"
+
+
+def test_smooth_step_is_slewed_not_clamped(monkeypatch=None):
+    """The flutter defect: a floor/ceiling clamp on the step.
+
+    The smoothing policy lives in lib/vclock; this pins that the old clamp
+    constants are gone and the slew bound is what bounds the step, so the
+    BGM's note onsets stay evenly spaced (devdoc 129 follow-up).
+    """
+    h = HAL_H.read_text(encoding="utf-8")
+    for dead in ("SMOOTH_CLOCK_MIN_MS", "SMOOTH_CLOCK_MAX_MS"):
+        assert dead not in h, f"{dead} (the flutter-causing clamp) is back in hal.h"
+    vh = VCLOCK_H.read_text(encoding="utf-8")
+    assert "VCLOCK_SLEW_UNITS" in vh, "vclock must bound step change via the slew"
 
 
 def test_smooth_advance_is_declared_in_hal_h():

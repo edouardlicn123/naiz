@@ -11,7 +11,7 @@
 #include <stdlib.h>
 #include <string.h>
 
-#define MAG_PROGRESS_STRIDE 2048
+#define MAG_PROGRESS_STRIDE 4096
 
 static void (*g_mag_progress_hook)(void) = 0;
 

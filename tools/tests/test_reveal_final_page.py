@@ -39,6 +39,11 @@ Five bug classes are frozen here:
    hal.h), shared by typewriter / animation / BGM — the per-module local
    boxing (REVEAL_PASS_*) must not be reintroduced.
 
+   0.3.028 (devdoc 129 follow-up) superseded the CLAMP itself: with the frame
+   pump making the advance happen once per pass, the floor/ceiling clamp
+   alternated 40ms/100ms steps and that was the BGM flutter.  The smoothing
+   now lives in lib/vclock as a smooth slew (test_smooth_wallclock_bounds_in_hal).
+
 5. The "advance at least one char per call" conflation: a blanket per-frame
    floor is forbidden; the virtual-clock floor is a TIME bound (ms), not a
    char-per-call override, so the 16/32/64 speed tiers still set the rate.
@@ -136,23 +141,33 @@ def test_reveal_virtual_clock_bounded_delta():
 
 
 def test_smooth_wallclock_bounds_in_hal():
-    # The virtual-clock clamp must live in the HAL, shared by every
+    # The virtual-clock smoothing must live in the HAL, shared by every
     # micro-rhythm consumer (typewriter / animation / BGM, devdoc 107).
+    # 0.3.028 (devdoc 129 follow-up): the per-pass delta CLAMP was the BGM
+    # flutter — it alternated a 40ms floor step and a 100ms ceiling step, and
+    # that uneven step size is what the ear heard.  The smoothing policy moved
+    # to lib/vclock, which SLEWS its step toward the measured rate instead of
+    # clamping it; HAL keeps only the wiring and the writer/reader split.
     HAL = ROOT / "core" / "plat" / "hal_pc98.c"
     HDR = ROOT / "core" / "plat" / "hal.h"
+    VCLOCK_H = ROOT / "core" / "lib" / "vclock.h"
     src = HAL.read_text(encoding="utf-8")
     hdr = HDR.read_text(encoding="utf-8")
+    vh = VCLOCK_H.read_text(encoding="utf-8")
     assert "hal_wallclock_smooth_ms" in src, (
         "hal_pc98.c must implement the smooth virtual clock")
-    assert "smooth_inited" in src and "smooth_clock_total" in src, (
-        "the smooth clock needs a baseline pass and an accumulated total")
-    assert "SMOOTH_CLOCK_MIN_MS" in src and "SMOOTH_CLOCK_MAX_MS" in src, (
-        "the per-pass delta clamp (stall floor / catch-up ceiling) must live "
-        "with the HAL implementation (devdoc 107)")
-    assert "SMOOTH_CLOCK_MIN_MS" in hdr and "SMOOTH_CLOCK_MAX_MS" in hdr, (
-        "SMOOTH_CLOCK_* tuning constants must be exposed from hal.h")
+    assert "vclock_ms" in src and "vclock_advance" in src, (
+        "HAL must delegate the smooth clock to lib/vclock, not re-own a copy")
+    assert "SMOOTH_CLOCK_MIN_MS" not in src and "SMOOTH_CLOCK_MAX_MS" not in src, (
+        "the per-pass delta CLAMP (the BGM flutter) must not come back; "
+        "lib/vclock slews the step instead (devdoc 129 follow-up)")
+    assert "VCLOCK_SLEW_UNITS" in vh, (
+        "lib/vclock must bound per-pass step change via the slew, so the "
+        "reveal / animation / BGM all get an evenly spaced micro-beat")
     assert "hal_wallclock_smooth_ms" in hdr, (
         "hal.h must declare hal_wallclock_smooth_ms()")
+    assert "vclock.h" in src or "VClock" in src, (
+        "HAL must include the vclock header")
 
 
 def test_reveal_page_baseline_recalibrates():
