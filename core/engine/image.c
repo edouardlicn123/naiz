@@ -189,6 +189,44 @@ MagImage *image_load(unsigned short id)
     return mag_retain(img);
 }
 
+/* Decode image id into the LRU cache ahead of its use (devdoc 131 方案 D).
+ * Same decode path as image_load() but: on hit it does nothing; on miss it
+ * decodes and inserts (cache owns the slot reference) WITHOUT retaining a
+ * caller reference and WITHOUT touching the active palette.  Any failure is
+ * non-fatal — the eventual image_load() will simply decode again. */
+int image_prefetch(unsigned short id)
+{
+    long offset, msize;
+    MagImage *img;
+    uint8_t *raw;
+
+    if (!g_image_arc.fp || (int)id >= g_image_arc.count)
+        return -1;
+    if (image_cache_lookup((int)id))
+        return 0;                     /* already warm */
+
+    if (farchive_lookup_id(&g_image_arc, (int)id, &offset, &msize) != 0)
+        return -1;
+    if (msize <= 0)
+        return -1;
+
+    raw = farchive_read_alloc(&g_image_arc, offset, msize, NULL);
+    if (!raw)
+        return -1;
+    if (mag_decode(raw, (int)msize, &img) != 0) {
+        free(raw);
+        return -1;
+    }
+    free(raw);
+
+    /* Cache takes the slot's reference (refcount 1, as mag_decode left it);
+     * the prefetch holds none, so the image lives on in the cache until it is
+     * evicted or image_load() retains it for a caller. */
+    image_cache_insert((int)id, img);
+    image_cache_pin((int)id);         /* survive until the command runs (133) */
+    return 0;
+}
+
 /*=== Raw blob access ======================================================*/
 
 /* Return a pointer to the raw archive bytes of entry id (no decode).

@@ -21,6 +21,12 @@
 
 #define IMAGE_CACHE_SLOTS 8
 
+/* Hit floor for a prefetched image.  Eviction picks the lowest-hits slot, so a
+ * just-prefetched image (hits 0) would be the first thrown away before its
+ * script command ran; the pin lifts it above the freshly-loaded slots until it
+ * is used (devdoc 133 方案 D). */
+#define IMAGE_CACHE_PREFETCH_HITS 4
+
 typedef struct {
     int       id;            /* asset_id, -1 = empty */
     MagImage *img;           /* decoded image */
@@ -105,4 +111,19 @@ void image_cache_insert(int id, MagImage *img)
     g_image_cache[evict].id = id;
     g_image_cache[evict].img = img;
     g_image_cache[evict].hits = 0;
+}
+
+/* Lift a slot's hit floor so a prefetched image survives until it is used.
+ * See image_internal.h; no-op when the id is not cached. */
+void image_cache_pin(int id)
+{
+    int i;
+    if (id < 0) return;
+    for (i = 0; i < IMAGE_CACHE_SLOTS; i++) {
+        if (g_image_cache[i].id == id) {
+            if (g_image_cache[i].hits < IMAGE_CACHE_PREFETCH_HITS)
+                g_image_cache[i].hits = IMAGE_CACHE_PREFETCH_HITS;
+            return;
+        }
+    }
 }

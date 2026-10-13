@@ -25,5 +25,12 @@ MagImage *image_load(unsigned short id);
  * image_init/image_close. *out_size (optional) receives byte length.
  * NULL on bad id/hole/TOC corruption. */
 const unsigned char *image_raw_blob(unsigned short id, long *out_size);
+/* Decode image `id` into the LRU cache ahead of time (devdoc 131 方案 D).
+ * No-op with return 0 if already cached.  Unlike image_load(), this does NOT
+ * change the active palette and hands no reference back — the point is to
+ * move the decode cost off the frame that actually shows the image (during
+ * the preceding dialogue's idle wait).  Returns 0 on success/cached, -1 on
+ * bad id or decode failure. */
+int image_prefetch(unsigned short id);
 
 #endif

@@ -22,4 +22,16 @@
 
 void engine_frame_pump(void);
 
+/*
+ * Decode-time frame step (devdoc 131 方案 B).
+ *
+ * Same job as engine_frame_pump() but safe to call from inside a long
+ * CPU-bound path (the MAG decode progress hook): it advances the virtual
+ * clock and pumps audio only when the display has actually reached a new
+ * VBLANK, so the BGM keeps flowing during a decode without the clock racing,
+ * and it never blocks a full frame per decode stride.  (devdoc 131 方案 A's
+ * periodic vblank yield in audio_tick was removed in devdoc 133.)
+ */
+void frame_decode_pump(void);
+
 #endif

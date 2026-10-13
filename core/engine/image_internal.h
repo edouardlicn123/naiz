@@ -27,4 +27,9 @@ MagImage *image_cache_lookup(int id);
  * least-recently-used slot when the cache is full. */
 void image_cache_insert(int id, MagImage *img);
 
+/* Raise a cached slot's hit floor so a freshly prefetched image is not the
+ * first thing evicted before its script command runs (devdoc 133 方案 D).  A
+ * no-op if id is not cached. */
+void image_cache_pin(int id);
+
 #endif

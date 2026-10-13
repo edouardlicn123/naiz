@@ -21,6 +21,18 @@ What is pinned:
 
   CORRECT TEMPO.  Over a run, the virtual total must track real elapsed time,
   so a song neither creeps nor races.
+
+devdoc 133 added two fixes for the residual flutter the first design left:
+
+  ADOPT THE FIRST WINDOW.  The step used to start at a nominal 640 units and
+  slew to the measured rate, so a song played off-tempo for the first seconds
+  ("starts fast then settles").  The first closed window is now adopted
+  outright.
+
+  SMOOTH THE MEASUREMENT.  The DOS second is quantised, so one window's
+  `want` jitters by ~1/passes (~5% at 20 passes); chasing it every window was
+  itself the audible flutter.  Later windows now move the target only a
+  fraction of the way to each reading.
 """
 import ctypes
 import os
@@ -71,7 +83,9 @@ def _make_clock():
             ("step", ctypes.c_ulong),
             ("target", ctypes.c_ulong),
             ("passes", ctypes.c_ulong),
+            ("accum", ctypes.c_ulong),
             ("started", ctypes.c_int),
+            ("calibrated", ctypes.c_int),
         ]
 
     lib.vclock_init.argtypes = [ctypes.POINTER(VClockT)]
@@ -249,3 +263,79 @@ def test_init_is_zero_and_baseline_does_not_advance():
     assert lib.vclock_ms(ctypes.byref(vc)) == 0
     lib.vclock_advance(ctypes.byref(vc), 12345)
     assert lib.vclock_ms(ctypes.byref(vc)) == 0, "baseline pass must not advance"
+
+
+# --- 3. devdoc 133: adopt the first window, smooth the rest -----------------
+
+def _quantised_windows(sizes, tick_ms=1000):
+    """Real readings where window k spans `sizes[k]` passes then ticks.
+
+    Mirrors NP2kai: the DOS second is held flat and then delivered as one
+    +tick_ms jump on the pass that closes the window.
+    """
+    out = []
+    t = 0
+    for size in sizes:
+        for i in range(size):
+            if i == size - 1:
+                t += tick_ms
+            out.append(t)
+    return out
+
+
+def test_first_window_is_adopted_not_ramped():
+    """devdoc 133 §2.1: the first measured window must set the step outright.
+
+    The old design started at VCLOCK_INIT_STEP_UNITS (640) and slewed to the
+    measured rate, so a song played off-tempo for the first seconds.  15 passes
+    per second is a 66.7 ms true step (1066 units), far from 640 -- if it is
+    adopted, the step equals that on the closing pass itself, not several
+    passes later.
+    """
+    reals = _np2kai(150, hz=15)          # 15 frames per delivered second
+    lib, vc = _make_clock()
+    adopted = None
+    for r in reals:
+        lib.vclock_advance(ctypes.byref(vc), r)
+        if vc.calibrated:
+            adopted = vc.step
+            break
+    want = 16000 // 15                    # 1066 units
+    assert adopted == want, (
+        f"first window not adopted outright: step={adopted}, want={want}")
+    assert adopted != INIT_STEP, "step is still the nominal priming constant"
+
+
+def test_quantised_jitter_is_smoothed():
+    """devdoc 133 §2.2: the measured-rate jitter must not reach the step.
+
+    Alternating 20/21-pass windows make `want` swing between 800 and 762 units
+    (a ~5% jitter).  Without smoothing the step chases each reading and the
+    beat wobbles (range ~38 units); with the IIR it stays near the average.
+    """
+    reals = _quantised_windows([20, 21] * 60)
+    lib, vc = _make_clock()
+    steps = []
+    for r in reals:
+        lib.vclock_advance(ctypes.byref(vc), r)
+        steps.append(vc.step)
+    body = steps[1000:]                   # well past the first-window adoption
+    assert body, "no advances emitted"
+    spread = max(body) - min(body)
+    assert spread <= 24, (
+        f"step swings by {spread} units chasing quantisation jitter: "
+        f"{sorted(set(body))}")
+
+
+def test_a_stalled_window_does_not_move_the_rate():
+    """devdoc 133: a window that a single pass swallowed measures one pass per
+    second -- real, but unrepresentative.  It must not slow the clock."""
+    reals = _quantised_windows([20])      # first window adopts some rate
+    lib, vc = _make_clock()
+    for r in reals:
+        lib.vclock_advance(ctypes.byref(vc), r)
+    cal = vc.target
+    lib.vclock_advance(ctypes.byref(vc), reals[-1] + 1000)  # one pass, one second
+    assert vc.target == cal, (
+        f"a one-pass window moved the target {cal} -> {vc.target}")
+    assert vc.step == cal, f"the clock slowed to {vc.step}"

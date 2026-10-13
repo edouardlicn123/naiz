@@ -1,5 +1,5 @@
 /*
- * vclock.c — Smoothed virtual clock (devdoc 129).
+ * vclock.c — Smoothed virtual clock (devdoc 129/133).
  *
  * The defeat of the previous design (hal.h SMOOTH_CLOCK_MIN/MAX_MS) was that
  * it clamped the per-pass delta and let each consumer derive its beat from
@@ -11,12 +11,11 @@
  * audible flutter: the clock advanced unevenly where it needed to advance
  * smoothly.
  *
- * This module instead holds a step size in 1/K ms units and slews it toward
- * the rate the platform actually measures.  A window is the run of passes
- * between two platform clock movements; when the platform finally jumps, the
- * jump size and the number of passes it covered tell us the true per-pass
- * rate, and the step size moves toward it by at most VCLOCK_SLEW_UNITS per
- * pass.  Consequences:
+ * This module holds a step size in 1/K ms units and slews it toward the rate
+ * the platform actually measures.  A window is VCLOCK_WINDOW_MS of real time;
+ * when it closes, the amount of time and the number of passes it covered tell
+ * us the true per-pass rate, and the step size moves toward it by at most
+ * VCLOCK_SLEW_UNITS per pass.  Consequences:
  *
  *   - successive advances differ by at most VCLOCK_SLEW_UNITS (steady beat);
  *   - a frozen platform clock keeps advancing at the current step (no stall);
@@ -25,11 +24,22 @@
  *   - the long-run average tracks real time (correct tempo), because every
  *     window re-measures it.
  *
- * The phase between the virtual clock and the platform reading is not
+ * devdoc 133 refinement.  Two defects survived the above:
+ *
+ *   1. The step started at a nominal 640 units and *slewed* to the measured
+ *      rate, so for the first window(s) — seconds under NP2kai's cluster
+ *      delivery — a song played at the wrong tempo ("starts fast then
+ *      settles").  Fix: the first closed window is adopted outright.
+ *   2. Because the platform's second is quantised, `want` jitters by up to
+ *      ~1/passes (~5% at 20 passes); slewing after that jitter every window is
+ *      itself the residual flutter, and it is audible while merely sitting on
+ *      a dialogue page.  Fix: later windows move the target by only
+ *      1/VCLOCK_MEAS_SMOOTH of the error, averaging the jitter out.
+ *
+ * The phase between the virtual clock and the platform reading is still not
  * controlled, and does not need to be: every consumer drives a closed loop
  * (a MIDI table, a reveal, an animation) from this clock, so only its rate
- * matters.  That freedom is what allows the step to change smoothly rather
- * than being forced to chase instantaneous phase error.
+ * matters.
  *
  * Plain integer arithmetic, no floats and no I/O: the whole state machine is
  * exhaustively testable on the host.
@@ -44,7 +54,9 @@ void vclock_init(VClock *vc)
     vc->step = VCLOCK_INIT_STEP_UNITS;
     vc->target = VCLOCK_INIT_STEP_UNITS;
     vc->passes = 0;
+    vc->accum = 0;
     vc->started = 0;
+    vc->calibrated = 0;
 }
 
 void vclock_advance(VClock *vc, unsigned long real_ms)
@@ -64,27 +76,51 @@ void vclock_advance(VClock *vc, unsigned long real_ms)
 
     if (real_ms < vc->real_prev) {
         /* Platform wrapped (midnight) or went backwards.  Resynchronise the
-         * baseline instead of deriving a huge unsigned delta from it. */
+         * baseline and reopen the window instead of deriving a huge unsigned
+         * delta from it. */
         vc->real_prev = real_ms;
         vc->passes = 0;
+        vc->accum = 0;
+        vc->calibrated = 0;
         return;
     }
 
     delta = real_ms - vc->real_prev;   /* platform clock is monotone */
     vc->real_prev = real_ms;
+    vc->accum += delta;
     vc->passes++;
 
-    if (delta > 0) {
-        /* The platform moved: window closed.  `delta` ms were really consumed
-         * across `passes` frames, so that is the true per-pass rate.  Reaching
-         * for it here is what keeps the long-run tempo honest. */
-        unsigned long want = (delta * VCLOCK_UNITS_PER_MS) / vc->passes;
+    if (vc->accum >= VCLOCK_WINDOW_MS && vc->passes >= VCLOCK_MIN_WINDOW_PASSES) {
+        /* The window closed: `accum` ms were really consumed across `passes`
+         * frames, so that is the true per-pass rate.  Reaching for it here is
+         * what keeps the long-run tempo honest. */
+        unsigned long want = (vc->accum * VCLOCK_UNITS_PER_MS) / vc->passes;
         if (want < VCLOCK_RATE_MIN_MS * VCLOCK_UNITS_PER_MS)
             want = VCLOCK_RATE_MIN_MS * VCLOCK_UNITS_PER_MS;
         if (want > VCLOCK_RATE_MAX_MS * VCLOCK_UNITS_PER_MS)
             want = VCLOCK_RATE_MAX_MS * VCLOCK_UNITS_PER_MS;
-        vc->target = want;
+
+        if (!vc->calibrated) {
+            /* First real measurement: adopt it outright.  Ramping from the
+             * nominal constant is what made a song start off-tempo for the
+             * first seconds (devdoc 133 §2.1). */
+            vc->target = want;
+            vc->step = want;
+            vc->calibrated = 1;
+        } else {
+            /* Average the quantisation jitter: move only a fraction of the
+             * way to each window's reading (devdoc 133 §2.2). */
+            long diff = (long)want - (long)vc->target;
+            vc->target = (unsigned long)((long)vc->target
+                                         + diff / (long)VCLOCK_MEAS_SMOOTH);
+        }
         vc->passes = 0;
+        vc->accum = 0;
+    } else if (vc->accum >= VCLOCK_WINDOW_MS) {
+        /* Window closed but too short to trust (a hard stall ate the whole
+         * span): keep the rate and start a fresh window. */
+        vc->passes = 0;
+        vc->accum = 0;
     }
 
     /* Slew the step toward the measured target.  Bounded per pass, so the

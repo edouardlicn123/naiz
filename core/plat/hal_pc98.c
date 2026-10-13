@@ -70,6 +70,12 @@ static int          wallclock_inited = 0;
  */
 static VClock g_vclock;
 
+/* devdoc 133: serial tempo probe toggle (0 = off).  Defaults on so a single
+ * build is verifiable; the [VC] line is emitted every 64 advances. */
+#ifndef VCLOCK_TRACE_ENABLED
+#define VCLOCK_TRACE_ENABLED 1
+#endif
+
 /*
  * Platform initialization.
  *
@@ -118,20 +124,62 @@ unsigned long hal_wallclock_smooth_ms(void)
 void hal_wallclock_smooth_advance(void)
 {
     vclock_advance(&g_vclock, hal_wallclock_ms());
+#if VCLOCK_TRACE_ENABLED
+    /* devdoc 133 tempo probe.  step is in 1/16 ms (step/16 = ms/pass), tgt the
+     * rate the DOS clock measures, cal=1 once the first window is adopted.
+     * Compare step/16 against the display frame time to see whether the clock
+     * runs fast or slow.  Compile out with -DVCLOCK_TRACE_ENABLED=0. */
+    {
+        static unsigned trace_ctr = 0;
+        if (++trace_ctr >= 64) {
+            trace_ctr = 0;
+            hal_logf("[VC] v=%lu step=%lu tgt=%lu cal=%d\n",
+                     vclock_ms(&g_vclock), g_vclock.step, g_vclock.target,
+                     g_vclock.calibrated);
+        }
+    }
+#endif
 }
 
 /*
- * Wait for vertical retrace (VBLANK).
+ * Vertical-retrace sync and frame-boundary detection (devdoc 131 A/B).
  *
- * Polls GDC graphics status port 0xA0 bit 5 (VSYNC flag, refdocs C01).
- * Returns at the beginning of VBLANK, ~16ms safe window for tear-free VRAM ops.
- * Purely a pacing/tear-prevention sync point — it no longer feeds the
- * wall clock (NP2kai pass rate ~20.5Hz would make frame counting useless).
+ * GDC graphics status port 0xA0 bit 5 is the VSYNC flag (refdocs C01).
+ *
+ * `g_vs_level` tracks the last sampled level so a caller that cannot afford
+ * to block (the MAG decode inner loop, devdoc 131 §6 方案 B) can still detect
+ * that the display advanced one frame — the virtual clock must step at the
+ * DISPLAY's rate, not at the decode loop's stride count, or the BGM races.
+ * Frame counting is deliberately used ONLY as a boundary detector, never as a
+ * time source: B19 §2.3 retired it as a CLOCK because NP2kai runs it at
+ * ~20.5Hz (a 3x-slow time base).  A boundary is just a boundary.
  */
+static int g_vs_level = -1;   /* last sampled VSYNC level, -1 = uninitialised */
+
 void hal_vblank_wait(void)
 {
     int timeout = 100000;
     while (!(inb(GDC_GFX_PARAM) & GDC_VSYNC) && --timeout > 0);
+    /* Returning at the start of a VBLANK:  the flag is asserted here. */
+    g_vs_level = 1;
+}
+
+/*
+ * Non-blocking VSYNC sampling for long CPU-bound paths (devdoc 131 方案 B).
+ *
+ * Returns 1 exactly once per rising edge (VBLANK start); 0 otherwise.  Cheap
+ * enough to call on every MAG decode stride.  The baseline is set by the first
+ * call, and hal_vblank_wait() keeps it fresh after a blocking sync, so a
+ * blocking pump and a polling decode loop never double-count the same frame.
+ */
+int hal_vblank_poll(void)
+{
+    int now = (inb(GDC_GFX_PARAM) & GDC_VSYNC) ? 1 : 0;
+    int prev = g_vs_level;
+    g_vs_level = now;
+    if (prev < 0)
+        return 0;            /* establish baseline */
+    return (prev == 0 && now == 1);
 }
 
 /*

@@ -59,4 +59,12 @@ void nb_get_state(char *filename, int fn_size,
  */
 void nb_set_lang(const char *lang);
 
+/*
+ * 对话空闲期预取：从当前脚本位置向后扫描显示命令（cg/bg/char）并把图像
+ * 解码进 LRU 缓存，使解码开销落在玩家阅读时间而非显示帧上（devdoc 131
+ * 方案 D / devdoc 133 修活）。由 main.c 的三个主循环每 pass 调用一次；
+ * 内部 done_pc 守卫保证每个脚本位置最多扫描一次，故重复调用是廉价的。
+ */
+void nb_prefetch_lookahead(void);
+
 #endif

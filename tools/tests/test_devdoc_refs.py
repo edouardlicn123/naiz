@@ -100,9 +100,9 @@ LINE_REF_WHITELIST = {
     ("prefs.c", 244): "USER.CFG",
     ("prefs.c", 269): "prefs_set_lang",
     ("prefs.h", 75): "prefs_get_version",
-    ("bootmenu.c", 103): "find_lang_index",
-    ("bootmenu.c", 200): "bootmenu_run",
-    ("bootmenu.c", 286): "prefs_set_lang",
+    ("bootmenu.c", 104): "find_lang_index",
+    ("bootmenu.c", 201): "bootmenu_run",
+    ("bootmenu.c", 293): "prefs_set_lang",
     ("main.c", 102): "LANG] boot",
     ("main.c", 106): "cjk_load_for_lang",
     ("nb.c", 166): "prefs_load",
@@ -166,6 +166,12 @@ SUPERSEDED_SHIFTED_LINE_REFS = {
     ("nb_setting.c", 178), ("nb_setting.c", 227), ("nb_setting.c", 241),
     ("nb_setting.c", 486), ("hal_audio.c", 158),
     ("main.c", 101), ("main.c", 105),
+    # The boot menu gained the frame pump (frame.h: every interactive loop must
+    # pump it) so the virtual clock is calibrated before scene 1's BGM.  That
+    # added one #include and one call, shifting find_lang_index /
+    # bootmenu_run / prefs_set_lang by +1 / +1 / +7.  devdoc 120 §9 printed the
+    # old coordinates; the current ones are checked in LINE_REF_WHITELIST.
+    ("bootmenu.c", 103), ("bootmenu.c", 200), ("bootmenu.c", 286),
 }
 
 # References to files RENAMED in 0.3.014.  devdocs 118/119 are finished and may
@@ -187,7 +193,7 @@ RETIRED_FILE_QUOTES = {
     ("settings.c", 308), ("settings.h", 49), ("settings.h", 50),
     ("settings_menu.c", 105), ("settings_menu.c", 162),
     # devdoc 120 §2.2 cites bootmenu.c:105 in its pre-rename coordinate
-    # paragraph; find_lang_index now lives at 103 and is checked there.
+    # paragraph; find_lang_index now lives at 104 and is checked there.
     ("bootmenu.c", 105),
     # devdoc 118 §6.1 / devdoc 119 §2 last line: build_game.py's settings.txt
     # deploy stage.  Removed in 0.3.014; the prune that replaced it is 120 §9.

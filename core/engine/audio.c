@@ -447,10 +447,14 @@ int audio_get_pcm_volume(void) { return g_pcm_vol; }
 /*=== Lifecycle ==========================================================*/
 
 void audio_tick(void);
+/* devdoc 131 方案 B: the MAG decode progress hook runs one decode-time frame
+ * step (advance clock on vblank edge + pump audio) instead of a bare
+ * audio_tick(), so a long decode no longer freezes the BGM schedule. */
+void frame_decode_pump(void);
 
 void audio_init(void)
 {
-    mag_set_progress_hook(audio_tick);
+    mag_set_progress_hook(frame_decode_pump);
     if (farchive_open(&g_arc, AUDIO_ARCHIVE, AUDIO_MAX_ENTRIES) != 0) {
         hal_logf("AUD WARN: no %s (audio disabled)\r\n", AUDIO_ARCHIVE);
         g_arc_ok = 0;
@@ -495,6 +499,12 @@ void audio_init(void)
  * input-wait inner loop) — pumps MIDI events + PCM FIFO bytes. */
 void audio_tick(void)
 {
+    /* devdoc 133: the periodic vblank yield (devdoc 131 方案 A) was removed.
+     * It blocked ~one frame every 16 calls, i.e. a hitch roughly every 0.8s on
+     * the main loop at NP2kai's ~20Hz pass rate, and its "keep the display
+     * alive during a decode" purpose is now covered by frame_decode_pump(),
+     * which advances the clock and pumps audio without ever blocking. */
+
     /* PCM push first.  hal_pcm_tick stops the channel at EOF; a finished
      * buffer is then safe to release here. */
     hal_pcm_tick();

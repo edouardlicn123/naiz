@@ -41,6 +41,7 @@
 #include "image.h"
 #include "tr.h"
 #include "input_boundary.h"
+#include "frame.h"
 
 /* Language list: display names and lang codes */
 static const char *LANG_NAMES[] = {
@@ -227,6 +228,12 @@ void bootmenu_run(void)
     hal_mouse_draw_cursor_force();
 
     for (;;) {
+        /* The frame heartbeat runs here too (frame.h: every interactive loop
+         * must pump it).  Besides keeping the virtual clock advancing, this
+         * closes the first vclock window during the boot menu, so the BGM
+         * starts already calibrated instead of playing the initial nominal
+         * step for the first seconds (the residual "starts off-tempo" bug). */
+        engine_frame_pump();
         hal_kbd_update();
         hal_mouse_update();
 

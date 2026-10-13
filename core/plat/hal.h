@@ -116,6 +116,16 @@ void hal_read_palette(int idx, uint8_t *r, uint8_t *g, uint8_t *b);
 void hal_vblank_wait(void);
 
 /*
+ * 非阻塞 VSYNC 采样（devdoc 131 方案 B）
+ *
+ * 返回 1 恰好表示观察到一个上升沿（VBLANK 开始），否则 0。供无法阻塞的
+ * 长 CPU 路径（MAG 解码内循环）调用，使其仍能检测「显示前进了一帧」——
+ * 虚拟时钟必须按显示帧率步进，而非按解码扫描次数，否则 BGM 会跑快。
+ * 每次调用仅一次端口读，足够廉价以在解码扫描中频繁调用。
+ */
+int hal_vblank_poll(void);
+
+/*
  * 读取墙钟毫秒数（DOS 系统时钟 INT 21h AH=2Ch，10ms 粒度）
  *
  * 时间基动画步进。时钟源演变：NP2kai 下 8253 PIT（0x71/0x77）由模拟

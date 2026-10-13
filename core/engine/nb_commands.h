@@ -9,6 +9,11 @@ void nb_commands_dispatch(const char *cmd_name, int argc, const char **argv);
 /* Public asset-key lookup (asset_map, then spr_asset_map). Returns id or -1. */
 int  nb_asset_id(const char *key);
 
+/* Resolve a display command's brace key (cg/bg/char) to the IMAGE.DAT id it
+ * will show, for cache prefetch (devdoc 131 方案 D).  `expr` is the char
+ * command's expression argument (NULL/"" = default).  Returns id or -1. */
+int  nb_prefetch_key(const char *cmd, const char *key, const char *expr);
+
 /* Handlers split into nb_scene.c / nb_question.c (registered in cmd_table). */
 void cmd_scene(int argc, const char **argv, const char *cmd_name);
 void cmd_question(int argc, const char **argv, const char *cmd_name);

@@ -2,6 +2,71 @@
 
 自 R1 起全部 Bug 修复与功能演进记录（条目顺序沿用 AGENTS.md 既有历史排列）；`AGENTS.md` 仅保留当前版本与规则。**新条目约定**：每轮修复/演进完成后，在下方 `---` 分隔线之后（第一条位置）追加变更摘要，并在 AGENTS.md 头部同步「当前版本」。**条目格式**：每条以 `### <版本号> — <标题>` 开头（版本号化标题行 + `<a id="cN">` 锚点，N 按条目序递增），正文整段或分小节；历史速查直接读下方「版本索引」。
 
+<a id="c63"></a>
+### 0.3.032 — boot menu 预泵帧心跳：起播 BGM 提前标定虚拟时钟（治「一进场景先快」）
+
+**动机**：0.3.031（devdoc 133 Phase 1）把 vclock 首窗改为直采，但首窗需 `accum >= VCLOCK_WINDOW_MS (1000ms)` 才闭合（`vclock.c:93`）；`bootmenu_run()` 的 `for(;;)` 循环此前从不调 `engine_frame_pump()`，`hal_wallclock_smooth_advance()` 首次推进发生在进入第一个场景之后——于是进场景起播的 BGM 先以 `VCLOCK_INIT_STEP_UNITS=640`（40ms/pass）的名义步长跑，直到首窗闭合才收敛，即用户复报的「一开始较快」。**最简修复（用户指定，不动方案 C）**：在开机菜单循环也泵帧心跳，使 vclock 在玩家停留菜单期间完成首窗直采，进场景时时钟已标定。
+
+**改动**：`core/engine/bootmenu.c` 顶部加 `#include "frame.h"`，`bootmenu_run()` 的 `for(;;)` 循环首行加 `engine_frame_pump();`（frame.h 约定：每个交互循环都必须泵）。预初始化安全：`anim_tick` 在 `a->img==NULL` 早退、`nb_dialog_reveal_tick` 在 `!dialog_state.reveal_active` 早退（`nb_dialog.c:232`）、`audio_tick` 在无 BGM/PCM 时安全（`audio_init()` 先于 `bootmenu_run()`）。
+
+**防复发**：`test_frame_pump.py` 的 `PUMP_CALLERS` 新增 `("core/engine/bootmenu.c", 1)`；因新增 include/调用使 `bootmenu.c` 钉行位移（`find_lang_index` 103→104、`bootmenu_run` 200→201、`prefs_set_lang` 286→293），按 0.3.027 先例把旧坐标登记进 `test_devdoc_refs.py` 的 `SUPERSEDED_SHIFTED_LINE_REFS`、白名单改用新坐标。
+
+**验证**：`make -C core` 0 诊断；pytest **770 passed / 1 skipped**。`bump_version`：0.3.031 → **0.3.032**（全部项目同步）。
+
+**遗留**：仅治「起播先快」；静置颤 / 立绘拖 / 解码后 tempo 塌陷待后续（`[VC]` 串口数据 + 帧预算切片）。**实机验证未执行**。
+
+<a id="c62"></a>
+### 0.3.031 — BGM 颤动与立绘拖慢二轮根修：虚拟时钟首窗直采 + 测量平滑（治稳态颤）/ 预取修活（治拖）/ 撤销方案 A
+
+**动机与验收**：0.3.030 后用户实机复报——**BGM 静置对白页（不做任何立绘切换）仍颤**（⇒ 纯时钟速率问题，与加载无关，为根因判别关键），且**进入场景 1 的 BGM「一开始较快」**（起播先快后正常）；立绘（`char`/`cg`）**仍拖**。经与用户逐条确认（模拟器 NP2kai、后端未知、静置也颤），判定三个正交根因 + 方案 A 为负资产。**用户拍板：先写两个新 devdoc（第一个 = Phase 1–4 计划、第二个 = 方案 C 立项），仅执行 Phase 1–4 看效果；C 单独立项、E 不做**。验收 = `make -C core` 0 诊断 + pytest **770 passed / 1 skipped** + fullaudit 7/7；**实机听感/拖慢对比待用户执行**。`bump_version`：0.3.030 → **0.3.031**（全部项目同步）；新 `devdocs/133`（本轮记录 + §十 核对表已回填）、`devdocs/134`（方案 C 立项）。
+
+**根因**：(1) **静置也颤** = `vclock` 的窗口测量 `want = delta*16/passes` 整数量化锯齿——DOS 秒被量化到 1000ms 整数倍、（NP2kai 约 20.5 pass/窗）passes 取整，误差 ±1000/P² ms/pass ≈ **±5%**，而 step 以 0.5ms/pass 追 target，形成 ±5%、周期 1–5s 的三角摆；加载时 `VCLOCK_RATE_MAX_MS` 夹住、slew 恢复约 100 pass。(2) **起播先快** = `VCLOCK_INIT_STEP_UNITS=640`（40ms/pass）起步 + 首校准窗可长达数秒（B19 §2.6 秒块交付）+ slew 爬升。(3) **立绘仍拖** = 方案 D 有三个缺陷使预取基本未生效：预取调用只在多页分支、单页对白行（`text_offset=-1`）从不进入；`char` 忽略 expr；预取图 `hits=0` 最先生被淘汰。(4) **方案 A 负资产**：其节流让出是**阻塞式** `hal_vblank_wait()`，NP2kai 约 20Hz pass 率下每约 0.8s 阻塞一整帧，本身可感。
+
+**1. Phase 1（`core/lib/vclock.{c,h}`，治症状 1+2）**：新增 `accum`（时间累积窗口，`VCLOCK_WINDOW_MS=1000` 一个 DOS 秒才闭合，取代原「delta>0 即闭合」——真机 10ms 量化可平均、NP2kai 1s 块自然对齐）+ `calibrated`（**首窗直采** `target=step=want`，不再从 640 缓升）；非首窗 **IIR 平滑** `target += (want-target)/VCLOCK_MEAS_SMOOTH`（因子 4）吃掉 ±5% 抖动；`VCLOCK_MIN_WINDOW_PASSES=2` 丢弃「一次 pass 吞整秒」的硬停窗；回退读取重置窗口并解除校准。`VCLOCK_SLEW_UNITS` **保持 8**（平滑后无需大步追赶，维持「相邻 advance 差 ≤ slew」连续性契约）。纯整型无 I/O，主机穷举。
+
+**2. Phase 2（方案 D 修活）**：`nb_prefetch_lookahead()` 由 `static` 改导出（声明入 `nb.h:68`），在 `main.c` 三处主循环的 `engine_frame_pump()` 之后各调一次（`:126/:140/:159`，覆盖 AUTOEXIT / 主循环 / 输入等待内循环）——单页对白行的整个阅读窗口由此被覆盖；`nb.c:444` 原对白分支调用保留（翻页即预热，`done_pc` 幂等）。`nb_prefetch_key(cmd,key,expr)` 增第三参，`nb.c:396` 传 `(argc >= 3) ? args[1] : "normal"`（与 `cmd_char` 取值逐字一致）。新增 `image_cache_pin(int id)`（`image_internal.h:33` / `image_cache.c:118`，把该槽 `hits` 提到保底 `IMAGE_CACHE_PREFETCH_HITS=4`），`image_prefetch()` 末尾调用（`image.c:226`），使预取图不再最先被淘汰。
+
+**3. Phase 3（撤销方案 A）**：删除 `AUDIO_YIELD_EVERY` / `g_audio_yield_ctr` 及 `audio_tick()` 内阻塞 vblank 等待（原 `audio.c:500-501,504-514`），恢复为纯泵；订正 `frame.c:34` / `frame.h:33` 注释中指向 A 的说明（`frame_decode_pump` 非阻塞、按显示帧边沿推进的价值不受影响）。devdoc 132 走 §十 订正路径：**正文一字未改**，头部追加 `⚠ ERRATA` 块声明 A 已撤、行号以 133 为准。
+
+**4. Phase 4（确定性标记 + 收口）**：`hal_wallclock_smooth_advance()` 内每 64 pass 打一行 `[VC] v= step= tgt= cal=`（`hal_pc98.c:127-140`，编译期 `VCLOCK_TRACE_ENABLED` 默认 1 可关）——供 §八 五禁要求的确定性判别（禁靠点击计数/听感；`step/16` 即 ms/pass，与显示帧时对比即知快慢）。
+
+**5. 防复发**：`test_vclock.py` ctypes struct 增 `accum`/`calibrated`，新增 3 守卫（首窗直采无爬升 / 20·21 交替窗抖动被平滑 / 单 pass 整秒停窗不移动速率）；`test_frame_pump.py` 新增 `test_image_cache_pin_lifts_the_hit_floor`，`test_audio_tick_yields_periodically` **反向改写**为 `test_audio_tick_does_not_block_on_vblank`，`test_nb_warms_cache_while_parked_on_a_dialogue_page`（增 `main.c` 三调用点断言）与 `test_prefetch_key_resolves_the_display_commands`（expr 参数）同步。**`nb.c` 仍刻意不加顶层 include**（`test_devdoc_refs` 钉 166/171/337 行）；`main.c` 钉行 95/102/106 在新增调用点之前，不受影响。
+
+**6. 遗留**：**方案 C（OPNA Timer-B 中断驱动音泵）单独立项**（`devdocs/134`）——Phase 1 治稳态颤与起播快，但「主循环 pass 率被长操作绑架」导致的**加载期 tempo 塌陷**属结构性，只有 C 根治；前置探针先测 GDC vsync IRQ(0x64)（G09:41，原生 IRQ2、较便宜）再 OPNA Timer-B，未确认项 `F04:141`/`G08:80`/`F04:173`/`G09:117`。**实机验证未执行**：需 `build`+`make` 后按 §八 五禁用串口 `[VC]`（相邻行 `step/tgt` 波动 <1%、`v` 与真实时长期差 <0.5%）与 `[PF]`（预取命中）判颤/拖，并核后端 `AUD MPU OK`/`AUD OPNA OK`。
+
+<a id="c61"></a>
+### 0.3.030 — 剩余颤动与立绘加载拖慢根修：方案 A/B/D 落地（节流让出 + 边沿门控解码帧泵 + 对话期预取；C 单独立项）
+
+**动机与验收**：devdoc 131 判定 devdoc 129/130 之后**剩余两症状**——BGM **颤动**（解码窗口内更明显）与立绘**加载拖**（解码独占 CPU 饿死 GDC），同源：音乐/时间泵 = 主循环协作轮询。source doc 给 A–E 五方案；**用户拍板「全部（含 C）」后经二次确认，本轮只交付 A/B/D，C 单独立项**（131 §9.1 亦建议独立）。验收 = 三方案落地 + 引擎 0 诊断 + `test_frame_pump.py` 由 10 项扩至 **16 项**（新增 6 守卫）+ pytest **766 passed / 1 skipped**；**实机听感/拖慢对比待用户执行**。`bump_version`：0.3.029 → **0.3.030**（全部项目同步，新 `devdocs/132` 承载）。
+
+**1. 方案 A（节流让出 CPU）**：`core/engine/audio.c:500` 新增 `AUDIO_YIELD_EVERY 16` + `g_audio_yield_ctr`；`audio_tick()`（`:504`）每 16 次调一次 `hal_vblank_wait()`——长 CPU 路径（解码钩子）会远高于显示刷新率地调用它，周期性阻塞既让出又顺带与显示重同步。取 16（非 8）因 131 §10「A 专属」：NP2kai 的 `hal_vblank_wait` 是 VSYNC 轮询，**节流过密会过减速**。只缓解拖、不治颤。
+
+**2. 方案 B（解码期帧分片，边沿门控）**：正面解决 131 §6 的契约障碍——`hal_wallclock_smooth_advance()` 不能每解码扫描都调（会飙速）。新增 `hal_vblank_poll()`（`hal_pc98.c:154`，声明 `hal.h:126`）非阻塞返回**每帧恰好一次上升沿**；静态 `g_vs_level`（`:136`）在 `hal_vblank_wait()` 末尾置 1（`:143`）作基线，使阻塞泵与轮询解码**不重复计同一帧**。新增解码期帧泵 `frame_decode_pump()`（`frame.c:36`，声明 `frame.h:35`）：`if (hal_vblank_poll()) { advance; anim_tick(); } audio_tick(); nb_dialog_reveal_tick();`——**非阻塞**（否则每 4KB 扫描等一整帧、加载要数秒），时钟按**真实显示帧**步进（治颤）、`audio_tick` 节流让出（缓解拖）。`audio_init` 的 mag 钩子由 `audio_tick` 改指向 `frame_decode_pump`（`audio.c:457`）。**帧计数仅作边界探测、绝不作时基**（NP2kai ≈20.5Hz，作时基 3 倍慢——与 B19 §2.3 已淘汰的「VSYNC 计帧时钟」的关键区别）。`engine_frame_pump()` 本体未动，其契约测试继续成立。
+
+**3. 方案 D（对话空闲期预取下一批显示图）**：新增 `image_prefetch()`（`image.c:197`，`image.h:34`）——同 `image_load` 解码路径，命中即返回、未命中插入缓存、**不改活动调色板**（预取发生在显示之前）、失败静默（后续 `image_load` 会自解）；新增键解析 `nb_prefetch_key(cmd,key)`（`nb_commands.c:100`，`nb_commands.h:14`）——`cg`→`cg_map`、`bg`→`nb_asset_id`（含 SPR）、`char`→默认 `normal` 表情；新增 `nb_prefetch_lookahead()`（`nb.c:366`）在脚本停在对话框页时从 `nb.pc` 后扫 24 行、复用**真解析器** `nb_parse_line` 取 brace 键（不另写语法），`done_pc == nb.pc` 保证每位置最多一次；调用点 `nb_process()` 对话框空闲分支（`nb.c:439`）。
+
+**4. 防复发（`tools/tests/test_frame_pump.py` 10→16）**：新增 `test_decode_pump_is_edge_gated_and_nonblocking`（用 `hal_vblank_poll` 非 `vblank_wait`）、`test_audio_tick_yields_periodically`、`test_hal_exposes_a_vblank_edge_probe`（含基线刷新断言）、`test_image_prefetch_warms_cache_without_palette`（禁 `image_set_palette`）、`test_nb_warms_cache_while_parked_on_a_dialogue_page`（一次性 + 有界窗口）、`test_prefetch_key_resolves_the_display_commands`；`test_engine_registers_the_hook_in_audio_init` 由 `audio_tick` 更新为 `frame_decode_pump`。**`nb.c` 刻意不加顶层 include**（`test_devdoc_refs` 钉 166/171/337 行），两声明就地放 `nb.c:356-357`（337 行之后）。
+
+**5. 遗留**：**方案 C（OPNA Timer-B 中断驱动音泵）单独立项**——需 YM2608 Timer-B 初始化 + DOS/4GW DPMI 挂中断 + 锁内存 + 级联 IRQ EOI（131 §4.9/§10），本环境无法验证中断投递与 ACK，写错静默卡死；参照 `docs/refdocs/F04`/`G08`/`G09`。方案 E 仍不建议。**实机验证未执行**：需 `build`+`make` 后按 §八 五禁用串口/确定性标记对比颤与拖（禁点击计数判颤），并核 NP2kai 下 `hal_vblank_poll` 边沿计数 ≈ 显示帧率。新 `devdocs/132-剩余颤动与立绘拖慢根修方案ABD落地.md` 承载完整记录 + §十 逐条声称核对表。
+
+<a id="c60"></a>
+### 0.3.029 — refdocs 扩充：devdoc 131 参考文章落盘 5 篇（OPNA Timer / PMD 架构 / MML 手册全文 / DOS 中断 / 时基与音频工程）
+
+**动机与验收**：devdoc 131（BGM 颤动与立绘加载拖慢分析，方案 A–E 未实施）引用了约 20 项外部参考，散落在个人博客/论坛/手册镜像，随时可能失效。按用户指示将其中可获取者转化为本仓 `docs/refdocs/` 主题文件（沿用 F03 一文件多来源惯例），本轮**零代码改动**。验收 = 5 文件落盘 + README 索引与来源表同步（约 20 个来源登记）+ 每个文件头部均有来源/许可转写说明与未确认项分区。`bump_version`：0.3.028 → **0.3.029**（全部项目同步）。
+
+**1. 新增 5 篇 refdocs（按主题合并，非一文一档）**
+- `F04_opna_timer_a_b_specs.md`——Timer A/B 硬件规格（补 F03 未收段）：`tA=72·(1024−NA)/φM`（9µs 基准）/ `tB=1152·(256−NB)/φM`（144µs 基准）、`$24–$27`/`$29`/`$2D-$2F`、PC-98 端口 0x188–0x18E 与 FM timer→IRQ3 事实。**$29（SCH+IRQ ENABLE，D0=EN_TA/D1=EN_TB）从 YM2608 手册原文证实 devdoc 131 §4.1 的说法；但手册称 D4-D0 默认即为 1，devdoc 的「不写就拿不到 IRQ」未获支持——差异列入未确认项**。
+- `F05_pmd_driver_architecture.md`——PMD 常驻驱动 + Timer-B 节拍模型：GAME.BAT 预加载、AH=09h/22h API（ReC98 实证）、`TimerB=256−[10800000/(bpm·13·Zenlen)]`、`.M` 二进制格式字段；解释「原版 EQAP32 为什么不颤」（音泵由 Timer-B 中断驱动，与主循环解耦）。
+- `F06_pmd_mml_manual_en.md`——PMD 4.8 MML 手册英译**全文落盘**（4671 行，原著 M.Kajihara，英译 Blaze and Pigu）；头部明确 PMD 是驱动输入语言、本项目输入已定 MIDI，防混淆。
+- `G08_dos4gw_interrupt_and_pit.md`——DPMI 中断挂接 API（`_go32_dpmi_*`/`__dpmi_*`、iret wrapper、锁内存硬约束、bi-modal handler）、expiredpopsicle PIT 改频模板（除数/mode 2/累计 18.2Hz 才链旧 handler/自补 EOI）与 PC-98 端口差异注意。
+- `G09_timing_vsync_audio_engineering.md`——XtoF 时钟源候选谱（对照 B19 已淘汰项）、ReactOS/DOSBox-X 的写 0x64→vsync IRQ2、**DOSBox-X #342 级联 IRQ ACK 全记录**（FM=IRQ12、鼠标=IRQ13 更高优先级、电平触发、OCW3 读错端口实例=方案 C 前置检查清单）、Scali latched-timer 事件线、DCEmulation 分片解码（最坏帧 60%→25% + vblank 归零测量法）、Defold 预载隐藏、MIDAS 屏幕同步三回调。
+
+**2. 来源可达性核验（curl/搜索逐条过）**：20 项中 14 项直接下载原文；3 项（ajworld.net YM2610、ManualMachine、DCEmulation）因 DNS/403 不可达但经搜索快照核对关键事实并在文件内注明；3 项（Wikibooks Sound BIOS、Wikipedia VBI、archive.org 存档路径）网络不可达——按既定策略标注「未获取」并保留 URL（archive.org 在本环境整体不可达，失效源无存档可退）。
+
+**3. 防混淆与许可纪律**：所有 GPL/LGPL 源码（QEMU/DOSBox-X/ReactOS）只取事实不复制文本（AGENTS §十）；YM2608 手册 PDF 原镜像 404 已改用 Waterloo 镜像并在 README 登记；F06 全文为第三方英译文档，注明原著/译者/仓库。
+
+**4. 遗留**：devdoc 131 仍是「分析/建议（未实施）」状态，本轮不推进其方案；F04/F05/G09 内共列 12 条未确认项（$29 默认位行为、NP2kai OPNA/vsync IRQ 投递时序、`#Timer` 范围两源不一致等），供后续立项逐条核。`test_devdoc_refs.py` 不受影响（不读 refdocs），pytest 预期无回归。
+
 <a id="c57"></a>
 ### 0.3.026 — 引擎按 8.3 短名解析音频键（str_toc8）：修 AUDIO.DAT 截断名失配 + 全素材面同名风险审计
 <a id="c59"></a>
@@ -379,6 +444,10 @@
 
 | 条目 |
 |------|
+| [0.3.032 — boot menu 预泵帧心跳：起播 BGM 提前标定虚拟时钟（治「一进场景先快」）](#c63) |
+| [0.3.031 — BGM 颤动与立绘拖慢二轮根修：虚拟时钟首窗直采 + 测量平滑（治稳态颤）/ 预取修活（治拖）/ 撤销方案 A](#c62) |
+| [0.3.030 — 剩余颤动与立绘加载拖慢根修：方案 A/B/D 落地（节流让出 + 边沿门控解码帧泵 + 对话期预取；C 单独立项）](#c61) |
+| [0.3.029 — refdocs 扩充：devdoc 131 参考文章落盘 5 篇（OPNA Timer / PMD 架构 / MML 手册全文 / DOS 中断 / 时基与音频工程）](#c60) |
 | [0.3.028 — BGM 颤动根修：虚拟时钟废止 floor/ceiling 钳制，改平滑变步进（`lib/vclock`）](#c59) |
 | [0.3.027 — BGM 在菜单/询问/立绘加载期间卡顿与中断根修：时钟单点化 + 统一帧泵 + mag 分块泵](#c58) |
 | [0.3.026 — 引擎按 8.3 短名解析音频键（str_toc8）：修 AUDIO.DAT 截断名失配 + 全素材面同名风险审计](#c57) |

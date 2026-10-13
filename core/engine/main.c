@@ -123,6 +123,7 @@ int main(void)
 #ifdef AUTOEXIT
         for (;;) {
             engine_frame_pump();  /* vblank + clock + anim + audio + reveal */
+            nb_prefetch_lookahead();  /* devdoc 133: warm next display images */
             hal_kbd_update();
             hal_mouse_update();
             /* Headless build: keep processing each frame regardless of any
@@ -136,6 +137,7 @@ int main(void)
 #else
         for (;;) {
             engine_frame_pump();  /* vblank + clock + anim + audio + reveal */
+            nb_prefetch_lookahead();  /* devdoc 133: warm next display images */
             hal_kbd_update();
             hal_mouse_update();
             if (vm_delay_tick())
@@ -154,6 +156,7 @@ int main(void)
                 input_drain_boundary();
                 for (;;) {
                     engine_frame_pump();  /* vblank + clock + anim + audio + reveal */
+                    nb_prefetch_lookahead();  /* devdoc 133: warm next display images */
                     hal_kbd_update();
                     /* A pending waitanima hold ended on its own (once playback
                      * finished): leave immediately so the script resumes. */

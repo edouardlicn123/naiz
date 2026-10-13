@@ -349,6 +349,57 @@ void nb_set_lang(const char *lang)
     text_set_blackletter(prefs_get_blackletter_dialog() && !nb_lang_is_cjk());
 }
 
+/*=== Display-image cache prefetch (devdoc 131 方案 D) ======================*/
+
+/* Forward decls are kept local: nb.c must NOT gain new top-of-file includes,
+ * because test_devdoc_refs pins nb.c lines 166/171/337 to symbols. */
+int image_prefetch(unsigned short id);
+int nb_prefetch_key(const char *cmd, const char *key, const char *expr);
+
+#define NB_PREFETCH_LOOKAHEAD 24
+
+/* Warm the LRU cache with the next display images while the script is parked
+ * on a dialogue page, so the decode cost is paid during the player's reading
+ * time rather than on the frame that shows the image.  Runs at most once per
+ * script position.  Decode failures are silent (the later image_load() just
+ * decodes again).
+ *
+ * devdoc 133: exported and called from main.c's loops (not only the paged
+ * dialogue branch), because a SINGLE-page line sets text_offset = -1 and never
+ * reached the old call site -- the common case was never prefetched. */
+void nb_prefetch_lookahead(void)
+{
+    static int done_pc = -1;
+    char line[NB_LINE_MAX];
+    char cmd[64];
+    const char *args[NB_ARGS_MAX];
+    int argc, i, brace, id;
+
+    if (done_pc == nb.pc)
+        return;
+    done_pc = nb.pc;
+
+    for (i = nb.pc; i < nb.pc + NB_PREFETCH_LOOKAHEAD && i < nb.num_lines; i++) {
+        nb_get_line(i, line, sizeof(line));
+        if (line[0] == '\0' || line[0] == '#')
+            continue;
+
+        argc = nb_parse_line(line, cmd, sizeof(cmd), args, NB_ARGS_MAX, &brace);
+        if (argc < 0)
+            continue;
+        if (strcmp(cmd, "cg") != 0 && strcmp(cmd, "bg") != 0 &&
+            strcmp(cmd, "char") != 0)
+            continue;
+        if (brace < 0 || brace >= argc)
+            continue;
+
+        id = nb_prefetch_key(cmd, args[brace],
+                             (argc >= 3) ? args[1] : "normal");
+        if (id >= 0)
+            image_prefetch((unsigned short)id);
+    }
+}
+
 /*
  * nb_process — NB engine main execution loop (called each frame).
  *
@@ -390,6 +441,7 @@ int nb_process(void)
         if (nb_dialog_pending()) {
             if (nb_dialog_get_offset() >= 0 && nb_dialog_get_text()) {
                 dialog_show(nb_dialog_get_charname(), nb_dialog_get_text());
+                nb_prefetch_lookahead();
                 vm_pause_process();
             } else {
                 nb_dialog_dismiss();

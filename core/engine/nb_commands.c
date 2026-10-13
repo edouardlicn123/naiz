@@ -91,6 +91,40 @@ static int resolve_expression(int char_id, const char *expr)
     return -1;
 }
 
+/*=== Display prefetch (devdoc 131 方案 D) ==================================*/
+
+/* Resolve a display command's brace key to the IMAGE.DAT id it will show, so
+ * nb.c can warm the LRU cache during an idle dialogue wait (hiding the decode
+ * behind the player's reading time).  Returns -1 when the key is unknown, the
+ * command shows nothing prefetchable, or the id cannot be resolved.
+ *
+ * `expr` is the char command's expression argument (the same value cmd_char
+ * derives at nb_commands.c:310); pass NULL/"" to use the default. */
+int nb_prefetch_key(const char *cmd, const char *key, const char *expr)
+{
+    const struct { const char *key; int id; } *p;
+    int cid;
+
+    if (cmd == NULL || key == NULL || key[0] == '\0')
+        return -1;
+
+    if (strcmp(cmd, "cg") == 0) {
+        for (p = cg_map; p->key; p++)
+            if (strcmp(p->key, key) == 0)
+                return p->id;
+        return -1;
+    }
+    if (strcmp(cmd, "bg") == 0)
+        return nb_asset_id(key);
+    if (strcmp(cmd, "char") == 0) {
+        cid = resolve_char_id(key);
+        if (cid < 0)
+            return -1;
+        return resolve_expr(cid, (expr && expr[0]) ? expr : "normal");
+    }
+    return -1;                               /* not a display-image command */
+}
+
 static const char *resolve_display_name(const char *key)
 {
     const struct { const char *key; int id; const char *name; } *p;
