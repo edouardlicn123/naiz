@@ -7,7 +7,7 @@ and SSG decay are all proven here without an emulator.
 
 Assertions cover:
   - note-on reproduces the full register program (24 op regs + B0/B4 +
-    A4/A0 + keyon) and the 1-3-2-4 op reorder lands on the right TL regs
+    A4/A0 + keyon) and the operator->register-slot map lands on the right TLs
   - velocity attenuates every op TL (max +15 at vel 1)
   - note-off keyoffs and frees the voice; sustain pedal holds it instead
     and pedal-up breathes the pending notes
@@ -211,16 +211,16 @@ def test_note_on_program(lib):
     log = s.log
 
     assert log[-1] == (0, 0x28, 0xF0)          # keyon ch0 all-ops
-    # block4/fnum520 for A4 across the two freq regs
-    assert (0, 0xA4, 0x22) in log and (0, 0xA0, 0x08) in log
+    # block5/fnum520 for A4 across the two freq regs
+    assert (0, 0xA4, 0x2A) in log and (0, 0xA0, 0x08) in log
     # op TLs land at their register-slot addresses.  Register-slot r sits
     # at base + 4*r (per ymfm/OPN, operator = address bits 2-3, channel =
-    # bits 0-1); files are reordered 1-3-2-4, i.e. chip slots 0,1,2,3 read
-    # file slots 0,2,1,3 whose TLs are 40,42,44,46.
-    assert (0, 0x40, 40) in log                # chip0 (file op1)
-    assert (0, 0x44, 42) in log                # chip1 (file op2)
-    assert (0, 0x48, 44) in log                # chip2 (file op3)
-    assert (0, 0x4C, 46) in log                # chip3 (file op4)
+    # bits 0-1); the file maps file idx -> register slot via fmopn_op_slot,
+    # so register slots 0,1,2,3 read file slots 0,2,1,3 (TLs 40,42,44,46).
+    assert (0, 0x40, 40) in log                # regslot0 (file idx0 = op1)
+    assert (0, 0x44, 42) in log                # regslot1 (file idx2 = op3)
+    assert (0, 0x48, 44) in log                # regslot2 (file idx1 = op2)
+    assert (0, 0x4C, 46) in log                # regslot3 (file idx3 = op4)
     assert (0, 0xB0, (5 << 3) | 4) in log      # FB=5 AL=4
     assert (0, 0xB4, 0xC0) in log              # pan both
     # full program: 24 op regs + B0 + B4 + A4 + A0 + keyon
@@ -319,7 +319,7 @@ def test_percussion_kick(lib):
     assert s.writes(bank=1) == []
     # SSG0 tone period regs written, amplitude reg 8, mixer enables ch A tone
     blk, fn = _ratio(lib, "fmopn_note_ratio", 36)
-    freq = (fn << blk) * 7987200.0 / (144.0 * (1 << 20))
+    freq = (fn << blk) * 7987200.0 / (288.0 * (1 << 20))
     period = max(1, min(4095, int(124800.0 / freq)))
     got = next((v for b, r, v in log if r == 0x00), 0) \
         | (next((v for b, r, v in log if r == 0x01), 0) << 8)

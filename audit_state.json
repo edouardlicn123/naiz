@@ -1,7 +1,7 @@
 {
   "version": 2,
-  "git_head": "3f89857",
-  "checked_at": "2026-10-13T15:07:36",
+  "git_head": "588583b",
+  "checked_at": "2026-10-16T10:37:30",
   "files": {
     "core/build.sh": {
       "sha256": "0e6bb3f41cae8f6c5a014a49767f93990ddd3e2c461a85ec991c01b40b66b11e",
@@ -22,17 +22,17 @@
       ]
     },
     "core/engine/audio.c": {
-      "sha256": "39f06fcb964649494f1f1bccf2dba9f792dc5a9c700ddcb4f977803beefd296b",
+      "sha256": "edc0cf0d6e58ebdb9b43609cf906c90c1e9b15ae8dd90e029a8bbd85f3d50e5f",
       "violations": 0,
       "candidates": 2,
       "findings": [
         {
-          "line": 484,
+          "line": 489,
           "rule": "C1",
           "level": "HEUR"
         },
         {
-          "line": 158,
+          "line": 159,
           "rule": "C9",
           "level": "HEUR"
         }
@@ -332,7 +332,7 @@
       "findings": []
     },
     "core/engine/nb_config.h": {
-      "sha256": "3be58bf987a8420b4538d5a0817da75ca385754b20c01e784980988c0c85ad0d",
+      "sha256": "0e1d78327aec949233d19628e4413d6b2240d75471b2a686bf9b58f7bb25a109",
       "violations": 0,
       "candidates": 0,
       "findings": []
@@ -685,25 +685,25 @@
       "findings": []
     },
     "core/lib/fmopn.c": {
-      "sha256": "e2ac9dbe8a23fb56c73fd6610dee626c53de4e38f1a8ae0979289d684bc47a1f",
+      "sha256": "68700edab2df14fe7fde7c6427293317c436e54b2690df930886cec93567f6bd",
       "violations": 0,
       "candidates": 1,
       "findings": [
         {
-          "line": 100,
+          "line": 115,
           "rule": "C35",
           "level": "HEUR"
         }
       ]
     },
     "core/lib/fmopn.h": {
-      "sha256": "c115e48bb87e85ce38f707554e170cbe01d918b56d6cfb8e6a6b3b7b251ac8df",
+      "sha256": "585ef4620cc3534cdfc224da046f82409d732fdabf71d859eedd698e428a65aa",
       "violations": 0,
       "candidates": 0,
       "findings": []
     },
     "core/lib/fmseq.c": {
-      "sha256": "63c1fad7f10934228bda4b8d1df1a53c87830f8c58ff0d237cd8c000600c7f3b",
+      "sha256": "1405b4cd2e093e0f1b47b784c7e80f287bdbcb08d218aa60aa71e88d189d61f1",
       "violations": 0,
       "candidates": 0,
       "findings": []
@@ -799,13 +799,13 @@
       "findings": []
     },
     "core/lib/vclock.c": {
-      "sha256": "7f6a12c08d7fc6db306e18e54d81f0ffdc911287772f65fe603f41cd998bdff4",
+      "sha256": "b796219fa71b90a841703976deee885e2ed8661b1fc195d87b57001f15631af3",
       "violations": 0,
       "candidates": 0,
       "findings": []
     },
     "core/lib/vclock.h": {
-      "sha256": "4e1f46a7e89a2327b38447d36380aebed0a4e6a44abea043e732279964b04ec5",
+      "sha256": "101fcbf9145abd0f7754583c2ecb05238d64b73e0d7c98c99d5a7bd0c0849628",
       "violations": 0,
       "candidates": 0,
       "findings": []
@@ -829,7 +829,7 @@
       "findings": []
     },
     "core/plat/hal_audio.c": {
-      "sha256": "3b6d1ac86d11fee1803fe384e8a9f47ef73f8600fd50c872ec5f9022a7d54ff5",
+      "sha256": "d169bb37c0f642ae3d47fb6bd59065a95f80afbf659e1de8a75564088ee57279",
       "violations": 0,
       "candidates": 0,
       "findings": []
@@ -1044,7 +1044,13 @@
       "findings": []
     },
     "tools/naiz_audio/fm_patch.py": {
-      "sha256": "6047cce41728a8df4784a7e0ae4c09e2721e46c82e176138f66cf5bd4db666d7",
+      "sha256": "0eb0f773338ee9ef725a96326013ad7660e10adf227add5363d8c215275220cf",
+      "violations": 0,
+      "candidates": 0,
+      "findings": []
+    },
+    "tools/naiz_audio/fm_render.py": {
+      "sha256": "4a236e58583008c30091a81da84e0fac79394dc5fd79fc1ace557ddfa5db4746",
       "violations": 0,
       "candidates": 0,
       "findings": []
@@ -1066,6 +1072,18 @@
       "violations": 0,
       "candidates": 0,
       "findings": []
+    },
+    "tools/naiz_audio/spectrum_report.py": {
+      "sha256": "5bd17593f07041c38090283563922d657d04228380fdd72d6e6da92296796c28",
+      "violations": 0,
+      "candidates": 1,
+      "findings": [
+        {
+          "line": 43,
+          "rule": "P8",
+          "level": "HEUR"
+        }
+      ]
     },
     "tools/naiz_audio/wav_convert.py": {
       "sha256": "2c1ee8bf5446d19dddf48a88dca1324e33f1f0663e200a8a81719b82a0fd68b4",
@@ -1507,16 +1525,16 @@
     }
   },
   "summary": {
-    "files": 203,
-    "changed": 2,
-    "skipped": 201,
+    "files": 205,
+    "changed": 0,
+    "skipped": 205,
     "out_of_scope": 0,
     "violations": 0,
-    "candidates": 49,
+    "candidates": 50,
     "fresh_violations": 0,
-    "fresh_candidates": 1,
+    "fresh_candidates": 0,
     "verified": 22,
     "stale": 2,
-    "open": 25
+    "open": 26
   }
 }

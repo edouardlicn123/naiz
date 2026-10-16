@@ -222,6 +222,11 @@ void hal_pcm_stop(void)
 #define FM_FM_CHANNELS      6   /* YM2608 FM voices (F03 §3.3) */
 #define FM_SSG_MIX_SILENT   0x3F  /* reg7: every bit 0 disables that output */
 
+/* LFO rate index (reg $22 bits2-0, LFRQ).  Rate rises as the index grows;
+ * index 2 is roughly 6.6 Hz, a natural vibrato/tremolo speed.  Only channels
+ * whose patch leaves AMS/PMS > 0 react, so this is inert for the rest. */
+#define FM_LFO_RATE         2
+
 /* Per-write register trace (devdocs/123 §1.5 判据 5): audit every
  * (port, addr, val) on the serial channel.  Compile-time switch — a 60Hz
  * register pump would spam the trace during normal use, so flip this to 1
@@ -244,6 +249,10 @@ void hal_fm_init(void)
     outb(PCM_ID_PORT, 0x01);
     /* Prime FM VOL1 at full loudness (attenuation 0). */
     outb(PCM_STATUS_PORT, (uint8_t)(FM_VOL_PATH_VOL1 | 0x00));
+    /* Enable the LFO (reg $22): bit3 on, bits2-0 = rate (F03 §3.3).  This is
+     * the chip-wide oscillator that $B4 AMS/PMS depths modulate; with those
+     * bits 0 the register has no audible effect. */
+    hal_fm_write_reg(0, 0x22, (uint8_t)(0x08 | FM_LFO_RATE));
 }
 
 void hal_fm_set_volume(int atten)

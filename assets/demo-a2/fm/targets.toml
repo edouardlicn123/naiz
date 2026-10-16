@@ -1,0 +1,125 @@
+# FM timbre acceptance bands for the demo-a2 default patch families
+# (devdocs/136 P1b).  One table per family; family order/set mirrors
+# tools/naiz_audio/gm_families.py FAMILIES.
+#
+# Bands are DESIGN INTENT: initial values from FM/orchestral knowledge, to be
+# corrected by the P1c oracle<->NP2kai alignment pass plus the P2/P3 timbre
+# work.  `calibrated` gates enforcement in tools/tests/test_fm_timbre.py:
+#
+#   calibrated = false  -> the oracle only checks sanity (patch sounds, has a
+#                          measurable fundamental).  The band is documented
+#                          intent, not yet met/verified.
+#   calibrated = true   -> the oracle must place every listed metric inside its
+#                          band, else the test fails.
+#
+# Flip a family to true once P1c/P2 has verified its .fmp actually meets the
+# band.  All metrics are measured by tools/naiz_audio/spectrum_report.py from a
+# C4 (note 60) probe rendered by the fmbench oracle; see devdocs/136 P1b for
+# the metric definitions.
+
+[piano]
+calibrated = false
+attack_ms   = [1, 25]
+centroid_hz = [900, 3500]
+harmonics   = { "2f" = [-18, -4], "3f" = [-30, -6] }
+
+[bell]
+calibrated = false
+attack_ms   = [1, 20]
+centroid_hz = [1500, 5000]
+# Bells are inharmonic; only a weak 2f band is meaningful.
+harmonics   = { "2f" = [-18, 10] }
+
+[organ]
+calibrated = false
+attack_ms   = [5, 80]
+centroid_hz = [300, 900]
+harmonics   = { "2f" = [-22, -6], "3f" = [-65, -40] }
+
+[guitar]
+calibrated = false
+attack_ms   = [0, 30]
+centroid_hz = [350, 900]
+harmonics   = { "2f" = [-25, -12], "3f" = [-50, -35] }
+
+[bass]
+calibrated = false
+attack_ms   = [2, 40]
+centroid_hz = [150, 900]
+harmonics   = { "2f" = [-5, 15], "3f" = [-12, 5] }
+
+[strings]
+calibrated   = false
+attack_ms     = [30, 300]
+centroid_hz   = [350, 1000]
+vibrato_hz    = [4, 8]
+vibrato_cent  = [5, 45]
+harmonics     = { "2f" = [-18, -4], "3f" = [-22, -6] }
+
+[brass]
+calibrated   = false
+attack_ms     = [20, 120]
+centroid_hz   = [350, 1500]
+vibrato_hz    = [4, 8]
+vibrato_cent  = [3, 25]
+harmonics     = { "2f" = [-45, -28], "3f" = [-25, -8] }
+
+[reeds]
+calibrated   = false
+attack_ms     = [1, 60]
+centroid_hz   = [500, 1500]
+vibrato_hz    = [4, 8]
+vibrato_cent  = [5, 45]
+harmonics     = { "2f" = [-18, -4], "3f" = [-32, -12] }
+
+[flute]
+calibrated   = false
+attack_ms     = [30, 80]
+centroid_hz   = [500, 2500]
+vibrato_hz    = [5.5, 7.5]
+vibrato_cent  = [10, 60]
+harmonics     = { "2f" = [-25, -15], "3f" = [-35, -25] }
+
+[synlead]
+calibrated   = false
+attack_ms     = [1, 60]
+centroid_hz   = [350, 1200]
+vibrato_hz    = [4, 8]
+vibrato_cent  = [5, 45]
+harmonics     = { "2f" = [-20, -5], "3f" = [-70, -55] }
+
+[synpad]
+calibrated   = false
+attack_ms     = [20, 300]
+centroid_hz   = [300, 1000]
+vibrato_hz    = [4, 8]
+vibrato_cent  = [3, 25]
+harmonics     = { "2f" = [-18, -3], "3f" = [-32, -15] }
+
+[synfx]
+calibrated   = false
+attack_ms     = [10, 200]
+centroid_hz   = [400, 1600]
+vibrato_hz    = [4, 8]
+vibrato_cent  = [5, 40]
+harmonics     = { "2f" = [-35, -18], "3f" = [-55, -35] }
+
+[ethnic]
+calibrated   = false
+attack_ms     = [0, 120]
+centroid_hz   = [500, 1600]
+vibrato_hz    = [4, 8]
+vibrato_cent  = [5, 45]
+harmonics     = { "2f" = [-75, -55], "3f" = [-20, -2] }
+
+[perc]
+calibrated   = false
+attack_ms     = [0, 20]
+centroid_hz   = [300, 2000]
+harmonics     = { "2f" = [-14, -2], "3f" = [-18, -6] }
+
+[sfx]
+calibrated   = false
+attack_ms     = [0, 20]
+centroid_hz   = [400, 2500]
+harmonics     = { "2f" = [-12, 0] }

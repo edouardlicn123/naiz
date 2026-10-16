@@ -126,17 +126,19 @@ PMD 值得借鉴的**只有 MML 这套记谱法**(纯文本、diffable、通道�
 | `$A0`–`$A3` | — | **F-number** 低 8 位 | 0–255 |
 | `$A4`–`$A7` | `xxx-----` / `-----xxx` | **BLOCK** / **F-number** 高 3 位 | 0–7 / 0–7 |
 | `$B0` | `---xxx--` / `-----xxx` | **FB**(Feedback) / **AL**(Algorithm) | 0–7 / 0–7 |
-| `$B4` | `xx------` / `------xx` / `----xxxx` | **PAN-L / PAN-R**\*(OPNA) / **LFO AMS** / **LFO PMS**\*(OPNA) | 0–1 / 0–3 / 0–7 |
+| `$B4` | `xx------` / `--xx----` / `----x---`(未用) / `-----xxx` | **PAN-L / PAN-R** / **LFO AMS** / (保留=0) / **LFO PMS**\*(OPNA) | 0–1 / 0–3 / 0 / 0–7 |
 | `$28` | `---xxxxx` | **KEYON**:CH = bit0–1,OPNA 的 +3 通道用 bit2;KEY 掩码 = bit4–7 | — |
 
 > **YM2203 没有 `$22`,也没有 `$B4` 整条**——即**无 pan、无 LFO 深度**。这是 26K 与 86 板的功能差异,做跨机型兼容时要注意。
+
+> **位域已按 NP2kai fmgen 逐位核实(0.3.033)**:`$B4` 的 pan 由 `(data>>6)&3` 解出(bit7–6),AMS 由 `(ms>>4)&3`(bit5–4),PMS 由 `ms&7`(bit2–0),bit3 未用;`$22` 的 LFO 速率由 `reg22 & 7` 索引(bit2–0),bit3 为使能。见 `sound/fmgen/fmgen_opna.cpp`(`SetReg` 的 `case 0xb4`/`case 0x22` 与 `lfodcount = reg22 & 8 ? lfotable[reg22 & 7] : 0`)。**关键联动**:全局 LFO 关闭时 `FMMix()` 把 `activech &= 0x555`,强制走无 LFO 路径——**PMS 颤音同样依赖 `$22` bit3 开启**,不只是 AMS。
 
 ### 3.4 系统级寄存器
 
 | 寄存器 | 作用 |
 |--------|------|
 | `$21` | TEST |
-| `$22` | LFO 使能 + 速率\*(OPNA) |
+| `$22` | LFO 使能 + 速率\*(OPNA):bit3=**使能**,bit2–0=**速率 LFRQ**(0 最慢…7 最快,约 3.98→21 Hz) |
 | `$24` / `$25` | Timer A |
 | `$26` | Timer B |
 | `$27` | CSM / multifreq + timer 控制 |
@@ -204,7 +206,7 @@ PMD 值得借鉴的**只有 MML 这套记谱法**(纯文本、diffable、通道�
 4. 奇端口(`0189h`/`018Bh`/`018Dh`/`018Fh`)在两家实现都**无处理**——驱动一律写偶数端口。
 5. 寄存器地址进位 `0x100`(§3.1 的 `A1A0=10/11`)在 PC-98 侧**由端口对体现**,不是把 `+0x100` 写进地址锁存:扩展组地址就是 `0x30`–`0xB6` 原值。
 
-**F-number 公式**(S1 用):`f = (fnum<<BLOCK) × 7987200 / (144 × 2^20)` → A4(440Hz)= **BLOCK 4 + fnum 520**。交叉验证:`NP2kai/sound/opngenc.c` 的 `OPNA_CLOCK / 144.0` 与 `/ 72.0` 分频基准、S98 `device1clock = 7987200`(**主时钟 = 7.9872MHz 已证**,`s98.c:168`)。SSG 周期寄存器:频率 = `7987200 / 4 / (16 × period)`(19年 fmgen `psg.SetClock(clock/4)`)。
+**F-number 公式**(S1 用):YM2608 手册 `f = (fnum << (BLOCK-1)) × 7987200 / (144 × 2^20)`(等价 `(fnum<<BLOCK) × 7987200 / (288 × 2^20)`)→ A4(440Hz)= **BLOCK 5 + fnum 520**。⚠ 早期版本写作 `(fnum<<BLOCK) … /(144×2^20)` 漏了 `2^(BLOCK-1)` 的折半,导致 A4 误标 BLOCK 4(引擎实际发低八度,devdocs/138 订正)。交叉验证:`NP2kai/sound/opngenc.c` 的 `OPNA_CLOCK / 144.0` 与 `/ 72.0` 分频基准、S98 `device1clock = 7987200`(**主时钟 = 7.9872MHz 已证**,`s98.c:168`);ymfm OPN `compute_phase_step` 的 `(fnum<<1<<BLOCK)>>2` = `fnum<<(BLOCK-1)`,亦合此式。SSG 周期寄存器:频率 = `7987200 / 4 / (16 × period)`(19年 fmgen `psg.SetClock(clock/4)`)。
 
 ---
 
@@ -311,7 +313,7 @@ PMD 手册在 `#Zenlen` 条目下明确警告:
      │
      ▼
  audio.c:audio_tick()  60Hz 事件泵        ← 平滑时钟 hal_wallclock_smooth_ms()
-     │             替换 core/engine/audio.c:370-374 的 hal_midi_out() 三连透传
+     │             插入点在 core/engine/audio.c:557-561 的 hal_midi_out() 三连透传处（S5 后现行坐标）
      ▼
  【新增】M2  fmseq   MIDI → 6 声部
      │             · GM program → 32B patch(族归并)
@@ -453,6 +455,7 @@ PMD 官方「PMD98用 Preset FM音色集」由 KAJA 本人分发(<http://www5.ai
 | PMD98 Preset FM 音色集(KAJA) | `http://www5.airnet.ne.jp/kajapon/tool.html` | 现成素材(**授权未核**) | — |
 | FM Towns Technical Databook(3rd, 1994, Chiba/ASCII) | 经 `https://raw.githubusercontent.com/captainys/TOWNSEMU/master/references.txt` 转引 | EUPHONY 背景 | — |
 | NP2kai 86 板源码 | `github.com/AZO234/NP2kai` → `cbus/board86.c` / `pcm86io.c` / `cbuscore.c` / `pcm86.c` / `sound/opna.c` / `sound/opngenc.c` / `sound/s98.c` | **§3.8 端口分工唯一出处**;主时钟 7987200 确认;KEYON/pan/寄存器细节 | — |
+| NP2kai fmgen 合成核 | `github.com/AZO234/NP2kai` → `sound/fmgen/fmgen_opna.cpp`(`SetReg` $22/$B4、`Mix6`/`FMMix` LFO 门控)、`fmgen_fmgen.cpp`(`SetMS`/`ams_`/`pms`) | **§3.3 `$B4`/`$22` 位域逐位核实出处**(0.3.033) | — |
 | QEMU `hw/audio/pc98-opna.c` | `gitlab.com/qemu-project/qemu`(PC-98 ops 界面) | §3.8 端口语义第二出处(与 NP2kai 一致) | GPL-2.0(仅事实参照) |
 
 ---

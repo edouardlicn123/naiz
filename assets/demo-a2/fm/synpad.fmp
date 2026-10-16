@@ -1,7 +1,9 @@
 # synpad — GM 88..95 synth pads.  Detuned two-pair stack (alg 6), slow
-# attack for a swelling pad, sustained, long tail.
-alg=6 fb=0 pan=0xc0
+# attack for a swelling pad, sustained, long tail.  pms=2 + a gentle
+# ams=1 tremolo on the three carriers (op2/op3/op4) give the slow chorus
+# shimmer typical of pads.
+alg=6 fb=0 pan=0xc0 ams=1 pms=2
 op=1 dt=1 mul=2  tl=44 ks=1 ar=14 am=0 d1r=2  d2r=2  sl=13 rr=8
-op=3 dt=0 mul=2  tl=44 ks=1 ar=14 am=0 d1r=2  d2r=2  sl=13 rr=8
-op=2 dt=1 mul=1  tl=42 ks=1 ar=14 am=0 d1r=2  d2r=2  sl=13 rr=8
-op=4 dt=0 mul=1  tl=40 ks=1 ar=14 am=0 d1r=2  d2r=2  sl=13 rr=8
+op=3 dt=0 mul=2  tl=44 ks=1 ar=14 am=1 d1r=2  d2r=2  sl=13 rr=8
+op=2 dt=1 mul=1  tl=42 ks=1 ar=14 am=1 d1r=2  d2r=2  sl=13 rr=8
+op=4 dt=0 mul=1  tl=40 ks=1 ar=14 am=1 d1r=2  d2r=2  sl=13 rr=8

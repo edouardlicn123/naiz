@@ -21,12 +21,16 @@
 #define FMOPN_OPS_PER_VOICE    4
 
 /* Patch record: 32 bytes (devdocs/123 §五, F03 §5.2).  The four operators
- * are stored in FILE order 1-3-2-4 (PMD .FF / MUCOM88 .DAT compat), which
- * is not the chip's register order — fmopn_op_slot maps file slot -> chip
- * slot.  Bytes:
+ * are stored in algorithm-operator order (file idx k = operator k+1), which
+ * is not the chip's register order — fmopn_op_slot maps operator index ->
+ * register slot.  Bytes:
  *   0..23   ops, 6 bytes each: DT/MUL, TL, KS/AR, AM/D1R, D2R, SL/RR
  *   24      FB<<3 | AL
- *   25      PANL<<6 | PANR<<4  (default 0xC0: L full, R full)
+ *   25      PANL<<6|PANR<<4|AMS<<4|PMS (default 0xC0: L/R full, no LFO)
+ *           bits7-6 = pan L/R, bits5-4 = LFO AM sensitivity (AMS 0-3),
+ *           bit3 reserved, bits2-0 = LFO PM sensitivity (PMS 0-7).  Written
+ *           verbatim to reg $B4 (F03 §3.3; NP2kai fmgen decodes pan from
+ *           data>>6, AMS from (ms>>4)&3, PMS from ms&7).
  *   26..31  reserved, must be 0
  */
 #define FMOPN_PATCH_BYTES  32
@@ -49,17 +53,24 @@ typedef struct {
     uint8_t data[FMOPN_PATCH_BYTES];
 } FmopnPatch;
 
-/* File-order op slot -> chip register slot.  Files store 1-3-2-4; the chip
- * numbers operators 1-2-3-4.  Pin once here, once in the compiler and once
- * in the tests (mis-ordering mutes the pitch, silently wrong). */
+/* Algorithm operator index -> chip register slot.  The OPN core addresses
+ * operators in slot order 1-3-2-4: algorithm op 1 -> 0x30, op 2 -> 0x38,
+ * op 3 -> 0x34, op 4 -> 0x3C (so alg=4's pairs are op1->op2 / op3->op4).
+ * Confirmed against ymfm operator_map and NP2kai fmgen slottable.  Pin once
+ * here, once in the compiler and once in the tests (mis-ordering mutes the
+ * pitch, silently wrong). */
 extern const uint8_t fmopn_op_slot[FMOPN_OPS_PER_VOICE];
 
 /* --- note / bend / keyon encoders -------------------------------------- */
 
-/* MIDI note 0..127 -> chip block/fnum.  Exact fnum<<block = freq*18432/975
- * rounding at the final per-block step (A4 -> block 4 fnum 520, C4 -> 618).
- * Clamps to fnum 1023 / block 7 at the top of MIDI range. */
+/* MIDI note 0..127 -> chip block/fnum.  Exact fnum<<block = freq*36864/975
+ * rounding at the final per-block step (A4 -> block 5 fnum 520, C4 -> block 4
+ * fnum 618).  Clamps to fnum 1023 / block 7 at the top of MIDI range. */
 void fmopn_note_ratio(int note, int *block, int *fnum);
+
+/* Frequency (Hz) represented by a (block, fnum) pair.  Inverse of the note
+ * encoder; used by the SSG-percussion path and pitch bend. */
+double fmopn_ratio_freq(int block, int fnum);
 
 /* Pitch bend 0..16383 (8192 centred) applied to an existing block/fnum.
  * Linear approximation of +-2 semitones, block unchanged, fnum clamped. */
@@ -78,9 +89,14 @@ uint8_t fmopn_ssg_period_coarse(int period);
 /* 0 on success, else a bitwise OR of FMOPN_E_* (missing/invalid fields). */
 int fmopn_patch_validate(const FmopnPatch *p);
 
-/* $B0 / $B4 register values for a channel. */
+/* $B0 / $B4 register values for a channel.  fmopn_patch_pan returns the pan
+ * field only (bits 7-6); fmseq packs pan | AMS<<4 | PMS back into $B4. */
 uint8_t fmopn_patch_fb_alg(const FmopnPatch *p);
 uint8_t fmopn_patch_pan(const FmopnPatch *p);
+
+/* LFO sensitivity fields packed in $B4 (byte 25). */
+uint8_t fmopn_patch_ams(const FmopnPatch *p);
+uint8_t fmopn_patch_pms(const FmopnPatch *p);
 
 /* Per-slot op register values; regslot is the CHIP slot 0..3. */
 uint8_t fmopn_op_dt_mul(const FmopnPatch *p, int regslot);

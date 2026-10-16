@@ -63,10 +63,10 @@ LINE_REF_WHITELIST = {
     ("nb_setting.c", 122): "snprintf",
     ("nb_setting.c", 140): "Text Speed",
     ("nb_setting.c", 152): "Read Progress",
-    ("audio.c", 215): "g_bgm_on",
-    ("audio.c", 361): "g_snd_on",
-    ("audio.c", 370): "g_vc_on",
-    ("audio.c", 268): "audio_bgm_stop",
+    ("audio.c", 220): "g_bgm_on",
+    ("audio.c", 366): "g_snd_on",
+    ("audio.c", 375): "g_vc_on",
+    ("audio.c", 273): "audio_bgm_stop",
     ("hal_audio.c", 88): "PCM_CTRL_A46A_IRQ",
     ("hal_audio.c", 94): "PCM_IRQ_INTERVAL_MAX",
     ("hal_audio.c", 122): "hal_pcm_set_volume",
@@ -172,6 +172,12 @@ SUPERSEDED_SHIFTED_LINE_REFS = {
     # bootmenu_run / prefs_set_lang by +1 / +1 / +7.  devdoc 120 §9 printed the
     # old coordinates; the current ones are checked in LINE_REF_WHITELIST.
     ("bootmenu.c", 103), ("bootmenu.c", 200), ("bootmenu.c", 286),
+    # fm_load_patches() gained a fixed-slot/reserve-default rewrite (devdoc 135,
+    # S7 timbre work) that added 5 net lines ahead of the audio toggle gates and
+    # audio_bgm_stop, shifting every later audio.c citation by +5.  The current
+    # coordinates are checked in LINE_REF_WHITELIST; the old ones are recorded
+    # here so the drift stays visible.
+    ("audio.c", 215), ("audio.c", 268), ("audio.c", 361), ("audio.c", 370),
 }
 
 # References to files RENAMED in 0.3.014.  devdocs 118/119 are finished and may
@@ -229,6 +235,9 @@ KNOWN_GOOD_REFS = {
 DOC_118 = DEV_DOCS / "118-玩家偏好分家与音频开关音量设置场景.md"
 DOC_119 = DEV_DOCS / "119-用户偏好分家实装订正与设计门控与规格双源守恒.md"
 DOC_120 = DEV_DOCS / "120-settings.txt废止与config.toml单一配置源与启动菜单语言根修.md"
+DOC_136 = DEV_DOCS / "136-BGM音质长远方案FM音色实验室与FM原生作曲.md"
+DOC_138 = DEV_DOCS / "138-FM音高整体低八度根因修复.md"
+DOC_139 = DEV_DOCS / "139-虚拟时钟单窗速率尖峰钳制.md"
 TEST_TEXT_SPEED = ROOT / "tools/tests/test_text_speed_settings.py"
 TEST_USER_CFG = ROOT / "tools/tests/test_user_cfg_settings.py"
 TEST_AUDIO_INV = ROOT / "tools/tests/test_audio_settings_invariants.py"
@@ -396,6 +405,20 @@ def test_devdoc_118_keeps_its_errata_block():
     assert "119" in head, "the ERRATA block must name devdoc 119"
 
 
+def test_devdoc_136_keeps_its_errata_block():
+    """devdoc 136 §十五 judged the engine formula correct and "fixed" the
+    oracle with an FNUM x2, i.e. it identified the wrong root cause for the
+    octave-flat BGM symptom.  The archived body is frozen, so AGENTS.md §10
+    step 1 is the only way that conclusion stays corrected -- deleting the
+    block would silently resurrect it (devdoc 138 §四)."""
+    head = "\n".join(_lines(DOC_136)[:40])
+    assert "ERRATA" in head, (
+        "devdoc 136 lost its ERRATA block — AGENTS.md §10 requires the "
+        "superseded conclusion to stay corrected"
+    )
+    assert "138" in head, "the ERRATA block must name devdoc 138"
+
+
 def test_finished_devdoc_has_no_pending_claims():
     """A document marked finished may legitimately defer real-hardware work
     (§10), but must not defer its own bookkeeping."""
@@ -407,7 +430,7 @@ def test_finished_devdoc_has_no_pending_claims():
         )
 
 
-@pytest.mark.parametrize("doc", [DOC_118, DOC_119, DOC_120])
+@pytest.mark.parametrize("doc", [DOC_118, DOC_119, DOC_120, DOC_136, DOC_138, DOC_139])
 def test_cited_docs_exist(doc):
     """Every sibling devdoc/refdoc a document points at must be on disk."""
     text = "\n".join(_lines(doc))

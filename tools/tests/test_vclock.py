@@ -33,6 +33,16 @@ devdoc 133 added two fixes for the residual flutter the first design left:
   `want` jitters by ~1/passes (~5% at 20 passes); chasing it every window was
   itself the audible flutter.  Later windows now move the target only a
   fraction of the way to each reading.
+
+devdoc 139 added one more:
+
+  BOUND ONE WINDOW'S CORRECTION.  A window that opens during a DOS-clock stall
+  gap and closes on the catch-up jump measures a spuriously fast rate (the
+  jump covers time the window's few passes did not really span); unchecked,
+  the IIR follows it and the slow slew needs seconds to relax.  Each window's
+  measurement is now capped to VCLOCK_MAX_WINDOW_RATIO_NUM/DEN of the running
+  rate, so no single window can hold the tempo fast.  The first (adopted)
+  window is exempt.
 """
 import ctypes
 import os
@@ -339,3 +349,53 @@ def test_a_stalled_window_does_not_move_the_rate():
     assert vc.target == cal, (
         f"a one-pass window moved the target {cal} -> {vc.target}")
     assert vc.step == cal, f"the clock slowed to {vc.step}"
+
+
+# --- 4. devdoc 139: bound one window's correction ---------------------------
+
+def test_short_stall_then_jump_does_not_spike_the_rate():
+    """devdoc 139: a window spanning a stall gap plus its catch-up jump must
+    not yank the rate (and then take seconds to relax).
+
+    Calibrate at 25Hz, then a few passes report no time (a DOS second that has
+    not landed yet) before one pass delivers the whole second.  That window
+    measures 1000ms over 6 passes (~167ms/pass, ~2.5x the nominal rate);
+    unchecked the IIR moves the target ~35% and the slew holds it there.
+    """
+    lib, vc = _make_clock()
+    cal_reals = _quantised_windows([25])       # calibrate: 24 passes, +1000 last
+    for r in cal_reals:
+        lib.vclock_advance(ctypes.byref(vc), r)
+    assert vc.calibrated, "calibration window did not close"
+    base_target = vc.target
+    base_step = vc.step
+
+    last = cal_reals[-1]
+    for _ in range(5):                         # stall: platform clock holds
+        lib.vclock_advance(ctypes.byref(vc), last)
+    lib.vclock_advance(ctypes.byref(vc), last + 1000)   # catch-up jump
+
+    assert vc.target <= base_target * 5 // 4 + 1, (
+        f"a short stall + jump spiked the rate {base_target} -> {vc.target}")
+    assert vc.step <= base_step + SLEW * 4, (
+        f"the step lurched {base_step} -> {vc.step} in a few passes")
+
+
+def test_sustained_rate_change_still_converges():
+    """The devdoc 139 clamp must not deafen the clock to a real change.
+
+    A sustained drop (25Hz -> 10Hz) is not reached instantly -- that is the
+    price of the tight band, and it is acceptable because the frame-pump rate
+    is stable in practice -- but the clock must clearly keep tracking toward
+    it, not freeze at the old rate.  (Full 2.5x convergence takes ~15
+    windows.)  The existing test_rate_change_converges_without_lurch covers
+    the no-lurch property of the same run.
+    """
+    reals = _rate_change_run()
+    lib, vc = _make_clock()
+    for r in reals:
+        lib.vclock_advance(ctypes.byref(vc), r)
+    assert vc.target >= 900, (
+        f"clock went deaf to a sustained slowdown: target={vc.target} "
+        "(25Hz rate is 640 units, 10Hz is 1600)")
+

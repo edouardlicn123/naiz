@@ -186,7 +186,9 @@ static void fm_write_patch(Fmseq *seq, const FmseqSink *sink, int ch,
     fmopn_ch_addr(ch, 0xB0, &bank, &addr);
     w(sink, bank, addr, fmopn_patch_fb_alg(p));
     fmopn_ch_addr(ch, 0xB4, &bank, &addr);
-    w(sink, bank, addr, fmopn_patch_pan(p));
+    w(sink, bank, addr, (uint8_t)(fmopn_patch_pan(p)
+                                  | (fmopn_patch_ams(p) << 4)
+                                  | fmopn_patch_pms(p)));
     fmopn_ch_addr(ch, 0xA4, &bank, &addr);
     w(sink, bank, addr, (uint8_t)((block << 3) | (fnum >> 8)));
     fmopn_ch_addr(ch, 0xA0, &bank, &addr);
@@ -293,7 +295,7 @@ static void ssg_note_on(Fmseq *seq, const FmseqSink *sink, int midi_ch,
         fmopn_note_ratio(note, &blk, &fn);
         if (seq->bend[FMSEQ_PERCUSSION_MIDI_CH] != 8192)
             fmopn_bend_ratio(seq->bend[FMSEQ_PERCUSSION_MIDI_CH], &blk, &fn);
-        freq = ((double)((long)fn << blk)) * FMSEQ_CLOCK / 150994944.0;
+        freq = fmopn_ratio_freq(blk, fn);
         period = period_of_freq(freq);
         w(sink, 0, (uint8_t)(ssg_ch * 2), fmopn_ssg_period_fine(period));
         w(sink, 0, (uint8_t)(ssg_ch * 2 + 1),
@@ -389,8 +391,7 @@ static void fm_apply_bend(Fmseq *seq, const FmseqSink *sink, int midi_ch)
                 fmopn_note_ratio(seq->ssg[i].v.midi_note, &blk, &fn);
                 if (seq->bend[midi_ch] != 8192)
                     fmopn_bend_ratio(seq->bend[midi_ch], &blk, &fn);
-                freq = ((double)((long)fn << blk)) * FMSEQ_CLOCK /
-                       150994944.0;
+                freq = fmopn_ratio_freq(blk, fn);
                 period = period_of_freq(freq);
                 w(sink, 0, (uint8_t)(i * 2), fmopn_ssg_period_fine(period));
                 w(sink, 0, (uint8_t)(i * 2 + 1),

@@ -36,6 +36,14 @@
  *      a dialogue page.  Fix: later windows move the target by only
  *      1/VCLOCK_MEAS_SMOOTH of the error, averaging the jitter out.
  *
+ * devdoc 139 refinement.  One defect survived devdocs 133: a window that opens
+ * during a DOS-clock stall gap and closes on the catch-up jump measures a rate
+ * far above nominal (the jump covers time the window's few passes did not
+ * really span), and the 0.5 ms/pass slew needs seconds to undo the excursion.
+ * Fix: cap each window's measurement to VCLOCK_MAX_WINDOW_RATIO_NUM/DEN of the
+ * running rate before the IIR sees it.  The first window is exempt so a
+ * genuinely different machine rate still calibrates outright.
+ *
  * The phase between the virtual clock and the platform reading is still not
  * controlled, and does not need to be: every consumer drives a closed loop
  * (a MIDI table, a reveal, an animation) from this clock, so only its rate
@@ -108,9 +116,22 @@ void vclock_advance(VClock *vc, unsigned long real_ms)
             vc->step = want;
             vc->calibrated = 1;
         } else {
+            /* Bound how far one window may move the rate before averaging it:
+             * a window that catches a DOS-clock stall gap plus its catch-up
+             * jump measures a spuriously fast rate (B19 §2.3), and following
+             * it would hold the clock fast for seconds. */
+            unsigned long hi = vc->target * VCLOCK_MAX_WINDOW_RATIO_NUM
+                               / VCLOCK_MAX_WINDOW_RATIO_DEN;
+            unsigned long lo = vc->target * VCLOCK_MAX_WINDOW_RATIO_DEN
+                               / VCLOCK_MAX_WINDOW_RATIO_NUM;
+            long diff;
+            if (want > hi)
+                want = hi;
+            if (want < lo)
+                want = lo;
             /* Average the quantisation jitter: move only a fraction of the
              * way to each window's reading (devdoc 133 §2.2). */
-            long diff = (long)want - (long)vc->target;
+            diff = (long)want - (long)vc->target;
             vc->target = (unsigned long)((long)vc->target
                                          + diff / (long)VCLOCK_MEAS_SMOOTH);
         }

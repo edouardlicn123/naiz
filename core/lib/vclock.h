@@ -100,6 +100,21 @@
  */
 #define VCLOCK_MIN_WINDOW_PASSES 2UL
 
+/*
+ * A measurement window may not move the rate by more than NUM/DEN up, nor
+ * below DEN/NUM down, in one step.  The DOS second is delivered in clusters
+ * (B19 §2.3): a window that happens to start during a stall gap and closes on
+ * the catch-up jump measures a spuriously fast rate (up to RATE_MAX, ~2.5x
+ * nominal) over the few passes it actually covered.  Left unclamped, the IIR
+ * would follow it and the 0.5 ms/pass slew would take seconds to undo — an
+ * audible fast stretch.  Genuine pass-rate changes are gradual, so bounding
+ * each window's correction loses nothing; the first (adopted) window is exempt
+ * so a machine whose real rate differs from the priming constant still
+ * calibrates outright.
+ */
+#define VCLOCK_MAX_WINDOW_RATIO_NUM 5UL
+#define VCLOCK_MAX_WINDOW_RATIO_DEN 4UL
+
 typedef struct {
     unsigned long virtual;    /* current virtual time, in units */
     unsigned long real_prev;  /* real ms seen at the previous advance */

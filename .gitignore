@@ -8,6 +8,8 @@ disks/
 *.o
 *.exe
 *.EXE
+tools/naiz_audio/fmbench/fmbench
+tools/naiz_audio/fmbench/.cache/
 *.MAG
 *.DAT
 temp*.png

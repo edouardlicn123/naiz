@@ -9,12 +9,20 @@
 
 #include "fmopn.h"
 
-/* File order = 1-3-2-4 (PMD .FF / MUCOM88 .DAT); chip slot for each. */
+/* Register slot for each algorithm operator index (op1->0x30, op2->0x38,
+ * op3->0x34, op4->0x3C).  Masked to 0..3 for 4-op algorithms. */
 const uint8_t fmopn_op_slot[FMOPN_OPS_PER_VOICE] = { 0, 2, 1, 3 };
 
-/* freq = (fnum << block) * MCLK / (144 * 2^20);  MCLK = 7987200.
- *   fnum<<block = freq * 150994944 / 7987200 = freq * 18432 / 975.        */
-#define FMOPN_FNUM_SCALE_N 18432
+/* YM2608 Application Manual: the F-Number for a note is
+ *   fnum = (144 * freq * 2^20 / MCLK) / 2^(block-1)
+ * i.e.  freq = (fnum << (block-1)) * MCLK / (144 * 2^20).
+ * Writing the shift as the raw register block:
+ *   freq = (fnum << block) * MCLK / (288 * 2^20)
+ *   fnum<<block = freq * 288 * 2^20 / MCLK = freq * 301989888 / 7987200
+ *               = freq * 36864 / 975.
+ * (An earlier revision omitted the 2^(block-1) halving, so every note was
+ * encoded one block low and the chip rendered it an octave flat; devdocs/138.) */
+#define FMOPN_FNUM_SCALE_N 36864
 #define FMOPN_FNUM_SCALE_D 975
 
 static double fmopn_note_freq(int note)
@@ -29,9 +37,18 @@ static double fmopn_note_freq(int note)
     return f;
 }
 
+/* Frequency (Hz) represented by a (block, fnum) register pair.  Inverse of
+ * fmopn_freq_ratio; shared so the SSG-percussion path and pitch bend recover
+ * the note exactly instead of re-deriving the clock constants. */
+double fmopn_ratio_freq(int block, int fnum)
+{
+    return ((double)((long)fnum << block)) * FMOPN_FNUM_SCALE_D /
+           FMOPN_FNUM_SCALE_N;
+}
+
 /* Encode an absolute frequency (Hz) into block/fnum.  Rounds the per-block
- * quotient so the canonical anchors land exactly: A4 (440) -> 520/4,
- * C4 (261.63) -> 618/3. */
+ * quotient so the canonical anchors land exactly: A4 (440) -> 520/5,
+ * C4 (261.63) -> 618/4. */
 static void fmopn_freq_ratio(double freq, int *block, int *fnum)
 {
     double full;
@@ -65,7 +82,6 @@ void fmopn_bend_ratio(int bend, int *block, int *fnum)
      * d = (bend - 8192) / 8192.  2^(1/6) - 1 = 0.122462...  Fixed-point
      * with 4096 units: 0.122462 * 4096 = 501.6 -> 502. */
     double freq;
-    long fh;
     int b = *block, fn = *fnum;
 
     if (bend < 0)
@@ -74,8 +90,7 @@ void fmopn_bend_ratio(int bend, int *block, int *fnum)
         bend = 16383;
 
     /* Recover the pre-block frequency from the stored ratio. */
-    fh = ((long)fn << b);
-    freq = ((double)fh) * 7987200.0 / 150994944.0;
+    freq = fmopn_ratio_freq(b, fn);
 
     /* Apply the bend factor, fixed-point to stay in [0.88, 1.12]. */
     {
@@ -122,7 +137,8 @@ uint8_t fmopn_ssg_period_coarse(int period)
 
 /* --- patch layout helpers ---------------------------------------------- */
 
-/* Index into data[] for the register slot's op block (file order inverse). */
+/* Index into data[] for the register slot's op block: the algorithm operator
+ * whose register slot is regslot (inverse of fmopn_op_slot). */
 static int fmopn_file_slot(int regslot)
 {
     int k;
@@ -160,7 +176,7 @@ int fmopn_patch_validate(const FmopnPatch *p)
     if ((b & 0xC0) != 0)      /* FB is bits5-3, AL bits2-0 */
         err |= FMOPN_E_FBALG;
     b = p->data[25];
-    if ((b & 0x0F) != 0)      /* PAN uses bits7-4 only */
+    if ((b & 0x08) != 0)      /* bit3 reserved; 7-6 PAN, 5-4 AMS, 2-0 PMS */
         err |= FMOPN_E_PAN;
     for (i = 26; i < FMOPN_PATCH_BYTES; i++)
         if (p->data[i] != 0)
@@ -176,7 +192,17 @@ uint8_t fmopn_patch_fb_alg(const FmopnPatch *p)
 
 uint8_t fmopn_patch_pan(const FmopnPatch *p)
 {
-    return p->data[25];
+    return (uint8_t)(p->data[25] & 0xC0);   /* pan L/R field (bits 7-6) */
+}
+
+uint8_t fmopn_patch_ams(const FmopnPatch *p)
+{
+    return (uint8_t)((p->data[25] >> 4) & 0x03);   /* AMS field (bits 5-4) */
+}
+
+uint8_t fmopn_patch_pms(const FmopnPatch *p)
+{
+    return (uint8_t)(p->data[25] & 0x07);          /* PMS field (bits 2-0) */
 }
 
 uint8_t fmopn_op_dt_mul(const FmopnPatch *p, int regslot)

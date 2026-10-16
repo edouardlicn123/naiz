@@ -6,7 +6,7 @@ register model is pure logic (zero outb()), so its correctness is proven
 here without an emulator.
 
 Assertions cover:
-  - the 1-3-2-4 op reorder (file slot -> register slot) is pinned in code
+  - the algorithm-operator -> register-slot map {0,2,1,3} is pinned in code
   - every MIDI note 0..127 lands on a valid block/fnum whose implied
     frequency is within 0.6% of the ideal (monotone, no gaps, clamped top)
   - the canonical anchors A4/C4 hit the reference table values
@@ -27,9 +27,10 @@ REPO_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__fi
 FMOPN_C = os.path.join(REPO_ROOT, "core", "lib", "fmopn.c")
 FMOPN_H = os.path.join(REPO_ROOT, "core", "lib", "fmopn.h")
 
-# Master clock 7.9872MHz; freq = (fnum << block) * 7987200 / (144 * 2**20).
+# Master clock 7.9872MHz; YM2608 manual: freq = (fnum << (block-1)) * 7987200
+# / (144 * 2**20).  Writing the shift as the raw block: / (288 * 2**20).
 _MCLK = 7987200.0
-_MCLK_DIV = 144.0 * (1 << 20)
+_MCLK_DIV = 288.0 * (1 << 20)
 
 
 def _freq_of(block, fnum):
@@ -76,7 +77,8 @@ def fmopn():
     lib.fmopn_patch_validate.argtypes = [ctypes.POINTER(ctypes.c_uint8)]
     lib.fmopn_patch_validate.restype = ctypes.c_int
 
-    for name in ("fmopn_patch_fb_alg", "fmopn_patch_pan"):
+    for name in ("fmopn_patch_fb_alg", "fmopn_patch_pan",
+                 "fmopn_patch_ams", "fmopn_patch_pms"):
         getattr(lib, name).argtypes = [ctypes.POINTER(ctypes.c_uint8)]
         getattr(lib, name).restype = ctypes.c_uint8
     for name in ("fmopn_op_dt_mul", "fmopn_op_tl", "fmopn_op_ks_ar",
@@ -108,7 +110,9 @@ def _bent(lib, bend, block0, fnum0):
 
 
 def test_op_slot_order_pinned():
-    """The 1-3-2-4 reorder must stay as defined (silent-pitch-slip guard)."""
+    """Algorithm-operator -> register-slot map must stay {0,2,1,3} (the OPN
+    core reads operators in 1-3-2-4 order; getting it wrong is silently
+    wrong)."""
     lib, _ = _build_fmopn()
     lib.fmopn_op_slot  # exported data; verify via addr of the symbol
     # ctypes: get the symbol value
@@ -138,9 +142,9 @@ def test_all_notes_valid_and_accurate(fmopn):
 
 def test_anchors(fmopn):
     block, fnum = _ratio(fmopn, "fmopn_note_ratio", 69)  # A4
-    assert (block, fnum) == (4, 520)
+    assert (block, fnum) == (5, 520)
     block, fnum = _ratio(fmopn, "fmopn_note_ratio", 60)  # C4
-    assert (block, fnum) == (3, 618)
+    assert (block, fnum) == (4, 618)
 
 
 def test_top_clamp(fmopn):
@@ -191,9 +195,9 @@ def test_ssg_period_split(fmopn):
 
 
 def _good_patch():
-    """A valid 32-byte patch.  Ops are stored in FILE order 1-3-2-4, i.e.
-    file slot k holds chip register slot fmopn_op_slot[k] = {0,2,1,3}.
-    Each op has a distinct TL so the file<->chip reorder is observable."""
+    """A valid 32-byte patch.  File slot k holds algorithm operator k+1, whose
+    chip register slot is fmopn_op_slot[k] = {0,2,1,3}.  Each op has a
+    distinct TL so the file<->register-slot mapping is observable."""
     p = ctypes.c_uint8 * 32
     b = p()
     # file slot 0 = chip slot 0: dt=2 mul=9, tl=40
@@ -275,19 +279,32 @@ def test_patch_validate_errors(fmopn):
     r[24] = save | 0xC0
     assert fmopn.fmopn_patch_validate(r) & 0x80
 
-    # PAN low nibble
+    # $B4 bit3 reserved (bits7-6 pan, 5-4 AMS, 2-0 PMS are all legal)
     r = bad(*b)
-    r[25] |= 0x01
+    r[25] |= 0x08
     assert fmopn.fmopn_patch_validate(r) & 0x100
+    # AMS/PMS in the other bits must be accepted
+    r = bad(*b)
+    r[25] = 0xC0 | (3 << 4) | 7
+    assert fmopn.fmopn_patch_validate(r) == 0
 
 
 def test_patch_accessors(fmopn):
     b = _good_patch()
     assert fmopn.fmopn_patch_fb_alg(b) == (5 << 3) | 4
+    assert fmopn.fmopn_patch_pan(b) == 0xC0       # pan field (bits 7-6)
+    assert fmopn.fmopn_patch_ams(b) == 0
+    assert fmopn.fmopn_patch_pms(b) == 0
+    b[25] = 0xC0 | (2 << 4) | 5
     assert fmopn.fmopn_patch_pan(b) == 0xC0
+    assert fmopn.fmopn_patch_ams(b) == 2
+    assert fmopn.fmopn_patch_pms(b) == 5
+    # fmseq packs the three fields back into the $B4 byte
+    assert (fmopn.fmopn_patch_pan(b) | (fmopn.fmopn_patch_ams(b) << 4)
+            | fmopn.fmopn_patch_pms(b)) == 0xC0 | (2 << 4) | 5
 
-    # accessor regslot -> file slot -> byte: the reorder must make chip 0,1,2,3
-    # read file slots 0, 2, 1, 3 respectively.
+    # accessor regslot -> file slot -> byte: register slots 0,1,2,3 read file
+    # slots 0,2,1,3 respectively (= algorithm operators 1,3,2,4).
     assert fmopn.fmopn_op_dt_mul(b, 0) == 0x29
     assert fmopn.fmopn_op_tl(b, 0) == 40
     assert fmopn.fmopn_op_ks_ar(b, 0) == 0x18

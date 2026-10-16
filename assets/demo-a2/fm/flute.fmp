@@ -1,8 +1,20 @@
-# flute — GM 72..79 (flute/recorder/pan/whistle).  Simple single-modulator
-# body (alg 2), very weak modulation (high TL sidetones) for a near-sine
-# pure tone; gentle attack, holds at sustain.
-alg=2 fb=0 pan=0xc0
-op=1 dt=0 mul=1  tl=8  ks=1 ar=18 am=0 d1r=2  d2r=2  sl=2 rr=6
-op=3 dt=0 mul=1  tl=8  ks=1 ar=18 am=0 d1r=2  d2r=2  sl=2 rr=6
-op=2 dt=0 mul=2  tl=20 ks=1 ar=18 am=0 d1r=2  d2r=2  sl=2 rr=6
-op=4 dt=0 mul=1  tl=12 ks=1 ar=18 am=0 d1r=2  d2r=2  sl=2 rr=6
+# flute — GM 72..79 (flute/recorder/pan/whistle).  alg 4 = two independent
+# 2-op pairs (out = op1->op2 + op3->op4); pair B is silenced (tl=127) so the
+# voice is a single 2-op stack.
+# Pair A (op1->op2): a *weak* same-frequency modulator (mul=1, tl=52) over a
+# strong mul=1 fundamental, so the steady tone is near-sine (flute spectrum =
+# dominant fundamental + faint harmonics).  The modulator has a slower attack
+# (ar=12) than the carrier (ar=16) and settles low (sl=10), so the harmonics
+# swell in on the onset like breath and then nearly vanish.
+# The carrier attack is deliberately soft (ar=16, ~tens of ms) instead of the
+# chip-max ar=28: the source line is detached (80% gate), so a hard attack
+# made every note read as a *keyed* instrument ("like playing a keyboard").
+# rr=8 gives a gentle release that fills the inter-note gaps.
+# pms=2 adds the natural light pitch vibrato (LFO LFRQ=2 ~= 6.6 Hz, F03 §3.3);
+# AMS 0 = no tremolo.  The previous patch kept a *sustained* octave (op3->op4
+# mul=2, sl=4) which registered as fundamental + octave = an organ stop.
+alg=4 fb=0 pan=0xc0 ams=0 pms=1
+op=1 dt=0 mul=1 tl=54 ks=1 ar=12 am=0 d1r=5 d2r=3 sl=10 rr=8
+op=2 dt=0 mul=1 tl=2  ks=1 ar=16 am=0 d1r=4 d2r=2 sl=2  rr=8
+op=3 dt=0 mul=1 tl=127 ks=0 ar=0 am=0 d1r=0 d2r=0 sl=0 rr=0
+op=4 dt=0 mul=1 tl=127 ks=0 ar=0 am=0 d1r=0 d2r=0 sl=0 rr=0

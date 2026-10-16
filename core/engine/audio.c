@@ -121,8 +121,12 @@ static void fm_unmapped(void *ctx, int midi_ch, int program, int def_family)
 }
 
 /* Load the project's FMP patch families from AUDIO.DAT (id order ==
- * fmp_map order == AUDIO.DAT order).  Invalid entries are skipped loudly;
- * if nothing valid remains, the built-in default takes over. */
+ * fmp_map order == AUDIO.DAT order).  Every fmp_map entry owns a FIXED
+ * family slot: fmp_gm_map[] stores family indices positionally into
+ * g_fm_patches[], so a missing/invalid/dummy entry must leave the built-in
+ * default in its slot — never be skipped, which would shift every later
+ * family down by one and silently reroute all higher GM programs (e.g.
+ * program 73 -> flute would land on the next family instead). */
 static void fm_load_patches(void)
 {
     const AudioAssetMap *m;
@@ -130,36 +134,37 @@ static void fm_load_patches(void)
 
     for (m = fmp_map; m->name != NULL; m++) {
         long off = 0, size = 0;
-        uint8_t *raw;
+        char k8[9];
 
-        if (strcmp(m->name, "__dummy__") == 0)
-            continue;
         if (n >= FM_FAMILY_MAX)
             break;
-        {
-            char k8[9];
+
+        g_fm_patches[n] = g_fm_default_patch;   /* placeholder for this slot */
+
+        if (strcmp(m->name, "__dummy__") != 0) {
             str_toc8(k8, sizeof k8, m->name);
             if (farchive_lookup_name(&g_arc, k8, &off, &size, NULL) != 0) {
-                hal_logf("FM WARN: patch '%s' missing in %s\r\n", m->name,
-                         AUDIO_ARCHIVE);
-                continue;
+                hal_logf("FM WARN: patch '%s' missing in %s; family %d "
+                         "uses default\r\n", m->name, AUDIO_ARCHIVE, n);
+            } else if (size != FMOPN_PATCH_BYTES) {
+                hal_logf("FM WARN: patch '%s' has %ld bytes, need %d; "
+                         "family %d uses default\r\n", m->name, size,
+                         FMOPN_PATCH_BYTES, n);
+            } else {
+                uint8_t *raw = farchive_read_alloc(&g_arc, off, size, NULL);
+                if (!raw) {
+                    hal_logf("FM WARN: read patch '%s' failed; family %d "
+                             "uses default\r\n", m->name, n);
+                } else {
+                    memcpy(g_fm_patches[n].data, raw, FMOPN_PATCH_BYTES);
+                    free(raw);
+                    if (fmopn_patch_validate(&g_fm_patches[n]) != 0) {
+                        hal_logf("FM WARN: patch '%s' fails validation; "
+                                 "family %d uses default\r\n", m->name, n);
+                        g_fm_patches[n] = g_fm_default_patch;
+                    }
+                }
             }
-        }
-        if (size != FMOPN_PATCH_BYTES) {
-            hal_logf("FM WARN: patch '%s' has %ld bytes, need %d\r\n",
-                     m->name, size, FMOPN_PATCH_BYTES);
-            continue;
-        }
-        raw = farchive_read_alloc(&g_arc, off, size, NULL);
-        if (!raw) {
-            hal_logf("FM WARN: read patch '%s' failed\r\n", m->name);
-            continue;
-        }
-        memcpy(g_fm_patches[n].data, raw, FMOPN_PATCH_BYTES);
-        free(raw);
-        if (fmopn_patch_validate(&g_fm_patches[n]) != 0) {
-            hal_logf("FM WARN: patch '%s' fails validation\r\n", m->name);
-            continue;   /* slot not committed */
         }
         n++;
     }

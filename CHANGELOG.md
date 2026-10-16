@@ -2,6 +2,114 @@
 
 自 R1 起全部 Bug 修复与功能演进记录（条目顺序沿用 AGENTS.md 既有历史排列）；`AGENTS.md` 仅保留当前版本与规则。**新条目约定**：每轮修复/演进完成后，在下方 `---` 分隔线之后（第一条位置）追加变更摘要，并在 AGENTS.md 头部同步「当前版本」。**条目格式**：每条以 `### <版本号> — <标题>` 开头（版本号化标题行 + `<a id="cN">` 锚点，N 按条目序递增），正文整段或分小节；历史速查直接读下方「版本索引」。
 
+<a id="c68"></a>
+### 0.3.037 — 虚拟时钟单窗速率尖峰钳制（修「演奏时快时慢」的残留机制）
+
+**动机**：devdoc 133 收敛后，用户实机复报 FM BGM「演奏时快时慢（tempo jitter）」仍在。本会话读码定位到 `core/lib/vclock.c` 的**单窗测量尖峰**路径，属 133 未覆盖的残留缺陷。
+
+**根因**：虚拟时钟每 1000ms 窗口闭合按 `want = accum*16/passes` 测速（`vclock.c:105`），`step` 仅以 0.5ms/pass 向 `target` 逼近、`target` 再以 1/4 IIR 分数跟 `want`。`VCLOCK_MIN_WINDOW_PASSES=2` 只挡「单个 pass 吞掉整秒」的硬停顿；若窗口先经历**几次 delta=0 的短停顿**、随即吃到一个 `+1000..+6000ms` 的**成簇大跳**（B19 §2.3：DOS 秒成簇交付），`passes` 仍 ≥2 ⇒ 窗被采纳，`want` 飙到 `RATE_MAX`(≈2.5×)，`target` 移动 1/4、`step` 数秒才追上 ⇒ **实机听到「偏快数秒」**。既有 `test_vclock.py` 覆盖 1-pass 停顿与「24 pass 后跳」，恰缺「短停顿后跳」；`test_jump_is_not_dumped_in_one_pass` 只断言发射步被兜底，抓不到速率尖峰。
+
+**修复**：`core/lib/vclock.h` 新增 `VCLOCK_MAX_WINDOW_RATIO_NUM/DEN = 5/4`（±25% 带）；`core/lib/vclock.c:118-137` 在窗口闭合后、IIR 更新前把 `want` 钳制到 `[target*4/5, target*5/4]`。**首窗（采纳窗）免钳**——整机真实速率本不等于初值 640 时仍一次校准到位；`RATE_MIN/MAX`(1/100ms) 绝对钳制保留为外层界；文件头补「devdoc 139 refinement」段。
+
+**兼容性**：`test_first_window_is_adopted_not_ramped`（首窗免钳）、`test_rate_change_converges_without_lurch`（只断言 slew 界）、`test_tempo_at_various_pass_rates`（稳态在带内）、`test_quantised_jitter_is_smoothed`（±5% ≪ 25%）全部仍过。
+
+**验证**：新 `test_vclock.py::test_short_stall_then_jump_does_not_spike_the_rate` **先红后绿**（临时放大比值常量等效去钳 → 实测失败 `666 → 899`；恢复后 `666 → 707` 通过，落 ±25% 带内）+ `test_sustained_rate_change_still_converges`（钳制不得使时钟对真实变慢失聪：25Hz→10Hz 长跑后 `target ≥ 900`，实测 983）；`pytest tools/tests/test_vclock.py` **14 passed**；`make -C core` **0 诊断**（`core/*.err` 空）；全量 pytest **798 passed / 1 skipped**（0.3.036 为 795，本轮 +3 = vclock 新例 ×2 + `test_cited_docs_exist` 参数化 139 ×1）；`./start.sh fullaudit` **7/7**。`bump_version` 0.3.036→**0.3.037**（全项目同步）、`nb_config.h` 重生成。
+
+**文档**：新 **`devdocs/139`**（症状→判定→根因→修复→验证→防复发→遗留）。
+
+**遗留**：**实机验证未执行**（需 `build`+`make` 后确认「偏快数秒」消失；判据 = 串口 `[VC]` 行 `tgt=` 不再一次性大跳后缓降）；±25% 带的代价 = 真实 2.5× 持续变率需 ~15 窗才完全跟随（pass 率实际稳定，代价可接受）；若 `[VC]` 实测 `tgt` 是**平滑漂移**而非尖峰，则唯**方案 C**（`devdocs/134`）可根治。③ buzz 与 P1c 音色调音另行处理。
+
+<a id="c67"></a>
+### 0.3.036 — FM 音高整体低八度根因修复（引擎编码漏 `2^(block-1)`，实机「音调偏低」）+ 订正 devdoc 136 §十五 的错误 oracle 补偿
+
+**动机**：用户裁决「先修八度 BUG」。执行 136 P1a 首次自检时即发现 ff flute 渲染**绝对音高比目标低一个八度（×0.5）**，但 136 §十五 把这个 0.5 判成「ymfm 低八度」并给 fmbench 打了 `FNUM ×2` 补丁——**判定方向错了**。
+
+**根因（三条独立证据链交叉确证，非推断）**：
+1. **YM2608 官方手册**：`fnote = F-Number × 2^(block-1) × φM / (144 × 2^20)`，即 `f = (fnum << (block-1)) × 7987200/(144×2^20)` ⇒ A4(440) = **block5/fnum520**。
+2. **NP2kai fmgen（= 用户实听通路）逐行核算 + 宿主渲染实测**：`fmgen_opna.cpp:525` 内 `c /= 2`（7987200→3993600）+ `:122` `fmclock = c/6/12 = 55466.7Hz` + `fmgen_fmgen.cpp:607` `dp_ = (f&2047) << ((f>>11)&7)` ⇒ 实测 **block4/fnum520 → 220.0 Hz**、**block5/fnum520 → 440.0 Hz**。
+3. **ymfm**：`compute_phase_step` 净 `fnum<<(block-1)`，**恰是手册公式**。
+
+⇒ **三方一致，错的是引擎**：`core/lib/fmopn.c` 的 `FMOPN_FNUM_SCALE_N=18432`（= `(144×2^20)/7987200`）隐含用了 `2^block`、**漏了 `2^(block-1)` 折半**，把每个 MIDI 音符编低一个 block ⇒ 芯片对引擎发出的寄存器只给半频 = **用户实听的「音调偏低」**。交叉校验：`(18432/975) × (7987200/(144×2^20)) = 1.0`，即旧编码恒使「寄存器隐含频率=目标」，但那个公式本身错。
+
+**136 §十五 的错判与代价**：它把「引擎公式正确、ymfm 半数=ymfm 错」当结论，于是 `FNUM ×2` 把 oracle 拉高到「作曲者心里的音高」=440，**恰好掩盖引擎 bug、使 oracle 与实听脱钩**。教训：oracle 职责是**忠实再现芯片对给定寄存器的输出**，不是输出目标音高——**绝对音高可被引擎单方面搞错，该修引擎不修 oracle**。（136 §十五 的「八度不变量」——谐波比值/inharm/centroid/颤音率——结论仍有效，仅 f0 相关表述作废。）
+
+**修复**：`FMOPN_FNUM_SCALE_N 18432 → 36864`（A4 改发 block5/fnum520、C4→block4/fnum618）；新增 `fmopn_ratio_freq(block,fnum)` 作编码逆，bend（`fmopn.c:93`）与 SSG 打击恢复（`fmseq.c:298,394`）改用它（原各写死 `7987200/150994944`），**常量单一事实源**；SSG 音高不变（编码/解码同步改）。镜像与测试同步：`fmbench.cpp` 镜像 `18432→36864`、**撤销 `FNUM ×2`**、`test_fmopn.py` anchor `(4,520)/(3,618)→(5,520)/(4,618)`、`_MCLK_DIV 144→288`、`test_fm_seq.py` `0xA4 0x22→0x2A`、`test_fm_timbre.py` docstring 订正、**`F03 §S1` 公式就地订正为 `2^(block-1)`+附 ERRATA 提示**。
+
+**文档**：新 **`devdocs/138`**（症状→判定→根因→修复→验证→防复发→遗留）；**`devdocs/136` 头部加 ERRATA 块**（正文一字未改，按 AGENTS §十 四步，指向 138）。
+
+**防复发**：`test_devdoc_refs.py` 新增 `test_devdoc_136_keeps_its_errata_block`（136 头部必须留 ERRATA 且指 138，删即红）+ 把 136/138 纳入 `test_cited_docs_exist`。
+
+**验证**：`make -C core` 0 诊断（`core/*.err` 空）；pytest **795 passed / 1 skipped**（0.3.035 为 792，本轮 +3 = `test_devdoc_136_keeps_its_errata_block` ×1 + `test_cited_docs_exist` 参数化 136/138 ×2）；FM 三件套 26 + timbre 10 全过；**oracle 绝对音高复核**（fmbench 重建、无 ×2）note 60/69/71/81/86 = 261.3/439.8/494.6/880.5/1174.5 Hz，ratio 0.999–1.001；引擎现发 block5/fnum520，fmgen/ymfm 同给 440 ⇒ 三方对齐。`bump_version` 0.3.035→**0.3.036**（全项目同步）、`nb_config.h` 重生成。
+
+**遗留**：**实机试听未验证**（需 `build`+`make` 后实机确认 BGM 音高回到正确八度；001/002 为 flute 试听源、003/004 对照）；`FMOPN_FNUM_MAX=1023`（10 bit）修八度后上限约 3463Hz，MIDI 高端夹顶（demo 音域 ≤ D6 不受影响，11 bit 是否放开另议）；P2 音色调音回到 136 P1c/P2 流程。
+
+<a id="c66"></a>
+### 0.3.035 — P1a FM 音色实验室落地 + `op=` 标签语义根因修复（flute 实为静音 → 复声）
+
+**动机**：执行 `devdocs/136`（P1a FM 音色实验室）。首次自检时用 c65 的 `flute.fmp` 渲染 C4 **完全无声**（peak=0）——揭出一个比「像电子琴」更严重的根因：**c65 的 flute 实际上不发声**。
+
+**根因（两独立模拟器交叉确证，非推断）**：
+1. **`.fmp` 是文本源**：32 字节二进制由 `fm_patch.py` 的 `compile_source()` 生成后再打包进 `AUDIO.DAT`；工具若直接读 `.fmp` 文本会得到垃圾字节（首验错误）。
+2. **算法的算子顺序 = 寄存器槽 [1,3,2,4]**：ymfm `operator_map`（chan0=`{0,6,3,9}`）与 NP2kai fmgen `slottable={0,2,1,3}` 一致确认——**alg4 的两对是 `op1->op3` 与 `op2->op4`**，载波在寄存器 **0x38/0x3C**，而非注释里流传的 `op1->op2 + op3->op4`。
+3. **旧语义错位**：`.fmp` 的 `op=N` 被当作**寄存器槽 N**。c65 flute 把「组 B（`op3/op4`）」静音，而这两个算子恰是 alg4 的**真载波** ⇒ 载波被静音 = 完全无声。c64 只是碰巧未踩中；补丁注释的配对心智模型一直是错的。
+
+**修复（用户拍板语义：`op=N` = 算法算子 N）**：
+- `tools/naiz_audio/fm_patch.py`：`OP_FILE` `[0,2,1,3]` → **恒等 `[0,1,2,3]`**（源 `op=N` 存 file idx N-1，文件按算法顺序）。
+- `core/lib/fmopn.{c,h}`：`fmopn_op_slot={0,2,1,3}` **不变**（语义定为「算法算子 → 寄存器槽」硬件事实）；**引擎零行为改动**。
+- **`flute.fmp` 一行未改**——格式修正后其原文即正确（`op1` 弱调制 + `op2` 强载波 + 组 B 静音）。
+- 同步注释：`fmopn.{c,h}`、`fmbench.cpp`、`test_fm_patch/fm_seq/fmopn.py`。
+
+**验证**：`fmbench` 渲染 flute `peak 0 → 2648`；**全 15 族 audit**（旧 vs 新格式逐族对比）无一变静音；`make -C core` 0 诊断（`core/*.err` 空）；pytest **779 passed / 1 skipped**。`bump_version` 0.3.034 → **0.3.035**（全部项目同步），`nb_config.h` 重生成。防复发：`test_fm_patch.py::test_op_label_semantics_pinned`（钉 `OP_FILE` 恒等 + C `fmopn_op_slot={0,2,1,3}`）+ `test_file_is_algorithm_order` + `test_ctypes_round_trips_per_field`（经 C 访问器验证 `op N → regslot[N-1]`）。
+
+**附带交付**：`tools/vendor/ymfm/`（vendored ymfm，BSD-3，commit `81aec25`，含 `PROVENANCE.md`）+ `tools/naiz_audio/fmbench/`（离线 YM2608 渲染 CLI + Makefile，**不进 `engine.exe`/HDI**）+ `tools/naiz_audio/fm_render.py`（Python 包装：先 `compile_source()` 再调 fmbench、读回 32-bit PCM、按 job 哈希缓存）+ `tools/tests/test_fm_patch_shape.py`（P1b 静态不变量：**禁载波全静音**——已反证能捕获修复前 flute）；**P1b 全落地**：`tools/naiz_audio/spectrum_report.py`（指标库 + Hilbert 颤音 + 可信度门控）+ `assets/demo-a2/fm/targets.toml`（15 族验收带 + `calibrated` 标志）+ `tools/tests/test_fm_timbre.py`（合成分析器自测恒跑 + oracle 谱回归，10 项）。devdoc 136 更新为「实施中」并记录本轮发现（§十三/§十四/§十五）。
+
+**oracle 低八度根因（本会话发现并修复）**：fmbench 首用发现**渲染音高比引擎低一个八度（×0.5）**，纯音参考 C4/A4/C5 比率恒 0.5。**判据（非推断）**：引擎 `f=(fnum<<block)*7987200/(144*2^20)`（`F03 §S1`，A4=block4/fnum520）与 NP2kai `fmgen`（`opna.c:123` 以 `OPNA_CLOCK*2=7987200` 调用，= 用户实听）**一致且正确**；ymfm `GeneralInfo.md:178` 载明 OPN `block_freq=[block]:[fnum]0`（尾随 0 位）⇒ `compute_phase_step` 净 `>>1`（满周期 2^20、FM 率 clock/144）恰为半数。**关键分辨**：ymfm 时间基（LFO/EG）在标称时钟下**是对的**（flute LFRQ=2 实测 6.0 Hz ≈ 硬件 6.6）⇒ **只修音高、不可用「时钟 ×2」**。修复：`fmbench.cpp::write_patch_and_keyon()` 写 `$A4/$A0` 时 FNUM **×2**（引擎 fnum ≤1023 ⇒ ≤2046，稳落 11 bit）；顺带修 `fm_render.py` 缓存键（加入 `BENCH_BIN` 的 `size:mtime_ns`，否则重编后命中旧半音高缓存）。钉死：`test_fm_timbre.py::test_oracle_pitch_is_engine_octave`。**验证**：C4/A4/C5 均 100.0%；flute 颤音/起音不变；pytest **792 passed / 1 skipped**。
+
+**遗留**：`targets.toml` 全族 `calibrated=false`（带值为设计意图，待 P1c oracle↔NP2kai 对齐 + P2 调音后逐族翻 true；flute 实测 3f=−51.1 dB 低于设计带 [−35,−25]，属 P2 待调）；`bass.fmp` 等串行 patch 在新语义下的载波系数待 P2 重估；**实机试听未验证**（需用户 `build`+`make` 后按频谱脚本核对）。
+
+<a id="c65"></a>
+### 0.3.034 — flute 音色二轮重做：去持续八度 + 软起音（治「仍像电子琴 / 像弹琴」）+ 客观频谱分析工具
+
+**动机**：0.3.033（c64）接入 LFO 并重做 flute 后，用户实机复听仍报「**像弹琴，而且有颤音**」——即 `pms=2` 颤音已可闻（LFO 通路生效），但音色仍似键盘/风琴而非笛子。
+
+**排查（确认非构建/映射问题）**：
+1. **构建生效**——`games/demo-a2/AUDIO.DAT`（重建于改动后）中**已含**新 `flute.fmp` 的 32 字节（偏移 21655 命中 `compile_source()` 输出）；`fmp_gm_map[73]=8` → `fmp_map[8]='flute'`，`fm_write_patch()` 原样写 alg/TL/`$B4`，无额外染色。
+2. **源曲即独奏笛**——逐轨解析 `Melody Town Theme.mid`：track0=tempo、track1=空、track2=**ch0 单通道 140 音（音域 B4–D6）**，唯一 program=73（flute）。**音符 80% gate、基本断奏**（时长均 408ms / 间隔均 451ms，仅 4/139 连奏）。
+3. **根因**：① c64 版 flute 的组 B（`op3→op4 mul=2`）为**持续八度**（`sl=4` 不衰减）⇒ 「基频+八度」= 风琴音栓；② 载波/调制器 `ar=28/31`（芯片最快）⇒ 断奏源每音均为**硬起音**，听感即「像弹琴」。
+
+**改动**（`assets/demo-a2/fm/flute.fmp`，单算子对近正弦）：
+- `alg=4`，**组 B 静音**（`op3/op4 tl=127`），只留组 A `op1→op2`；
+- 调制器 `op1 mul=1 tl=52`（**弱**同频调制 ⇒ 近正弦）、起音更慢（`ar=12`）且落点低（`sl=10`）⇒ 泛音如「气声」起而后近消失；
+- 载波 `op2 mul=1 tl=2`，**软起音**（`ar=16`，约数十 ms，替代芯片最快 `ar=28`），`rr=8` 缓释填音符间隙；
+- 保留 `pms=2` 轻颤音、`AMS=0`。
+
+**新增工具**：客观频谱分析脚本（离线对 NP2kai 录音做谐波比 + 颤音率/深测量），把「盲调音色」变为可测量的迭代。使用 `parec --device=<monitor> … > cap.raw` 采集后分析（脚本内容见本轮交付说明，非仓库文件）。
+
+**验证**：`make -C core` 0 诊断（`core/*.err` 空）；pytest **779 passed / 1 skipped**；`flute.fmp` 经 `fm_patch.compile_source()` 通过 32 字节校验。`bump_version`：0.3.033 → **0.3.034**（全部项目同步），`nb_config.h` 重生成。**实机试听未验证**：需用户 `build`+`make` 后试听，并结合频谱脚本核对 2f/1f 与颤音深度。
+
+**遗留**：flute 参数为试听迭代项；其余 14 族未动（c64 基线）；时序问题（颤动/拖）仍待 `[VC]` 数据（devdocs 131–134）。
+
+<a id="c64"></a>
+### 0.3.033 — MIDI→FM 通路 S7：接入 OPNA LFO（`$22`+`$B4` AMS/PMS）+ 15 族音色重做试听基线 + 修 `fm_load_patches` 索引错位
+
+**动机**：用户实机反馈进入场景 1 播 `Melody Town Theme.mid` 时**原曲是笛子（flute 73）却听成电子琴**。排查判定**不是映射错误**——program 73 → `fmp_gm_map[73]=8` → 族 8 = `flute.fmp`，解析/存族/选族链路（`midi.c:238` → `fmseq.c:440` → `fmseq.c:147`）端到端正确；根因是 **`flute.fmp` 自身以 `alg=2` + 近满强度同频调制器（`tl=8`）设计成近正弦**（devdoc 124 §三原文即写「单调制器近正弦」），叠加**引擎全链路从不写 LFO**（`$22` 从未被写、`$B4` 只写 pan），既嗡嗡又无颤音。**用户拍板全部四项**：接入 OPNA LFO / 系统重做 15 族 / 重做 flute / 修装载索引错位。本轮交付前三项与第四项。
+
+**1. 硬件事实（据 NP2kai fmgen 逐位核实，非二手文档）**：`$22` = **bit3 使能 + bits2-0 速率 LFRQ**（`fmgen_opna.cpp` `lfodcount = reg22 & 8 ? lfotable[reg22 & 7] : 0`）；`$B4` = **bits7-6 pan / bits5-4 AMS / bit3 保留 / bits2-0 PMS**（`(data>>6)&3`、`(ms>>4)&3`、`ms&7`）。**关键联动**：`FMMix()` 中 `if (!(reg22 & 0x08)) act &= 0x555;` —— 全局 LFO 关时走无 LFO 路径，**PMS 颤音同样失效**，故 `$22` 是 PM/AM 共同前置。F03 §3.3 原 `$B4` 掩码记法自相矛盾，已订正并补 `$22` 位域与来源。
+
+**2. patch 格式（byte25 复用为完整 `$B4`）**：`tools/naiz_audio/fm_patch.py` 的 `_GLOBAL_KEYS` 增 `ams`(0–3)/`pms`(0–7)、`pan` 收紧为仅 bit7-6、`to_bytes` 组装 `byte25 = pan | AMS<<4 | PMS`；`core/lib/fmopn.{c,h}` 校验由「低 4 位必须 0」改为「**仅 bit3 必须 0**」，`fmopn_patch_pan()` 改为只返回 pan 字段（bits7-6）并加 `fmopn_patch_ams()`（bits5-4）/`fmopn_patch_pms()`（bits2-0），`fmseq.c:189` 由直写整字节改为**组合三字段回写 `$B4`**（三访问器各有真实调用方，否则 `symbol_audit` A/B 判死导出）；`core/plat/hal_audio.c` 的 `hal_fm_init()` 写 `$22 = 0x08 | FM_LFO_RATE`（`FM_LFO_RATE=2`≈6.6Hz 全局单速）。**旧 15 族 `pan=0xc0`、AMS=PMS=0 ⇒ 走无 LFO 路径，行为零变化**（向后兼容）。
+
+**3. 装载索引错位修复（`core/engine/audio.c:fm_load_patches()`）**：原实现 `n++` 仅在成功时前进，`continue` 跳过缺失/非法/`__dummy__` 条目使**其后族索引整体前移**，而 `fmp_gm_map[]` 固定以 0..N 位置索引 `g_fm_patches[]` ⇒ **任一 patch 失败即令其后所有 GM program 静默错配**（仅一行 WARN）。改为**每条目固定占一槽**：先以 `g_fm_default_patch` 预置、失败保留默认、`n++` 无条件前进。
+
+**4. flute.fmp 重做**：`alg=4`（两组独立 2-op）——组 A 弱调制器（`tl=40`）+ 强基频载波（`tl=8`）出近正弦稳态；组 B 八度载波（`mul=2`）快起音快衰减（`d1r=9`）做「气声 chiff」后淡出；`pms=2` 轻颤音。
+
+**5. 15 族 LFO 分配（S7 试听基线）**：strings/reeds/ethnic `pms=3`、synfx `pms=3 ams=2`、synpad `pms=2 ams=1`、brass/synlead `pms=1`、flute `pms=2`、organ `ams=1`（全算子 `am=1` 旋转颤音）、sfx `ams=1`；piano/bell/guitar/bass/perc 无 LFO 保持原设计。
+
+**防复发**：`test_fmopn.py` byte25 守卫改 bit3 + 新 AMS/PMS 接受与访问器断言；`test_fm_patch.py` 增 ams/pms 解析编码 + pan 收紧 + 全库过 C 校验；**新增 `test_fm_lfo.py`**（`$22` 写入门卫 + `FM_LFO_RATE` 范围）；**新增 `test_fm_load_alignment.py`**（`fm_load_patches` 禁 `continue`、无条件 `n++`、gm_map 接线）。新 `devdocs/135` 承载完整记录。
+
+**验证**：`make -C core` 0 诊断（`core/*.err` 空）；pytest **779 passed / 1 skipped**；`./start.sh fullaudit` 7/7（含 symbol_audit A/B 空——为此把 `fmopn_patch_pan/ams/pms` 三字段访问器接入 `fmseq` 回写 `$B4`，消除死导出）。`bump_version`：0.3.032 → **0.3.033**（全部项目同步）。**实机试听未执行**：15 族为 S7 试听基线，需用户 `build`+`make` 后逐族试听迭代。
+
+**遗留**：15 族音色为主观试听迭代项（AI 无法试听）；全局单速 LFRQ=2 的取舍（分族速率需再扩格式）；**时序问题（颤动/拖/起播快）不属本轮**，仍待 `[VC]` 串口数据（承 devdocs 131–134）。
+
 <a id="c63"></a>
 ### 0.3.032 — boot menu 预泵帧心跳：起播 BGM 提前标定虚拟时钟（治「一进场景先快」）
 
@@ -444,6 +552,11 @@
 
 | 条目 |
 |------|
+| [0.3.037 — 虚拟时钟单窗速率尖峰钳制（修「演奏时快时慢」的残留机制）](#c68) |
+| [0.3.036 — FM 音高整体低八度根因修复（引擎编码漏 `2^(block-1)`，实机「音调偏低」）+ 订正 devdoc 136 §十五 的错误 oracle 补偿](#c67) |
+| [0.3.035 — P1a FM 音色实验室落地 + `op=` 标签语义根因修复（flute 实为静音 → 复声）](#c66) |
+| [0.3.034 — flute 音色二轮重做：去持续八度 + 软起音（治「仍像电子琴 / 像弹琴」）+ 客观频谱分析工具](#c65) |
+| [0.3.033 — MIDI→FM 通路 S7：接入 OPNA LFO（`$22`+`$B4` AMS/PMS）+ 15 族音色重做试听基线 + 修 `fm_load_patches` 索引错位](#c64) |
 | [0.3.032 — boot menu 预泵帧心跳：起播 BGM 提前标定虚拟时钟（治「一进场景先快」）](#c63) |
 | [0.3.031 — BGM 颤动与立绘拖慢二轮根修：虚拟时钟首窗直采 + 测量平滑（治稳态颤）/ 预取修活（治拖）/ 撤销方案 A](#c62) |
 | [0.3.030 — 剩余颤动与立绘加载拖慢根修：方案 A/B/D 落地（节流让出 + 边沿门控解码帧泵 + 对话期预取；C 单独立项）](#c61) |

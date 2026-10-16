@@ -1,27 +1,35 @@
 #!/usr/bin/env python3
 """Compile text YM2608 FM patches to the 32-byte binary layout and register
-them in ASSETS.DB (devdocs/123 S3).
+them in ASSETS.DB (devdocs/123 S3; label semantics fixed in devdocs/136 P1).
 
 The .fmp authoring format reads like a register listing.  Each file is ONE
 patch:
 
     alg=4 fb=5 pan=0xc0
     op=1 dt=2 mul=9  tl=40 ks=0 ar=24 am=0 d1r=5 d2r=4 sl=1 rr=5
-    op=3 dt=0 mul=3  tl=42 ks=1 ar=20 am=0 d1r=5 d2r=3 sl=1 rr=6
-    op=2 dt=0 mul=4  tl=44 ks=1 ar=20 am=0 d1r=4 d2r=3 sl=1 rr=5
+    op=2 dt=0 mul=3  tl=42 ks=1 ar=20 am=0 d1r=5 d2r=3 sl=1 rr=6
+    op=3 dt=0 mul=4  tl=44 ks=1 ar=20 am=0 d1r=4 d2r=3 sl=1 rr=5
     op=4 dt=0 mul=3  tl=46 ks=1 ar=24 am=0 d1r=5 d2r=4 sl=2 rr=6
 
-`op=N` labels the *chip register slot* (1..4); the compiler stores operators
-in FILE order 1-3-2-4, which is the same permutation as its own inverse:
-file slot k holds chip slot FMOPN_OP_SLOT[k] = {0,2,1,3}.  This array is the
-single source of truth and must stay in lockstep with core/lib/fmopn.h.
+`op=N` labels *algorithm operator* N (1..4) — the operator numbers found in
+connection diagrams and FMP editors, so `alg=4` really is the two pairs
+op1->op2 and op3->op4.  Do NOT read N as a chip register slot: the OPN core
+addresses operators in register-slot order 1-3-2-4, i.e. algorithm operator
+k lives in register slot FMOPN_OP_SLOT[k] = {0,2,1,3} (confirmed against
+ymfm `operator_map` and NP2kai fmgen `slottable`).  That map lives in
+core/lib/fmopn.c fmopn_op_slot (single source of truth).
 
-Compiled layout (32 bytes, one patch):
-  slot 0 (file idx 0): DT<<4|MUL  TL  KS<<6|AR  AM<<7|D1R  D2R  SL<<4|RR
-  slot 2 (file idx 1):   same 6-byte shape
-  slot 1 (file idx 2):   same 6-byte shape
-  slot 3 (file idx 3):   same 6-byte shape
-  byte 24: FB<<3|AL   byte 25: PANL<<6|PANR<<4   bytes 26..31: 0
+Compiled layout (32 bytes, one patch): the file stores operators in
+algorithm order, so file idx k holds algorithm operator k+1 (this file's
+OP_FILE is the identity permutation).
+  op 1 (file idx 0): DT<<4|MUL  TL  KS<<6|AR  AM<<7|D1R  D2R  SL<<4|RR
+  op 2 (file idx 1):   same 6-byte shape
+  op 3 (file idx 2):   same 6-byte shape
+  op 4 (file idx 3):   same 6-byte shape
+  byte 24: FB<<3|AL
+  byte 25: pan<<6 | AMS<<4 | PMS  (bits7-6 pan, 5-4 AMS, bit3 reserved 0,
+           bits2-0 PMS; fmseq packs the fields back and writes reg $B4).
+           bytes 26..31: 0
 
 The binary is validated by fmopn_patch_validate (reserved bits must stay
 clear), so range checks below mirror its FMOPN_E_* bits.
@@ -42,10 +50,10 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
 
 from naiz_lib import project_assets_dir  # noqa: E402
 
-# File order == a 2-cycle permutation: k <-> op_slot[k] for the 1-3-2-4 case.
-# index = chip register slot, value = file index.  Keep in sync with
-# core/lib/fmopn.c fmopn_op_slot.
-OP_FILE = [0, 2, 1, 3]
+# Source `op=N` (algorithm operator) is stored at file idx N-1, so the file is
+# laid out in algorithm order (identity).  core/lib/fmopn.c maps file idx ->
+# chip register slot via fmopn_op_slot = {0,2,1,3}.
+OP_FILE = [0, 1, 2, 3]
 
 # (key, min, max) — mirrors the FMOPN_E_* ranges in fmopn.h.
 _OP_KEYS = [
@@ -60,7 +68,7 @@ _OP_KEYS = [
     ('sl', 0, 0x0F),
     ('rr', 0, 0x0F),
 ]
-_GLOBAL_KEYS = ['alg', 'fb', 'pan']
+_GLOBAL_KEYS = ['alg', 'fb', 'pan', 'ams', 'pms']
 
 
 class _PatchError(RuntimeError):
@@ -82,10 +90,10 @@ def _parse_value(key, line, val):
 
 
 def parse_patch(text):
-    """Parse .fmp text into (params, ops).  ops keyed by chip slot 1..4.
+    """Parse .fmp text into (params, ops).  ops keyed by algorithm operator 1..4.
 
     Authoring format: whitespace-separated `key=value` tokens.  `op=N` starts
-    an operator block (chip register slot 1..4); every other key on the line
+    an operator block (algorithm operator 1..4); every other key on the line
     belongs to that op.  Lines without `op=` carry the global keys
     alg/fb/pan.  Raises _PatchError on bad content.
     """
@@ -112,7 +120,7 @@ def parse_patch(text):
                 if key not in _GLOBAL_KEYS:
                     raise _PatchError(
                         f"line {lineno}: op must precede {key!r}; global "
-                        f"keys are alg/fb/pan only")
+                        f"keys are alg/fb/pan/ams/pms only")
                 params[key] = (lineno, _parse_value(key, lineno, val))
             else:
                 fields[key] = (lineno, _parse_value(key, lineno, val))
@@ -126,6 +134,8 @@ def parse_patch(text):
             raise _PatchError(f"patch missing op={k}")
 
     params.setdefault('pan', (0, 0xC0))
+    params.setdefault('ams', (0, 0))
+    params.setdefault('pms', (0, 0))
     known = {kk for kk, _lo, _hi in _OP_KEYS}
     ranges = {kk: (lo, hi) for kk, lo, hi in _OP_KEYS}
     for slot, fields in ops.items():
@@ -143,14 +153,16 @@ def parse_patch(text):
     for kk in ('alg', 'fb'):
         if kk not in params:
             raise _PatchError(f"missing global {kk}")
+    _global_ranges = {'pan': (0, 0xC0), 'ams': (0, 3), 'pms': (0, 7)}
     for kk, (lineno, value) in params.items():
-        if kk == 'pan':
-            _require('pan', lineno, value, 0, 0xFF)
-            # FMOPN_E_PAN: low nibble is reserved on the chip write path
-            if value & 0x0F:
+        if kk in _global_ranges:
+            lo, hi = _global_ranges[kk]
+            _require(kk, lineno, value, lo, hi)
+            # FMOPN_E_PAN: bit3 is reserved on the chip write path.
+            if kk == 'pan' and value & 0x3F:
                 raise _PatchError(
-                    f"line {lineno}: pan=0x{value:X}: low 4 bits are reserved "
-                    f"(PAN=0x..0); the C validator would reject this patch")
+                    f"line {lineno}: pan=0x{value:X}: only the L/R bits "
+                    f"(0xC0) belong to pan; use ams=/pms= for the rest")
         else:
             _require(kk, lineno, value, 0, 0x07)
 
@@ -158,12 +170,13 @@ def parse_patch(text):
 
 
 def to_bytes(params, ops):
-    """32-byte binary in file order 1-3-2-4.  ops keyed by chip slot, values
-    are (line, value) pairs from parse_patch (line kept for diagnostics)."""
+    """32-byte binary in algorithm order.  ops keyed by algorithm operator,
+    values are (line, value) pairs from parse_patch (line kept for
+    diagnostics)."""
     out = bytearray(32)
-    for chip in (1, 2, 3, 4):
-        file_idx = OP_FILE[chip - 1]
-        f = {k: v for k, (_l, v) in ops[chip].items()}
+    for op in (1, 2, 3, 4):
+        file_idx = OP_FILE[op - 1]
+        f = {k: v for k, (_l, v) in ops[op].items()}
         off = file_idx * 6
         out[off + 0] = (f['dt'] << 4) | f['mul']
         out[off + 1] = f['tl']
@@ -172,7 +185,10 @@ def to_bytes(params, ops):
         out[off + 4] = f['d2r']
         out[off + 5] = (f['sl'] << 4) | f['rr']
     out[24] = (params['fb'][1] << 3) | params['alg'][1]
-    out[25] = params['pan'][1] if 'pan' in params else 0xC0
+    pan = params['pan'][1] if 'pan' in params else 0xC0
+    ams = params['ams'][1] if 'ams' in params else 0
+    pms = params['pms'][1] if 'pms' in params else 0
+    out[25] = (pan & 0xC0) | (ams << 4) | pms
     return bytes(out)
 
 
