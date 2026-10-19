@@ -494,6 +494,7 @@ void fmseq_events(Fmseq *seq, const MidEvent *events, int count)
 void fmseq_pump(Fmseq *seq, const FmseqSink *sink, uint64_t now_ms)
 {
     uint64_t dt;
+    int budget = FMSEQ_PUMP_MAX_PER_CALL;
 
     if (seq->last_tick == 0 || now_ms < seq->last_tick) {
         seq->last_tick = now_ms;        /* first call / clock wrap: no decay */
@@ -503,10 +504,11 @@ void fmseq_pump(Fmseq *seq, const FmseqSink *sink, uint64_t now_ms)
         seq->last_tick = now_ms;
     }
 
-    while (seq->cursor < seq->count &&
+    while (budget > 0 && seq->cursor < seq->count &&
            seq->events[seq->cursor].tick_ms <= now_ms) {
         dispatch(seq, sink, &seq->events[seq->cursor]);
         seq->cursor++;
+        budget--;
     }
 
     if (dt > 0)
@@ -547,4 +549,23 @@ int fmseq_fm_voices(const Fmseq *seq)
 int fmseq_finished(const Fmseq *seq)
 {
     return seq->cursor >= seq->count;
+}
+
+uint64_t fmseq_loop_start(uint64_t last_start, uint64_t song_len, uint64_t now)
+{
+    uint64_t next;
+
+    if (song_len == 0)
+        return now;                 /* degenerate: no phase to preserve */
+
+    next = last_start + song_len;
+    if (next > now)
+        return now;                 /* not a full song elapsed: clamp to now */
+
+    /* Starved for more than one song: skip whole lengths so the result is
+     * <= now < result + song_len.  Bounded: one division, no loop. */
+    if (now - next >= song_len)
+        next += ((now - next) / song_len) * song_len;
+
+    return next;
 }

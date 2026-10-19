@@ -39,6 +39,10 @@ typedef struct {
  *   out_events   receives a malloc'd MidEvent array sorted by tick_ms
  *                (NULL when out_count is 0); caller releases with midi_free()
  *   out_count    receives the number of events
+ *   out_len_ms   receives the song length in ms — the later of the last
+ *                voice event and any track's end-of-track tick, converted
+ *                through the tempo map (so trailing silence is preserved);
+ *                0 when the stream holds no events.  May be NULL.
  *
  * Returns 0 on success, negative on error:
  *   -1  bad MThd header / truncated stream / chunk length exceeds bounds
@@ -48,7 +52,7 @@ typedef struct {
  *   -4  out of memory or event budget exceeded
  */
 int  midi_parse(const uint8_t *data, uint32_t len,
-                MidEvent **out_events, int *out_count);
+                MidEvent **out_events, int *out_count, uint32_t *out_len_ms);
 
 /* Free an event array returned by midi_parse.  NULL is safe. */
 void midi_free(MidEvent *events);

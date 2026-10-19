@@ -10,9 +10,9 @@
 # chip-max ar=28: the source line is detached (80% gate), so a hard attack
 # made every note read as a *keyed* instrument ("like playing a keyboard").
 # rr=8 gives a gentle release that fills the inter-note gaps.
-# pms=2 adds the natural light pitch vibrato (LFO LFRQ=2 ~= 6.6 Hz, F03 §3.3);
-# AMS 0 = no tremolo.  The previous patch kept a *sustained* octave (op3->op4
-# mul=2, sl=4) which registered as fundamental + octave = an organ stop.
+# pms=1 = a *light* pitch vibrato (LFO LFRQ=2, ~6 Hz / ~5 cents measured on the
+# ymfm oracle) = the intended natural flute flutter.  An earlier note said
+# pms=2; the audited value is 1.  AMS 0 = no tremolo.  (devdocs/153, 154)
 alg=4 fb=0 pan=0xc0 ams=0 pms=1
 op=1 dt=0 mul=1 tl=54 ks=1 ar=12 am=0 d1r=5 d2r=3 sl=10 rr=8
 op=2 dt=0 mul=1 tl=2  ks=1 ar=16 am=0 d1r=4 d2r=2 sl=2  rr=8

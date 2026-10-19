@@ -42,6 +42,32 @@
  */
 #define ENGINE_EXIT(s) do { hal_video_exit(); return (s); } while(0)
 
+/* devdoc 150 diagnostic bench: play one BGM on repeat, headlessly, so a
+ * capture reflects the steady-state BGM path with no host input.  Off by
+ * default; enable with -DBGM_BENCH=1 [-DBGM_BENCH_NAME=icy_garden]. */
+#ifndef BGM_BENCH
+#define BGM_BENCH 0
+#endif
+#ifndef BGM_BENCH_NAME
+#define BGM_BENCH_NAME melody_town
+#endif
+/* Stringify so the key can be passed unquoted on the command line. */
+#define NAIZ_BGM_STR2(x) #x
+#define NAIZ_BGM_STR(x) NAIZ_BGM_STR2(x)
+#define BGM_BENCH_KEY NAIZ_BGM_STR(BGM_BENCH_NAME)
+
+/* devdoc 152: BGM_IDLE runs the REAL main loop (not the tight BGM_BENCH spin)
+ * sitting on the first dialogue page of a gameplay scene, so a recording
+ * reflects the true per-pass load (prefetch I/O + input poll).  Default 0;
+ * enable with -DBGM_IDLE=1 [-DBGM_IDLE_SCENE=nbook001] (extension appended). */
+#ifndef BGM_IDLE
+#define BGM_IDLE 0
+#endif
+#ifndef BGM_IDLE_SCENE
+#define BGM_IDLE_SCENE nbook001
+#endif
+#define BGM_IDLE_FILE NAIZ_BGM_STR(BGM_IDLE_SCENE) ".nb"
+
 int main(void)
 {
 
@@ -91,8 +117,10 @@ int main(void)
 
     /* Settings: load existing or show first-launch menu */
     prefs_load();
+#if !BGM_BENCH && !BGM_IDLE
     bootmenu_run();
     prefs_save();
+#endif
 
     /* Deterministic marker for the effective boot language.  The whole point
      * of devdoc 120 was that the menu selection used to be saved but never
@@ -113,6 +141,25 @@ int main(void)
         ENGINE_EXIT(1);
     }
     hal_log("NB OK\r\n");
+
+#if BGM_IDLE
+    /* devdoc 152: jump straight into a gameplay scene (its bgm(){...} starts
+     * the music), then FALL THROUGH to the normal main loop below — it runs
+     * to the first dialogue page and parks in the input-waiting loop, exactly
+     * the "idle dialogue page" state the player reported as still fluttering. */
+    hal_logf("BGM idle: %s\r\n", BGM_IDLE_FILE);
+    scene_switch(BGM_IDLE_FILE, SCENE_SWITCH_INIT);
+#endif
+
+#if BGM_BENCH
+    /* devdoc 150: skip the game flow and loop one BGM so a recording captures
+     * the steady-state BGM path with no host input (makegame.sh test can't
+     * deliver input under NP2kai's disk-audio capture). */
+    hal_logf("BGM bench: %s\r\n", BGM_BENCH_KEY);
+    audio_bgm_start(BGM_BENCH_KEY);
+    for (;;)
+        engine_frame_pump();
+#endif
 
     /* Drain init-phase I/O deltas and recenter cursor before main loop. */
     hal_mouse_drain();

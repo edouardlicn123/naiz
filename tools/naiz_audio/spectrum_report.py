@@ -302,6 +302,121 @@ def note_to_hz(note):
     return 440.0 * 2.0 ** ((note - 69) / 12.0)
 
 
+def detect_onsets(x, fs, *, hop_ms=5.0, win_ms=10.0, thresh=1.8,
+                  min_gap_ms=120.0, floor=0.05):
+    """Onset times in milliseconds via the log-RMS envelope's positive slope.
+
+    Note attacks raise the short-window RMS envelope sharply, while
+    vibrato/tremolo ripple it only mildly; a positive log-difference with a
+    moving-median threshold + minimum inter-onset interval therefore separates
+    attacks from sustained-note modulation.  Validated on a synthetic control
+    (8/8 onsets, ~10 ms window bias).  Caveat (devdocs/150): heavily legato /
+    overlapping notes show no envelope dip and are missed, so this is a coarse
+    temporal instrument -- exact timing comes from the engine dispatch trace.
+    Returns a sorted list of onset times (ms).
+    """
+    x = np.asarray(x, dtype=np.float64)
+    if x.size < int(fs * win_ms * 1e-3):
+        return []
+    env, _, hop = _frame_rms(x, fs, win_ms, hop_ms)
+    env = np.maximum(env, 1e-9)
+    d = np.maximum(0.0, np.diff(np.log(env)))
+    if d.size < 2 or d.max() <= 0:
+        return []
+    half = max(1, int(round(50.0 / hop_ms)))
+    med = np.array([np.median(d[max(0, i - half):i + half + 1])
+                    for i in range(d.size)])
+    thr = med * thresh + d.max() * floor
+    gap = max(1, int(round(min_gap_ms / hop_ms)))
+    peaks = []
+    last = -10 ** 9
+    for i in range(1, d.size - 1):
+        if (d[i] >= thr[i] and d[i] > d[i - 1] and d[i] >= d[i + 1]
+                and i - last >= gap):
+            peaks.append(i)
+            last = i
+    return [round(p * hop_ms, 3) for p in peaks]
+
+
+def residual_jitter(deltas, span_ms=None):
+    """Latency-corrected jitter of matched (ref, actual, delta) pairs.
+
+    Fits a line delta ~ a*t + b (removes constant latency and any slow tempo
+    drift), then reports the residual spread -- the part that is genuine
+    per-note jitter rather than a uniform offset.  Returns a dict.
+    """
+    import numpy as _np
+    if not deltas:
+        return {"latency_ms": None, "drift_ms_per_s": None,
+                "jitter_std_ms": None, "jitter_p95_ms": None, "n": 0}
+    t = _np.array([d[0] for d in deltas], dtype=float)
+    y = _np.array([d[2] for d in deltas], dtype=float)
+    if y.size >= 4 and _np.ptp(t) > 0:
+        coef = _np.polyfit(t, y, 1)
+        fit = _np.polyval(coef, t)
+        drift = coef[0] * 1000.0
+        lat = float(_np.mean(y - fit))
+    else:
+        fit = _np.full_like(y, y.mean())
+        drift = 0.0
+        lat = float(y.mean())
+    resid = y - fit
+    return {
+        "latency_ms": round(lat, 1),
+        "drift_ms_per_s": round(float(drift), 4),
+        "jitter_std_ms": round(float(resid.std()), 1),
+        "jitter_p95_ms": round(float(_np.percentile(_np.abs(resid), 95)), 1),
+        "n": int(y.size),
+    }
+
+
+def measure_ioi(onsets_ms):
+    """Inter-onset-interval statistics (ms).  None-able fields if too few."""
+    o = np.asarray(onsets_ms, dtype=np.float64)
+    if o.size < 2:
+        return {"n": int(o.size), "ioi_mean_ms": None, "ioi_std_ms": None,
+                "ioi_p95_ms": None, "ioi_cv": None, "span_ms": None}
+    ioi = np.diff(o)
+    mean = float(ioi.mean())
+    std = float(ioi.std())
+    return {
+        "n": int(o.size),
+        "ioi_mean_ms": round(mean, 2),
+        "ioi_std_ms": round(std, 2),
+        "ioi_p95_ms": round(float(np.percentile(ioi, 95)), 2),
+        "ioi_cv": round(std / mean, 4) if mean > 0 else None,
+        "span_ms": round(float(o[-1] - o[0]), 1),
+    }
+
+
+def match_onsets(onsets_ms, ref_ms, tol_ms=120.0):
+    """Greedy nearest-neighbour match of onsets to reference times.
+
+    Returns (deltas, unmatched_ref) where deltas is a list of
+    (ref_ms, actual_ms, delta_ms) for matched pairs.  Used to compare a
+    recording's detected onsets against the MIDI's intended note times.
+    """
+    ref = list(ref_ms)
+    det = list(onsets_ms)
+    used = [False] * len(det)
+    deltas = []
+    unmatched = 0
+    for r in ref:
+        best, best_d = -1, None
+        for j, a in enumerate(det):
+            if used[j]:
+                continue
+            d = abs(a - r)
+            if d <= tol_ms and (best_d is None or d < best_d):
+                best, best_d = j, d
+        if best >= 0:
+            used[best] = True
+            deltas.append((r, det[best], det[best] - r))
+        else:
+            unmatched += 1
+    return deltas, unmatched
+
+
 def render_and_analyze(patch, note=60, vel=96, dur_ms=1000, *,
                        cache_dir=None, **kw):
     """Render a .fmp via fm_render, then analyze the FM channel (L)."""

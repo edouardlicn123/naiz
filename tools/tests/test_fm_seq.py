@@ -24,6 +24,7 @@ Assertions cover:
 
 import ctypes
 import os
+import struct
 import subprocess
 import sys
 import tempfile
@@ -90,15 +91,21 @@ def lib():
     lib.fmseq_stop.argtypes = [ctypes.c_void_p, ctypes.POINTER(SinkT)]
     lib.fmseq_fm_voices.argtypes = [ctypes.c_void_p]
     lib.fmseq_fm_voices.restype = ctypes.c_int
+    lib.fmseq_finished.argtypes = [ctypes.c_void_p]
+    lib.fmseq_finished.restype = ctypes.c_int
     lib.fmopn_note_ratio.argtypes = [ctypes.c_int, ctypes.c_void_p,
                                      ctypes.c_void_p]
     lib.fmopn_bend_ratio.argtypes = [ctypes.c_int, ctypes.c_void_p,
                                      ctypes.c_void_p]
     lib.midi_parse.argtypes = [ctypes.c_void_p, ctypes.c_uint32,
                                ctypes.POINTER(ctypes.POINTER(MidEventT)),
-                               ctypes.POINTER(ctypes.c_int)]
+                               ctypes.POINTER(ctypes.c_int),
+                               ctypes.POINTER(ctypes.c_uint32)]
     lib.midi_parse.restype = ctypes.c_int
     lib.midi_free.argtypes = [ctypes.POINTER(MidEventT)]
+    lib.fmseq_loop_start.argtypes = [ctypes.c_uint64, ctypes.c_uint64,
+                                     ctypes.c_uint64]
+    lib.fmseq_loop_start.restype = ctypes.c_uint64
     return lib
 
 
@@ -404,8 +411,10 @@ def test_smf_end_to_end(lib):
     buf = ctypes.create_string_buffer(smf)
     out = ctypes.POINTER(MidEventT)()
     n = ctypes.c_int()
+    length = ctypes.c_uint32()
     rc = lib.midi_parse(ctypes.addressof(buf), len(smf),
-                        ctypes.byref(out), ctypes.byref(n))
+                        ctypes.byref(out), ctypes.byref(n),
+                        ctypes.byref(length))
     assert rc == 0 and n.value > 0
     evs = [(int(out[i].tick_ms), out[i].b0, out[i].b1, out[i].b2)
            for i in range(n.value)]
@@ -430,3 +439,87 @@ def test_smf_end_to_end(lib):
     assert any(s.log[i][1] == 0x28 and s.log[i][2] == 0
                for i in range(len(s.log)))       # released the single voice
     assert len(s.writes(0, 0xA0)) >= 3           # three distinct notes tuned
+
+
+# --- devdoc 147: song length (A1), loop phase (A2), pump budget (A3) --------
+
+def _vlq(n):
+    """Encoded MIDI variable-length quantity."""
+    out = [n & 0x7F]
+    n >>= 7
+    while n:
+        out.append(0x80 | (n & 0x7F))
+        n >>= 7
+    return bytes(reversed(out))
+
+
+def _smf_note_then_eot(eot_delta, with_eot=True, ppqn=480):
+    """A one-track SMF: note on@0, note off@480 ticks, then (optionally) EOT
+    eot_delta ticks later, so the EOT time exceeds the last voice event."""
+    trk = bytearray()
+    trk += _vlq(0) + bytes([0x90, 60, 0x60])       # note on @0
+    trk += _vlq(480) + bytes([0x80, 60, 0x40])     # note off @480
+    if with_eot:
+        trk += _vlq(eot_delta) + bytes([0xFF, 0x2F, 0x00])
+    hdr = b"MThd" + struct.pack(">IHHH", 6, 0, 1, ppqn)
+    return hdr + b"MTrk" + struct.pack(">I", len(trk)) + bytes(trk)
+
+
+def _parse(lib, smf):
+    buf = ctypes.create_string_buffer(smf)
+    out = ctypes.POINTER(MidEventT)()
+    n = ctypes.c_int()
+    length = ctypes.c_uint32()
+    rc = lib.midi_parse(ctypes.addressof(buf), len(smf),
+                        ctypes.byref(out), ctypes.byref(n),
+                        ctypes.byref(length))
+    assert rc == 0
+    evs = [(int(out[i].tick_ms), out[i].b0, out[i].b1, out[i].b2)
+           for i in range(n.value)]
+    lib.midi_free(out)
+    return evs, length.value
+
+
+def test_song_length_includes_trailing_silence(lib):
+    # 120 BPM (no tempo event -> 500000 us/quarter), 480 PPQN, so tick->ms is
+    # tick * 500000 / 480 / 1000: last event @480 -> 500ms, EOT @960 -> 1000ms.
+    smf = _smf_note_then_eot(eot_delta=480, with_eot=True)
+    evs, length = _parse(lib, smf)
+    assert evs[-1][0] == 500
+    assert length == 1000
+    assert length > evs[-1][0]          # trailing silence is preserved
+
+
+def test_song_length_falls_back_without_eot(lib):
+    smf = _smf_note_then_eot(eot_delta=0, with_eot=False)
+    evs, length = _parse(lib, smf)
+    assert evs[-1][0] == 500
+    assert length == evs[-1][0]         # no EOT -> use the last voice event
+
+
+def test_loop_start_preserves_phase(lib):
+    f = lib.fmseq_loop_start
+    # exactly one song elapsed -> advance by one length
+    assert f(1000, 400, 1400) == 1400
+    # overshoot inside the next song -> still exactly one length (phase kept)
+    assert f(1000, 400, 1450) == 1400
+    # not a full song yet -> clamp to now
+    assert f(1000, 400, 1200) == 1200
+    # starved two full songs -> skip whole lengths, land inside the current one
+    assert f(1000, 400, 2200) == 2200
+    assert f(1000, 400, 2250) == 2200
+    # degenerate length -> now
+    assert f(1000, 0, 1300) == 1300
+
+
+def test_pump_budget_spreads_a_backlog(lib):
+    # 40 note-ons all due at t=0: well beyond FMSEQ_PUMP_MAX_PER_CALL (32), so
+    # one pump must not drain the whole backlog (devdoc 147 A3).
+    s = Seq(lib)
+    for i in range(40):
+        s.push([(0, 0x90, 40 + i, 0x40)])
+    s.load()
+    s.pump(0)
+    assert lib.fmseq_finished(ctypes.addressof(s._seq)) == 0   # backlog remains
+    s.pump(0)
+    assert lib.fmseq_finished(ctypes.addressof(s._seq)) == 1   # now drained

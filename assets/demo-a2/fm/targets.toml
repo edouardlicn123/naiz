@@ -26,7 +26,10 @@ harmonics   = { "2f" = [-18, -4], "3f" = [-30, -6] }
 [bell]
 calibrated = false
 attack_ms   = [1, 20]
-centroid_hz = [1500, 5000]
+# devdoc 150: the previous band [1500,5000] described the buggy patch (its
+# carrier sat at mul=8, an octave x3 too high).  A GM glockenspiel/music-box is
+# fundamental-dominant: measured centroid 401/778/1569 Hz at note 60/72/84.
+centroid_hz = [300, 1800]
 # Bells are inharmonic; only a weak 2f band is meaningful.
 harmonics   = { "2f" = [-18, 10] }
 

@@ -15,6 +15,9 @@
  *   - A second pass converts absolute ticks to wall-clock ms via the tempo
  *     map:  ms += (tick - prev_tick) * us_per_quarter / ppqn / 1000,
  *     switching tempo each time a tempo event is crossed.
+ *   - The song length (devdoc 147 A1) is the later of the last voice event
+ *     and any track's end-of-track tick, so trailing silence is preserved
+ *     for the caller's loop point.
  */
 #include <stdlib.h>
 #include <string.h>
@@ -136,13 +139,39 @@ static int tempo_add(MidiTempo **tps, int *n, int *cap, uint32_t tick, uint32_t 
     return 0;
 }
 
+/* Convert one absolute tick to wall-clock ms via the (sorted) tempo map.
+ * Shared by the event-table pass and the song-length computation so both use
+ * exactly one tempo-conversion rule (devdoc 147 A1). */
+static unsigned long long midi_tick_to_ms(uint32_t tick,
+                                          const MidiTempo *tps, int tp_n,
+                                          uint32_t ppqn)
+{
+    unsigned long long ms = 0;
+    unsigned long long prev = 0;
+    unsigned int cur_us = MIDI_DEFAULT_TEMPO_US;
+    int i;
+
+    for (i = 0; i < tp_n; i++) {
+        if ((unsigned long long)tps[i].tick > (unsigned long long)tick)
+            break;
+        ms += ((unsigned long long)tps[i].tick - prev) *
+              (unsigned long long)cur_us / ppqn / 1000;
+        prev = (unsigned long long)tps[i].tick;
+        cur_us = tps[i].us;
+    }
+    ms += ((unsigned long long)tick - prev) * (unsigned long long)cur_us /
+          ppqn / 1000;
+    return ms;
+}
+
 /* Parse one MTrk chunk starting at offset *pos (checked to hold the 8-byte
- * chunk header).  Adds events/tempo changes to the shared arrays.  Returns
+ * chunk header).  Adds events/tempo changes to the shared arrays, and keeps
+ * *song_end_tick at the maximum end-of-track absolute tick seen.  Returns
  * 0, -1 on malformed data, -2 on budget overflow. */
 static int midi_parse_track(const uint8_t *d, uint32_t len, uint32_t *pos,
                             MidiRawEvt **evts, int *evt_n, int *evt_cap,
                             MidiTempo **tps, int *tp_n, int *tp_cap,
-                            uint32_t *seq)
+                            uint32_t *seq, uint32_t *song_end_tick)
 {
     uint32_t abs_tick = 0;
     uint8_t  running = 0;
@@ -196,7 +225,10 @@ static int midi_parse_track(const uint8_t *d, uint32_t len, uint32_t *pos,
                 if (tempo_add(tps, tp_n, tp_cap, abs_tick, us) < 0)
                     return -2;
             } else if (mtype == 0x2F) {
-                /* end of track; skip the (normally zero) payload and bail */
+                /* end of track: remember its time (may exceed the last voice
+                 * event, i.e. trailing silence) so the song length is right. */
+                if (abs_tick > *song_end_tick)
+                    *song_end_tick = abs_tick;
                 *pos = end;
                 break;
             }
@@ -252,7 +284,7 @@ static int midi_parse_track(const uint8_t *d, uint32_t len, uint32_t *pos,
 }
 
 int midi_parse(const uint8_t *data, uint32_t len,
-               MidEvent **out_events, int *out_count)
+               MidEvent **out_events, int *out_count, uint32_t *out_len_ms)
 {
     MidiRawEvt *evts = NULL;
     MidiTempo *tps = NULL;
@@ -264,6 +296,7 @@ int midi_parse(const uint8_t *data, uint32_t len,
     uint32_t hdr_len;
     uint32_t ntrks;
     uint32_t seq = 0;
+    uint32_t song_end_tick = 0;   /* max EOT absolute tick across all tracks */
     int rc = -1;
     int i;
 
@@ -271,6 +304,8 @@ int midi_parse(const uint8_t *data, uint32_t len,
         return -1;
     *out_events = NULL;
     *out_count = 0;
+    if (out_len_ms)
+        *out_len_ms = 0;
 
     if (len < 14)
         return -1;
@@ -295,7 +330,7 @@ int midi_parse(const uint8_t *data, uint32_t len,
 
     for (i = 0; i < (int)ntrks; i++) {
         int t = midi_parse_track(data, len, &pos, &evts, &evt_n, &evt_cap,
-                                 &tps, &tp_n, &tp_cap, &seq);
+                                 &tps, &tp_n, &tp_cap, &seq, &song_end_tick);
         if (t < 0) {
             rc = (t == -2) ? -4 : -3;
             goto done;
@@ -320,26 +355,11 @@ int midi_parse(const uint8_t *data, uint32_t len,
 
     /* tick -> wall-clock ms via the tempo map. */
     {
-        unsigned long long prev_tick = 0;
-        unsigned long long ms = 0;
-        unsigned int cur_us = MIDI_DEFAULT_TEMPO_US;
         int k;
-        int ti = 0;
 
         for (k = 0; k < evt_n; k++) {
-            unsigned long long ems;
+            unsigned long long ems = midi_tick_to_ms(evts[k].tick, tps, tp_n, ppqn);
 
-            /* Catch up the tempo as long as a change precedes this event. */
-            while (ti < tp_n && (unsigned long long)tps[ti].tick <=
-                                (unsigned long long)evts[k].tick) {
-                ms = ms + (tps[ti].tick - prev_tick) * (unsigned long long)cur_us /
-                             ppqn / 1000;
-                prev_tick = (unsigned long long)tps[ti].tick;
-                cur_us = tps[ti].us;
-                ti++;
-            }
-            ems = ms + (evts[k].tick - prev_tick) * (unsigned long long)cur_us /
-                          ppqn / 1000;
             if (ems > 0xFFFFFFFFUL)
                 ems = 0xFFFFFFFFUL;  /* clamp driver cursor range */
             final[k].tick_ms = (uint32_t)ems;
@@ -347,6 +367,22 @@ int midi_parse(const uint8_t *data, uint32_t len,
             final[k].b1 = evts[k].b1;
             final[k].b2 = evts[k].b2;
         }
+    }
+
+    /* Song length (devdoc 147 A1): the later of the last voice event and any
+     * track's end-of-track tick, converted through the same tempo map.  This
+     * preserves trailing silence so the replay driver loops on musical length
+     * instead of stopping the instant the final event is dispatched. */
+    if (out_len_ms) {
+        uint32_t end_tick = evts[evt_n - 1].tick;   /* events are sorted */
+        unsigned long long lms;
+
+        if (song_end_tick > end_tick)
+            end_tick = song_end_tick;
+        lms = midi_tick_to_ms(end_tick, tps, tp_n, ppqn);
+        if (lms > 0xFFFFFFFFUL)
+            lms = 0xFFFFFFFFUL;
+        *out_len_ms = (uint32_t)lms;
     }
 
     *out_events = final;

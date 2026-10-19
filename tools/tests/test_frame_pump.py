@@ -50,13 +50,15 @@ IMAGE_CACHE_C = ROOT / "core" / "engine" / "image_cache.c"
 NB_C = ROOT / "core" / "engine" / "nb.c"
 MAIN_C = ROOT / "core" / "engine" / "main.c"
 
-# Every self-contained input loop from devdoc 129 §2.1 plus main.c's three.
+# Every self-contained input loop from devdoc 129 §2.1 plus main.c's three
+# gameplay loops and the devdoc 150 BGM_BENCH loop (a #if-gated diagnostic
+# loop that must also pump, or the clock would not advance while it spins).
 # A loop missing here is a loop that freezes BGM.  bootmenu.c was the one loop
 # that spun without the pump, so the virtual clock was never advanced before
 # the game loop -- the first window closed seconds into scene 1 and the BGM
 # played the nominal step until then (the "starts off-tempo" residual).
 PUMP_CALLERS = [
-    ("core/engine/main.c", 3),
+    ("core/engine/main.c", 4),
     ("core/engine/bootmenu.c", 1),
     ("core/engine/nb_interact.c", 1),
     ("core/engine/nb_menu.c", 1),

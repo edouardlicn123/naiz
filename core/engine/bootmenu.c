@@ -206,6 +206,17 @@ void bootmenu_run(void)
 
     NB_DEBUG("bootmenu: enter (default lang=%s)\r\n", LANG_CODES[lang_idx]);
 
+#ifdef AUTOEXIT
+    /* Headless auto-run build (makegame.sh test --auto, devdoc 150): the
+     * capture harness cannot deliver host input under NP2kai, so the menu
+     * would block forever.  Keep the default language and proceed.  This
+     * path exists only in the AUTOEXIT test build; the shipped engine is
+     * unchanged. */
+    prefs_set_lang(LANG_CODES[lang_idx]);
+    NB_DEBUG("bootmenu: auto-select lang=%s (headless)\r\n", LANG_CODES[lang_idx]);
+    return;
+#endif
+
     input_drain_boundary();
     hal_mouse_set_pos(LAYER_SCREEN_W / 2, LAYER_SCREEN_H / 2);
 

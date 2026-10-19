@@ -2,6 +2,78 @@
 
 自 R1 起全部 Bug 修复与功能演进记录（条目顺序沿用 AGENTS.md 既有历史排列）；`AGENTS.md` 仅保留当前版本与规则。**新条目约定**：每轮修复/演进完成后，在下方 `---` 分隔线之后（第一条位置）追加变更摘要，并在 AGENTS.md 头部同步「当前版本」。**条目格式**：每条以 `### <版本号> — <标题>` 开头（版本号化标题行 + `<a id="cN">` 锚点，N 按条目序递增），正文整段或分小节；历史速查直接读下方「版本索引」。
 
+<a id="c72"></a>
+### 0.3.041 — BGM「颤音」根因收束：非 flute `pms`（ymfm 证伪）+ 实机 NP2kai `Latencys=372` 消除
+
+**症状**：`152` 收束后，用户实机复报 `001/002`（melody_town/flute）「颤音」依旧（`003/004` 为「电流声」）。
+
+**离线取证（`devdocs/153`）**：① 用 ymfm oracle（`fm_render`，**完全绕开 NP2kai 与引擎主循环**）渲染 flute：`lfo=on`（`pms=1`）实测 **~6.0 Hz / 5.14 cent** 音高颤音、`lfo=off` 无；`melody_town` 的 4 个 pitch-bend **全为 8192（中心，无弯音）** ⇒ 音高调制唯一来源是 patch `pms`。② **全曲 ymfm-only 渲染**（`midi_ref` 重建 140 音符，108.4s）包络谱**无 13.5 Hz 主峰**（仅节拍节律）；NP2kai 引擎录音主峰 **13.38–13.48 Hz**；静音录音**无** 13.5 Hz ⇒ `152` 的「13.5 Hz 属 NP2kai 输出通路」结论经独立 oracle 复核成立。
+
+**实机 A/B（`devdocs/154`）**：把 `flute.fmp` 临时改 `pms=0` 重建 → **实机仍有颤音** ⇒ **颤音非 `pms`**。最终将模拟器 `Latencys` 由默认附近档位调到 **372**（`SampleHz=44100`）→ **颤音消失**。机制：`Latencys` 决定音频缓冲块 `pow2(rate×ms/2000)`，SDL 队列空时插静音 = 全频带 AM；93 档（4096 块）落在 ~13.5 Hz，186/372 档（8192/16384 块）把 AM 推到 ~2.95 Hz 不可闻。
+
+**改动**：`assets/demo-a2/fm/flute.fmp` 注释订正（原误写 `pms=2`，实际 `pms=1`，保留 c64 设计的轻颤音——它不是根因）；`Latencys` 为**玩家侧** `~/.config/wxnp21kai/wxnp21kai.toml` 配置，**不进仓库**。**引擎零改动**。
+
+**验证**：`pms=1`/`pms=0` 两份 HDI 供用户 A/B，用户选定 `pms=1`；`disks/demo-a2.hdi` 为 `pms=1` 版、`SCSIHDD0` 复原；`make -C core` 0 诊断、pytest **807 passed / 1 skipped**、`./start.sh fullaudit` **7/7**；`bump_version` 0.3.040→**0.3.041**、`nb_config.h` 重生成。
+
+**文档**：新 `devdocs/153`（离线取证）、`devdocs/154`（实机闭环 + 推荐设置），均 `已完结`。
+
+<a id="c71"></a>
+### 0.3.040 — BGM 残余「电流声」判别取证收束：真实主循环时基 + 音频包络谱，判定可测分量为 NP2kai 输出通路伪影（非引擎）
+
+**承 `149` 的 A1 取证**（`151` 后 `001/002` 仍有「电流声/颤音」）。新增 `BGM_IDLE` 诊断模式（`core/engine/main.c`，编译期默认关，用途同 `BGM_BENCH`）——跳过 bootmenu 直进剧情节（`scene_switch`）后**落入真实主循环**（`engine_frame_pump` + `nb_prefetch_lookahead` + 输入轮询），复刻用户「静置对白页」状态。无头采集 `SDL_AUDIODRIVER=disk`（raw `S16/2ch/44100`，与 NP2kai `SampleHz` 一致）。
+
+**A 轴（时基）实测**：真实循环 `[VC]` 稳态 **`step=574` 单位 = 35.9 ms/pass ≈ 27.9 Hz**，紧 `BGM_BENCH` 为 **`step=55` = 3.4 ms/291 Hz**（慢约 10×）；`[BGMT]` vs MIDI 拟合 **tempo ratio 0.998（正确）**，残差 **std 21.4 ms / p95 35 ms**（bench 6.5–8.2）。⇒ A 轴存在但**次级**，未在音频留下主导特征。
+
+**主发现（H1/H2/H3 逐一排除）**：引擎录音包络谱主导 **~13.4–13.8 Hz AM**，GM 参考（`TimGM6mb`）仅 1.2–2.4 Hz（音符率）。判别四连：① **patch**：flute（`pms=2`，有 LFO）与 bell（无 LFO）**都有** ⇒ 排除 H1（LFO）；② **循环速率**：291 Hz 与 28 Hz **都有且频率相同** ⇒ 排除「每 frame 寄存器重写」；③ **FM 核**：`USEFMGEN` true/false **都有** ⇒ 排除 FM 核；④ **输出延迟**：`Latencys` 30/93/250 → AM **8.3/13.5/5.7 Hz** ⇒ **锁定 NP2kai 音频输出通路**。且 AM 出现在 `<300`/`300–3k`/`>3k` **全频带** ⇒ 整段输出的**增益调制（AM）**，非 click/断续（H3 排除）。
+
+**结论 / 裁决**：残余可测分量属 **NP2kai 输出通路伪影**，引擎侧 A/C 改动不能消除；用户裁决**收束引擎侧音频排查**，恢复发布引擎。**方法论警示**：该无头采集法自带此 13.5 Hz 伪影，日后判定引擎音频伪影须先过 `Latencys` 扫频剔除。
+
+**改动**：`core/engine/main.c` 加 `BGM_IDLE`/`BGM_IDLE_SCENE`/`BGM_IDLE_FILE`（`#if !BGM_BENCH && !BGM_IDLE` 守卫 bootmenu 调用）。
+
+**验证**：`make -C core` **0 诊断**（`core/*.err` 空）；pytest **807 passed / 1 skipped**（`test_devdoc_refs.py` 的 main.c 行号 pin 随 `+12` 位移（`prefs_save` 110→122、`[LANG] boot` 118→130、`cjk_load_for_lang` 122→134），旧值登记进 `SUPERSEDED_SHIFTED_LINE_REFS`；`test_frame_pump.py` 无改动——`BGM_IDLE` 不新增帧泵调用）；`./start.sh fullaudit` **7/7**；`bump_version` 0.3.039→**0.3.040**（全项目同步）、`nb_config.h` 重生成；发布引擎 `./makegame.sh build+make demo-a2` 复原。
+
+**文档**：新 `devdocs/152`（判别取证：采集→四连排除→结论，含 `devdocs/149` A1 回填与 §八 收束）；`devdocs/149`、`152` 转 `已完结`。
+
+**遗留**：`001/002`（flute）「颤音」与 `003/004` 残余电流声的**可测分量**已定性为模拟器侧；**真机（真实 PC-98）听感未验证**（本环境仅 NP2kai）；模拟器侧可试 `Latencys=250`（AM 降至 5.7 Hz）作缓解，未采纳。
+
+<a id="c70"></a>
+### 0.3.039 — bell 载波八度根因修复（alg4 最响载波 mul=8 → 基频）：BGM「电流声/颤音」的 B 轴定位
+
+**承 `149` 的 Phase B**（`148` 三轴 A/B/C）。`0.3.038` 后用户复报 BGM「仍有类似电流声的颤音」。按 `150` 的工具链录引擎稳态音频（`BGM_BENCH` 无头循环 + SDL `disk` 驱动）并对比 GM soundfont/原版 MIDI：**引擎 `icy_garden`（`003/004`，bell 族）`>5kHz` 占比 0.3977、质心 4160 Hz vs GM 0.0041 / 861 Hz（约 100×）** —— **B 轴（音色）确证**；同录 `melody_town`（`001/002`，flute）0.0008 vs GM 0.0006，无亮度问题。
+
+**根因**：`bell.fmp` 用 `alg=4`。YM2608 算法连接表（`tools/vendor/ymfm/…/ymfm_fm.ipp:1019` `s_algorithm_ops`）载波为 **`op2` + `op4`**；原 patch 把高比值放在**载波**上（`op2 mul=8 tl=14` 最响）⇒ 该堆栈把音符基频按 **8×** 发出（上移 3 个八度），能量全堆高频 = 金属性电流声。设计意图（注释「inharmonic partials mul 2/5/8」）本应置于**调制器**，但 `c66` 的「`op=N` = 算法算子 N」语义修正改变了算子解码，成品未随之复核。
+
+**修复**：`bell.fmp` 载波 `op2`/`op4` 改 `mul=1`（承载基频），调制器 `op1 mul=5`/`op3 mul=7`（素数非谐）——离线 `fmbench` 逐音高质心 **note 60/72/84 = 402/773/1488 Hz vs GM 401/778/1569**；实机通路录音 `>5kHz` **0.3977 → 0.0123**、质心 **4160 → 1085 Hz**（GM 861），且因基频恢复整体更响（RMS 0.057→0.192）。`targets.toml [bell] centroid_hz` 由 `[1500,5000]`（描述错误音的亮）改为 `[300,1800]`（对齐 GM）。**同族审计**：以 `ymfm` 载波表扫全 15 族「载波 `mul≥3` 且非静音」——`alg=7` 命中者属合法加法设计，`ethnic`/`perc` 基频均在为刻意音色，**唯 bell 为缺陷**。
+
+**时基（A 轴）实测排除**：引擎 `BGM_TICK_TRACE`（`$28` 键位）派发时刻对 MIDI note-on 残差 **std 6.5–8.2 ms / p95 ≤20 ms / drift ≤0.56 ms/s** ⇒ 非主因。
+
+**诊断设施（编译期可选，默认关）**：`core/engine/audio.c` 加 `BGM_TICK_TRACE`、`core/engine/main.c` 加 `BGM_BENCH`（stringify `-DBGM_BENCH_NAME=`）、`core/engine/bootmenu.c` 加 `AUTOEXIT`、`core/Makefile` 加 `EXTRA_DEFS ?=`；`tools/diag/{bgm_compare,np2kai_audio}.py`、`tools/naiz_audio/{midi_ref,gm_render}.py`（ctypes 复用 `core/lib/midi.c` 与 `libfluidsynth.so.2`）、`spectrum_report.py` 的 `detect_onsets`（log-RMS 包络）与 `residual_jitter`。
+
+**验证**：`make -C core` **0 诊断**（`core/*.err` 空）；pytest **807 passed / 1 skipped**（随动 `test_devdoc_refs.py` 的 audio.c/bootmenu.c/main.c 行号 pin，旧值入 `SUPERSEDED_SHIFTED_LINE_REFS`；`test_frame_pump.py` 的 `PUMP_CALLERS` `main.c` 3→4）；`./start.sh fullaudit` **7/7**；`bump_version` 0.3.038→**0.3.039**（全项目同步）、`nb_config.h` 重生成。
+
+**文档**：新 `devdocs/151`（修复记录：症状→判定→根因→修复→验证→防复发→遗留）；`devdocs/150` §六 回填实测表并转 `部分完成`；`devdocs/149` 转 `执行中`（Phase B 完成）。
+
+**遗留**：`001/002`（flute）的「颤音」非亮度（频谱同 GM），候选 **C 轴（LFO `pms`）** 与 **A 轴（重载 pass 率下派发抖动）**，按 `149` A1/C 续查；A2（Timer-B 中断时基）本环境不可验证；**实机实听为最终判据**（`build`+`make` 后核 `003/004`）。
+
+<a id="c69"></a>
+### 0.3.038 — BGM P0 三修：曲长含尾部静默（A1）+ 回绕保留相位（A2）+ 事件派发分片（A3）
+
+**动机**：`devdocs/146` 对 BGM 现状代码做只读分析，列出「回绕按末事件而非乐曲长度 / 回绕重置时钟丢相位 / 事件派发无分片」等结构性缺陷；用户拍板先做 P0（`devdocs/147` §一），本轮交付 A1–A3（含 A4 核对）。
+
+**A1 曲长含尾部静默**：`midi_parse()` 增 `uint32_t *out_len_ms` 出参——曲长取「末音符事件 tick」与「各轨 EOT tick 最大者」经**同一 tempo map** 折算的较晚值，尾部静默不再被丢弃；`midi_parse_track()` 的 `0x2F` 由丢弃改为记 `song_end_tick`，新增纯函数 `midi_tick_to_ms()` 供重构。`BgmState` 增 `len_ms`（`bgm_release()` 清零），`audio_bgm_start` 存之，**空流（`count<=0 || len_ms==0`）判为无 BGM**（`midi_free` 后 return），启动日志含 `%lums`。
+
+**A2 回绕保留相位**：`audio_tick()` 两条后端判据由「末事件已派发」改为「`cur >= g_bgm.len_ms` 且（FM 侧）`fmseq_finished()`」；回绕经新纯函数 `fmseq_loop_start(last_start, song_len, now)`（`core/lib/fmseq.c`，声明入 `fmseq.h`）按**整曲边界**推进 `wall0`——`next = last_start + song_len`，饥饿多曲则一次除法跳整段，结果恒落 `[now, now+song_len)`，即保留 `(cur − len_ms)` 余数（旧码 `wall0 = now` 丢相位）。`audio.c` 侧封装为 `static bgm_rewind_phase()`，`song_len==0` 退化回 `now`。
+
+**A3 事件派发分片**：FM 侧 `fmseq_pump()` 受 `FMSEQ_PUMP_MAX_PER_CALL`（32）封顶、MPU 侧 `audio_tick()` 受 `AUDIO_BGM_MAX_EVENTS_PER_TICK`（32）封顶；预算用尽则余下事件待后续帧派发（FM 侧 `fmseq_finished()` 为假故不回绕），防时钟跳变把整窗积压在单 pass 齐发。
+
+**A4 核对**：`test_frame_pump.py` 的 `PUMP_CALLERS`（9 文件/12 处）已覆盖各阻塞循环的帧泵，**无源码改动**。
+
+**验证**：`make -C core` **0 诊断**（`core/*.err` 空）；`test_fm_seq.py` 由 14 增至 **18**（ctypes `midi_parse` 改 5 参 + 绑定 `fmseq_finished`/`fmseq_loop_start`；新增自造最小 SMF 的「尾部静默 ⇒ `len_ms`=1000 > 末事件 500」、无 EOT ⇒ `len_ms`=末事件、「`fmseq_loop_start` 相位保持」、40 事件积压「一次 pump 只发 32、二次才尽」四例）；全量 pytest **807 passed / 1 skipped**；`./start.sh fullaudit` **7/7**。`test_devdoc_refs.py` 的 audio.c 行号 pin 随动（`220/273/366/375 → 230/291/384/393`，旧值入 `SUPERSEDED_SHIFTED_LINE_REFS`）。`docs/B90` audio.c BGM 条目补 devdoc 147 段。`bump_version` 0.3.037→**0.3.038**（全项目同步）、`nb_config.h` 重生成。
+
+**文档**：新 `devdocs/146`（现状分析，只读）、`devdocs/147`（P0 实施计划，本轮后转完结）。
+
+**遗留**：**实机试听未验证**（需 `build`+`make`；判据 = 循环处不再切掉尾音、跨 loop 相位连续、无整窗爆发）；A3 预算 32 为保守值、手感待实机确认；**P1（Timer-B 中断驱动音泵，`devdocs/134` 方案 C）** 与 **P2（输出纪律审计）** 另立。
+
 <a id="c68"></a>
 ### 0.3.037 — 虚拟时钟单窗速率尖峰钳制（修「演奏时快时慢」的残留机制）
 
@@ -554,6 +626,10 @@
 
 | 条目 |
 |------|
+| [0.3.041 — BGM「颤音」根因收束：非 flute `pms`（ymfm 证伪）+ 实机 NP2kai `Latencys=372` 消除](#c72) |
+| [0.3.040 — BGM 残余「电流声」判别取证收束：真实主循环时基 + 音频包络谱，判定可测分量为 NP2kai 输出通路伪影（非引擎）](#c71) |
+| [0.3.039 — bell 载波八度根因修复（alg4 最响载波 mul=8 → 基频）：BGM「电流声/颤音」的 B 轴定位](#c70) |
+| [0.3.038 — BGM P0 三修：曲长含尾部静默（A1）+ 回绕保留相位（A2）+ 事件派发分片（A3）](#c69) |
 | [0.3.037 — 虚拟时钟单窗速率尖峰钳制（修「演奏时快时慢」的残留机制）](#c68) |
 | [0.3.036 — FM 音高整体低八度根因修复（引擎编码漏 `2^(block-1)`，实机「音调偏低」）+ 订正 devdoc 136 §十五 的错误 oracle 补偿](#c67) |
 | [0.3.035 — P1a FM 音色实验室落地 + `op=` 标签语义根因修复（flute 实为静音 → 复声）](#c66) |

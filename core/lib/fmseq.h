@@ -35,6 +35,12 @@
 #define FMSEQ_MIDI_CHANNELS    16
 #define FMSEQ_PERCUSSION_MIDI_CH 9          /* 0-based GM channel 10 */
 
+/* Per-call dispatch cap: one fmseq_pump() fires at most this many events, so a
+ * large clock jump is spread over several frames instead of flushing a whole
+ * backlog into a single pass (devdoc 147 A3).  Generous enough that steady
+ * playback (0-1 events per frame) is unaffected. */
+#define FMSEQ_PUMP_MAX_PER_CALL 32
+
 /* SSG voice modes (per voice, mapped onto SSG registers). */
 #define FMSEQ_SSG_TONE      0               /* tone output (kick/toms) */
 #define FMSEQ_SSG_NOISE     1               /* noise only (hats/cymbals) */
@@ -88,8 +94,10 @@ void fmseq_init(Fmseq *seq, const FmopnPatch *patches, int patch_count,
  * ownership and must keep the array alive while fmseq_pump is fed. */
 void fmseq_events(Fmseq *seq, const MidEvent *events, int count);
 
-/* Pump up to wall-clock now_ms: dispatch all events with tick_ms <= now_ms,
- * then decay the SSG percussion voices for the elapsed time.  now_ms must be
+/* Pump up to wall-clock now_ms: dispatch the events with tick_ms <= now_ms,
+ * then decay the SSG percussion voices for the elapsed time.  At most
+ * FMSEQ_PUMP_MAX_PER_CALL events fire per call; any remainder stays pending
+ * and is dispatched by a later call (devdoc 147 A3).  now_ms must be
  * monotonic across calls (the engine feeds hal_wallclock_smooth_ms,
  * devdocs/107). */
 void fmseq_pump(Fmseq *seq, const FmseqSink *sink, uint64_t now_ms);
@@ -107,5 +115,14 @@ int fmseq_fm_voices(const Fmseq *seq);
 /* 1 once the whole loaded event stream has been dispatched.  The engine
  * uses this as its loop point: rewind to the start of the last seek. */
 int fmseq_finished(const Fmseq *seq);
+
+/* Next loop-start clock for a looping event stream (devdoc 147 A2).  Given the
+ * previous loop start, the song length and the current clock, advance by whole
+ * song lengths so the result satisfies result <= now < result + song_len —
+ * preserving musical phase instead of resetting to `now` (which dropped the
+ * remainder every loop).  song_len == 0 returns now.  Shared by both engine
+ * backends (FM and MPU): looping the parsed event table is backend-independent
+ * even though this lives beside fmseq_finished(). */
+uint64_t fmseq_loop_start(uint64_t last_start, uint64_t song_len, uint64_t now);
 
 #endif /* LIB_FMSEQ_H */

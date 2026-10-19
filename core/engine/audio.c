@@ -45,6 +45,7 @@ typedef struct {
     int           count;
     int           idx;            /* next event to fire (MIDI backend) */
     unsigned long wall0;          /* hal_wallclock_smooth_ms() at pass start */
+    unsigned long len_ms;         /* song length incl. trailing silence (A1) */
     int           fm;             /* 1: rendered by fmseq on the OPNA */
     int           active;
 } BgmState;
@@ -61,6 +62,23 @@ static int g_vc_on = 1;
 #define AUDIO_BGM_VOL_MAX  127
 static int g_bgm_vol = AUDIO_BGM_VOL_MAX;
 
+/* Per-pass dispatch cap for the MIDI backend: bounds how many events one
+ * audio_tick() may send to the MPU-401, so a large clock jump is spread over
+ * several frames instead of flushing a whole backlog in one pass (devdoc 147
+ * A3).  Generous enough that steady playback (0-1 events per frame) is
+ * unaffected.  The FM backend caps internally via FMSEQ_PUMP_MAX_PER_CALL. */
+#define AUDIO_BGM_MAX_EVENTS_PER_TICK 32
+
+/* devdoc 150 opt-in dispatch trace.  Logs each BGM note dispatch with its
+ * virtual-clock timestamp so a recording's timing can be attributed to the
+ * frame-pump quantization (axis A) rather than to voicing/LFO (axes B/C).
+ * Off by default: zero cost, zero output.  Enable with
+ *   make -C core EXTRA_DEFS=-DBGM_TICK_TRACE=1
+ * and capture with makegame.sh test --serial. */
+#ifndef BGM_TICK_TRACE
+#define BGM_TICK_TRACE 0
+#endif
+
 /* PCM attenuation 0-15 (0 = loudest, 15 = softest).  Mirrors the A466 bit
  * layout; see F02 §4.2.  Distinct from AUDIO_PCM_VOL_DEFAULT so the two
  * units can never be confused at a call site. */
@@ -76,6 +94,7 @@ static void bgm_release(void)
     }
     g_bgm.count = 0;
     g_bgm.idx = 0;
+    g_bgm.len_ms = 0;
     g_bgm.fm = 0;
     g_bgm.active = 0;
 }
@@ -108,6 +127,13 @@ static const FmopnPatch g_fm_default_patch = {
 static void fm_sink_write(void *ctx, int bank, uint8_t reg, uint8_t val)
 {
     (void)ctx;
+#if BGM_TICK_TRACE
+    /* $28 with a non-zero slot mask is a key-on: one per FM note attack.
+     * devdoc 150. */
+    if (bank == 0 && reg == 0x28 && (val & 0xF0))
+        hal_logf("BGMT on t=%lu ch=%d\n",
+                 (unsigned long)hal_wallclock_smooth_ms(), val & 0x03);
+#endif
     hal_fm_write_reg(bank, reg, val);
 }
 
@@ -215,6 +241,7 @@ void audio_bgm_start(const char *key)
     uint8_t *raw;
     MidEvent *ev;
     int count = 0;
+    uint32_t len_ms = 0;
 
     if (!key || !key[0]) return;
     if (!g_bgm_on) {
@@ -246,17 +273,25 @@ void audio_bgm_start(const char *key)
         hal_logf("BGM WARN: read '%s' failed\r\n", key);
         return;
     }
-    if (midi_parse(raw, (uint32_t)size, &ev, &count) != 0) {
+    if (midi_parse(raw, (uint32_t)size, &ev, &count, &len_ms) != 0) {
         hal_logf("BGM WARN: parse '%s' failed\r\n", key);
         free(raw);
         return;
     }
     free(raw);   /* event table is independently owned by midi_parse */
 
+    /* An empty/zero-length stream loops forever; treat as no BGM. */
+    if (count <= 0 || len_ms == 0) {
+        hal_logf("BGM WARN: '%s' has no playable events\r\n", key);
+        midi_free(ev);
+        return;
+    }
+
     bgm_release();
     g_bgm.ev = ev;
     g_bgm.count = count;
     g_bgm.idx = 0;
+    g_bgm.len_ms = len_ms;
     g_bgm.wall0 = hal_wallclock_smooth_ms();
     g_bgm.active = 1;
     if (g_mpu_ok) {
@@ -266,8 +301,8 @@ void audio_bgm_start(const char *key)
         fmseq_events(g_fm_seq, ev, count);
     }
     bgm_apply_volume();
-    hal_logf("BGM start '%s' (%d events)%s\r\n", key, count,
-             g_bgm.fm ? " (FM)" : "");
+    hal_logf("BGM start '%s' (%d events, %lums)%s\r\n", key, count,
+             (unsigned long)len_ms, g_bgm.fm ? " (FM)" : "");
 }
 
 void audio_bgm_stop(void)
@@ -500,6 +535,17 @@ void audio_init(void)
         hal_log("AUD WARN: no audio backend (MPU-401 absent, no OPNA)\r\n");
 }
 
+/* Advance the loop start to the next whole song boundary, preserving musical
+ * phase (devdoc 147 A2).  The old code reset wall0 to the current clock, which
+ * dropped the (cur - len_ms) remainder every loop.  The arithmetic lives in
+ * fmseq_loop_start() so it is host-testable; g_bgm.len_ms is non-zero for any
+ * active BGM (audio_bgm_start rejects zero-length streams). */
+static void bgm_rewind_phase(unsigned long now)
+{
+    g_bgm.wall0 = (unsigned long)fmseq_loop_start(g_bgm.wall0,
+                                                  g_bgm.len_ms, now);
+}
+
 /* Called from the 60Hz heartbeat every frame (AUTOEXIT, main and the
  * input-wait inner loop) — pumps MIDI events + PCM FIFO bytes. */
 void audio_tick(void)
@@ -523,18 +569,20 @@ void audio_tick(void)
     if (g_bgm.fm) {
         /* FM backend: feed the smooth virtual clock to fmseq (devdoc 107 /
          * 0.2.134 — raw hal_wallclock_ms deltas are chunked under NP2kai).
-         * Loop by rewinding to the current clock and re-seeding fmseq. */
+         * Loop on musical length, not on "last event dispatched": the parsed
+         * event table drops trailing silence, so a cursor-based test cut every
+         * loop short (devdoc 147 A2).  Rewind preserves phase (A2). */
         unsigned long now = hal_wallclock_smooth_ms();
         unsigned long cur = now - g_bgm.wall0;
 
-fmseq_pump(g_fm_seq, &g_fm_sink, cur);
-        if (fmseq_finished(g_fm_seq)) {
+        fmseq_pump(g_fm_seq, &g_fm_sink, cur);
+        if (cur >= g_bgm.len_ms && fmseq_finished(g_fm_seq)) {
             int ring = fmseq_fm_voices(g_fm_seq);
             if (ring > 0)
                 hal_logf("FM loop: %d voice%s still ringing on rewind\r\n",
                          ring, ring == 1 ? "" : "s");
-            g_bgm.wall0 = now;
             fmseq_stop(g_fm_seq, &g_fm_sink);
+            bgm_rewind_phase(now);
         }
         return;
     }
@@ -545,11 +593,14 @@ fmseq_pump(g_fm_seq, &g_fm_sink, cur);
          * then +1000..+6000ms jumps), which stalled cur during the holes and
          * tone-burst the whole event backlog on catch-up.  The smooth clock
          * advances cur at pass cadence with per-pass bounded deltas, so the
-         * MIDI schedule tracks nominal event times through the holes. */
+         * MIDI schedule tracks nominal event times through the holes.
+         * The per-pass event budget (devdoc 147 A3) additionally bounds any
+         * residual burst: a full backlog is spread over several frames. */
         unsigned long now = hal_wallclock_smooth_ms();
         unsigned long cur = now - g_bgm.wall0;
+        int budget = AUDIO_BGM_MAX_EVENTS_PER_TICK;
 
-        while (g_bgm.idx < g_bgm.count &&
+        while (budget > 0 && g_bgm.idx < g_bgm.count &&
                g_bgm.ev[g_bgm.idx].tick_ms <= cur) {
             const MidEvent *e = &g_bgm.ev[g_bgm.idx];
             uint8_t st = e->b0;
@@ -559,14 +610,23 @@ fmseq_pump(g_fm_seq, &g_fm_sink, cur);
             /* 0xC0/0xD0 are single-data voice statuses (2-byte wire). */
             if ((st & 0xF0) != 0xC0 && (st & 0xF0) != 0xD0)
                 hal_midi_out(e->b2);
+#if BGM_TICK_TRACE
+            /* devdoc 150: note-on dispatches only, with the virtual timestamp
+             * and intended tick, so latency vs the schedule is visible. */
+            if ((st & 0xF0) == 0x90 && (e->b2 & 0x7F))
+                hal_logf("BGMT on t=%lu sch=%lu n=%d\n",
+                         (unsigned long)cur,
+                         (unsigned long)e->tick_ms, e->b1 & 0x7F);
+#endif
             g_bgm.idx++;
+            budget--;
         }
 
-        /* End of table: loop by resetting the playhead to the current
-         * smooth virtual clock (devdoc 101 §4.2, devdoc 107). */
-        if (g_bgm.idx >= g_bgm.count) {
-            g_bgm.wall0 = now;
+        /* Loop on musical length once every event has been sent (devdoc 147
+         * A2).  If the budget held events back, wait for a later pass. */
+        if (g_bgm.idx >= g_bgm.count && cur >= g_bgm.len_ms) {
             g_bgm.idx = 0;
+            bgm_rewind_phase(now);
         }
     }
 }

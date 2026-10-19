@@ -63,10 +63,10 @@ LINE_REF_WHITELIST = {
     ("nb_setting.c", 122): "snprintf",
     ("nb_setting.c", 140): "Text Speed",
     ("nb_setting.c", 152): "Read Progress",
-    ("audio.c", 220): "g_bgm_on",
-    ("audio.c", 366): "g_snd_on",
-    ("audio.c", 375): "g_vc_on",
-    ("audio.c", 273): "audio_bgm_stop",
+    ("audio.c", 247): "g_bgm_on",
+    ("audio.c", 401): "g_snd_on",
+    ("audio.c", 410): "g_vc_on",
+    ("audio.c", 308): "audio_bgm_stop",
     ("hal_audio.c", 88): "PCM_CTRL_A46A_IRQ",
     ("hal_audio.c", 94): "PCM_IRQ_INTERVAL_MAX",
     ("hal_audio.c", 122): "hal_pcm_set_volume",
@@ -74,7 +74,7 @@ LINE_REF_WHITELIST = {
     ("nb_asset_table.h", 70): "CG_COUNT",
     ("save.h", 16): "CG_TOTAL",
     ("save_sys.c", 12): "SYSTEM.SAV",
-    ("main.c", 95): "prefs_save",
+    ("main.c", 122): "prefs_save",
     ("nb_mainmenu.c", 115): "prefs_save",
     # devdoc 119 §3.4: the i18n width guard's geometry anchors.  These were
     # cited before they were registered, and the off-by-one that followed
@@ -102,9 +102,9 @@ LINE_REF_WHITELIST = {
     ("prefs.h", 75): "prefs_get_version",
     ("bootmenu.c", 104): "find_lang_index",
     ("bootmenu.c", 201): "bootmenu_run",
-    ("bootmenu.c", 293): "prefs_set_lang",
-    ("main.c", 102): "LANG] boot",
-    ("main.c", 106): "cjk_load_for_lang",
+    ("bootmenu.c", 304): "prefs_set_lang",
+    ("main.c", 130): "LANG] boot",
+    ("main.c", 134): "cjk_load_for_lang",
     ("nb.c", 166): "prefs_load",
     ("nb.c", 171): "nb_set_lang",
     ("nb.c", 337): "nb_set_lang",
@@ -161,6 +161,14 @@ SUPERSEDED_AUDIO_LINE_REFS = {
 # test_every_devdoc_ref_is_registered pass unnoticed.
 SUPERSEDED_SHIFTED_LINE_REFS = {
     ("main.c", 94), ("nb_saveload.c", 44),
+    # devdoc 150's BGM_BENCH block (top-of-file defines + the #if !BGM_BENCH
+    # guard around bootmenu_run) shifted main.c's boot citations by +15/+16;
+    # the current locations are checked in LINE_REF_WHITELIST.
+    ("main.c", 95), ("main.c", 102), ("main.c", 106),
+    # devdoc 152's BGM_IDLE block (top-of-file defines, devdoc 152 §Phase 1)
+    # shifted main.c's prefs_save / [LANG] marker / cjk_load_for_lang citations
+    # by +12; the current locations are checked in LINE_REF_WHITELIST.
+    ("main.c", 110), ("main.c", 118), ("main.c", 122),
     ("nb_setting.c", 107), ("nb_setting.c", 139), ("nb_setting.c", 149),
     ("nb_setting.c", 151), ("nb_setting.c", 159), ("nb_setting.c", 170),
     ("nb_setting.c", 178), ("nb_setting.c", 227), ("nb_setting.c", 241),
@@ -172,12 +180,26 @@ SUPERSEDED_SHIFTED_LINE_REFS = {
     # bootmenu_run / prefs_set_lang by +1 / +1 / +7.  devdoc 120 §9 printed the
     # old coordinates; the current ones are checked in LINE_REF_WHITELIST.
     ("bootmenu.c", 103), ("bootmenu.c", 200), ("bootmenu.c", 286),
+    # devdoc 150's #if AUTOEXIT early-return inside bootmenu_run shifted the
+    # later prefs_set_lang call by +11; the current location is checked in
+    # LINE_REF_WHITELIST.
+    ("bootmenu.c", 293),
     # fm_load_patches() gained a fixed-slot/reserve-default rewrite (devdoc 135,
     # S7 timbre work) that added 5 net lines ahead of the audio toggle gates and
     # audio_bgm_stop, shifting every later audio.c citation by +5.  The current
     # coordinates are checked in LINE_REF_WHITELIST; the old ones are recorded
     # here so the drift stays visible.
     ("audio.c", 215), ("audio.c", 268), ("audio.c", 361), ("audio.c", 370),
+    # The BGM P0 rework (devdoc 147) added BgmState.len_ms, the bgm_rewind_phase
+    # helper and the per-tick event budget, shifting the audio.c toggle gates
+    # and audio_bgm_stop.  The current coordinates are checked in
+    # LINE_REF_WHITELIST; the pre-147 ones are recorded here.
+    ("audio.c", 220), ("audio.c", 273), ("audio.c", 366), ("audio.c", 375),
+    # devdoc 150 added the opt-in BGM_TICK_TRACE dispatch log (an #if-gated
+    # block in fm_sink_write plus its #define above the toggle gates), shifting
+    # every later audio.c citation by +17.  The current locations are checked
+    # in LINE_REF_WHITELIST instead.
+    ("audio.c", 230), ("audio.c", 291), ("audio.c", 384), ("audio.c", 393),
 }
 
 # References to files RENAMED in 0.3.014.  devdocs 118/119 are finished and may
@@ -443,3 +465,57 @@ def test_cited_docs_exist(doc):
                          text):
         target = ROOT / m.group(1)
         assert target.exists(), f"{doc.name} cites missing {target}"
+
+
+# --- 4. a hand-maintained doc must not balloon (the B90 corruption) --------
+#
+# `docs/B90-参考-函数索引.md` was silently corrupted into a 3.4 GB blob -- a
+# single line repeated ~15.5M times by an out-of-control text loop -- and it
+# survived four commits because nothing checked that a hand-maintained
+# reference doc stayed doc-sized.  These two guards make that failure loud.
+
+MAX_DOC_BYTES = 1_000_000   # ~6x the largest legitimate doc in the tree
+MAX_LINE_REPEATS = 5_000    # a runaway duplication signature
+
+
+def _reference_docs():
+    for base in (ROOT / "docs", DEV_DOCS):
+        for path in sorted(base.rglob("*.md")):
+            yield path
+
+
+def test_reference_docs_are_doc_sized():
+    """No hand-maintained doc under `docs/` or `devdocs/` may balloon past a
+    sane size: a multi-MB file is the signature of the runaway loop that
+    destroyed B90, not of content anyone wrote."""
+    offenders = []
+    for doc in _reference_docs():
+        size = doc.stat().st_size
+        if size > MAX_DOC_BYTES:
+            offenders.append(f"{doc.relative_to(ROOT)} = {size} bytes")
+    assert not offenders, (
+        f"reference docs exceed {MAX_DOC_BYTES} bytes (runaway loop?): "
+        + ", ".join(offenders)
+    )
+
+
+def test_reference_docs_have_no_runaway_repetition():
+    """The other half of the B90 signature: one line repeated thousands of
+    times.  Checked only for files that passed the size guard, so the read is
+    bounded."""
+    for doc in _reference_docs():
+        if doc.stat().st_size > MAX_DOC_BYTES:
+            continue  # the size guard owns this failure
+        worst, worst_n = "", 0
+        counts = {}
+        for line in _lines(doc):
+            s = line.strip()
+            if not s:
+                continue
+            counts[s] = counts.get(s, 0) + 1
+            if counts[s] > worst_n:
+                worst_n, worst = counts[s], s
+        assert worst_n <= MAX_LINE_REPEATS, (
+            f"{doc.relative_to(ROOT)} repeats one line {worst_n} times "
+            f"(> {MAX_LINE_REPEATS}): {worst[:80]!r}"
+        )

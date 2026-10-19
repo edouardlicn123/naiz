@@ -1,7 +1,7 @@
 {
   "version": 2,
-  "git_head": "588583b",
-  "checked_at": "2026-10-16T10:37:30",
+  "git_head": "636bcb2",
+  "checked_at": "2026-10-19T11:58:56",
   "files": {
     "core/build.sh": {
       "sha256": "0e6bb3f41cae8f6c5a014a49767f93990ddd3e2c461a85ec991c01b40b66b11e",
@@ -22,17 +22,17 @@
       ]
     },
     "core/engine/audio.c": {
-      "sha256": "edc0cf0d6e58ebdb9b43609cf906c90c1e9b15ae8dd90e029a8bbd85f3d50e5f",
+      "sha256": "c60201ee8eb6911b6281596da51dba8ba8b68d13156713022c47ef1a8cb0f811",
       "violations": 0,
       "candidates": 2,
       "findings": [
         {
-          "line": 489,
+          "line": 524,
           "rule": "C1",
           "level": "HEUR"
         },
         {
-          "line": 159,
+          "line": 185,
           "rule": "C9",
           "level": "HEUR"
         }
@@ -45,7 +45,7 @@
       "findings": []
     },
     "core/engine/bootmenu.c": {
-      "sha256": "e71e3b0c4124d0d3428a62077725e7ef172ac7faf79dc81645b7b877207c6bd8",
+      "sha256": "d1e6b12a791253849c94d2390db5ccefea446b071741ad497e56d804f52f68a6",
       "violations": 0,
       "candidates": 1,
       "findings": [
@@ -236,7 +236,7 @@
       ]
     },
     "core/engine/main.c": {
-      "sha256": "9aabf8105e9987292c338f4f935bb435965eba22c2a2ffc5217a232ceefc6c92",
+      "sha256": "63ca2fc73f13253e14415cad06983f884e6abb99056471e8d62e3114858fd95c",
       "violations": 0,
       "candidates": 0,
       "findings": []
@@ -332,7 +332,7 @@
       "findings": []
     },
     "core/engine/nb_config.h": {
-      "sha256": "0e1d78327aec949233d19628e4413d6b2240d75471b2a686bf9b58f7bb25a109",
+      "sha256": "2ca510404f23ff5161dd9958d37cc664e6f9d71d834e098534dc777320421b06",
       "violations": 0,
       "candidates": 0,
       "findings": []
@@ -703,13 +703,13 @@
       "findings": []
     },
     "core/lib/fmseq.c": {
-      "sha256": "1405b4cd2e093e0f1b47b784c7e80f287bdbcb08d218aa60aa71e88d189d61f1",
+      "sha256": "912cd5a366d312704da999c5a3de607e0b7d8fa22022c900d7943a4d1c645aee",
       "violations": 0,
       "candidates": 0,
       "findings": []
     },
     "core/lib/fmseq.h": {
-      "sha256": "f3b3c7c52496b9193b1238015c3d2b98af91e99730670bebaa030b895907908e",
+      "sha256": "add59d09c3257f53b602ba6bbf0015a8bb65041e0647b7d98ef585486f16f09b",
       "violations": 0,
       "candidates": 0,
       "findings": []
@@ -745,13 +745,13 @@
       "findings": []
     },
     "core/lib/midi.c": {
-      "sha256": "bc58e074895c8377bb42893676d535f1065a62da86285acd66338f7fc61c4996",
+      "sha256": "4dde4fd1b3d7624849cf6539bbfdd2526712010b311d40c4204c036121be5bb0",
       "violations": 0,
       "candidates": 0,
       "findings": []
     },
     "core/lib/midi.h": {
-      "sha256": "d1d48480351f316fd063ab167aa51307e0f63d687c6e2537894357aecade23d1",
+      "sha256": "940cc2d2829268efdb4b0327575b079543ceb2035339e0ecb0d4a963544f395f",
       "violations": 0,
       "candidates": 0,
       "findings": []
@@ -947,6 +947,18 @@
       "candidates": 0,
       "findings": []
     },
+    "tools/diag/bgm_compare.py": {
+      "sha256": "29e14315170dba6264aec17d402567fd4b4c70218bb2ec054e6be392ab0421e8",
+      "violations": 0,
+      "candidates": 1,
+      "findings": [
+        {
+          "line": 100,
+          "rule": "P8",
+          "level": "HEUR"
+        }
+      ]
+    },
     "tools/diag/gen_com.py": {
       "sha256": "642a100231ce48f9e41d8fcf7160a02359f4af81e2e3bfdf4fd493eb756ff6ea",
       "violations": 0,
@@ -964,6 +976,18 @@
       "violations": 0,
       "candidates": 0,
       "findings": []
+    },
+    "tools/diag/np2kai_audio.py": {
+      "sha256": "bf5ffba46338059957721e9f3d73527b0b5f195429fc3ad8393eebe02fe3faa5",
+      "violations": 0,
+      "candidates": 1,
+      "findings": [
+        {
+          "line": 62,
+          "rule": "P8",
+          "level": "HEUR"
+        }
+      ]
     },
     "tools/diag/np2kai_serial.py": {
       "sha256": "999e8b3e5bfc81edb71f8bfefb2430233f50095dda395a1506411c4d95ce0374",
@@ -1067,6 +1091,24 @@
       "candidates": 0,
       "findings": []
     },
+    "tools/naiz_audio/gm_render.py": {
+      "sha256": "1162192dac8708dac4e89b5c3f31cf624ef541f5e71bde3aa4292acbe2f197f4",
+      "violations": 0,
+      "candidates": 0,
+      "findings": []
+    },
+    "tools/naiz_audio/midi_ref.py": {
+      "sha256": "0ff36068ddb1a263807e0402130fcf169b4f93809e227863886e268c8d957b5f",
+      "violations": 0,
+      "candidates": 1,
+      "findings": [
+        {
+          "line": 119,
+          "rule": "P8",
+          "level": "HEUR"
+        }
+      ]
+    },
     "tools/naiz_audio/pack_audio.py": {
       "sha256": "aceecf79d9274cb948f990e5430310a8502615b984d2756fd1e8214cefa2167b",
       "violations": 0,
@@ -1074,7 +1116,7 @@
       "findings": []
     },
     "tools/naiz_audio/spectrum_report.py": {
-      "sha256": "5bd17593f07041c38090283563922d657d04228380fdd72d6e6da92296796c28",
+      "sha256": "a161701b437530bdb0bf8b2311ed46e564bdaa5d890b3725fc38c50eac14f93a",
       "violations": 0,
       "candidates": 1,
       "findings": [
@@ -1525,16 +1567,16 @@
     }
   },
   "summary": {
-    "files": 205,
+    "files": 209,
     "changed": 0,
-    "skipped": 205,
+    "skipped": 209,
     "out_of_scope": 0,
     "violations": 0,
-    "candidates": 50,
+    "candidates": 53,
     "fresh_violations": 0,
     "fresh_candidates": 0,
     "verified": 22,
     "stale": 2,
-    "open": 26
+    "open": 29
   }
 }

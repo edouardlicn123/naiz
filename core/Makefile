@@ -19,13 +19,16 @@ ifeq ($(WATCOM),)
 $(error Open Watcom not found. Run build.sh or set $$WATCOM)
 endif
 NAIZ_DEBUG ?= ON
+# Extra compile-time defines for diagnostic builds (devdoc 150):
+#   make -C core EXTRA_DEFS=-DBGM_TICK_TRACE=1
+EXTRA_DEFS ?=
 CC      = wcl386
 TARGET  = engine.exe
 BUILD   = build
 
 # 编译隔离：每层只能看到自己的头文件和共享的 lib/。
 # engine/ 需要 -Iplat 以访问 hal.h；plat/ 需要 -Iengine 以访问 cursor.h。
-BASE    = -bt=dos -l=dos4g -zq -os -s -DNAIZ_DEBUG=$(NAIZ_DEBUG)
+BASE    = -bt=dos -l=dos4g -zq -os -s -DNAIZ_DEBUG=$(NAIZ_DEBUG) $(EXTRA_DEFS)
 ENG_CFLAGS = $(BASE) -Iengine -Ilib -Iplat -I$(WATCOM)/h
 PLAT_CFLAGS = $(BASE) -Iplat -Ilib -Iengine -I$(WATCOM)/h -DHAL_BUILD_ALLOWED
 LIB_CFLAGS  = $(BASE) -Ilib -I$(WATCOM)/h
