@@ -22,6 +22,9 @@
  *                          note vel start_ms dur_ms bend   (one per line, # = comment)
  *     --no-lfo           do not prime $22 (LFO disabled)
  *     --raw-note         skip velocity TL attenuation (pure patch tone)
+ *     --legato-ms N      tie events whose start is within N ms of the previous
+ *                          note-off (skip keyoff+keyon, retune pitch only, so
+ *                          the phase is not reset); <0/omitted = disabled
  *
  * Output WAV is 32-bit signed int PCM, stereo (L = ymfm data[0], R = data[1]),
  * at the chip's native sample rate; no normalisation or clipping is applied so
@@ -114,10 +117,10 @@ void w(ymfm::ym2608 &chip, int bank, uint8_t reg, uint8_t val)
     }
 }
 
-/* Write every patch register then key on voice 0 (mirror of fm_write_patch +
- * the $28 keyon in fm_note_on).  vel_atten=0 gives the raw patch tone. */
-void write_patch_and_keyon(ymfm::ym2608 &chip, const uint8_t *p, int vel,
-                           int block, int fnum, int vel_atten)
+/* Write every patch register (mirror of fm_write_patch).  vel_atten=0 gives
+ * the raw patch tone.  Does NOT touch $28, so the EG/phase are left alone. */
+void write_patch_regs(ymfm::ym2608 &chip, const uint8_t *p, int vel,
+                      int block, int fnum, int vel_atten)
 {
     uint8_t att = vel_atten ? (uint8_t)(((127 - vel) >> 3) & 0x0F) : 0;
 
@@ -140,6 +143,14 @@ void write_patch_and_keyon(ymfm::ym2608 &chip, const uint8_t *p, int vel,
      * fnum520), so no pitch compensation is needed. */
     w(chip, 0, 0xA4, (uint8_t)((block << 3) | (fnum >> 8)));
     w(chip, 0, 0xA0, (uint8_t)(fnum & 0xFF));
+}
+
+/* Write every patch register then key on voice 0 (mirror of fm_write_patch +
+ * the $28 keyon in fm_note_on).  vel_atten=0 gives the raw patch tone. */
+void write_patch_and_keyon(ymfm::ym2608 &chip, const uint8_t *p, int vel,
+                           int block, int fnum, int vel_atten)
+{
+    write_patch_regs(chip, p, vel, block, fnum, vel_atten);
     w(chip, 0, 0x28, 0xF0);                                     /* keyon ch0 */
 }
 
@@ -195,7 +206,7 @@ void usage(const char *argv0)
     fprintf(stderr,
             "usage: %s <patch.fmp> <out.wav> [--clock N] [--fidelity min|med|max]\n"
             "          [--note N] [--vel N] [--dur MS] [--bend N] [--tail MS]\n"
-            "          [--events FILE] [--no-lfo] [--raw-note]\n", argv0);
+            "          [--events FILE] [--no-lfo] [--raw-note] [--legato-ms N]\n", argv0);
 }
 
 }  // namespace
@@ -212,6 +223,7 @@ int main(int argc, char **argv)
     bool lfo = true;
     bool vel_atten = true;
     bool have_single = false;
+    long legato_ms = -1;   /* <0 = disabled: always keyoff/keyon between events */
     Event single = { 60, 96, 0, 1000, 8192 };
     const char *events_path = nullptr;
 
@@ -237,6 +249,7 @@ int main(int argc, char **argv)
         else if (a == "--events") events_path = next("--events");
         else if (a == "--no-lfo") lfo = false;
         else if (a == "--raw-note") vel_atten = false;
+        else if (a == "--legato-ms") legato_ms = atol(next("--legato-ms"));
         else { fprintf(stderr, "fmbench: unknown option %s\n", a.c_str()); usage(argv[0]); return 2; }
     }
 
@@ -299,6 +312,18 @@ int main(int argc, char **argv)
         return (long)((double)ms * (double)rate / 1000.0 + 0.5);
     };
 
+    /* A legato tie: event i is joined to i-1 when it starts within legato_ms
+     * of i-1's note-off and the voice is still sounding.  Tied events skip
+     * both the keyoff and the $28 keyon (retune only), so the OPN phase is
+     * not reset -- mirroring a "no re-key" transition in the engine. */
+    auto tied = [&](size_t i) -> bool {
+        if (legato_ms < 0 || i == 0)
+            return false;
+        long gap = events[i].start_ms
+                 - (events[i - 1].start_ms + events[i - 1].dur_ms);
+        return gap <= legato_ms;
+    };
+
     for (size_t i = 0; i < events.size(); i++) {
         const Event &e = events[i];
         long start = ms_to_samples(e.start_ms);
@@ -310,13 +335,17 @@ int main(int argc, char **argv)
         note_ratio(e.note, &block, &fnum);
         if (e.bend != 8192)
             bend_ratio(e.bend, &block, &fnum);
-        write_patch_and_keyon(chip, patch, e.vel, block, fnum, vel_atten ? 1 : 0);
+        if (tied(i))
+            write_patch_regs(chip, patch, e.vel, block, fnum, vel_atten ? 1 : 0);
+        else
+            write_patch_and_keyon(chip, patch, e.vel, block, fnum, vel_atten ? 1 : 0);
 
         long dur = ms_to_samples(e.dur_ms);
         gen(dur);
         pos += dur;
 
-        keyoff(chip);
+        if (i + 1 >= events.size() || !tied(i + 1))
+            keyoff(chip);
     }
     gen(ms_to_samples(tail_ms));
 

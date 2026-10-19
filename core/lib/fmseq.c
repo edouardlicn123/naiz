@@ -203,12 +203,17 @@ static void fm_note_on(Fmseq *seq, const FmseqSink *sink, int midi_ch,
     int block, fnum, family;
     const FmopnPatch *p;
 
-    /* Allocator: a free voice, then a pedal-pending one, then the oldest. */
+    /* Allocator: the coldest free voice (least recently allocated, so the
+     * longest into its release tail), then a pedal-pending one, then the
+     * oldest.  Coldest-free is what keeps a repeated note from re-keying the
+     * voice it just released: OPNA/fmgen resets the operator phase on a
+     * keyoff->keyon, and a freshly freed voice still has a loud tail, so
+     * re-keying it clicks (devdoc 156). */
     for (i = 0; i < FMSEQ_MELODY_FM_CH; i++) {
-        if (!seq->fm[i].active) {
+        if (seq->fm[i].active)
+            continue;
+        if (best < 0 || seq->fm[i].age < seq->fm[best].age)
             best = i;
-            break;
-        }
     }
     if (best < 0) {
         for (i = 0; i < FMSEQ_MELODY_FM_CH; i++) {
@@ -259,11 +264,10 @@ static void fm_note_off(Fmseq *seq, const FmseqSink *sink, int midi_ch,
     for (i = 0; i < FMSEQ_MELODY_FM_CH; i++) {
         if (seq->fm[i].active && seq->fm[i].midi_ch == midi_ch &&
             seq->fm[i].midi_note == note) {
-            if (seq->sustain[midi_ch]) {
+            if (seq->sustain[midi_ch])
                 seq->fm[i].sustain_pending = 1;   /* hold until pedal up */
-            } else {
+            else
                 fm_release(seq, sink, i);
-            }
             return;
         }
     }
@@ -401,8 +405,9 @@ static void fm_apply_bend(Fmseq *seq, const FmseqSink *sink, int midi_ch)
     }
 }
 
-static void dispatch(Fmseq *seq, const FmseqSink *sink, const MidEvent *ev)
+static void dispatch(Fmseq *seq, const FmseqSink *sink, int cursor)
 {
+    const MidEvent *ev = &seq->events[cursor];
     uint8_t st = (uint8_t)(ev->b0 & 0xF0);
     uint8_t ch = (uint8_t)(ev->b0 & 0x0F);
     int note, vel;
@@ -475,8 +480,10 @@ void fmseq_init(Fmseq *seq, const FmopnPatch *patches, int patch_count,
         seq->bend[i] = 8192;
         seq->program[i] = 0;
     }
-    for (i = 0; i < FMSEQ_MELODY_FM_CH; i++)
+    for (i = 0; i < FMSEQ_MELODY_FM_CH; i++) {
         seq->fm[i].active = 0;
+        seq->fm[i].age = 0;
+    }
     for (i = 0; i < FMSEQ_PERCUSSION_SSG_CH; i++) {
         seq->ssg[i].v.active = 0;
         seq->ssg[i].mode = FMSEQ_SSG_TONE;
@@ -506,7 +513,7 @@ void fmseq_pump(Fmseq *seq, const FmseqSink *sink, uint64_t now_ms)
 
     while (budget > 0 && seq->cursor < seq->count &&
            seq->events[seq->cursor].tick_ms <= now_ms) {
-        dispatch(seq, sink, &seq->events[seq->cursor]);
+        dispatch(seq, sink, seq->cursor);
         seq->cursor++;
         budget--;
     }

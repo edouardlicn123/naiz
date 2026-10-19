@@ -249,6 +249,13 @@ void hal_fm_init(void)
     outb(PCM_ID_PORT, 0x01);
     /* Prime FM VOL1 at full loudness (attenuation 0). */
     outb(PCM_STATUS_PORT, (uint8_t)(FM_VOL_PATH_VOL1 | 0x00));
+    /* Enable all six FM voices (reg $29 bit7 = SCH).  YM2608 wakes up with
+     * SCH=0, where channels 4-6 are simply not assigned (manual: "Channel 4-6
+     * is not good at assign"); the datasheet says to set bit 7 first to use
+     * the chip's six-voice mode.  Without this the fmseq allocator silently
+     * drops any note it places on voice 3-5 (devdoc 156).  bits 0-5 are the
+     * timer IRQ enables, left 0 (the engine polls, it takes no OPNA IRQ). */
+    hal_fm_write_reg(0, 0x29, 0x80);
     /* Enable the LFO (reg $22): bit3 on, bits2-0 = rate (F03 §3.3).  This is
      * the chip-wide oscillator that $B4 AMS/PMS depths modulate; with those
      * bits 0 the register has no audible effect. */

@@ -2,6 +2,39 @@
 
 自 R1 起全部 Bug 修复与功能演进记录（条目顺序沿用 AGENTS.md 既有历史排列）；`AGENTS.md` 仅保留当前版本与规则。**新条目约定**：每轮修复/演进完成后，在下方 `---` 分隔线之后（第一条位置）追加变更摘要，并在 AGENTS.md 头部同步「当前版本」。**条目格式**：每条以 `### <版本号> — <标题>` 开头（版本号化标题行 + `<a id="cN">` 锚点，N 按条目序递增），正文整段或分小节；历史速查直接读下方「版本索引」。
 
+<a id="c74"></a>
+### 0.3.043 — `makegame.sh audio` 模拟器音频延迟子菜单（BGM 颤音/电流声的玩家侧一键设置）
+
+**背景**：`devdocs/152`–`154` 已确证 demo-a2 BGM 的「颤音/电流声」中可测分量为 **NP2kai 宿主侧输出通路伪影**（`Latencys` → `np2cfg.delayms` → `write_emulator_toml` 块长 `pow2(rate×ms/2000)`；SDL 队列空时插静音 = 全频带 AM），**引擎侧无法消除**，只能改模拟器配置。此前需手工编辑 `~/.config/wxnp21kai/wxnp21kai.toml`，故提供菜单化入口。
+
+**实现**（宿主侧工具，**引擎零改动 / 不进 HDI**）：
+- `tools/naiz_lib/np2kai_capture.py`：新增单一事实源档位表 `AUDIO_LATENCY_LEVELS`（`off/short=47/normal=93/long=186/max=372`，含块簇 2048/4096/8192/16384，对齐 `devdoc 154 §二`）+ `AUDIO_LATENCY_SAMPLE_HZ=44100` + `audio_latency_levels()` + `apply_audio_latency(level)`（经既有 `write_emulator_toml` 写 `[NP21kai]` `Latencys`+`SampleHz`；`off` 返回 `None` 不改盘）。
+- `tools/env_setup/env_test.py`：新增 `cmd_audio_latency(level)`；`tools/env_setup/install_env.py`：注册 `audio-latency` 子命令 + `--latency` 选项。
+- `makegame.sh`：新增顶层子命令 `./makegame.sh audio`（数字子菜单 `1)Off 2)Short 3)Normal 4)Long 5)Max 0)返回`）+ 交互模式操作菜单新增 `5) audio`；用法/头注释同步。
+
+**验证**：`tools/tests/test_makegame_audio.py`（**新**，7 项：档位表↔`devdoc 154` 块簇、makegame.sh 菜单 `Latencys` 值与表一致〔漂移守卫〕、`audio)` 子命令接线、`off` 不动盘、选档写入 `Latencys`+`SampleHz` 且保留无关键、未知档位 `ValueError`）；CLI 实测 `audio-latency --latency long` → 临时 `XDG_CONFIG_HOME` 写入 `Latencys = 186 / SampleHz = 44100`、`off` 不写、`nope` 报错列出可选档；`bash -n makegame.sh` 通过；`bump_version` 0.3.042→**0.3.043**。
+
+**文档**：`docs/B91 §2.1` 命令表 + `docs/B90` 函数索引（`np2kai_capture`/`env_test` 两条）同步。
+
+**遗留**：`Latencys` 为**全局**设置（影响所有游戏；`Max` 音效延迟最明显）；不自动应用，`build`/`make`/`test` 均不主动改盘。
+
+<a id="c73"></a>
+### 0.3.042 — BGM 长笛「水泡爆开」根修：note-off→note-on 复用声部触发 OPNA 相位重置（legato tie）
+
+**症状**：`001/002`（melody_town/flute）BGM 每个音符边界有一处「水泡爆开」杂音——位置固定、确定性、逐音触发。
+
+**判定（四连排除）**：① 改 `flute.fmp` 起音（softbreath 版）后**水泡依旧** ⇒ 非包络形状；② `pms=0` 重建后**依旧** ⇒ 非 `153` 的 LFO 颤音；③ 水泡**随音符边界**出现、不随 `Latencys` 移动 ⇒ 非 `152` 的 NP2kai 输出通路 AM；④ **ymfm 结构上复现不出**（`ymfm_fm.ipp` 的 `start_attack()` 合并同采样 keyoff+keyon ⇒ single/rekey/tie 三份 md5 全同 `a8c44692befe5f07f8f784e6a37eff5f`）⇒ oracle 只能用 NP2kai `fmgen`（= 用户实机听的那份）。
+
+**根因**：`core/lib/fmseq.c` `fm_note_off()` → `fm_release()` 发 keyoff（`$28=0`）并立即 `active=0`（慢释放 `rr=8` 尾音仍在响）；下个 note-on 复用该「空闲」声部时直接 `$28=0xF0` keyon，而 fmgen/真机 `Operator::KeyOn()` 在 `eg_phase_==off||release` 时执行 **`pg_count_=0`（相位归零）** ⇒ 波形阶跃 ⇒ click。`Melody Town Theme.mid`（fmt 1/3 tracks/div 96）的 ch0 长笛线**每处 note-off 与下个 note-on 同 tick（0 ms）** ⇒ 最坏情形逐音触发。
+
+**修复（引擎侧 legato tie，前瞻式，不依赖 `audio_tick` 节奏）**：`core/lib/fmseq.h` 加 `#define FMSEQ_LEGATO_MS 40` + `FmseqVoice.tied`；`fmseq.c` 加纯函数 `fm_tie_follows()`（`:151`，从 `cursor+1` 扫，`tick_ms > now+40` 即停，先遇同频道 note-on → tie）；`fm_note_off()`（`:309`）无 pedal 且 tie 为真时置 `tied=1` **跳过 keyoff**；`fm_note_on()`（`:225`）优先认领 `tied` 声部、`fm_write_patch` 重写除 `$28` 外全部寄存器后 return（**不 keyon ⇒ 相位不重置**，音高滑到新音）；`fm_release`/正常分配/`fmseq_init`/`fmseq_stop` 均清 `tied`；`dispatch()` 增 `cursor` 参。间隔 > 40 ms 的真实休止仍走 keyoff+keyon；旧曲无近触边界则零变化。
+
+**验证**：自建 `/tmp/opencode/fmgenbench/fmgenbench`（复刻 fmbench + NP2kai `FM::OPNA`，32-bit stereo）对片段 A/B：**rekey 5 处瞬态 / tie 0 处**，用户确认「norekey 是对的」；`tools/tests/test_fm_seq.py` 18→**21 passed**（新增 `test_legato_tie_retunes_without_rekey`、`test_legato_tie_spans_pump_passes`〔跨 pump pass〕、`test_legato_gap_beyond_window_rekeys`）；`make -C core` 0 诊断、pytest **810 passed / 1 skipped**、`./start.sh fullaudit` **7/7**；实机录音（`np2kai_audio`，同 patch）交界瞬态 **17 → 9**、`max|diff|` **7691 → 3780**；`bump_version` 0.3.041→**0.3.042**、`nb_config.h` 重生成、`build+make demo-a2` 复原。
+
+**文档**：新 `devdocs/155`（症状→判定→根因→修复→验证→防复发→遗留）。
+
+**遗留**：**最终听感确认待用户**（判据：逐音边界水泡消失）；`FMSEQ_LEGATO_MS=40` 若误 tie 40–80 ms 有意分隔可下调；空闲可顺修 `start.sh:131` 对**整份日志** `grep -E 'Warning|Error'` 造成的假告警（前序步骤输出含 `Error` 会误触 make 节 `[!]`）。
+
 <a id="c72"></a>
 ### 0.3.041 — BGM「颤音」根因收束：非 flute `pms`（ymfm 证伪）+ 实机 NP2kai `Latencys=372` 消除
 
@@ -626,6 +659,8 @@
 
 | 条目 |
 |------|
+| [0.3.043 — `makegame.sh audio` 模拟器音频延迟子菜单（BGM 颤音/电流声的玩家侧一键设置）](#c74) |
+| [0.3.042 — BGM 长笛「水泡爆开」根修：note-off→note-on 复用声部触发 OPNA 相位重置（legato tie）](#c73) |
 | [0.3.041 — BGM「颤音」根因收束：非 flute `pms`（ymfm 证伪）+ 实机 NP2kai `Latencys=372` 消除](#c72) |
 | [0.3.040 — BGM 残余「电流声」判别取证收束：真实主循环时基 + 音频包络谱，判定可测分量为 NP2kai 输出通路伪影（非引擎）](#c71) |
 | [0.3.039 — bell 载波八度根因修复（alg4 最响载波 mul=8 → 基频）：BGM「电流声/颤音」的 B 轴定位](#c70) |

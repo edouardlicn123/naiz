@@ -11,8 +11,9 @@ Assertions cover:
   - velocity attenuates every op TL (max +15 at vel 1)
   - note-off keyoffs and frees the voice; sustain pedal holds it instead
     and pedal-up breathes the pending notes
-  - steal order: free, then pedal-pending, then oldest (proven by register
-    evidence, not timers)
+  - steal order: coldest free, then pedal-pending, then oldest (proven by
+    register evidence, not timers); a repeated note never re-keys the voice it
+    just released (devdoc 156 click-free allocation)
   - GM ch 10 drives the 3 SSG percussion voices with the right register
     set (tone / noise / tone+noise) and the reg-7 mixer semantics
   - SSG software volume decay frees a voice and silences the mixer
@@ -431,14 +432,73 @@ def test_smf_end_to_end(lib):
     s.pump(250)
     assert s.voices() == 0                   # C4 released
     s.pump(750)
-    assert s.voices() == 1                   # E4 reuses the freed voice
+    assert s.voices() == 1                   # E4 on the coldest free voice
     s.pump(1450)
-    assert s.voices() == 1                   # G4 on E4's voice (old run-out)
+    assert s.voices() == 1                   # G4 likewise (never a live voice)
     s.pump(1700)
     assert s.voices() == 0
     assert any(s.log[i][1] == 0x28 and s.log[i][2] == 0
                for i in range(len(s.log)))       # released the single voice
-    assert len(s.writes(0, 0xA0)) >= 3           # three distinct notes tuned
+    # three notes tuned on three distinct FNUM-low registers (<=3<4: bank 0),
+    # since the coldest-free allocator spreads them over voices 0,1,2
+    fnum_low = [e for e in s.log
+                if e[0] == 0 and e[1] in (0xA0, 0xA1, 0xA2)]
+    assert len(fnum_low) >= 3
+
+
+# --- devdoc 156: coldest-free allocation (no keyon on a just-released voice) -
+
+def _keyon_voices(s):
+    """FM voice index of every keyon ($28 keymask 0xF*), in emission order."""
+    out = []
+    for _b, r, v in s.log:
+        if r == 0x28 and (v & 0xF0) == 0xF0:
+            sel = v & 0x0F
+            out.append(sel if sel < 4 else 3 + (sel - 4))
+    return out
+
+
+def test_repeat_note_does_not_rekey_its_own_voice(lib):
+    """A repeated note must not key on the voice it just released.  OPNA (and
+    NP2kai's fmgen) reset the operator phase on keyoff->keyon, so re-keying a
+    still-ringing voice clicks; the coldest-free allocator lands the re-key on
+    a colder voice instead (devdoc 156)."""
+    s = Seq(lib)
+    s.push([(0, 0x90, 69, 0x7F), (100, 0x80, 69, 0), (100, 0x90, 69, 0x7F)])
+    s.load()
+    s.pump(0)
+    s.pump(100)
+    keyoffs = [v for _b, r, v in s.log if r == 0x28 and v < 0x10]
+    assert keyoffs == [0]                    # the first voice released, once
+    assert _keyon_voices(s) == [0, 1]        # second note on a *different* voice
+
+
+def test_repeat_note_rotates_through_voices(lib):
+    """Six spaced repeats land on six distinct voices, then the seventh wraps
+    to the coldest one -- the allocator never collapses a monophonic line onto
+    one voice (which is what would re-key a ringing operator)."""
+    s = Seq(lib)
+    for k in range(7):
+        t = k * 100
+        s.push([(t, 0x90, 69, 0x7F), (t + 50, 0x80, 69, 0)])
+    s.load()
+    for k in range(7):
+        s.pump(k * 100 + 60)
+    assert _keyon_voices(s) == [0, 1, 2, 3, 4, 5, 0]
+    assert s.voices() <= 1                   # never more than the one live note
+
+
+def test_coldest_free_does_not_preempt_a_live_voice(lib):
+    """With voices still sounding, the allocator keys on a free voice only:
+    the register evidence shows two distinct keyon selects and no keyoff."""
+    s = Seq(lib)
+    s.push(_note_on(60, 0x7F, 0))            # voice 0, held
+    s.push(_note_on(64, 0x7F, 0))            # voice 1, held
+    s.load()
+    s.pump(0)
+    assert s.voices() == 2
+    assert not any(_b == 0 and r == 0x28 and v < 0x10 for _b, r, v in s.log)
+    assert _keyon_voices(s) == [0, 1]
 
 
 # --- devdoc 147: song length (A1), loop phase (A2), pump budget (A3) --------

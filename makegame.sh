@@ -4,6 +4,7 @@
 # 用法:
 #   makegame.sh make <game>    制作 HDI
 #   makegame.sh test <game>    启动 NP2kai 测试 [--serial] [--porttest] [--auto]
+#   makegame.sh audio          模拟器音频延迟设置 (BGM 颤音/电流声, 全局)
 #   makegame.sh build <proj>   编译项目数据
 #   makegame.sh                交互式游戏工作流
 #
@@ -26,6 +27,40 @@ if [ ! -d "$VENV_DIR" ]; then
     echo "请先运行: bash start.sh pip"
     exit 1
 fi
+
+# Emulator audio buffer latency menu (BGM "vibrato/buzz", devdoc 154).
+# The NP2kai SDL output path inserts silence whenever its audio queue starves;
+# the resulting AM frequency follows the buffer block size (Latencys).  This is
+# a host-side emulator setting, so it is applied here (launcher), not by the
+# game.  The Latencys values below MUST match AUDIO_LATENCY_LEVELS in
+# tools/naiz_lib/np2kai_capture.py (guarded by test_makegame_audio.py).
+audio_apply() {
+    "$VENV_PYTHON" -m tools.env_setup.install_env audio-latency --latency "$1"
+}
+
+audio_menu() {
+    while true; do
+        echo ""
+        echo "===== 模拟器音频延迟设置 (BGM 颤音/电流声) ====="
+        echo "  写入 ~/.config/wxnp21kai/wxnp21kai.toml [NP21kai] 段（全局，影响所有游戏）"
+        echo "  1) Off     — 不改动模拟器（使用其现有设置）"
+        echo "  2) Short   — Latencys=47   (2048 块 ≈ 23ms)"
+        echo "  3) Normal  — Latencys=93   (4096 块 ≈ 93ms)   ← 会出现 ~13.5Hz 颤音"
+        echo "  4) Long    — Latencys=186  (8192 块 ≈ 186ms)  ← 推荐"
+        echo "  5) Max     — Latencys=372  (16384 块 ≈ 372ms) ← 最彻底，音效延迟最明显"
+        echo "  0) 返回"
+        read -r -p "请选择 [0-5]: " lvl
+        case "$lvl" in
+            1) audio_apply off ;;
+            2) audio_apply short ;;
+            3) audio_apply normal ;;
+            4) audio_apply long ;;
+            5) audio_apply max ;;
+            0) return ;;
+            *) echo "无效选项" ;;
+        esac
+    done
+}
 
 check_wcl386() {
     # 复用 core/detect_watcom.sh 的统一搜索逻辑（$WATCOM 环境变量 → ~/open-watcom-v2/rel → /opt/watcom）
@@ -137,6 +172,12 @@ case "$SUBCOMMAND" in
         cd "$ROOT" && exec "$VENV_PYTHON" -m tools.naiz_img.inject --game "$GAME" --yes
         ;;
 
+    audio)
+        # Emulator audio latency (global, not per-game): see devdoc 154.
+        audio_menu
+        exit 0
+        ;;
+
     "")
         # 交互模式 — 项目工作流
         while true; do
@@ -177,14 +218,16 @@ case "$SUBCOMMAND" in
                 echo "  2) make          — 制作 HDI 镜像"
                 echo "  3) test          — 启动 NP2kai 测试"
                 echo "  4) test --porttest — 串口硬件测试"
+                echo "  5) audio         — 模拟器音频延迟设置 (全局)"
                 echo "  0) 返回"
-                read -p "请选择 [0-4]: " action
+                read -p "请选择 [0-5]: " action
 
                 case "$action" in
                     1) "$0" build "$GAME" ;;
                     2) "$0" make "$GAME" ;;
                     3) "$0" test "$GAME" ;;
                     4) "$0" test "$GAME" --porttest ;;
+                    5) audio_menu ;;
                     0) break ;;
                     *) echo "无效选项" ;;
                 esac
@@ -194,11 +237,12 @@ case "$SUBCOMMAND" in
         ;;
 
     *)
-        echo "用法: $0 {make|test|build|i18n-gen} [args]"
+        echo "用法: $0 {make|test|build|i18n-gen|audio} [args]"
         echo "  build <game>    编译游戏数据 (PNG→MAG, 引擎, 场景, IMAGE.DAT, 运行时)"
-        echo "  make <game>     制作 HDI 镜像 (仅注入 games/<game>/ → disks/<game>.hdi)"
+        echo "  make <game>     制作 HDI 镜像 (仅注入 games/<game> → disks/<game>.hdi)"
         echo "  test <game>     启动 NP2kai 测试 [--serial] [--porttest] [--auto]"
         echo "    --porttest    串口硬件测试 (serialwrite.com + PTY + 验证)"
+        echo "  audio           模拟器音频延迟设置 (BGM 颤音/电流声, 全局)"
         echo "  i18n-gen <game> 生成翻译模板 [--force]"
         echo ""
         echo "无参数: 交互式游戏工作流"

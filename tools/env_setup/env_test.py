@@ -213,6 +213,42 @@ def cmd_test_hdi(hdi_path=None, emulator=None, serial=False, auto=False):
     print("")
 
 
+def cmd_audio_latency(level):
+    """Set the NP2kai audio buffer latency (BGM artefact mitigation).
+
+    devdoc 154: the emulator's SDL output path inserts silence whenever its
+    audio queue starves, giving a periodic AM whose frequency follows the
+    buffer block size (Latencys -> np2cfg.delayms).  Pushing Latencys to the
+    Long/Max cluster moves that artefact below audibility.  This is a
+    host-side emulator setting, so it is applied here (launcher), never by
+    the game.  Runs `makegame.sh audio` -> this command.
+    """
+    print("")
+    print("===== 模拟器音频延迟设置 =====")
+
+    levels = np2kai_capture.audio_latency_levels()
+    by_key = {k: m for k, _l, m, _b in levels}
+    if level is None or level not in by_key:
+        print(f"[✗] 未知档位: {level}")
+        print("    可选: " + ", ".join(k for k, _l, _m, _b in levels))
+        sys.exit(1)
+
+    try:
+        cpath = np2kai_capture.apply_audio_latency(level)
+    except ValueError:
+        print(f"[✗] 未知档位: {level}")
+        sys.exit(1)
+
+    if cpath is None:
+        print("[✓] Off — 未改动模拟器音频延迟（使用其现有设置）")
+    else:
+        print(f"[✓] 已写入: {cpath}")
+        print(f"    Latencys = {by_key[level]}"
+              f"   SampleHz = {np2kai_capture.AUDIO_LATENCY_SAMPLE_HZ}")
+        print("    （全局设置，影响所有游戏；如需还原请选 Off 或手动改回）")
+    print("")
+
+
 def cmd_check():
     project_root = os.path.normpath(
         os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", ".."))

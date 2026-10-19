@@ -1,7 +1,7 @@
 {
   "version": 2,
-  "git_head": "636bcb2",
-  "checked_at": "2026-10-19T11:58:56",
+  "git_head": "66307ea",
+  "checked_at": "2026-10-19T20:12:50",
   "files": {
     "core/build.sh": {
       "sha256": "0e6bb3f41cae8f6c5a014a49767f93990ddd3e2c461a85ec991c01b40b66b11e",
@@ -332,7 +332,7 @@
       "findings": []
     },
     "core/engine/nb_config.h": {
-      "sha256": "2ca510404f23ff5161dd9958d37cc664e6f9d71d834e098534dc777320421b06",
+      "sha256": "cf99ab0476ca52520a5d92f2ce39299bbed6711de0221fa958513365b68114c1",
       "violations": 0,
       "candidates": 0,
       "findings": []
@@ -703,13 +703,13 @@
       "findings": []
     },
     "core/lib/fmseq.c": {
-      "sha256": "912cd5a366d312704da999c5a3de607e0b7d8fa22022c900d7943a4d1c645aee",
+      "sha256": "15eff4491efa490ebc7270f81b92d5f2d145e63006b645035e95b6feef36bd04",
       "violations": 0,
       "candidates": 0,
       "findings": []
     },
     "core/lib/fmseq.h": {
-      "sha256": "add59d09c3257f53b602ba6bbf0015a8bb65041e0647b7d98ef585486f16f09b",
+      "sha256": "6f56241c8bdc43e3b9ca33a4ea7f191cc86c5d55878cf4ae043b52596f88abf8",
       "violations": 0,
       "candidates": 0,
       "findings": []
@@ -829,7 +829,7 @@
       "findings": []
     },
     "core/plat/hal_audio.c": {
-      "sha256": "d169bb37c0f642ae3d47fb6bd59065a95f80afbf659e1de8a75564088ee57279",
+      "sha256": "44f49dac3ffe5b7ac3e350d5471f375bf98b2e7127f653dc164d7707794dbb76",
       "violations": 0,
       "candidates": 0,
       "findings": []
@@ -919,17 +919,17 @@
       "findings": []
     },
     "makegame.sh": {
-      "sha256": "e17aa943397ce8e58e24d160dca5ef8ff56dcc37d532050de22d4f824a041b0e",
+      "sha256": "60cc17bc8589b4b1570fdf0adef6bd1cb95532d4ff7e470d533a3e374a9f7acd",
       "violations": 0,
       "candidates": 2,
       "findings": [
         {
-          "line": 161,
+          "line": 202,
           "rule": "S1",
           "level": "HEUR"
         },
         {
-          "line": 43,
+          "line": 78,
           "rule": "S5",
           "level": "HEUR"
         }
@@ -1032,12 +1032,12 @@
       "findings": []
     },
     "tools/env_setup/env_test.py": {
-      "sha256": "6cda3dd5cff7b2f95c2f062e1624f55530d5d364243a16f509f659268c48ee03",
+      "sha256": "ed964a663634bf7f264453b3a12c4e2f301810b6c2a020c7a9a7fd8597901efa",
       "violations": 0,
       "candidates": 1,
       "findings": [
         {
-          "line": 263,
+          "line": 299,
           "rule": "P8",
           "level": "HEUR"
         }
@@ -1062,7 +1062,7 @@
       ]
     },
     "tools/env_setup/install_env.py": {
-      "sha256": "3683d1377dbb51b0a99c5a0cea3a6be325b3559dc7e6a96f8d5f322edb35881a",
+      "sha256": "c54229a3323d01d4f85769c3b6980856e64a3c51c99c44b0e2f7419e6e494848",
       "violations": 0,
       "candidates": 0,
       "findings": []
@@ -1482,7 +1482,7 @@
       "findings": []
     },
     "tools/naiz_lib/np2kai_capture.py": {
-      "sha256": "a812298c37eb7f69f33e4c44ce810a9f33858a3545a233a88f9402aba5fb8aaa",
+      "sha256": "df5d63cbf465353e8e4e82b38cae319177b311fd7466fa1564966cc27d99905e",
       "violations": 0,
       "candidates": 0,
       "findings": []
@@ -1576,7 +1576,7 @@
     "fresh_violations": 0,
     "fresh_candidates": 0,
     "verified": 22,
-    "stale": 2,
-    "open": 29
+    "stale": 1,
+    "open": 30
   }
 }

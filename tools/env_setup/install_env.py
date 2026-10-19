@@ -21,7 +21,7 @@ from .env_build import (
     cmd_np2kai_libretro, cmd_deps,
 )
 from .env_test import (
-    cmd_test_hdi, cmd_check, cmd_retroarch,
+    cmd_test_hdi, cmd_check, cmd_retroarch, cmd_audio_latency,
 )
 
 
@@ -59,7 +59,7 @@ def main():
     VALID_COMMANDS = {"check", "deps", "gcc-ia16", "np2kai", "np2kai-libretro",
                       "retroarch", "system-tools", "backup-emu", "pip-install",
                       "build-i286", "test-hdi", "install-watcom", "install-djgpp",
-                      "mirror"}
+                      "mirror", "audio-latency"}
     parser = argparse.ArgumentParser(description="Naiz 开发环境安装工具")
     parser.add_argument(
         "command",
@@ -77,6 +77,11 @@ def main():
         default=None,
         choices=["ia32"],
         help="指定模拟器版本: ia32 (默认, wxnp21kai) (仅 test-hdi)",
+    )
+    parser.add_argument(
+        "--latency",
+        default=None,
+        help="模拟器音频缓冲延迟档位: off/short/normal/long/max (仅 audio-latency)",
     )
     parser.add_argument(
         "--serial",
@@ -143,6 +148,7 @@ def main():
         "test-hdi": cmd_test_hdi,
         "install-watcom": cmd_install_watcom,
         "install-djgpp": cmd_install_djgpp,
+        "audio-latency": lambda: cmd_audio_latency(args.latency),
     }
     if args.command == "test-hdi":
         cmd_test_hdi(hdi_path=args.hdi, emulator=args.emulator, serial=args.serial, auto=args.auto)

@@ -153,6 +153,51 @@ def _toml_val(v):
     return str(v)
 
 
+# --- Emulator audio buffer latency (BGM "vibrato/buzz" mitigation) --------
+#
+# NP2kai's SDL audio path inserts silence whenever its filled sample queue is
+# empty (sound/soundmng.c sdlaudio_callback), so the output gains a periodic
+# amplitude modulation whose frequency tracks the buffer block size:
+#   Latencys -> np2cfg.delayms -> sound_create() -> calc_blocksize(pow2(...))
+# The default cluster (~93 ms) lands the artefact at ~13.5 Hz, audible as the
+# BGM "vibrato/buzz"; the 186/372 clusters push it to ~3 Hz (devdoc 154 §二).
+# This is a HOST-side emulator setting (the guest has no channel to it), so it
+# is applied by the launcher, never by the game.
+#
+# This table is the single source of truth for both the makegame.sh menu and
+# the TOML writer.  SampleHz is pinned to 44100 because the ms -> block
+# mapping is defined at that rate (devdoc 154 §二/§三).
+AUDIO_LATENCY_SAMPLE_HZ = 44100
+AUDIO_LATENCY_LEVELS = (
+    # (key,     label,    latency_ms, block)
+    ("off",    "Off",     None,      None),
+    ("short",  "Short",   47,        2048),
+    ("normal", "Normal",  93,        4096),
+    ("long",   "Long",    186,       8192),
+    ("max",    "Max",     372,       16384),
+)
+
+
+def audio_latency_levels():
+    """Return the (key, label, latency_ms, block) audio latency table."""
+    return AUDIO_LATENCY_LEVELS
+
+
+def apply_audio_latency(level):
+    """Apply audio latency *level* to wxnp21kai.toml; return the config path.
+
+    *level* is a level key ("off"/"short"/...).  "off" leaves the emulator
+    config untouched and returns None.  Raises ValueError for an unknown key.
+    """
+    for key, _label, ms, _block in AUDIO_LATENCY_LEVELS:
+        if key == level:
+            if ms is None:
+                return None
+            return write_emulator_toml(
+                {"Latencys": ms, "SampleHz": AUDIO_LATENCY_SAMPLE_HZ})
+    raise ValueError(f"unknown audio latency level: {level!r}")
+
+
 def write_emulator_toml(updates, config_dir=None, config_path=None):
     """Read the existing wxnp21kai config, apply *updates* under the
     [NP21kai] section, and write it back.  Returns the config path.

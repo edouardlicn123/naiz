@@ -15,12 +15,19 @@
  *     gm_map[program]; NULL maps every program to family 0.  Programs out
  *     of [0, patch_count) trigger the unmapped callback and fall back to
  *     family 0 (the callback is the engine's fail-loud log point).
- *   - Note steal: a free voice, then a pedal-pending one, then the oldest
- *     (a forced steal keyoffs first so no stuck key bit survives).
+ *   - Note steal: the coldest free voice, then a pedal-pending one, then the
+ *     oldest (a forced steal keyoffs first so no stuck key bit survives).
  *   - v1 simplifications (documented in devdocs/123): CC7 ignored; bend is
  *     a linear +-2-semitone approximation; every note-on re-writes the whole
  *     patch; SSG drums get a software volume decay driven here (the SSG has
  *     no 4-operator envelope to do the tail).
+ *   - Click-free re-use (devdoc 156): OPNA keyoff->keyon resets the operator
+ *     phase, which clicks on real hardware/fmgen (ymfm masks it).  A repeated
+ *     note therefore never re-keys the voice it just released: the allocator
+ *     picks the coldest free voice (least recently allocated, i.e. longest
+ *     into its release tail), and fmgen/OPNA then has a decayed phase to key
+ *     on.  This supersedes the legato tie of devdoc 155, which suppressed the
+ *     per-note re-attack entirely and cost ~3 dB of level on monophonic lines.
  */
 #ifndef LIB_FMSEQ_H
 #define LIB_FMSEQ_H
