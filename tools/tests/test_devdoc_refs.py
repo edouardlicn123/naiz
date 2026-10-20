@@ -64,9 +64,9 @@ LINE_REF_WHITELIST = {
     ("nb_setting.c", 140): "Text Speed",
     ("nb_setting.c", 152): "Read Progress",
     ("audio.c", 247): "g_bgm_on",
-    ("audio.c", 401): "g_snd_on",
-    ("audio.c", 410): "g_vc_on",
-    ("audio.c", 308): "audio_bgm_stop",
+    ("audio.c", 408): "g_snd_on",
+    ("audio.c", 417): "g_vc_on",
+    ("audio.c", 315): "audio_bgm_stop",
     ("hal_audio.c", 88): "PCM_CTRL_A46A_IRQ",
     ("hal_audio.c", 94): "PCM_IRQ_INTERVAL_MAX",
     ("hal_audio.c", 122): "hal_pcm_set_volume",
@@ -200,6 +200,12 @@ SUPERSEDED_SHIFTED_LINE_REFS = {
     # every later audio.c citation by +17.  The current locations are checked
     # in LINE_REF_WHITELIST instead.
     ("audio.c", 230), ("audio.c", 291), ("audio.c", 384), ("audio.c", 393),
+    # audio_bgm_start gained an fmseq_stop() of the previous FM BGM before it
+    # swaps the event table (devdoc 157: a mid-scene bgm(){key} must not leave
+    # the old voices ringing / the per-voice ages stale).  The 7-line insert
+    # shifted the audio.c toggle gates and audio_bgm_stop by +7; the current
+    # coordinates are checked in LINE_REF_WHITELIST.
+    ("audio.c", 401), ("audio.c", 410), ("audio.c", 308),
 }
 
 # References to files RENAMED in 0.3.014.  devdocs 118/119 are finished and may

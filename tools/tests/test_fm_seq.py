@@ -187,6 +187,10 @@ class Seq:
         self.lib.fmseq_pump(ctypes.addressof(self._seq),
                             ctypes.byref(self._sink), ms)
 
+    def stop(self):
+        self.lib.fmseq_stop(ctypes.addressof(self._seq),
+                            ctypes.byref(self._sink))
+
     def voices(self):
         return self.lib.fmseq_fm_voices(ctypes.addressof(self._seq))
 
@@ -499,6 +503,37 @@ def test_coldest_free_does_not_preempt_a_live_voice(lib):
     assert s.voices() == 2
     assert not any(_b == 0 and r == 0x28 and v < 0x10 for _b, r, v in s.log)
     assert _keyon_voices(s) == [0, 1]
+
+
+def test_stop_resets_voice_ages_for_the_next_stream(lib):
+    """fmseq_stop must reset per-voice ages, exactly like fmseq_init.  A scene
+    switch stops the song (audio_stop_all) and the next scene restarts it on
+    the SAME seq; stale ages make the coldest-free allocator keep picking the
+    same voice and re-key a ringing opterator (the scene-2 start click,
+    devdoc 157).  After stop, a fresh monophonic line must rotate 0,1,2,..."""
+    s = Seq(lib)
+    # scene 1: a few notes so the ages advance well past 0
+    for k in range(4):
+        t = k * 100
+        s.push([(t, 0x90, 60 + k, 0x7F), (t + 50, 0x80, 60 + k, 0)])
+    s.load()
+    for k in range(4):
+        s.pump(k * 100 + 60)
+    s.stop()
+    first_scene_voices = len(_keyon_voices(s))
+    assert first_scene_voices == 4
+
+    s.log.clear()
+    # scene 2: same seq, restart; a monophonic line must rotate from voice 0
+    s._pending = []
+    s.push([(0, 0x90, 69, 0x7F)])
+    s.push([(0, 0x90, 71, 0x7F)])
+    s.push([(0, 0x90, 72, 0x7F)])
+    s.load()
+    s.pump(0)
+    # three simultaneous notes land on three distinct voices starting at 0,
+    # i.e. ages were reset (stale ages would collapse them onto one voice)
+    assert _keyon_voices(s) == [0, 1, 2]
 
 
 # --- devdoc 147: song length (A1), loop phase (A2), pump budget (A3) --------

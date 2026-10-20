@@ -1,7 +1,7 @@
 {
   "version": 2,
-  "git_head": "66307ea",
-  "checked_at": "2026-10-19T20:12:50",
+  "git_head": "648f076",
+  "checked_at": "2026-10-20T09:51:18",
   "files": {
     "core/build.sh": {
       "sha256": "0e6bb3f41cae8f6c5a014a49767f93990ddd3e2c461a85ec991c01b40b66b11e",
@@ -22,12 +22,12 @@
       ]
     },
     "core/engine/audio.c": {
-      "sha256": "c60201ee8eb6911b6281596da51dba8ba8b68d13156713022c47ef1a8cb0f811",
+      "sha256": "1ff9ea217fa18588e7f899b958fb78836c27fff2b1107d86cb20d312fd02e045",
       "violations": 0,
       "candidates": 2,
       "findings": [
         {
-          "line": 524,
+          "line": 531,
           "rule": "C1",
           "level": "HEUR"
         },
@@ -703,7 +703,7 @@
       "findings": []
     },
     "core/lib/fmseq.c": {
-      "sha256": "15eff4491efa490ebc7270f81b92d5f2d145e63006b645035e95b6feef36bd04",
+      "sha256": "3ffb52e4d22dd13cb65507c195d523426d55b922684b6897c669c42c2b7a4c7b",
       "violations": 0,
       "candidates": 0,
       "findings": []
@@ -1568,13 +1568,13 @@
   },
   "summary": {
     "files": 209,
-    "changed": 0,
-    "skipped": 209,
+    "changed": 2,
+    "skipped": 207,
     "out_of_scope": 0,
     "violations": 0,
     "candidates": 53,
     "fresh_violations": 0,
-    "fresh_candidates": 0,
+    "fresh_candidates": 2,
     "verified": 22,
     "stale": 1,
     "open": 30

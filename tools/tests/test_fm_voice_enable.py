@@ -13,6 +13,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent.parent
 HAL_AUDIO_C = ROOT / "core" / "plat" / "hal_audio.c"
+ENGINE_AUDIO_C = ROOT / "core" / "engine" / "audio.c"
 
 
 def _fn_body(src, name):
@@ -36,3 +37,17 @@ def test_init_enables_all_six_fm_voices():
     val = int(m.group(1), 0)
     assert val & 0x80, "$29 bit7 (SCH) must be set: six-voice mode"
     assert val & 0x3F == 0, "$29 bits0-5 are timer IRQ enables; keep them 0"
+
+
+def test_bgm_start_stops_prior_fm_voices():
+    """audio_bgm_start must key off any still-sounding FM voices before it
+    installs a new event stream.  A mid-scene bgm(){key} over a playing song
+    otherwise leaves the old voices ringing and the per-voice ages stale, so
+    the coldest-free allocator re-keys a release tail (devdoc 157).  The call
+    sits before bgm_release(); deleting it fails here."""
+    body = _fn_body(ENGINE_AUDIO_C.read_text(encoding="utf-8"), "audio_bgm_start")
+    stop = body.find("fmseq_stop(")
+    release = body.find("bgm_release()")
+    assert stop != -1, "audio_bgm_start must fmseq_stop() the previous BGM"
+    assert release != -1 and stop < release, \
+        "fmseq_stop() must run before bgm_release() swaps the event table"

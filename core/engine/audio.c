@@ -287,6 +287,13 @@ void audio_bgm_start(const char *key)
         return;
     }
 
+    /* Cut any still-sounding FM voices from the previous BGM before swapping
+     * the event table: a mid-scene bgm(){key} while a song plays would
+     * otherwise leave the old voices ringing under the new one and keep the
+     * per-voice ages stale (scene_switch covers the common path via
+     * audio_stop_all, but this start must be safe on its own, devdoc 157). */
+    if (g_fm_ok)
+        fmseq_stop(g_fm_seq, &g_fm_sink);
     bgm_release();
     g_bgm.ev = ev;
     g_bgm.count = count;

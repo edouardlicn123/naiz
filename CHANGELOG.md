@@ -2,6 +2,39 @@
 
 自 R1 起全部 Bug 修复与功能演进记录（条目顺序沿用 AGENTS.md 既有历史排列）；`AGENTS.md` 仅保留当前版本与规则。**新条目约定**：每轮修复/演进完成后，在下方 `---` 分隔线之后（第一条位置）追加变更摘要，并在 AGENTS.md 头部同步「当前版本」。**条目格式**：每条以 `### <版本号> — <标题>` 开头（版本号化标题行 + `<a id="cN">` 锚点，N 按条目序递增），正文整段或分小节；历史速查直接读下方「版本索引」。
 
+<a id="c75"></a>
+### 0.3.047 — BGM 分配器三项根修：启用 OPNA 六声道（$29=0x80）+「最冷空闲」分配 + `fmseq_stop` 声部 age 复位（场景切换 click）
+
+**背景**：承 `c73`（legato tie，0.3.042）。用户实机复报两症：`melody_town`（`001/002`）BGM「低音/响度偏轻」，且**同一首曲、场景 1 起播干净、场景 2 起播有水泡 click**。用户拍板「全部实现」：写 `$29=0x80` + 分配器改「最冷空闲」+ 撤销 legato tie + `flute.fmp` 回退 HEAD。
+
+**根因（三处，均以 fmgen oracle 取证，非推断）**：
+1. **OPNA 六声道未启用**：YM2608 手册 `$29` D7(SCH) 上电为 0（「Channel 4-6 is not good at assign」），`hal_fm_init()` 从不写 `$29` ⇒ voice 3-5 静音（fmgen `FMMix` `if (reg29 & 0x80)` 决定 ch3-5 混音）。`icy_garden` 旧分配器把 **34/287 个音**放到 voice 3/4 → 丢音。
+2. **legato tie 压低响度**：`c73` 取消逐音重击 ⇒ 包络不回升，`melody_town` 整曲 `rms 1689.4`（较 notie 2359.0 低 ~2.9 dB）。
+3. **`fmseq_stop` 漏复位声部 age**：`fmseq_stop()` 重置了 `cursor`/`last_tick`/`last_age`，**却未重置 `fm[i].age`**。场景切换（`scene_switch`→`audio_stop_all`→`audio_bgm_stop`→`fmseq_stop`）后 age 残留为大值，场景 2 起播的多个音被「最冷空闲」扫描反复选到**同一个残留声部**（keyon 全挤在同一毫秒），连续 `keyoff→keyon` 重击 release 尾音 ⇒ click。这正是「场景 1 干净、场景 2 有水泡」的成因（场景 1 从冷芯片起播，声部处 `off` 态，清相位无阶跃）。
+
+**修复**：
+- `core/plat/hal_audio.c::hal_fm_init()`：新增 `hal_fm_write_reg(0, 0x29, 0x80);`（bits0-5 保持 0，不开计时器 IRQ），置于 `$22` 写之前。
+- `core/lib/fmseq.h`：删 `FMSEQ_LEGATO_MS`、`FmseqVoice.tied`；注释改「coldest free voice, then pedal-pending, then oldest」。
+- `core/lib/fmseq.c`：删 `fm_tie_follows()`；`fm_note_on()` 空闲扫描改「**最冷空闲**」（`!active && age < best.age`）——冷声已走 release 尾，避开刚被清零的相位脉冲；`fm_note_off(seq,sink,midi_ch,note)` 减参；`fmseq_init` 加 `age=0`；**`fmseq_stop` 补 `for(i) seq->fm[i].age = 0;`**（对齐 `fmseq_init`，修症状 3，同时覆盖循环回绕路径）。
+- `core/engine/audio.c::audio_bgm_start()`：装新事件流前先 `fmseq_stop()`（切掉上一首仍发声的 FM 声部 / 不复用脏 age）；`scene_switch` 路径本由 `audio_stop_all` 覆盖，此改动让其独立成立。
+- `assets/demo-a2/fm/flute.fmp`：`git checkout HEAD` 回退（撤销试听期的临时调音）。
+
+**离线 fmgen oracle（`seqdump`+`chplay`，真分配器 + 真 fmgen 核，32-bit stereo）**：
+
+| 配置 | melody_town rms | max\|Δ\| |
+|---|---|---|
+| tie（0.3.042 现状） | 1689.4 | 901 |
+| 仅撤 tie | 2359.0 | 3890（click） |
+| **$29=0x80 + 最冷空闲 + 撤 tie** | **2299.6** | **901（零 click）** |
+
+`icy_garden`：keyon 分布 `0/1/2/4/5/6` = 122/129/129/129/129/121（旧 100/91/62/30/4），`rms 3486.5 → 4317.8`（+1.9 dB）。**双场景 oracle**（`seqdump2`，同一 fmgen 芯片实例：场景 1 播 4 s → `fmseq_stop` → 场景 2 从 0 重启）：修复前场景 2 起点 0–600 ms `clicks=4753`（场景 1 同期 0），修复后 `clicks=0`，keyon 恢复 `F0…F6` 轮转。
+
+**验证**：`make -C core` 0 诊断（`core/*.err` 空）；`tools/tests/test_fm_seq.py`（新增 `test_stop_resets_voice_ages_for_the_next_stream`，先红后绿）+ `tools/tests/test_fm_voice_enable.py`（新增 `$29` bit7 + `audio_bgm_start` 必先 `fmseq_stop` 两条守卫）；全量 pytest **819 passed, 1 skipped**；`./start.sh fullaudit` **7/7**；`test_devdoc_refs.py` audio.c 三条 whitelist +7 移位更新（旧坐标入 `SUPERSEDED_SHIFTED_LINE_REFS`）；`bump_version` 0.3.043→**0.3.047**、`nb_config.h` 重生成。
+
+**文档**：新 `devdocs/157`（症状→双证根因→修复→验证→取舍）；`docs/B90` 无 tie 残留引用（已核）。
+
+**遗留**：**实机听感未验证**——需 `build`+`make` 后确认 `melody_town` 低音回正、`icy_garden` 丢音消失、两场景起点均无 click。`devdocs/155`（legato tie）不追加 ERRATA（其离线证据在「只用 tie」场景下成立，本取舍另立 157）。
+
 <a id="c74"></a>
 ### 0.3.043 — `makegame.sh audio` 模拟器音频延迟子菜单（BGM 颤音/电流声的玩家侧一键设置）
 
@@ -659,6 +692,7 @@
 
 | 条目 |
 |------|
+| [0.3.047 — BGM 分配器三项根修：启用 OPNA 六声道（$29=0x80）+「最冷空闲」分配 + `fmseq_stop` 声部 age 复位（场景切换 click）](#c75) |
 | [0.3.043 — `makegame.sh audio` 模拟器音频延迟子菜单（BGM 颤音/电流声的玩家侧一键设置）](#c74) |
 | [0.3.042 — BGM 长笛「水泡爆开」根修：note-off→note-on 复用声部触发 OPNA 相位重置（legato tie）](#c73) |
 | [0.3.041 — BGM「颤音」根因收束：非 flute `pms`（ymfm 证伪）+ 实机 NP2kai `Latencys=372` 消除](#c72) |

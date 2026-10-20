@@ -541,6 +541,12 @@ void fmseq_stop(Fmseq *seq, const FmseqSink *sink)
     seq->cursor = 0;
     seq->last_tick = 0;
     seq->last_age = 0;
+    /* Reset per-voice ages too: the coldest-free allocator reads them, and a
+     * scene switch leaves stale ages behind, so the next scene would keep
+     * picking the same "coldest" voice and re-key a loud release tail
+     * (keyoff->keyon phase reset = the scene-2 start click, devdoc 157). */
+    for (i = 0; i < FMSEQ_MELODY_FM_CH; i++)
+        seq->fm[i].age = 0;
 }
 
 int fmseq_fm_voices(const Fmseq *seq)
