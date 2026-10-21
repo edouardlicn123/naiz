@@ -2,6 +2,45 @@
 
 自 R1 起全部 Bug 修复与功能演进记录（条目顺序沿用 AGENTS.md 既有历史排列）；`AGENTS.md` 仅保留当前版本与规则。**新条目约定**：每轮修复/演进完成后，在下方 `---` 分隔线之后（第一条位置）追加变更摘要，并在 AGENTS.md 头部同步「当前版本」。**条目格式**：每条以 `### <版本号> — <标题>` 开头（版本号化标题行 + `<a id="cN">` 锚点，N 按条目序递增），正文整段或分小节；历史速查直接读下方「版本索引」。
 
+<a id="c77"></a>
+### 0.3.049 — `makegame.sh` 新增 `makegame` 子命令（build + make 一步到位）
+
+**背景**：用户要求合并 `build`（编译项目数据/部署 DOS 树）与 `make`（注入 HDI）两步为一条命令，新选项放交互菜单第一位，原两条保留。新子命令名 = `makegame`。
+
+**改动**（仅 `makegame.sh` + `docs/B91`）：
+- 新增 `makegame <game>` case 分支：先调 `build_game`（**不用 `exec`**，否则第二步不执行），再 `cd "$ROOT" && exec` 注入 HDI（末跳）；语义 = `build` 的超集。`build`/`make` 分支一字未动。
+- 交互菜单重排：`1) makegame` 置首、`2) build`、`3) make`、`4) test`、`5) test --porttest`、`6) audio`、`0) 返回`；提示改 `[0-6]`，case 对应改写。
+- 帮助文本（`*)` 分支）用法行 `{makegame|make|test|build|i18n-gen|audio}` + 新增说明行；顶部注释头同步。
+- `docs/B91 §2` 命令职责表补 `makegame.sh makegame <game>` 一行。
+
+**验证**：`bash -n makegame.sh` 通过；守卫测试 `test_hdi_freshness_guard.py`（切片 `test)`→`build)` 不受 `makegame)` 影响）与 `test_makegame_audio.py` **10 passed, 1 skipped**；**冒烟实跑** `./makegame.sh makegame demo-a2` 两步串联成功（build 部署 + `Done: 32 new, 3 updated, 35 total, 20757 free clusters` HDI 刷新）；全量 pytest **822 passed, 1 skipped**；`./start.sh fullaudit --no-make` **6/6**；`bump_version` 0.3.048→**0.3.049**、`export_config` 重生成 `nb_config.h`、`make -C core` 0 诊断（`core/*.err` 空）。
+
+**文档**：`docs/B91 §2` 命令表补 `makegame` 一条。
+
+**遗留**：无。
+
+<a id="c76"></a>
+### 0.3.048 — BGM 不可打断性立项：Phase 1 取证打点（`[AP]` 泵间隔+债 / `[VC]` 补墙钟）+ Phase 2 解码泵时钟去门控（B2）+ Phase 3 vsync IRQ 投递探针（C1）
+
+**背景**：用户实报「任何操作（对白翻页/立绘/SE/voice/菜单）→ BGM 停住，操作结束**原地续播**」。定性为**设计缺陷**（协作式音泵 + 虚拟时钟「每 pass 定步进、相位不受控」），CPU 慢放大——非单点 bug。用户拍板三阶段全立项（Phase 3 = `devdocs/134` 实施轮，接受中断风险），立 `devdocs/163`。本轮交付 Phase 1 取证打点（零行为改动）+ Phase 2 快赢 B2 + Phase 3 探针；**ISR 音泵本体（C2）待探针判定后另轮实施**。
+
+**根因（三机制并存，Phase 1 判主次）**：
+1. **M1 主嫌：慢 pass 时间债**——`audio_tick()` 是 `fmseq_pump`/PCM 的唯一泵，只在 `engine_frame_pump()`/`frame_decode_pump()` 被调；`vclock_advance()` 每次只发 `step`（与本次 `delta` 无关），真实流逝仅用于窗口测速、**相位差从不补偿**（`vclock.h` 明文「only the rate matters」）。一次慢 pass（整页重绘/模拟器放大）墙钟走 300 ms 而虚拟钟只走 ≈36 ms ⇒ **音乐时间债**，此后仅被 5/4 窗口比率钳制的瞬态速率追赶、**无相位偿还** ⇒ 操作期停住、操作后原地续播。
+2. **M2 次嫌：同步读盘段零泵**——`pcm_play()` 的 `farchive_read_alloc()`（`audio.c:393`）阻塞读期间无泵（文件 ≈6–9 KB，量级待 Phase 1 实测）。
+3. **M3 结构疑点：解码泵时钟门控两头错**——`frame_decode_pump` 曾把时钟推进关在 `hal_vblank_poll()` 门后：轮询失效则解码期时钟**冻结**（M3a），有效则解码 stride 率 × 主循环 `step` ≈ **2× 快进**（M3b）。
+
+**修复/落地**：
+- **Phase 1 取证（零行为改动）**：`audio.c::audio_tick()` 入口插 `AUDIO_PUMP_TRACE`（**默认开**，同 `[VC]` 先例）：`gap = wall_ms − last_wall_ms`，`gap ≥ AUDIO_PUMP_TRACE_GAP_MS`（150 ms 听感停顿阈值）才打 `[AP] gap=… v=… w=… d=…`（`d = w − v` = 累计债，正 = BGM 落后；每次入口无条件刷新 `last_wall_ms`）；`hal_pc98.c` 的 `[VC]` 行补 `w=`（墙钟），使长跑 `w−v` 即债趋势可读。
+- **Phase 2 B2（本轮已实施）**：`frame.c::frame_decode_pump()` 的 `hal_wallclock_smooth_advance()` 改**无条件**调用；`anim_tick()` 仍留 `hal_vblank_poll` 边沿门控（动画须保持显示节拍，不得按解码 stride 率快进）。依据：vclock 窗口 `want=accum*16/passes` 按调用率自归一，任意调用率下每秒发出的虚拟时间恒 ≈ 真实秒 ⇒ 解码 stride 率推进**速率正确**，门控只造成冻结/2× 两头错。
+- **Phase 3 C1（本轮已实施，探针）**：`hal_pc98.c::hal_irq_probe_run()`（`#if NAIZ_IRQ_PROBE`，**默认编译排除**）——写 `0x64` 唤醒 vsync → 读 master IMR 备案 → 2 s 紧循环经 OCW3（`outb(0x00,0x0A)`）采样 master PIC **IRR bit2** → 打 `[IRQP] vsync irq2 hits=… samples=… imr=…`。**安全优先**：绝不改 IMR、不挂 INT 0Ah 向量、无 DPMI 依赖（电平触发 IRR 无视 mask 即证 GDC 拉线，对 DOS 零副作用）；调用点 `main.c` `hal_video_init()` 后。判定：`hits/samples ≈ 显示帧率` ⇒ NP2kai 投递 vsync IRQ、Phase 3 走 IRQ2 路线；恒 0 ⇒ 转 OPNA Timer-B（`F04`）。**C2（ISR 音泵本体）总纲**见 `devdocs/163 §五`，待探针判定后另轮。
+- **B3 有界相位追赶暂缓**：追赶只缩短恢复、不消操作期停顿，且 133/139 有「追太快 = 新颤音」前科；Phase 3 后若仍有可闻残留债再启。
+
+**验证**：`make -C core` 0 诊断（`core/*.err` 空，含 `-DNAIZ_IRQ_PROBE=1` 探针编译）；`test_frame_pump.py`（B2 新语义重写 `test_decode_pump_advances_clock_unconditionally_and_stays_nonblocking` + 新增 `[AP]`/`[VC] w=`/`[IRQP]` 三条字符串守卫）；全量 pytest **822 passed, 1 skipped**；`./start.sh fullaudit --no-make` **6/6**（symbol_audit A/B 节为空）；`test_devdoc_refs.py` audio.c 三条 + main.c 两条 whitelist 移位 +7/+14 更新（旧坐标入 `SUPERSEDED_SHIFTED_LINE_REFS`）；`bump_version` 0.3.047→**0.3.048**、`nb_config.h` 重生成。
+
+**文档**：新 `devdocs/163`（症状→三机制→三阶段）；`docs/B90` 补 `hal_vblank_poll`/`hal_irq_probe_run` 两条。
+
+**遗留**：**Phase 1 取证未执行**——需 `./makegame.sh build demo-a2 && ./makegame.sh make demo-a2` 后 `makegame.sh test demo-a2 --serial` 按 `devdocs/163 §3.3` 表格逐操作填实测数字、读 `[IRQP]` 判定、收口 c61 遗留的边沿计数验证；**M1 属结构性，Phase 3（`devdocs/134`）方能根治**；M2 量级由实测决定、不做盲改；实机（非 NP2kai）列为复验。
+
 <a id="c75"></a>
 ### 0.3.047 — BGM 分配器三项根修：启用 OPNA 六声道（$29=0x80）+「最冷空闲」分配 + `fmseq_stop` 声部 age 复位（场景切换 click）
 
@@ -692,6 +731,8 @@
 
 | 条目 |
 |------|
+| [0.3.049 — `makegame.sh` 新增 `makegame` 子命令（build + make 一步到位）](#c77) |
+| [0.3.048 — BGM 不可打断性立项：Phase 1 取证打点（`[AP]` 泵间隔+债 / `[VC]` 补墙钟）+ Phase 2 解码泵时钟去门控（B2）+ Phase 3 vsync IRQ 投递探针（C1）](#c76) |
 | [0.3.047 — BGM 分配器三项根修：启用 OPNA 六声道（$29=0x80）+「最冷空闲」分配 + `fmseq_stop` 声部 age 复位（场景切换 click）](#c75) |
 | [0.3.043 — `makegame.sh audio` 模拟器音频延迟子菜单（BGM 颤音/电流声的玩家侧一键设置）](#c74) |
 | [0.3.042 — BGM 长笛「水泡爆开」根修：note-off→note-on 复用声部触发 OPNA 相位重置（legato tie）](#c73) |

@@ -79,6 +79,20 @@ static int g_bgm_vol = AUDIO_BGM_VOL_MAX;
 #define BGM_TICK_TRACE 0
 #endif
 
+/* devdoc 163 Phase 1 pump-gap + music-time-debt trace.  audio_tick() is the
+ * only pump for fmseq/PCM, so the gap between two of its calls is exactly
+ * how long the BGM was starved; the debt (wall clock minus virtual clock) is
+ * what the stall cost musically.  On by default like the [VC] trace: it only
+ * emits when a gap exceeds AUDIO_PUMP_TRACE_GAP_MS, so a healthy loop is
+ * silent.  Compile out with
+ *   make -C core EXTRA_DEFS=-DAUDIO_PUMP_TRACE=0 */
+#ifndef AUDIO_PUMP_TRACE
+#define AUDIO_PUMP_TRACE 1
+#endif
+/* Audible-stall threshold in ms: a shorter gap between pumps is not heard
+ * as a pause, so it is not worth a serial line. */
+#define AUDIO_PUMP_TRACE_GAP_MS 150UL
+
 /* PCM attenuation 0-15 (0 = loudest, 15 = softest).  Mirrors the A466 bit
  * layout; see F02 §4.2.  Distinct from AUDIO_PCM_VOL_DEFAULT so the two
  * units can never be confused at a call site. */
@@ -562,6 +576,28 @@ void audio_tick(void)
      * the main loop at NP2kai's ~20Hz pass rate, and its "keep the display
      * alive during a decode" purpose is now covered by frame_decode_pump(),
      * which advances the clock and pumps audio without ever blocking. */
+
+#if AUDIO_PUMP_TRACE
+    /* devdoc 163 Phase 1: measure the stall that just happened before
+     * pumping anything away.  gap = wall time since the previous tick (how
+     * long the BGM was starved); d = wall minus virtual clock (the music
+     * time debt the stall cost).  Runs at every entry, but only logs past
+     * the audible threshold so a healthy loop stays silent. */
+    {
+        static unsigned long last_tick_wall;
+        unsigned long wnow = hal_wallclock_ms();
+
+        if (last_tick_wall != 0) {
+            unsigned long gap = wnow - last_tick_wall;
+            if (gap >= AUDIO_PUMP_TRACE_GAP_MS) {
+                unsigned long vnow = hal_wallclock_smooth_ms();
+                hal_logf("[AP] gap=%lu v=%lu w=%lu d=%+ld\r\n",
+                         gap, vnow, wnow, (long)(wnow - vnow));
+            }
+        }
+        last_tick_wall = wnow;
+    }
+#endif
 
     /* PCM push first.  hal_pcm_tick stops the channel at EOF; a finished
      * buffer is then safe to release here. */

@@ -126,6 +126,22 @@ void hal_vblank_wait(void);
 int hal_vblank_poll(void);
 
 /*
+ * devdoc 163 Phase 3 C1: GDC vsync IRQ delivery probe (compile-gated).
+ *
+ * Samples the master PIC IRR bit2 (IRQ2) for ~2 seconds after arming the
+ * GDC via a write to port 0x64, then logs "[IRQP] hits=... samples=...".
+ * Never touches the PIC mask or the INT 0Ah vector (see hal_pc98.c).
+ * Default build compiles this out entirely; enable with
+ *   make -C core EXTRA_DEFS=-DNAIZ_IRQ_PROBE=1
+ */
+#ifndef NAIZ_IRQ_PROBE
+#define NAIZ_IRQ_PROBE 0
+#endif
+#if NAIZ_IRQ_PROBE
+void hal_irq_probe_run(void);
+#endif
+
+/*
  * 读取墙钟毫秒数（DOS 系统时钟 INT 21h AH=2Ch，10ms 粒度）
  *
  * 时间基动画步进。时钟源演变：NP2kai 下 8253 PIT（0x71/0x77）由模拟

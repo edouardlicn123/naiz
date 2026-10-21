@@ -2,6 +2,7 @@
 # Naiz — 游戏工作流工具
 # 制作/测试/编译一体化脚本
 # 用法:
+#   makegame.sh makegame <game>  编译项目数据并制作 HDI (build + make 合并)
 #   makegame.sh make <game>    制作 HDI
 #   makegame.sh test <game>    启动 NP2kai 测试 [--serial] [--porttest] [--auto]
 #   makegame.sh audio          模拟器音频延迟设置 (BGM 颤音/电流声, 全局)
@@ -148,6 +149,21 @@ case "$SUBCOMMAND" in
         exec "$VENV_PYTHON" -m tools.naiz_build.build_game "$GAME"
         ;;
 
+    makegame)
+        GAME="${1:-}"
+        if [ -z "$GAME" ]; then
+            echo "用法: makegame.sh makegame <game>"
+            exit 1
+        fi
+        check_wcl386
+        # build first (deploy the DOS tree + regenerate nb_config.h).  No exec
+        # here, or the injection step below would never run; `makegame` is a
+        # superset of `build` and `make`, which stay available on their own.
+        "$VENV_PYTHON" -m tools.naiz_build.build_game "$GAME"
+        echo "=== 制作 HDI 镜像: $GAME ==="
+        cd "$ROOT" && exec "$VENV_PYTHON" -m tools.naiz_img.inject --game "$GAME" --yes
+        ;;
+
     i18n-gen)
         GAME="${1:-}"
         I18N_ARGS=()
@@ -214,20 +230,22 @@ case "$SUBCOMMAND" in
                 echo ""
                 echo "=== $GAME ==="
                 echo "操作选择:"
-                echo "  1) build         — 编译项目数据"
-                echo "  2) make          — 制作 HDI 镜像"
-                echo "  3) test          — 启动 NP2kai 测试"
-                echo "  4) test --porttest — 串口硬件测试"
-                echo "  5) audio         — 模拟器音频延迟设置 (全局)"
+                echo "  1) makegame      — 编译项目数据 + 制作 HDI (build + make)"
+                echo "  2) build         — 编译项目数据"
+                echo "  3) make          — 制作 HDI 镜像"
+                echo "  4) test          — 启动 NP2kai 测试"
+                echo "  5) test --porttest — 串口硬件测试"
+                echo "  6) audio         — 模拟器音频延迟设置 (全局)"
                 echo "  0) 返回"
-                read -p "请选择 [0-5]: " action
+                read -p "请选择 [0-6]: " action
 
                 case "$action" in
-                    1) "$0" build "$GAME" ;;
-                    2) "$0" make "$GAME" ;;
-                    3) "$0" test "$GAME" ;;
-                    4) "$0" test "$GAME" --porttest ;;
-                    5) audio_menu ;;
+                    1) "$0" makegame "$GAME" ;;
+                    2) "$0" build "$GAME" ;;
+                    3) "$0" make "$GAME" ;;
+                    4) "$0" test "$GAME" ;;
+                    5) "$0" test "$GAME" --porttest ;;
+                    6) audio_menu ;;
                     0) break ;;
                     *) echo "无效选项" ;;
                 esac
@@ -237,7 +255,8 @@ case "$SUBCOMMAND" in
         ;;
 
     *)
-        echo "用法: $0 {make|test|build|i18n-gen|audio} [args]"
+        echo "用法: $0 {makegame|make|test|build|i18n-gen|audio} [args]"
+        echo "  makegame <game> 编译游戏数据并制作 HDI (build + make 合并, 一步到位)"
         echo "  build <game>    编译游戏数据 (PNG→MAG, 引擎, 场景, IMAGE.DAT, 运行时)"
         echo "  make <game>     制作 HDI 镜像 (仅注入 games/<game> → disks/<game>.hdi)"
         echo "  test <game>     启动 NP2kai 测试 [--serial] [--porttest] [--auto]"

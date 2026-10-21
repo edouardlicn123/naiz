@@ -133,8 +133,9 @@ void hal_wallclock_smooth_advance(void)
         static unsigned trace_ctr = 0;
         if (++trace_ctr >= 64) {
             trace_ctr = 0;
-            hal_logf("[VC] v=%lu step=%lu tgt=%lu cal=%d\n",
-                     vclock_ms(&g_vclock), g_vclock.step, g_vclock.target,
+            hal_logf("[VC] v=%lu w=%lu step=%lu tgt=%lu cal=%d\n",
+                     vclock_ms(&g_vclock), hal_wallclock_ms(),
+                     g_vclock.step, g_vclock.target,
                      g_vclock.calibrated);
         }
     }
@@ -181,6 +182,45 @@ int hal_vblank_poll(void)
         return 0;            /* establish baseline */
     return (prev == 0 && now == 1);
 }
+
+#if NAIZ_IRQ_PROBE
+/*
+ * devdoc 163 Phase 3 C1: GDC vsync IRQ delivery probe (NP2kai verdict for
+ * the interrupt-driven audio pump, devdocs/134).
+ *
+ * Facts this rests on (refdocs): IRQ2 = INT 0Ah (C01:310; vector base 0x08
+ * cross-checked by keyboard.c INT 09h and G01:87), any write to port 0x64
+ * arms/wakes the GDC vsync interrupt (C01:311-312, G09 §2), master PIC is
+ * 00h cmd / 02h data (G01:78).  The probe samples the master PIC IRR (OCW3
+ * 0x0A then data-port read) for ~2 wall seconds in a tight loop.
+ *
+ * Safety design: the PIC mask (IMR) and the INT 0Ah vector are NEVER touched.
+ * A level-triggered PIC shows a pending request in IRR regardless of the IMR
+ * mask, so sampling alone proves the GDC asserts the line — zero side effects
+ * on DOS, no DPMI vector API needed.  A hit rate near the display rate means
+ * the IRQ2 route (devdoc 163 §五 C2) is viable on this platform; zero hits
+ * means fall back to the OPNA Timer-B route (F04). */
+void hal_irq_probe_run(void)
+{
+    unsigned long t0;
+    unsigned long hits = 0, samples = 0;
+    unsigned long imr;
+
+    outb(0x64, 0x00);        /* arm/wake vsync IRQ (C01 §VSYNC 中断) */
+    imr = inb(0x02);         /* master IMR (default data-port read select) */
+    t0 = hal_wallclock_ms();
+    for (;;) {
+        if (hal_wallclock_ms() - t0 >= 2000UL)
+            break;
+        outb(0x00, 0x0A);    /* OCW3: next data-port read returns IRR */
+        if (inb(0x02) & 0x04)
+            hits++;          /* bit2 = IRQ2 pending */
+        samples++;
+    }
+    hal_logf("[IRQP] vsync irq2 hits=%lu samples=%lu imr=%02lx (2s)\r\n",
+             hits, samples, imr);
+}
+#endif /* NAIZ_IRQ_PROBE */
 
 /*
  * Debug log output.

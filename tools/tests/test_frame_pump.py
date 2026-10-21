@@ -221,19 +221,81 @@ def test_engine_registers_the_hook_in_audio_init():
 
 # --- 4. decode-time frame step (devdoc 131 方案 A/B) ------------------------
 
-def test_decode_pump_is_edge_gated_and_nonblocking():
-    """frame_decode_pump() must step the clock only on a real VBLANK edge and
-    must NOT block (a full vblank_wait per 4 KB decode stride would make
-    loading a portrait take seconds — devdoc 131 方案 B)."""
+def test_decode_pump_advances_clock_unconditionally_and_stays_nonblocking():
+    """devdoc 163 Phase 2 B2: the clock advance is UNCONDITIONAL (vclock
+    self-measures its per-call rate, so decode-stride calls are rate-correct
+    by construction; the old VBLANK gate froze the clock where the GDC poll
+    never fires and raced it ~2x where it does).  Animation stays
+    display-paced behind the poll, and the pump must never block (a full
+    vblank_wait per 4 KB decode stride would make loading a portrait take
+    seconds — devdoc 131 方案 B)."""
     body = _func_body(FRAME_C.read_text(encoding="utf-8"), "frame_decode_pump")
-    assert "hal_vblank_poll()" in body, (
-        "the decode pump must gate on hal_vblank_poll() (non-blocking edge)")
-    assert "hal_wallclock_smooth_advance()" in body, (
+    i_adv = body.find("hal_wallclock_smooth_advance();")
+    i_poll = body.find("hal_vblank_poll()")
+    assert i_adv != -1, (
         "the decode pump must advance the virtual clock so the BGM flows")
+    assert i_poll != -1, (
+        "the decode pump must still poll hal_vblank_poll() for anim pacing")
+    assert i_adv < i_poll, (
+        "the clock advance must NOT sit behind the VBLANK gate "
+        "(devdoc 163 B2: gate froze it where the poll never fires)")
     assert "vblank_wait()" not in body, (
         "the decode pump must not block on a full vblank_wait() per stride")
+    assert re.search(r"if \(hal_vblank_poll\(\)\)[^\n]*\n\s*anim_tick\(\);",
+                     body), (
+        "anim_tick() must stay display-paced behind hal_vblank_poll() "
+        "(devdoc 163 B2: only the clock advance moved out of the gate)")
     for call in ("audio_tick()", "nb_dialog_reveal_tick()"):
         assert call in body, f"the decode pump must keep pumping {call}"
+
+
+def test_audio_tick_logs_pump_gaps_and_music_debt():
+    """devdoc 163 Phase 1: audio_tick() must carry the AUDIO_PUMP_TRACE
+    block — gap since the previous tick plus wall-vs-virtual debt — so BGM
+    stalls are measurable from a serial capture, and the trace must be ON by
+    default (it only emits past the audible threshold, healthy = silent)."""
+    c = AUDIO_C.read_text(encoding="utf-8")
+    body = _func_body(c, "audio_tick")
+    assert "[AP] gap=%lu v=%lu w=%lu d=%+ld" in body, (
+        "audio_tick() must emit the [AP] pump-gap/debt line (devdoc 163)")
+    assert "AUDIO_PUMP_TRACE_GAP_MS" in body, (
+        "the [AP] trace must threshold on the audible-stall gap")
+    assert "#define AUDIO_PUMP_TRACE 1" in c, (
+        "AUDIO_PUMP_TRACE must default to ON (devdoc 163 Phase 1)")
+
+
+def test_vc_trace_carries_the_wall_clock():
+    """devdoc 163 Phase 1: the [VC] line must include the wall clock (w=) so
+    the long-run music-time debt (w - v) is readable from a serial capture."""
+    c = HAL_PC98_C.read_text(encoding="utf-8")
+    assert "[VC] v=%lu w=%lu step=%lu tgt=%lu cal=%d" in c, (
+        "[VC] must include the wall clock (devdoc 163 Phase 1 debt metric)")
+
+
+def test_irq_probe_is_gated_and_safe():
+    """devdoc 163 Phase 3 C1: the GDC vsync IRQ probe must be compile-gated
+    (NAIZ_IRQ_PROBE default 0) with its boot call site under the same gate —
+    a default build pays nothing and cannot pick up a 2s busy-wait.  The
+    probe must sample the PIC IRR only: never touch the mask (IMR write) and
+    never hook a vector."""
+    h = HAL_H.read_text(encoding="utf-8")
+    assert "#define NAIZ_IRQ_PROBE 0" in h, (
+        "NAIZ_IRQ_PROBE must default to 0 (probe compiled out by default)")
+    assert "void hal_irq_probe_run(void);" in h
+    c = HAL_PC98_C.read_text(encoding="utf-8")
+    assert "#if NAIZ_IRQ_PROBE" in c, "the probe body must be compile-gated"
+    assert "[IRQP] vsync irq2 hits=%lu samples=%lu imr=%02lx" in c, (
+        "the probe must log [IRQP] hits/samples/imr (devdoc 163 C1)")
+    body = _func_body(c, "hal_irq_probe_run")
+    assert "outb(0x00, 0x0A)" in body, (
+        "the probe must select IRR via OCW3 before sampling")
+    assert "0x64" in body, "the probe must arm the GDC via port 0x64"
+    assert "0x0205" not in body and "0x31" not in body, (
+        "the probe must not hook vectors / call DPMI (IMR- and vector-neutral "
+        "by design, devdoc 163 C1)")
+    main = MAIN_C.read_text(encoding="utf-8")
+    assert "#if NAIZ_IRQ_PROBE" in main and "hal_irq_probe_run();" in main, (
+        "main.c must call the probe under the NAIZ_IRQ_PROBE gate")
 
 
 def test_audio_tick_does_not_block_on_vblank():

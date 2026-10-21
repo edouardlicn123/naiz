@@ -87,6 +87,13 @@ int main(void)
     hal_video_init();
     hal_log("Vid OK\r\n");
 
+#if NAIZ_IRQ_PROBE
+    /* devdoc 163 Phase 3 C1: 2-second GDC vsync IRQ probe (diagnostic
+     * build only; compiles out by default).  Runs after video_init so the
+     * GDC is initialised, and reports via serial [IRQP]. */
+    hal_irq_probe_run();
+#endif
+
     /* palette[0]=black first + fill_rect(black) as redundant safety net. */
     hal_set_palette(0, 0x00, 0x00, 0x00);
     fill_rect(0, 0, LAYER_SCREEN_W, LAYER_SCREEN_H, 0);

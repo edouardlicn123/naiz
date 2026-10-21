@@ -19,14 +19,21 @@ void engine_frame_pump(void)
 }
 
 /*
- * Decode-time frame step (devdoc 131 方案 B).
+ * Decode-time frame step (devdoc 131 方案 B, devdoc 163 Phase 2 B2).
  *
  * A long MAG decode monopolises the CPU and used to freeze the virtual clock
  * (its progress hook only *read* the clock), so the whole BGM event table
  * stalled and then drained in one burst when the frame pump resumed — the
- * residual flutter.  This runs one pump step from inside the decode loop, but
- * gated on a real VBLANK edge: the clock steps at the DISPLAY's rate, not at
- * the decode stride count, so it neither freezes nor races.
+ * residual flutter.  This runs one pump step from inside the decode loop.
+ *
+ * devdoc 163 B2: the clock advance is now UNCONDITIONAL.  Gating it on a
+ * VBLANK edge was wrong in both directions: on a platform where the GDC poll
+ * never fires the clock froze for the whole decode, and where it does fire
+ * the decode-stride call rate multiplied the main-loop-calibrated step (up to
+ * ~2x).  vclock self-measures its per-call rate (window: want = accum*16/
+ * passes), so advancing at stride rate is rate-correct by construction.
+ * anim_tick() stays display-paced on purpose: animation must not run at
+ * decode-stride rate.
  *
  * Deliberately non-blocking (hal_vblank_poll, not vblank_wait): a decode must
  * not wait a full frame per 4 KB stride, or loading a portrait would take
@@ -36,10 +43,9 @@ void engine_frame_pump(void)
  */
 void frame_decode_pump(void)
 {
-    if (hal_vblank_poll()) {           /* new displayed frame? */
-        hal_wallclock_smooth_advance();/* advance clock once for that frame */
-        anim_tick();                   /* keep animation flowing */
-    }
-    audio_tick();                      /* pump BGM/PCM (non-blocking) */
-    nb_dialog_reveal_tick();           /* keep the typewriter flowing */
+    hal_wallclock_smooth_advance();/* self-measuring clock: call-rate safe */
+    if (hal_vblank_poll())         /* animation stays display-paced */
+        anim_tick();
+    audio_tick();                  /* pump BGM/PCM (non-blocking) */
+    nb_dialog_reveal_tick();       /* keep the typewriter flowing */
 }

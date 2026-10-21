@@ -63,10 +63,10 @@ LINE_REF_WHITELIST = {
     ("nb_setting.c", 122): "snprintf",
     ("nb_setting.c", 140): "Text Speed",
     ("nb_setting.c", 152): "Read Progress",
-    ("audio.c", 247): "g_bgm_on",
-    ("audio.c", 408): "g_snd_on",
-    ("audio.c", 417): "g_vc_on",
-    ("audio.c", 315): "audio_bgm_stop",
+    ("audio.c", 261): "g_bgm_on",
+    ("audio.c", 422): "g_snd_on",
+    ("audio.c", 431): "g_vc_on",
+    ("audio.c", 329): "audio_bgm_stop",
     ("hal_audio.c", 88): "PCM_CTRL_A46A_IRQ",
     ("hal_audio.c", 94): "PCM_IRQ_INTERVAL_MAX",
     ("hal_audio.c", 122): "hal_pcm_set_volume",
@@ -74,7 +74,7 @@ LINE_REF_WHITELIST = {
     ("nb_asset_table.h", 70): "CG_COUNT",
     ("save.h", 16): "CG_TOTAL",
     ("save_sys.c", 12): "SYSTEM.SAV",
-    ("main.c", 122): "prefs_save",
+    ("main.c", 129): "prefs_save",
     ("nb_mainmenu.c", 115): "prefs_save",
     # devdoc 119 §3.4: the i18n width guard's geometry anchors.  These were
     # cited before they were registered, and the off-by-one that followed
@@ -103,8 +103,8 @@ LINE_REF_WHITELIST = {
     ("bootmenu.c", 104): "find_lang_index",
     ("bootmenu.c", 201): "bootmenu_run",
     ("bootmenu.c", 304): "prefs_set_lang",
-    ("main.c", 130): "LANG] boot",
-    ("main.c", 134): "cjk_load_for_lang",
+    ("main.c", 137): "LANG] boot",
+    ("main.c", 141): "cjk_load_for_lang",
     ("nb.c", 166): "prefs_load",
     ("nb.c", 171): "nb_set_lang",
     ("nb.c", 337): "nb_set_lang",
@@ -206,6 +206,11 @@ SUPERSEDED_SHIFTED_LINE_REFS = {
     # shifted the audio.c toggle gates and audio_bgm_stop by +7; the current
     # coordinates are checked in LINE_REF_WHITELIST.
     ("audio.c", 401), ("audio.c", 410), ("audio.c", 308),
+    # devdoc 163 Phase 1 added the AUDIO_PUMP_TRACE #define block above the
+    # toggle gates (audio.c +14) and the probe call after hal_video_init
+    # (main.c +7); the current coordinates are checked in LINE_REF_WHITELIST.
+    ("audio.c", 247), ("audio.c", 315), ("audio.c", 408), ("audio.c", 417),
+    ("main.c", 130), ("main.c", 134),
 }
 
 # References to files RENAMED in 0.3.014.  devdocs 118/119 are finished and may
