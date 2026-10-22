@@ -91,6 +91,10 @@ void hal_set_palette(int idx, uint8_t r, uint8_t g, uint8_t b);
 
 - [MHVNVisualNovelEngine](https://github.com/maxotaku11niku/MHVNVisualNovelEngine) — MIT, 场景格式参考
 - [98Bridge](https://github.com/NullMagic2/98Bridge) — MIT, HDI 注入设计参考
+- [ADV98](https://github.com/yarufu/pc98) — MIT, PC-98 ADV 引擎；游戏侧 PMD 集成与 BGM 生命周期参考
+- [98fmplayer](https://github.com/myon98/98fmplayer) — BSD-2-Clause, PMD/FMP 驱动与 OPN 寄存器实现参考
+- [NP2kai](https://github.com/AZO234/NP2kai) — MIT, 模拟器宿主与 fmgen FM 核（实机 oracle）
+- [ymfm](https://github.com/aaronsgiles/ymfm) — BSD-3-Clause, Yamaha FM 模拟核（离线音色 oracle，已 vendor 于 `tools/vendor/ymfm`）
 
 ## License
 

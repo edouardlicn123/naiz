@@ -100,7 +100,17 @@ void hal_midi_out(uint8_t b)
 #define FM_VOL_PATH_VOL1    0x00
 #define PCM_VOL_ATTEN_MAX   15
 
-#define PCM_TICK_MAX_BYTES 2048
+/* Sample rate per A468 bit2-0 (F02 §4.3).  Used to convert "how much real
+ * time has passed since the last tick" into "how many bytes the FIFO needs";
+ * pushing a fixed 2KB burst instead filled the 32KB FIFO in one interrupt and
+ * spent milliseconds of handler time on port writes (devdoc 167). */
+static const uint32_t g_pcm_rate_hz[8] = {
+    44100, 33075, 22050, 16537, 11025, 8269, 5512, 4134
+};
+
+/* Upper bound for a single pump, in bytes.  1024 is ~23ms at 44.1kHz: enough
+ * to refill after a late tick, small enough that the handler stays short. */
+#define PCM_TICK_MAX_BYTES 1024
 
 struct pcm_state {
     const uint8_t *data;   /* caller-owned sample buffer (borrowed) */
@@ -163,7 +173,7 @@ void hal_pcm_play(const uint8_t *data, uint32_t len, int rate, int loop)
     g_pcm.active = 1;
 }
 
-void hal_pcm_tick(void)
+void hal_pcm_tick(uint32_t elapsed_ms)
 {
     uint32_t push;
     uint32_t i;
@@ -171,9 +181,18 @@ void hal_pcm_tick(void)
     if (!g_pcm.active)
         return;
 
-    push = g_pcm.len - g_pcm.pos;
+    /* Bytes the DAC consumed since the last tick.  elapsed_ms == 0 (a burst
+     * of back-to-back pumps in one pass) still pushes one millisecond worth so
+     * a freshly started sample begins promptly. */
+    push = (g_pcm_rate_hz[g_pcm.rate & 7] * (elapsed_ms ? elapsed_ms : 1)) / 1000UL;
+    if (push == 0)
+        push = 1;
     if (push > PCM_TICK_MAX_BYTES)
         push = PCM_TICK_MAX_BYTES;
+
+    /* Never run past the end of the sample. */
+    if (push > g_pcm.len - g_pcm.pos)
+        push = g_pcm.len - g_pcm.pos;
 
     for (i = 0; i < push; i++) {
         /* Wait until FIFO not full, then write one byte. */
@@ -276,12 +295,18 @@ void hal_fm_shutdown(void)
 {
     int ch;
 
+#if NAIZ_BGM_IRQ
+    { extern void _disable(void); _disable(); }
+#endif
     /* Key off every FM voice: $28 carries the channel bits (bit2 selects
      * FM4-6, F03 §3.8 fact 2) and a zero key mask. */
     for (ch = 0; ch < FM_FM_CHANNELS; ch++)
         hal_fm_write_reg(0, 0x28, (uint8_t)((ch >= 3 ? 4 : 0) | (ch % 3)));
     /* SSG: disable every mixer output. */
     hal_fm_write_reg(0, 0x07, FM_SSG_MIX_SILENT);
+#if NAIZ_BGM_IRQ
+    { extern void _enable(void); _enable(); }
+#endif
 }
 
 void hal_fm_write_reg(int bank, uint8_t addr, uint8_t val)

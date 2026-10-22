@@ -407,3 +407,176 @@ def test_prefetch_key_resolves_the_display_commands():
     nb = NB_C.read_text(encoding="utf-8")
     assert "nb_prefetch_key(cmd, args[brace]," in nb and '(argc >= 3) ? args[1] : "normal"' in nb, (
         "nb.c must pass the char expression to nb_prefetch_key()")
+
+
+# --- 6. interrupt-driven pump (devdoc 164 phase 1) --------------------------
+
+HAL_IRQ_C = ROOT / "core" / "plat" / "hal_irq.c"
+
+
+def test_bgm_irq_is_gated_and_defaults_off():
+    """NAIZ_BGM_IRQ must default to 0 so the default build compiles the ISR to
+    nothing and the co-operative pump is byte-for-byte unchanged; the guard
+    function must be declared unconditionally in hal.h so frame.c/audio.c can
+    reference it in both configurations."""
+    h = HAL_H.read_text(encoding="utf-8")
+    assert "#define NAIZ_BGM_IRQ 0" in h, (
+        "NAIZ_BGM_IRQ must default to 0 (devdoc 164 §5.5)")
+    # The declarations live inside the gate (the default build has no such
+    # symbols), and the frame/audio call sites are wrapped by the same gate.
+    gated = h[h.index("#if NAIZ_BGM_IRQ"):]
+    for decl in ("hal_bgm_irq_init(void)",
+                 "hal_bgm_irq_active(void)",
+                 "hal_bgm_irq_ticks(void)",
+                 "hal_bgm_irq_shutdown(void)"):
+        assert decl in gated, f"hal.h must declare {decl} under the gate"
+    c = HAL_IRQ_C.read_text(encoding="utf-8")
+    assert "#if NAIZ_BGM_IRQ" in c and "bgm_irq_handler" in c, (
+        "the ISR body must be behind the NAIZ_BGM_IRQ gate")
+
+
+def test_isr_heartbeat_is_sampled_from_the_frame_path():
+    """devdoc 165: the handler must not log (hal_logf is not ISR-safe), so a
+    counter is bumped in the ISR and SAMPLED from the frame pump.  Without this
+    a Timer-B that installs but never fires looks identical to a working one."""
+    c = HAL_IRQ_C.read_text(encoding="utf-8")
+    body = _func_body(c, "bgm_irq_handler")
+    assert "g_isr_ticks++" in body, (
+        "the ISR must bump the heartbeat counter (devdoc 165)")
+    assert "g_isr_ticks" in _func_body(c, "hal_bgm_irq_ticks"), (
+        "hal_bgm_irq_ticks() must read the heartbeat counter")
+    # The sampling site lives in the ISR-active branch of the frame pump.
+    fr = _func_body(FRAME_C.read_text(encoding="utf-8"), "engine_frame_pump")
+    assert "hal_bgm_irq_ticks()" in fr, (
+        "the frame pump must sample the ISR heartbeat when the ISR is active")
+    assert "[ISR] ticks=%lu v=%lu" in fr, (
+        "the heartbeat sample must be logged so a silent Timer-B is visible")
+
+
+def test_frame_pump_yields_clock_and_audio_to_the_isr():
+    """When the ISR is active it is the sole virtual-clock writer and the sole
+    audio pump, so the frame pump must skip BOTH to avoid double-stepping.
+    Each must stay under an explicit hal_bgm_irq_active() yield, and the
+    anim/reveal ticks must remain unconditional (display-paced)."""
+    body = _func_body(FRAME_C.read_text(encoding="utf-8"), "engine_frame_pump")
+    assert "hal_bgm_irq_active()" in body, (
+        "the frame pump must consult hal_bgm_irq_active() before pumping "
+        "(devdoc 164 §5.4)")
+    # Both the clock advance and audio_tick sit inside the active() guard: a
+    # naive unconditional call would double-step (BUG of the double pump).
+    guard = body[body.index("hal_bgm_irq_active()"):]
+    assert "hal_wallclock_smooth_advance();" in guard, (
+        "the ISR takeover must move the clock advance under the guard")
+    assert "audio_tick();" in guard, (
+        "the ISR takeover must move the audio pump under the guard")
+    assert "anim_tick();" in body and "nb_dialog_reveal_tick();" in body, (
+        "anim/reveal ticks stay unconditional (display-paced, not audio-paced)")
+
+
+def test_decode_pump_yields_pump_but_keeps_anim_pacing():
+    """The decode hook is registered as the MAG progress hook and can run while
+    the ISR also fires, so it too must yield the pump; its VBLANK-gated
+    anim_tick must remain, and it must still never block."""
+    body = _func_body(FRAME_C.read_text(encoding="utf-8"), "frame_decode_pump")
+    assert "hal_bgm_irq_active()" in body, (
+        "the decode pump must yield the pump to the ISR when active")
+    assert re.search(r"if \(hal_vblank_poll\(\)\)[^\n]*\n\s*anim_tick\(\);",
+                     body), "anim_tick() must stay display-paced in the decode pump"
+    assert "vblank_wait()" not in body, "the decode pump must stay non-blocking"
+
+
+def test_isr_sequence_is_bounded_and_eois_both_pics():
+    """The handler must advance the clock by the fixed hardware delta, pump the
+    ISR-safe audio core once, reset the chip flag, and EOI slave-then-master
+    (G09 §3, correct for either IRQ line).  It must be allocation-free and must
+    never touch the prescaler ($2D-$2F, F04 §8.3).
+
+    devdoc 165 §四: the OS constructs that are NOT ISR-safe must never appear
+    in the handler -- no DOS/BIOS call (hal_wallclock_smooth_advance reads the
+    DOS clock), no floating point, no hal_logf, no free()."""
+    c = HAL_IRQ_C.read_text(encoding="utf-8")
+    body = _func_body(c, "bgm_irq_handler")
+    for call in ("hal_wallclock_fixed_advance(", "audio_tick_isr();"):
+        assert call in body, f"the ISR must call {call} (devdoc 165 §四)"
+    # The unsafe forms must not come back.
+    for bad in ("hal_wallclock_smooth_advance", "hal_wallclock_ms(",
+                "audio_tick();", "hal_logf", "free(", "pow(", "double "):
+        assert bad not in body, (
+            f"the ISR must not use {bad!r} — not ISR-safe (devdoc 165 B1-B4)")
+    assert "FM_CTRL_RESET_B" in body, "the ISR must reset the Timer-B flag"
+    assert body.index("outb(PIC1_CMD, PIC_EOI)") < body.index(
+        "outb(PIC0_CMD, PIC_EOI)"), "slave EOI must precede master EOI"
+    for bad in ("malloc", "free(", "fopen", "0x2D", "0x2E", "0x2F"):
+        assert bad not in body, f"the ISR must not contain {bad!r}"
+
+
+def test_isr_timer_b_reset_keeps_load_and_enable():
+    """devdoc 165 §二: the $27 acknowledge write must keep BOTH D1 (LOAD B) and
+    D3 (ENABLE B) set alongside D5 (RESET B) -- value 0x2A.  Clearing D1 stops
+    the Timer-B event (NP2kai opna_settimer nevent_reset) and clearing D3 stops
+    the model raising the overflow flag / IRQ after one tick, so a bare RESET B
+    (0x20) makes the ISR fire exactly once."""
+    c = HAL_IRQ_C.read_text(encoding="utf-8")
+    body = _func_body(c, "bgm_irq_handler")
+    assert "FM_CTRL_RESET_B | FM_CTRL_ENABLE_B | FM_CTRL_LOAD_B" in body, (
+        "the $27 acknowledge must OR RESET B | ENABLE B | LOAD B (devdoc 165)")
+    for name in ("FM_CTRL_LOAD_B", "FM_CTRL_ENABLE_B", "FM_CTRL_RESET_B"):
+        assert name in c, f"hal_irq.c must define {name}"
+    assert "#define FM_CTRL_LOAD_B   0x02" in c
+    assert "#define FM_CTRL_ENABLE_B 0x08" in c
+    assert "#define FM_CTRL_RESET_B  0x20" in c
+
+
+def test_bgm_irq_is_dual_line_slave_first():
+    """devdoc 164 §四: the OPNA timer line is strapped in hardware, and NP2kai
+    (this project's oracle) uses the slave line (IRQ 12 -> INT 14h) while
+    QEMU/F04 uses the master line (IRQ 3 -> INT 0Bh).  The init must try both,
+    slave first, and unmask the matching PIC IMR -- a single-line build would
+    silently fail on one of the two hosts."""
+    c = HAL_IRQ_C.read_text(encoding="utf-8")
+    # Both vectors must appear, and the slave one must be tried first.
+    assert "0x14" in c and "0x0B" in c, (
+        "the init must carry both candidate IRQ vectors (14h slave, 0Bh master)")
+    assert c.index("0x14") < c.index("0x0B"), (
+        "the slave line (IRQ12/INT 14h) must be tried before the master line")
+    # The mask must be lifted on the matching PIC (slave IMR bit 4 vs master
+    # IMR bit 3), not hardcoded to one PIC.
+    assert "PIC1_IMR" in c and "PIC0_IMR" in c, (
+        "the init must be able to unmask either PIC; a hardcoded PIC0_IMR alone "
+        "cannot reach the slave line")
+    body = _func_body(c, "hal_bgm_irq_init")
+    assert "240" not in body and "0x0188" not in body.split("FM_REG_ADDR")[0], (
+        "sanity: registers stay named, not inlined")
+
+
+def test_bgm_state_commit_is_critical_sectioned():
+    """audio_bgm_start/stop mutate FM registers + the shared event table while
+    the ISR may be pumping, so the commit windows must be bracketed by the
+    interrupt lock (compiled out when NAIZ_BGM_IRQ=0)."""
+    c = AUDIO_C.read_text(encoding="utf-8")
+    for fn in ("audio_bgm_start", "audio_bgm_stop"):
+        body = _func_body(c, fn)
+        assert "bgm_irq_lock()" in body and "bgm_irq_unlock()" in body, (
+            f"{fn}() must bracket its state commit with the IRQ lock "
+            "(devdoc 164 §5.4)")
+    assert "#define bgm_irq_lock()   ((void)0)" in c, (
+        "the lock must compile to nothing when NAIZ_BGM_IRQ is off")
+
+
+def test_dpmi_probe_is_gated_and_read_only():
+    """devdoc 164 phase 0: the DPMI self-check must be compile-gated with the
+    IRQ probe and must only issue read-only INT 31h calls (0400/0204/0600) --
+    never 0205 (set-vector), so a probe build cannot install anything."""
+    h = HAL_H.read_text(encoding="utf-8")
+    assert "void hal_dpmi_probe_run(void);" in h
+    c = HAL_PC98_C.read_text(encoding="utf-8")
+    assert "#if NAIZ_IRQ_PROBE" in c and "hal_dpmi_probe_run" in c, (
+        "the probe body must be compile-gated")
+    body = _func_body(c, "hal_dpmi_probe_run")
+    assert "0x0204" in body and "0x0600" in body, (
+        "the probe must exercise get-vector (0204) and lock (0600)")
+    assert "0x0205" not in body, (
+        "the probe must NOT call set-vector (0205); it is read-only by design")
+    main = MAIN_C.read_text(encoding="utf-8")
+    assert "hal_dpmi_probe_run();" in main, (
+        "main.c must call the DPMI probe (under the NAIZ_IRQ_PROBE gate)")

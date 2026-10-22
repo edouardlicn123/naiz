@@ -139,6 +139,19 @@ int hal_vblank_poll(void);
 #endif
 #if NAIZ_IRQ_PROBE
 void hal_irq_probe_run(void);
+
+/*
+ * devdoc 164 phase 0: DPMI interrupt-capability probe (compile-gated).
+ *
+ * Read-only: queries the DPMI version (INT 31h AX=0400), whether it can read
+ * a protected-mode vector for the IRQ3 line (AX=0204), and whether the lock
+ * API answers (AX=0600).  NEVER sets a vector, never touches the PIC mask --
+ * this exists to decide, before writing an ISR, whether the Open Watcom +
+ * DOS/4GW toolchain can hook a hardware IRQ at all (G08 §2 flags the Watcom
+ * equivalent of `_go32_dpmi_*` as unmapped).  Logs "[DPMP] ver=.. bits32=..
+ * vec0B_ok=.. vec0A_ok=.. lock_ok=..".  Default build compiles it out.
+ */
+void hal_dpmi_probe_run(void);
 #endif
 
 /*
@@ -175,6 +188,14 @@ unsigned long hal_wallclock_ms(void);
 void hal_wallclock_smooth_advance(void);
 
 /*
+ * Fixed-step advance for the Timer-B ISR (devdoc 165).  Adds a known delta (in
+ * 1/16 ms units) to the virtual clock without any DOS call — int 21h is not
+ * reentrant from a hardware handler, so the ISR cannot use
+ * hal_wallclock_smooth_advance().  The hardware timer period is the time source.
+ */
+void hal_wallclock_fixed_advance(unsigned long delta_units);
+
+/*
  * Read-only view of the virtual clock (devdoc 129).  No side effects: the
  * elapsed time between two reads reflects only frame-pump advances, so the
  * rate no longer depends on how many subsystems poll it.
@@ -198,16 +219,19 @@ unsigned long hal_wallclock_smooth_ms(void);
  *
  * hal_pcm_*():
  *   86 板 PCM。hal_pcm_play 配置速率/8bit mono 并启用输出；hal_pcm_tick
- *   每帧泵 FIFO（A466 bit7=full 时停泵）；loop=1 时数据耗尽自动回绕
+ *   泵 FIFO（A466 bit7=full 时停泵）；loop=1 时数据耗尽自动回绕
  *   pos 至 0（素材表语义决定调用方传入），否则耗尽自动停；hal_pcm_stop
  *   停输出清缓冲。data 由调用方持有（HAL 借用至 play/stop），不自 free。
+ *   `elapsed_ms` = 距上次 tick 的真实毫秒数（Timer-B ISR 传固定周期，
+ *   协作路径传时钟差）：泵入量按采样率折算，不再「一次塞满 32KB FIFO」。
+ *   一次塞满会让 ISR 里出现数千次 outb（devdoc 167）。
  *   hal_pcm_set_volume 写 A466 电子音量（0=最响~15=最轻，**倒序**且
  *   15 仍非静音）；真静音需 A66E bit0，音量档位见 F02 §4.2。
  */
 int  hal_audio_detect(void);
 void hal_midi_out(uint8_t b);
 void hal_pcm_play(const uint8_t *data, uint32_t len, int rate, int loop);
-void hal_pcm_tick(void);
+void hal_pcm_tick(uint32_t elapsed_ms);
 void hal_pcm_stop(void);
 int  hal_pcm_active(void);
 void hal_pcm_set_volume(int step);
@@ -226,6 +250,42 @@ void hal_fm_init(void);
 void hal_fm_shutdown(void);
 void hal_fm_write_reg(int bank, uint8_t addr, uint8_t val);
 void hal_fm_set_volume(int atten);
+
+/*============================================================================
+ * Interrupt-driven audio pump (devdoc 164 phase 1, OPNA Timer-B -> IRQ3)
+ *
+ * The BGM pump is co-operative by default: audio_tick() only runs from the
+ * frame pump, so a long CPU-bound pass starves it and the music stalls (the
+ * M1 time-debt of devdoc 163).  When enabled at build time
+ * (make -C core EXTRA_DEFS=-DNAIZ_BGM_IRQ=1) these install an OPNA Timer-B
+ * timer whose IRQ3 handler advances the virtual clock and pumps FMSeq/PCM,
+ * decoupling the beat from the main loop.
+ *
+ * Default build (NAIZ_BGM_IRQ=0) compiles the whole path out; the engine's
+ * co-operative pump is byte-for-byte unchanged.  If installation fails at
+ * runtime (DPMI vector hook or timer rejected) the functions report 0 and the
+ * co-operative path keeps running -- a failed install must never wedge boot.
+ *============================================================================ */
+#ifndef NAIZ_BGM_IRQ
+#define NAIZ_BGM_IRQ 0
+#endif
+#if NAIZ_BGM_IRQ
+/*
+ * Install the Timer-B IRQ3 handler and start the timer.
+ * Returns 1 on success, 0 if the DPMI vector hook or OPNA init failed (the
+ * caller then keeps the co-operative pump).  Call once, after hal_fm_init().
+ */
+int  hal_bgm_irq_init(void);
+/* 1 once the ISR owns the clock/audio pump.  The frame pump reads this to
+ * yield ownership and avoid double-pumping. */
+int  hal_bgm_irq_active(void);
+/* ISR tick count (devdoc 165).  The handler must not log, so the frame path
+ * samples this to prove the Timer-B is actually firing.  Monotone while the
+ * ISR is active; frozen if it is not. */
+unsigned long hal_bgm_irq_ticks(void);
+/* Stop the timer and restore the previous vector (scene shutdown). */
+void hal_bgm_irq_shutdown(void);
+#endif
 
 /*============================================================================
  * 键盘扫描码常量（PC-98 硬件标准）

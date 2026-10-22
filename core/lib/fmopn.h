@@ -68,9 +68,11 @@ extern const uint8_t fmopn_op_slot[FMOPN_OPS_PER_VOICE];
  * fnum 618).  Clamps to fnum 1023 / block 7 at the top of MIDI range. */
 void fmopn_note_ratio(int note, int *block, int *fnum);
 
-/* Frequency (Hz) represented by a (block, fnum) pair.  Inverse of the note
- * encoder; used by the SSG-percussion path and pitch bend. */
-double fmopn_ratio_freq(int block, int fnum);
+/* Frequency (Hz * 256) as an integer -- same value as the old double
+ * fmopn_ratio_freq, with no FP.  The SSG percussion / pitch-bend path (fmseq)
+ * uses this so nothing on the note-on path touches the x87 stack; the ISR
+ * needs that (devdoc 165 B2). */
+uint32_t fmopn_ratio_freq_x256(int block, int fnum);
 
 /* Pitch bend 0..16383 (8192 centred) applied to an existing block/fnum.
  * Linear approximation of +-2 semitones, block unchanged, fnum clamped. */

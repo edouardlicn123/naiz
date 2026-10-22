@@ -140,6 +140,21 @@ void vclock_init(VClock *vc);
  */
 void vclock_advance(VClock *vc, unsigned long real_ms);
 
+/*
+ * Step the clock by a FIXED amount of virtual time, bypassing the platform
+ * rate measurement entirely (devdoc 165).  This is the interrupt-driven beat:
+ * a hardware timer (OPNA Timer-B) fires at a known period, so the timer IS the
+ * time base and there is nothing to measure -- and nothing that may call into
+ * DOS, which a hardware ISR must not do.
+ *
+ * It deliberately does NOT consult real_prev/step/target/window: those exist
+ * to smooth an unreliable second-quantised DOS clock (devdoc 133), which the
+ * hardware tick does not have.  Call it exactly once per timer tick; the other
+ * vclock entry points must not run alongside it (the frame pump skips them
+ * while the ISR owns the beat, devdoc 164 §5.4).
+ */
+void vclock_advance_fixed(VClock *vc, unsigned long delta_units);
+
 /* Current virtual time in whole milliseconds. */
 unsigned long vclock_ms(const VClock *vc);
 

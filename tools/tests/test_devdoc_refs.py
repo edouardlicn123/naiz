@@ -63,10 +63,10 @@ LINE_REF_WHITELIST = {
     ("nb_setting.c", 122): "snprintf",
     ("nb_setting.c", 140): "Text Speed",
     ("nb_setting.c", 152): "Read Progress",
-    ("audio.c", 261): "g_bgm_on",
-    ("audio.c", 422): "g_snd_on",
-    ("audio.c", 431): "g_vc_on",
-    ("audio.c", 329): "audio_bgm_stop",
+    ("audio.c", 278): "g_bgm_on",
+    ("audio.c", 453): "g_snd_on",
+    ("audio.c", 462): "g_vc_on",
+    ("audio.c", 349): "audio_bgm_stop",
     ("hal_audio.c", 88): "PCM_CTRL_A46A_IRQ",
     ("hal_audio.c", 94): "PCM_IRQ_INTERVAL_MAX",
     ("hal_audio.c", 122): "hal_pcm_set_volume",
@@ -74,7 +74,7 @@ LINE_REF_WHITELIST = {
     ("nb_asset_table.h", 70): "CG_COUNT",
     ("save.h", 16): "CG_TOTAL",
     ("save_sys.c", 12): "SYSTEM.SAV",
-    ("main.c", 129): "prefs_save",
+    ("main.c", 143): "prefs_save",
     ("nb_mainmenu.c", 115): "prefs_save",
     # devdoc 119 §3.4: the i18n width guard's geometry anchors.  These were
     # cited before they were registered, and the off-by-one that followed
@@ -103,8 +103,8 @@ LINE_REF_WHITELIST = {
     ("bootmenu.c", 104): "find_lang_index",
     ("bootmenu.c", 201): "bootmenu_run",
     ("bootmenu.c", 304): "prefs_set_lang",
-    ("main.c", 137): "LANG] boot",
-    ("main.c", 141): "cjk_load_for_lang",
+    ("main.c", 151): "LANG] boot",
+    ("main.c", 155): "cjk_load_for_lang",
     ("nb.c", 166): "prefs_load",
     ("nb.c", 171): "nb_set_lang",
     ("nb.c", 337): "nb_set_lang",
@@ -211,6 +211,28 @@ SUPERSEDED_SHIFTED_LINE_REFS = {
     # (main.c +7); the current coordinates are checked in LINE_REF_WHITELIST.
     ("audio.c", 247), ("audio.c", 315), ("audio.c", 408), ("audio.c", 417),
     ("main.c", 130), ("main.c", 134),
+    # devdoc 164 phase 1 added the bgm_irq_lock/unlock critical-section block
+    # above the toggle gates (audio.c +16) plus a lock in audio_bgm_start and a
+    # lock/unlock pair in audio_bgm_stop.  The current coordinates are checked
+    # in LINE_REF_WHITELIST; the pre-164 ones are recorded here.
+    ("audio.c", 261), ("audio.c", 422), ("audio.c", 431), ("audio.c", 329),
+    # devdoc 164 phase 1 also added the NAIZ_BGM_IRQ_CLEANUP macro to
+    # ENGINE_EXIT (main.c +11) and the hal_dpmi_probe_run() boot call (+3), so
+    # main.c's prefs_save / [LANG] marker / cjk_load_for_lang citations moved
+    # by +14; the current coordinates are checked in LINE_REF_WHITELIST.
+    ("main.c", 129), ("main.c", 137), ("main.c", 141),
+    # devdoc 165 split audio_tick() into audio_tick_isr() (the ISR-safe core)
+    # plus the frame wrapper, and bracketed the PCM rebind / release with the
+    # bgm_irq_lock critical section.  That net-inserted 9 lines above the
+    # snd/vc toggle gates, shifting g_snd_on / g_vc_on by +9; the current
+    # coordinates are checked in LINE_REF_WHITELIST.
+    ("audio.c", 443), ("audio.c", 452),
+    # devdoc 165 also gave fmseq_fm_voices() a frame-path caller again (the
+    # B3 ISR split had removed the "FM loop: N voices" log that used it),
+    # adding a rewound flag to BgmState and a frame-path log block, +1 line
+    # above the toggle gates.  The current coordinates are checked in
+    # LINE_REF_WHITELIST; the pre-this-round ones are recorded here.
+    ("audio.c", 277), ("audio.c", 452), ("audio.c", 461), ("audio.c", 348),
 }
 
 # References to files RENAMED in 0.3.014.  devdocs 118/119 are finished and may

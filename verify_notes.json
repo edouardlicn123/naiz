@@ -270,6 +270,13 @@
       "sha256": "ce17b5579e8921d8076d947a482d1071337edd5f98baa4484003c6ce6ce70189",
       "line": "    a->toc = (uint8_t *)malloc((size_t)header_bytes);"
     },
+    "core/lib/fmseq.c:553": {
+      "verdict": "ok",
+      "text": "test-facing query API; no .c caller since ISR-safe pump dropped the rewind-ring log (devdoc 165 B3)",
+      "date": "2026-10-21T13:47:36",
+      "sha256": "5078fa963b67de5c800304e2566ee5092c6647e6b8413c07c6e78e705f20a17f",
+      "line": "int fmseq_fm_voices(const Fmseq *seq)"
+    },
     "core/lib/tr.c:65": {
       "verdict": "ok",
       "text": "memcpy into tr_table governed by table_len bounds check above",

@@ -13,6 +13,10 @@
 void audio_init(void);
 void audio_tick(void);
 
+/* ISR-safe pump core (devdoc 165): the Timer-B handler calls this after
+ * advancing the virtual clock.  No DOS call, no hal_logf, no free. */
+void audio_tick_isr(void);
+
 void audio_bgm_start(const char *key);
 void audio_bgm_stop(void);
 

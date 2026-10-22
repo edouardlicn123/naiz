@@ -31,6 +31,46 @@
 #define AUDIO_MAX_ENTRIES 8192    /* TOC cap, mirrors IMAGE.DAT usage */
 #define PCM_HDR_SIZE 16           /* "NAIZPCM" + rate + flags + reserved */
 
+/* devdoc 164 phase 1: with the Timer-B ISR pumping audio_tick() from interrupt
+ * context, the main thread must not mutate BGM state mid-flight.  These bracket
+ * the state-commit windows so the handler cannot observe a half-swapped event
+ * table.  Compiles to nothing when the interrupt pump is off (default), so the
+ * co-operative build is unchanged. */
+#if NAIZ_BGM_IRQ
+#include <i86.h>
+/* The engine never takes this lock with interrupts already disabled, so
+ * disable on the outermost entry / enable on the outermost exit is correct.
+ *
+ * devdoc 167: it must also be RE-ENTRANT.  fm_sink_write() takes the lock
+ * around every OPNA byte pair, and fmseq_stop() (called from inside
+ * audio_bgm_start()/audio_bgm_stop()'s own critical section) drives it.  With
+ * a flat disable/enable pair the inner unlock re-enabled interrupts in the
+ * middle of the outer window, so the Handler could run while the event table
+ * and the voice state were still being swapped.  Depth-count instead.
+ *
+ * In ISR context this is a pure no-op: the handler already runs with IF
+ * cleared, and calling _enable() there would let it re-enter itself
+ * (devdoc 166). */
+extern int bgm_irq_is_in_isr(void);
+static int g_irq_lock_depth;
+
+static void bgm_irq_lock(void)
+{
+    if (bgm_irq_is_in_isr()) return;
+    if (g_irq_lock_depth++ == 0)
+        _disable();
+}
+static void bgm_irq_unlock(void)
+{
+    if (bgm_irq_is_in_isr()) return;
+    if (g_irq_lock_depth > 0 && --g_irq_lock_depth == 0)
+        _enable();
+}
+#else
+#define bgm_irq_lock()   ((void)0)
+#define bgm_irq_unlock() ((void)0)
+#endif
+
 /*=== Archive ============================================================*/
 
 static FArchive g_arc;
@@ -48,6 +88,7 @@ typedef struct {
     unsigned long len_ms;         /* song length incl. trailing silence (A1) */
     int           fm;             /* 1: rendered by fmseq on the OPNA */
     int           active;
+    int           rewound;        /* ISR set a loop; frame path logs it (B3) */
 } BgmState;
 
 static BgmState g_bgm;
@@ -148,6 +189,16 @@ static void fm_sink_write(void *ctx, int bank, uint8_t reg, uint8_t val)
         hal_logf("BGMT on t=%lu ch=%d\n",
                  (unsigned long)hal_wallclock_smooth_ms(), val & 0x03);
 #endif
+#if NAIZ_BGM_IRQ
+    /* Serialize with the main thread: OPNA port pairs are not safe to
+     * interleave between ISR and non-ISR contexts (devdoc 166). */
+    if (hal_bgm_irq_active()) {
+        bgm_irq_lock();
+        hal_fm_write_reg(bank, reg, val);
+        bgm_irq_unlock();
+        return;
+    }
+#endif
     hal_fm_write_reg(bank, reg, val);
 }
 
@@ -235,10 +286,21 @@ static int audio_map_find(const AudioAssetMap *map, const char *key)
 static void bgm_apply_volume(void)
 {
     int ch;
+#if NAIZ_BGM_IRQ
+    int locked = 0;
+#endif
+    int atten;
 
     if (g_bgm.fm) {
-        int atten = (g_bgm_vol * 15) / AUDIO_BGM_VOL_MAX;
+#if NAIZ_BGM_IRQ
+        locked = (g_fm_ok && hal_bgm_irq_active());
+        if (locked) bgm_irq_lock();
+#endif
+        atten = (g_bgm_vol * 15) / AUDIO_BGM_VOL_MAX;
         hal_fm_set_volume(15 - atten);   /* reversed 0(loud)..15(quiet) */
+#if NAIZ_BGM_IRQ
+        if (locked) bgm_irq_unlock();
+#endif
         return;
     }
     if (!g_mpu_ok) return;
@@ -257,6 +319,11 @@ void audio_bgm_start(const char *key)
     int count = 0;
     uint32_t len_ms = 0;
 
+    /* devdoc 167: do NOT hold the ISR lock across the file read + MIDI parse.
+     * That window is tens of milliseconds of blocking archive I/O, and masking
+     * the Timer-B for its whole length is itself an audible BGM stall.  The
+     * lock now covers only the state commit below; every early return here
+     * leaves interrupts untouched. */
     if (!key || !key[0]) return;
     if (!g_bgm_on) {
         hal_logf("BGM WARN: '%s' ignored (BGM disabled)\r\n", key);
@@ -305,7 +372,9 @@ void audio_bgm_start(const char *key)
      * the event table: a mid-scene bgm(){key} while a song plays would
      * otherwise leave the old voices ringing under the new one and keep the
      * per-voice ages stale (scene_switch covers the common path via
-     * audio_stop_all, but this start must be safe on its own, devdoc 157). */
+     * audio_stop_all, but this start must be safe on its own, devdoc 157).
+     * devdoc 164: hold off the ISR across the FM touch + state commit. */
+    bgm_irq_lock();
     if (g_fm_ok)
         fmseq_stop(g_fm_seq, &g_fm_sink);
     bgm_release();
@@ -322,12 +391,14 @@ void audio_bgm_start(const char *key)
         fmseq_events(g_fm_seq, ev, count);
     }
     bgm_apply_volume();
+    bgm_irq_unlock();
     hal_logf("BGM start '%s' (%d events, %lums)%s\r\n", key, count,
              (unsigned long)len_ms, g_bgm.fm ? " (FM)" : "");
 }
 
 void audio_bgm_stop(void)
 {
+    bgm_irq_lock();   /* devdoc 164: no ISR pump while we tear the voices down */
     if (g_bgm.fm && g_fm_ok) {
         /* fmseq_stop keyoffs every sounding voice and silences the SSG. */
         fmseq_stop(g_fm_seq, &g_fm_sink);
@@ -341,6 +412,7 @@ void audio_bgm_stop(void)
         }
     }
     bgm_release();
+    bgm_irq_unlock();
     hal_log("BGM stop\r\n");
 }
 
@@ -358,12 +430,16 @@ static int g_pcm_channel;
 
 static void pcm_release(void)
 {
+    /* devdoc 165: the ISR pumps the PCM FIFO (hal_pcm_tick) and the frame path
+     * may release here -- the stop + buffer swap must be atomic against it. */
+    bgm_irq_lock();
     hal_pcm_stop();
     if (g_pcm_buf) {
         free(g_pcm_buf);
         g_pcm_buf = NULL;
     }
     g_pcm_channel = PCM_CH_NONE;
+    bgm_irq_unlock();
 }
 
 /* 'chan' is PCM_CH_SND / PCM_CH_VC, recorded on every successful play. */
@@ -409,11 +485,16 @@ static void pcm_play(const AudioAssetMap *map, const char *key, int chan)
 
     /* Replace current stream.  hal_pcm_play rebinds its borrow instantly,
      * so the old buffer is free to release straight after.  One-shot:
-     * SE/voice never loop (loop=0), per devdoc 101 §4.3 caller semantics. */
+     * SE/voice never loop (loop=0), per devdoc 101 §4.3 caller semantics.
+     * The rebind + buffer swap is atomic against the ISR PCM tick (devdoc
+     * 165): without the lock an IRQ landing mid-swap could tick a buffer we
+     * are about to free. */
+    bgm_irq_lock();
     hal_pcm_play(raw + PCM_HDR_SIZE, (uint32_t)(size - PCM_HDR_SIZE), rate, 0);
     free(g_pcm_buf);
     g_pcm_buf = raw;
     g_pcm_channel = chan;
+    bgm_irq_unlock();
     hal_logf("PCM start '%s' (%ld B, rate %u)\r\n", key, size - PCM_HDR_SIZE, rate);
 }
 
@@ -508,6 +589,9 @@ int audio_get_pcm_volume(void) { return g_pcm_vol; }
 /*=== Lifecycle ==========================================================*/
 
 void audio_tick(void);
+/* devdoc 165: ISR-safe pump core -- no DOS clock read, no hal_logf, no free.
+ * The Timer-B handler advances the virtual clock then calls this. */
+void audio_tick_isr(void);
 /* devdoc 131 方案 B: the MAG decode progress hook runs one decode-time frame
  * step (advance clock on vblank edge + pump audio) instead of a bare
  * audio_tick(), so a long decode no longer freezes the BGM schedule. */
@@ -550,6 +634,14 @@ void audio_init(void)
             g_fm_ok = 0;   /* nothing to render BGM on; PCM keeps working */
             hal_log("AUD WARN: no memory for FM backend\r\n");
         }
+#if NAIZ_BGM_IRQ
+        /* devdoc 164 phase 1: hand the BGM beat to the OPNA Timer-B ISR so a
+         * long CPU-bound pass can no longer starve it.  Only attempted once
+         * the FM backend is up; a failed install logs and the co-operative
+         * pump keeps running (frame.c checks hal_bgm_irq_active()). */
+        if (g_fm_ok && !hal_bgm_irq_init())
+            hal_log("BGM IRQ install failed; co-operative pump stays active\r\n");
+#endif
     }
 
     if (!g_mpu_ok && !g_fm_ok)
@@ -565,6 +657,72 @@ static void bgm_rewind_phase(unsigned long now)
 {
     g_bgm.wall0 = (unsigned long)fmseq_loop_start(g_bgm.wall0,
                                                   g_bgm.len_ms, now);
+}
+
+/* ISR-safe audio core (devdoc 165 §四 B3/B4).  No DOS call (the caller must
+ * not read the platform clock here), no hal_logf, no free: a hardware handler
+ * may only touch the OPNA/PCM ports and the sequence state.  The clock must be
+ * advanced by the caller before this runs. */
+void audio_tick_isr(void)
+{
+    unsigned long now;
+    unsigned long cur;
+    /* devdoc 167: the PCM pump is sized by the real time this tick covers, so
+     * it must not push a fixed burst.  The caller has already advanced the
+     * virtual clock, so its millisecond delta is exactly that span. */
+    static unsigned long last_pcm_ms;
+    unsigned long pcm_dt;
+
+    now = hal_wallclock_smooth_ms();
+    pcm_dt = now - last_pcm_ms;
+    last_pcm_ms = now;
+    if (pcm_dt > 1000UL)      /* first call / clock jump: never a huge burst */
+        pcm_dt = 1000UL;
+
+    /* PCM push first.  hal_pcm_tick stops the channel at EOF but does NOT free
+     * the buffer here (free() is not ISR-safe); the frame path releases it. */
+    hal_pcm_tick((uint32_t)pcm_dt);
+
+    if (!g_bgm.active) return;
+
+    if (g_bgm.fm) {
+        cur = now - g_bgm.wall0;
+
+        fmseq_pump(g_fm_seq, &g_fm_sink, cur);
+        if (cur >= g_bgm.len_ms && fmseq_finished(g_fm_seq)) {
+            /* Rewind preserves phase (devdoc 147 A2).  The "voices still
+             * ringing" note is deferred to the frame path -- logging is not
+             * ISR-safe (devdoc 165 B3).  The ISR only raises the flag. */
+            fmseq_stop(g_fm_seq, &g_fm_sink);
+            bgm_rewind_phase(now);
+            g_bgm.rewound = 1;
+        }
+        return;
+    }
+
+    {
+        int budget;
+        cur = now - g_bgm.wall0;
+        budget = AUDIO_BGM_MAX_EVENTS_PER_TICK;
+
+        while (budget > 0 && g_bgm.idx < g_bgm.count &&
+               g_bgm.ev[g_bgm.idx].tick_ms <= cur) {
+            const MidEvent *e = &g_bgm.ev[g_bgm.idx];
+            uint8_t st = e->b0;
+
+            hal_midi_out(st);
+            hal_midi_out(e->b1);
+            if ((st & 0xF0) != 0xC0 && (st & 0xF0) != 0xD0)
+                hal_midi_out(e->b2);
+            g_bgm.idx++;
+            budget--;
+        }
+
+        if (g_bgm.idx >= g_bgm.count && cur >= g_bgm.len_ms) {
+            g_bgm.idx = 0;
+            bgm_rewind_phase(now);
+        }
+    }
 }
 
 /* Called from the 60Hz heartbeat every frame (AUTOEXIT, main and the
@@ -599,79 +757,27 @@ void audio_tick(void)
     }
 #endif
 
-    /* PCM push first.  hal_pcm_tick stops the channel at EOF; a finished
-     * buffer is then safe to release here. */
-    hal_pcm_tick();
+    audio_tick_isr();
+
+    /* The FM rewind note is logged here, not in the ISR (B3): the handler only
+     * raised g_bgm.rewound.  fmseq_fm_voices() reports how many voices are
+     * still ringing as the new loop begins (devdoc 147 A2 phase-preserving
+     * rewind left them sounding). */
+    if (g_bgm.rewound) {
+        g_bgm.rewound = 0;
+        hal_logf("FM loop: %d voices still ringing\r\n",
+                 fmseq_fm_voices(g_fm_seq));
+    }
+
+    /* The ISR path defers buffer release to here: free() is not ISR-safe, and
+     * the free + pointer clear must be atomic against the ISR PCM tick so it
+     * cannot tick a buffer being released (devdoc 165). */
+    bgm_irq_lock();
     if (g_pcm_buf && !hal_pcm_active()) {
         free(g_pcm_buf);
         g_pcm_buf = NULL;
     }
-
-    if (!g_bgm.active) return;
-
-    if (g_bgm.fm) {
-        /* FM backend: feed the smooth virtual clock to fmseq (devdoc 107 /
-         * 0.2.134 — raw hal_wallclock_ms deltas are chunked under NP2kai).
-         * Loop on musical length, not on "last event dispatched": the parsed
-         * event table drops trailing silence, so a cursor-based test cut every
-         * loop short (devdoc 147 A2).  Rewind preserves phase (A2). */
-        unsigned long now = hal_wallclock_smooth_ms();
-        unsigned long cur = now - g_bgm.wall0;
-
-        fmseq_pump(g_fm_seq, &g_fm_sink, cur);
-        if (cur >= g_bgm.len_ms && fmseq_finished(g_fm_seq)) {
-            int ring = fmseq_fm_voices(g_fm_seq);
-            if (ring > 0)
-                hal_logf("FM loop: %d voice%s still ringing on rewind\r\n",
-                         ring, ring == 1 ? "" : "s");
-            fmseq_stop(g_fm_seq, &g_fm_sink);
-            bgm_rewind_phase(now);
-        }
-        return;
-    }
-
-    {
-        /* Smooth virtual clock (devdoc 107 / 0.2.134): raw
-         * hal_wallclock_ms() deltas are chunked under NP2kai (frozen 3-6s,
-         * then +1000..+6000ms jumps), which stalled cur during the holes and
-         * tone-burst the whole event backlog on catch-up.  The smooth clock
-         * advances cur at pass cadence with per-pass bounded deltas, so the
-         * MIDI schedule tracks nominal event times through the holes.
-         * The per-pass event budget (devdoc 147 A3) additionally bounds any
-         * residual burst: a full backlog is spread over several frames. */
-        unsigned long now = hal_wallclock_smooth_ms();
-        unsigned long cur = now - g_bgm.wall0;
-        int budget = AUDIO_BGM_MAX_EVENTS_PER_TICK;
-
-        while (budget > 0 && g_bgm.idx < g_bgm.count &&
-               g_bgm.ev[g_bgm.idx].tick_ms <= cur) {
-            const MidEvent *e = &g_bgm.ev[g_bgm.idx];
-            uint8_t st = e->b0;
-
-            hal_midi_out(st);
-            hal_midi_out(e->b1);
-            /* 0xC0/0xD0 are single-data voice statuses (2-byte wire). */
-            if ((st & 0xF0) != 0xC0 && (st & 0xF0) != 0xD0)
-                hal_midi_out(e->b2);
-#if BGM_TICK_TRACE
-            /* devdoc 150: note-on dispatches only, with the virtual timestamp
-             * and intended tick, so latency vs the schedule is visible. */
-            if ((st & 0xF0) == 0x90 && (e->b2 & 0x7F))
-                hal_logf("BGMT on t=%lu sch=%lu n=%d\n",
-                         (unsigned long)cur,
-                         (unsigned long)e->tick_ms, e->b1 & 0x7F);
-#endif
-            g_bgm.idx++;
-            budget--;
-        }
-
-        /* Loop on musical length once every event has been sent (devdoc 147
-         * A2).  If the budget held events back, wait for a later pass. */
-        if (g_bgm.idx >= g_bgm.count && cur >= g_bgm.len_ms) {
-            g_bgm.idx = 0;
-            bgm_rewind_phase(now);
-        }
-    }
+    bgm_irq_unlock();
 }
 
 /* Scene end: silence BGM (all-notes-off + release) and PCM. */

@@ -168,3 +168,23 @@ unsigned long vclock_ms(const VClock *vc)
     if (!vc) return 0;
     return vc->virtual / VCLOCK_UNITS_PER_MS;
 }
+
+void vclock_advance_fixed(VClock *vc, unsigned long delta_units)
+{
+    /* Interrupt-driven hardware time base (devdoc 165).  Pure arithmetic: a
+     * Timer-B tick is a known fixed period, so no platform clock is read and
+     * no DOS/BIOS call is made -- which is exactly what keeps this callable
+     * from a hardware ISR.  `delta_units` is in 1/16 ms units, so a
+     * non-integer-millisecond timer period (e.g. 8.064 ms -> 129 units) keeps
+     * its phase instead of rounding to whole ms.  `started` is still honoured
+     * so the very first tick after an origin establishes the baseline rather
+     * than emitting. */
+    if (!vc) return;
+
+    if (!vc->started) {
+        vc->started = 1;
+        return;
+    }
+
+    vc->virtual += delta_units;
+}

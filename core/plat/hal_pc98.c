@@ -142,6 +142,15 @@ void hal_wallclock_smooth_advance(void)
 #endif
 }
 
+/* devdoc 165: fixed-step clock advance for the Timer-B ISR.  No DOS call
+ * (int 21h is not reentrant from a hardware handler), no window/step logic --
+ * the hardware timer period IS the time source, so the ISR just adds the
+ * known per-tick delta. */
+void hal_wallclock_fixed_advance(unsigned long delta_units)
+{
+    vclock_advance_fixed(&g_vclock, delta_units);
+}
+
 /*
  * Vertical-retrace sync and frame-boundary detection (devdoc 131 A/B).
  *
@@ -219,6 +228,84 @@ void hal_irq_probe_run(void)
     }
     hal_logf("[IRQP] vsync irq2 hits=%lu samples=%lu imr=%02lx (2s)\r\n",
              hits, samples, imr);
+}
+#endif /* NAIZ_IRQ_PROBE */
+
+#if NAIZ_IRQ_PROBE
+/*
+ * devdoc 164 phase 0: DPMI interrupt-capability probe (read-only).
+ *
+ * Before an ISR can be written the toolchain must be able to hook a hardware
+ * IRQ from 32-bit protected mode.  Open Watcom ships no dpmi.h (G08 §2 flags
+ * the Watcom equivalent of the DJGPP `_go32_dpmi_*` API as unmapped), so this
+ * probe queries the DPMI host directly via INT 31h:
+ *
+ *   AX=0400  -> DPMI version (AH=major/AL=minor), flags in BX
+ *               (BX bit0 = 32-bit host, bit2 = virtual memory)
+ *               CL = CPU type, DH/DL = master/slave PIC base vectors
+ *   AX=0204  -> get the protected-mode vector for a real-mode vector number
+ *   AX=0600  -> lock a linear region (answers if the service exists)
+ *
+ * Nothing is written: no vector is set, no PIC mask is touched.  The verdict
+ * decides between Phase 1 (ISR) and the fallback vclock catch-up (devdoc 163
+ * §4 B3).  IRQ3 (OPNA Timer-B, F04 §6) maps to real-mode INT 0Bh (vector base
+ * 0x08 + 3, G01:87); INT 0Ah is probed too as the vsync cross-check.
+ *
+ * devdoc 164 §4.2: the 32-bit-host flag lives in BX bit0, NOT in CL -- CL is
+ * the CPU type (02=286/03=386/04=486).  The earlier probe read ECX bit0, which
+ * is just CL bit0 (even CPU type => 0) and carried no signal.  The byte verb we
+ * report now is (BX & 0x05): bit0 = 32-bit host, bit2 = virtual memory.
+ */
+void hal_dpmi_probe_run(void)
+{
+    union REGS r;
+    unsigned long v0b, v0a;
+    int ver_h, ver_l, flags, cpu, pic_hi, pic_lo;
+    int cf_b, cf_a;
+    unsigned long lock_off = 0;
+    int lock_ok;
+
+    /* AX=0400: DPMI version.  AH=major, AL=minor; BX=flags, CL=CPU type,
+     * DH/DL=master/slave PIC base vectors. */
+    r.x.eax = 0x0400;
+    int386(0x31, &r, &r);
+    ver_h = (int)((r.x.eax >> 8) & 0xFF);
+    ver_l = (int)(r.x.eax & 0xFF);
+    flags = (int)(r.x.ebx & 0x0005);   /* BX bit0 = 32-bit host, bit2 = VM */
+    cpu   = (int)(r.x.ecx & 0xFF);     /* CL = processor type */
+    pic_hi = (int)((r.x.edx >> 8) & 0xFF);   /* DH = master PIC base vector */
+    pic_lo = (int)(r.x.edx & 0xFF);          /* DL = slave PIC base vector */
+
+    /* AX=0204: read PM vector.  Input: BL=vector number, returns CX:EDX=sel:off.
+     * Carry clear = success; off != 0 proves a PM vector space exists. */
+    r.x.eax = 0x0204;
+    r.h.bl = 0x0B;
+    r.x.edx = 0;
+    r.x.ecx = 0;
+    cf_b = (int386(0x31, &r, &r) & INTR_CF) ? 1 : 0;
+    v0b = ((unsigned long)r.x.ecx << 16) | (r.x.edx & 0xFFFF);
+
+    r.x.eax = 0x0204;
+    r.h.bl = 0x0A;
+    r.x.edx = 0;
+    r.x.ecx = 0;
+    cf_a = (int386(0x31, &r, &r) & INTR_CF) ? 1 : 0;
+    v0a = ((unsigned long)r.x.ecx << 16) | (r.x.edx & 0xFFFF);
+
+    /* AX=0600: lock a linear region.  Asking about a 1-page region at the
+     * current code just tests whether the API answers; the lock request is
+     * not expected to succeed for an arbitrary address and we only report
+     * whether the call was serviced (no carry = service present). */
+    r.x.eax = 0x0600;
+    r.x.ecx = 0x00000000UL;   /* linear address (probe only) */
+    r.x.ebx = 0x1000;         /* 4 KiB */
+    r.x.esi = 0x00000000UL;   /* high 32 bits = 0 */
+    r.x.edi = 0x00000000UL;
+    lock_ok = (int386(0x31, &r, &r) == 0);
+    lock_off = r.x.ebx;
+
+    hal_logf("[DPMP] ver=%d.%d flags=%d cpu=%d pic=%02x/%02x cfB=%d cfA=%d vec0B=%lx vec0A=%lx lock_ok=%d lock_off=%lx\r\n",
+             ver_h, ver_l, flags, cpu, pic_hi, pic_lo, cf_b, cf_a, v0b, v0a, lock_ok, lock_off);
 }
 #endif /* NAIZ_IRQ_PROBE */
 

@@ -2,8 +2,98 @@
 
 自 R1 起全部 Bug 修复与功能演进记录（条目顺序沿用 AGENTS.md 既有历史排列）；`AGENTS.md` 仅保留当前版本与规则。**新条目约定**：每轮修复/演进完成后，在下方 `---` 分隔线之后（第一条位置）追加变更摘要，并在 AGENTS.md 头部同步「当前版本」。**条目格式**：每条以 `### <版本号> — <标题>` 开头（版本号化标题行 + `<a id="cN">` 锚点，N 按条目序递增），正文整段或分小节；历史速查直接读下方「版本索引」。
 
-<a id="c77"></a>
-### 0.3.049 — `makegame.sh` 新增 `makegame` 子命令（build + make 一步到位）
+<a id="c81"></a>
+### 0.3.053 — 方案 A 实机落地：Timer-B ISR 安全化（去 DOS 反射/FP/日志/堆）+ 定点硬件时基 + 心跳取证；`$27=0x2A` 定论
+
+**背景**：承 `c80`（0.3.052）双线自适应后，`NAIZ_BGM_IRQ=1` 构建实机**静默卡死**（串口停在 `BGM IRQ: unmask` 后无 `Timer-B installed`、无 `bootmenu`）；裸 ISR（只清标志 + EOI）则**不卡死但 ISR 从不被调用**。用户拍板「深挖 NP2kai 为何不触发」→ 立 `devdocs/165`，得两条定论并完成改造。
+
+**定论一 —— Timer-B 只触发一次的唯一根因 = `$27` 标志清除写入内容**：handler 清 OPNA Timer-B 标志写 `$27` 必须 = **`RESET_B|ENABLE_B|LOAD_B = 0x2A`**。缺 bit1（LOAD B）→ NP2kai `opna_settimer` 走 `nevent_reset` **停掉事件**；缺 bit3（ENABLE B）→ 不再置 status、不再 `pic_setirq`。裸 ISR 版实测 `isr_count` 1 → **3600+**（根因取自 NP2kai `sound/opntimer.c` 事件模型 + gdb 反证 `HIT fmport_b`/`pic_setirq irq=0xc` ×2 而 ISR 只进一次）。
+
+**定论二 —— ISR 上下文四类不安全构造**：① **B1 `hal_wallclock_ms()` = DOS 反射调用**（`hal_pc98.c` `int386(0x21, AH=2Ch)`）经 `hal_wallclock_smooth_advance()` 与 `audio_tick()` 的 `AUDIO_PUMP_TRACE` 块触达 → 不可重入死锁；② **B2 x87/FPU + `pow()`**（`fmopn.c`、`fmseq.c` 的 `double`）——Watcom `__interrupt` 不保存 x87 栈；③ **B3 `hal_logf`/串口阻塞 I/O**；④ **B4 `free()` 堆操作**（每 tick 的 PCM 缓冲释放）。`audio_tick()` 在协作路径正确、在 ISR 上下文**完全不可用**。
+
+**修复（方案 B 定点硬件时基，用户拍板路线 1）**：
+- **B1**：`core/lib/vclock.{c,h}` 增 `vclock_advance_fixed(vc, delta_units)`——纯算术、**不动 `real_prev/step/target/window/accum/calibrated`**（硬件时基不需那套为不可靠 DOS 秒设计的测量）；`hal.{h,c}` 增 `hal_wallclock_fixed_advance()`。
+- **B2**：`fmopn.c` 去 FP——新增 `fmopn_note_table[128]`（`block<<10|fnum`，锚点 A4=5/520、C4=4/618）、`fmopn_ratio_freq_x256()`（导出）、整数 `fmopn_bend_ratio()`；删 `pow`/`fmopn_note_freq`/`fmopn_ratio_freq`/`#include <math.h>`。`fmseq.c::period_of_freq()` 改收 Hz×256（内联 `7987200/4/16` 整数字面量，删 `FMSEQ_CLOCK`/`FMSEQ_SSG_DIV` 双精度宏）。
+- **B3/B4**：`audio.c` 拆 `audio_tick_isr()`（ISR 安全核心：`hal_pcm_tick()` + FM/MPU 泵 + 回绕，**无日志/无 free/无 DOS 反射**）；`audio_tick()` 保留为帧外壳。PCM 缓冲重绑与释放均套 `bgm_irq_lock()/unlock()` 临界区。回绕的「仍有声部在响」日志由 ISR 置 `g_bgm.rewound` 标志、帧路径经 `fmseq_fm_voices()` 打印（恢复 B3 移除日志后成为死导出的该函数，见验证）。
+- **handler**：`hal_wallclock_fixed_advance(BGM_TIMER_B_UNITS=129)`（`NB=200` ⇒ `1152*56/8e6=8.064ms`，×16=129 units，误差 <0.02%）→ `audio_tick_isr()` → `$27=0x2A` → 双发 EOI。
+- **心跳**：handler `g_isr_ticks++`（volatile），经 `hal_bgm_irq_ticks()` 由**帧路径**采样打 `[ISR] ticks=… v=…`（handler 自身绝不打日志）。
+
+**实机验证**（`EXTRA_DEFS=-DNAIZ_BGM_IRQ=1`，NP2kai）：`BGM IRQ: _dos_setvect(INT 14h)` → `Timer-B installed (NB=200, ~124Hz, IRQ12 (slave))` → `bootmenu: enter`；主循环跑满 **3836 次鼠标轮询、无卡死**；`[ISR] ticks` **2454→3439 单调递增**，每 ~141 tick 虚拟钟步 ≈1136ms（=141×8.064ms，**相位精确**）；`core/*.err` 空、无 panic。
+
+**验证**：默认构建（开关关）0 诊断；`test_frame_pump.py` 改写 `test_isr_sequence_is_bounded_and_eois_both_pics`（否定断言禁 `hal_wallclock_smooth_advance`/`hal_wallclock_ms`/`audio_tick();`/`hal_logf`/`free(`/`pow(`/`double `）+ 新增 `test_isr_timer_b_reset_keeps_load_and_enable`/`test_isr_heartbeat_is_sampled_from_the_frame_path`（**29 passed**）；`test_vclock.py` 新增 `test_fixed_advance_uses_the_hardware_delta_only`；全量 pytest **832 passed, 1 skipped**；`symbol_audit -s A,B` 空（B3 曾使 `fmseq_fm_voices()` 成死导出，已由帧路径回绕日志恢复调用方）；`./start.sh fullaudit --no-make` **全绿**；`test_devdoc_refs.py` 18 passed（`audio.c` pin 移位更新）；`bump_version` 0.3.052→**0.3.053**（全项目同步）、`export_config` 重生成 `nb_config.h`。
+
+**文档**：新 `devdocs/165`；`devdocs/164` 头部加 ⚠ ERRATA 块（§5.3 前提被证伪，指 165）；`docs/B90` 补 `hal_wallclock_fixed_advance`/`hal_bgm_irq_ticks`/`vclock_advance_fixed`/`audio_tick_isr` 并改写 `hal_bgm_irq_*`、`hal_wallclock_smooth_advance` 条目。**同轮文档整理（零代码、零版本号变更）**：五篇**尚未落地代码**的「模仿外部项目」升级计划文档（`158` MIDI CC/RPN 语义、`159` OPNA RHYTHM 打击乐、`160` MIDI 颤音软件 LFO、`161` S98 dump 工具、`162` BGM 功能候选池）由 `devdocs/` 根迁入新目录 **`devdocs/模仿升级计划/`**（`git mv`，保留历史；文件名与编号不变，跨文档裸编号引用仍成立）；根 `README.md` 的 `## Reference Projects` 增列四个被实际借鉴的外部项目 —— **ADV98**（`yarufu/pc98`，MIT）、**98fmplayer**（`myon98/98fmplayer`，BSD-2-Clause）、**NP2kai**（`AZO234/NP2kai`，MIT）、**ymfm**（`aaronsgiles/ymfm`，BSD-3-Clause，已 vendor 于 `tools/vendor/ymfm`）。`docs/refdocs/README.md` §来源索引按「只登记知识文档来源」定位不动。
+
+**遗留**：**实机最终听感（BGM 在 CPU 密集操作期是否真不停顿）待用户验证**；MIDI 后端路径 ISR 化未覆盖（本环境无 MPU-401）；非 NP2kai 真机 IRQ 线归属未知（双线自适应为缓解）；方案 B（vclock 有界相位追赶）保留为回退。
+
+<a id="c80"></a>
+### 0.3.052 — 方案 A IRQ 线定论：NP2kai 实为 IRQ12（slave）非 IRQ3，`hal_irq.c` 改双线自适应（IRQ12 优先/IRQ3 回退）+ `DL=0x10` 异常判断撤销
+
+**背景**：承 `c79`（0.3.051）——探针重跑得 `pic=08/10`，当时把 `DL=0x10` 记为「slave 基向量异常（标准 0x70）」的遗留。本轮先查证 DPMI `310400` 规格，再核 NP2kai 源码链，**得决定性结论**：`DL=0x10` 非异常、且 OPNA Timer-B 在本实机 oracle 上走的是 **IRQ12（slave）**、非原设计的 IRQ3。
+
+**根因/定论（两条）**：
+1. **`DL=0x10` 非异常**：DPMI `310400`（delorie）= `DH=virtual master PIC base`、`DL=virtual slave PIC base`；**PC-98 的 slave 基向量本就是 `0x10`**（IBM PC 才是 `0x70`），依 `docs/refdocs/B01_memory_map.md:104-113`：master IRQ0→INT 08h、slave IRQ8→**INT 10h**。`DH=08/DL=10` 与 PC-98 架构**完全自洽**——原「异常」判断**撤销**。
+2. **OPNA Timer IRQ = IRQ12（slave）**：两处来源矛盾（`F04:28` QEMU=IRQ3 vs `G09:49` DOSBox-X=IRQ12）；以本仓实机 oracle NP2kai 源码链定论——`pccore.c:654` 默认 **`snd86opt=0x7f`** ⇒ `board86.c:150` `nIrq=(0x7f&0x10)|((0x7f&0x4)<<5)|((0x7f&0x8)<<3)=`**`0xD0`** ⇒ `opntimer.c:158` `s_irqtable[nIrq>>6]=s_irqtable[3]` ⇒ `opntimer.c:13` `=0x0c` = **IRQ12**。交叉印证：`snd86opt&0x01=1` ⇒ OPNA I/O base=**0x188**，与串口 `AUDIO OPNA OK` 吻合（反证 `snd86opt=0x7f`）。IRQ12 = slave IRQ4 ⇒ 向量 **INT 14h**、**slave IMR bit4（0x10）**。
+
+**修复（用户拍板「双线自适应」，IRQ12 优先 / IRQ3 回退）**（`core/plat/hal_irq.c`）：`hal_bgm_irq_init()` 改为 `g_irq_lines[]` 顺序试挂——先 **IRQ12**（`vector=0x14`、`PIC1_IMR` bit4=`0x10`、`"IRQ12 (slave)"`），若 `0204` 无 PM 向量或 `0205` 失败则回退 **IRQ3**（`0x0B`、`PIC0_IMR` bit3=`0x08`、`"IRQ3 (master)"`）；`g_irq_line` 记录实挂线，`hal_bgm_irq_shutdown()` 重屏蔽**对应** IMR。handler 的双发 EOI（slave 先 master 后）对两线**均正确**，无需按线分支。文件头注释块同步重写（含 IRQ12 定论链）。
+
+**验证**：`make -C core EXTRA_DEFS=-DNAIZ_BGM_IRQ=1` 0 诊断、`core/*.err` 空；默认构建（开关关）0 诊断且逐字节不变；`test_frame_pump.py` 新增 `test_bgm_irq_is_dual_line_slave_first`（守卫两向量并存 + slave 先于 master + 两 PIC IMR 可达 + `0x14` 在 `0x0B` 之前），**27 passed**；全量 pytest **829 passed, 1 skipped**；`test_devdoc_refs.py` 18 passed；`bump_version` 0.3.051→**0.3.052**（全项目同步）、`export_config` 重生成 `nb_config.h`。
+
+**文档**：`devdocs/164` 新增 **§4.4（IRQ 线归属定论 + 双线自适应）**；§4.3 的 `pic` 行订正（`DL=0x10` 改为「slave base=INT 10h，正常」）、「新遗留」重写；标题/状态行/§二/§四/§5.2/§六/§七/§八/§九 同步；`docs/B90:227` `hal_bgm_irq_*` 条目改写为双线；`docs/B91:110` `NAIZ_BGM_IRQ` 描述补双线。
+
+**遗留**：**IRQ12/IRQ3 是否被 Timer-B 实际抬升**仍须实机（探针只查向量）；**`NAIZ_BGM_IRQ=1` 装 ISR 后是否静默卡死**仍须实机（预期串口见 `BGM IRQ: Timer-B installed (… IRQ12 (slave))`；风险 = 既有 stub 链可否安全覆盖/链尾）；方案 B（vclock 有界相位追赶）保留为回退。
+
+<a id="c79"></a>
+### 0.3.051 — 方案 A 阶段 0 探针修正 + 重跑：`flags=1` 证实 32-bit DPMI host、`pic=08` 证实 IRQ3→INT 0Bh（原「负向」结论彻底证伪）
+
+**背景**：承 `c78`（0.3.050）——阶段 0 DPMI 只读自检实机取证得 `[DPMP] ver=0.90 bits32=0 vec0B=80002c vec0A=800028 lock_ok=0`，据此误判「DPMI 层不可靠」⇒ 方案 A「判定负向」。本轮先就三项疑点查证外部规范（`devdocs/164 §4.2`），**三项全部指向「原判过强、探针有 bug」**；随即修探针并重跑（`§4.3`），取得清洁读数，**原负向结论彻底证伪**。
+
+**根因（三条，全部证伪原判）**：
+1. **`bits32` 读位 bug**：`0400` 的 32-bit host 标志在 **BX bit0**，**CL 才是 CPU 类型**（02=286/03=386/04=486/05+=保留）；旧探针读 `r.x.ecx & 0x01` = CL 最低位（CPU 类型偶⇒0），**不构成任何信号**。出处 `delorie.com/djgpp/doc/dpmi/api/310400.html`。
+2. **`lock_ok=0` 无意义**：部署树 `AUTOEXEC.BAT` **未设 `DOS4GVM`**、`CONFIG.SYS` 用 **VEM486**（HDI 实测）⇒ 按 DOS/4GW 文档「未设则只用真实内存」= **无分页宿主，锁页空转**；且探针探的是线性地址 0。锁页只在有 VM 宿主（Windows/OS-2/CWSDPMI/`DOS4GVM`）下才是硬约束（DOS/4GW FAQ 4c/7c）。
+3. **`vec0B` 非异常占用**：`8–2Eh` 是 DOS/4GW 的 **auto-passup 范围**，extender 在此区段预置 PM passup stub（FAQ 4a）——`vec0B=80002c` 恰是机制本身；且 FAQ 明言该区间**仅用 `_dos_setvect()` 即可**让 DOS/4GW 双向路由 PM/RM 中断（`0205` 是高效替代而非必需）。
+
+**探针修正**（`core/plat/hal_pc98.c::hal_dpmi_probe_run()`）：`bits32 = r.x.ecx & 0x01` → **`flags = r.x.ebx & 0x05`**（BX bit0=32-bit host、bit2=虚拟内存）；**增打 `cpu`**（CL=处理器类型）、**`pic`**（DH/DL=master/slave PIC 基向量）、**`cfB`/`cfA`**（两次 `0204` 进位，0=成功）。输出格式改为 `[DPMP] ver=… flags=… cpu=… pic=%02x/%02x cfB=… cfA=… vec0B=… vec0A=… lock_ok=… lock_off=…`。
+
+**重跑清洁读数**（`logs/serial_demo-a2.log`）：
+```
+[IRQP] vsync irq2 hits=3872 samples=3872 imr=7d (2s)
+[DPMP] ver=0.90 flags=1 cpu=6 pic=08/10 cfB=0 cfA=0 vec0B=80002c vec0A=800028 lock_ok=0 lock_off=1000
+```
+
+**判读（决定性）**：
+- ✅ **`flags=1`** ⇒ **bit0=1 = 32-bit (80386) DPMI host 证实**（原 `bits32=0` 确系读位 bug）；bit2=0 = 无虚拟内存。
+- ✅ **`pic=08/10`** ⇒ **DH=0x08 = master PIC 基向量 = INT 08h**（与 `G01:87`「IRQ0=INT 08h」一致）⇒ **IRQ3 → INT 0Bh 得证**。
+- ✅ **`cfB=0`/`cfA=0`** ⇒ 两次 `0204` 取向量**均成功**（`vec0B`/`vec0A` 有效佐证）。
+- `cpu=6`（CL，文档 0.9 定义 02–05，6 属保留区，NP2kai 报较新型号，无碍）；`lock_ok=0` 无 VM 下无意义。
+- **结论**：阶段 0 **取证通过**——Watcom + DOS/4GW 下用 DPMI `0205`（高效路）或 `_dos_setvect(0x0B,…)`（便捷路，`8–2Eh` auto-passup）挂 32-bit ISR **技术可行**；方案 A 由「判定负向」改为「**待实机启用**」。
+
+**验证**：`make -C core`（默认探针排除）0 诊断、`core/*.err` 空；`NAIZ_IRQ_PROBE=1` 全流程构建成功（`strings core/engine.exe` 含 `[DPMP]` 新格式）；实机（NP2kai `wxnp21kai` IA32 核，宿主 DOS/4GW）`test-hdi --serial` 取得上列清洁读数；全量 pytest **828 passed, 1 skipped**；`test_frame_pump.py` **26 passed**（`test_dpmi_probe_is_gated_and_read_only` 守卫仍适用）；`bump_version` 0.3.050→**0.3.051**、`export_config` 重生成 `nb_config.h`、默认引擎已重建并复原部署（`games/demo-a2/engine.exe` 无探针字符串）。
+
+**文档**：`devdocs/164` §4.1 逐项解读订正 + 新增 §4.2（网络调研订正表）+ 新增 §4.3（探针修正 + 重跑清洁读数）；状态行/§三/§四/§六/§八/§九同步。
+
+**遗留**：**`DL=0x10` 异常待解**——slave PIC 基向量报 0x10 而非标准 0x70（IRQ3 在 master 不受影响，但若 OPNA IRQ 走 slave 线则受影响；与 `G09 §3`「PC-98 级联线归属未定」呼应，启用前须确认 OPNA Timer-B 中断落 master 还是 slave）；**IRQ3 是否被 Timer-B 实际抬升**仍须实机（探针只查向量）；**`NAIZ_BGM_IRQ=1` 装 ISR 后是否静默卡死**仍须实机（风险已降至「IRQ3 既有 stub 链可否安全覆盖/链尾」）。方案 B（vclock 有界相位追赶）保留为回退。
+
+<a id="c78"></a>
+### 0.3.050 — 方案 A 中断驱动音泵：阶段 0 DPMI 只读自检 + 阶段 1 Timer-B/IRQ3 ISR 骨架落地
+
+**背景**：承 `devdocs/163`「BGM 不可打断性」总纲——M1 结构性缺陷（慢 pass 时间债，vclock 只发 `step` 从不补偿相位）使任何 CPU 密集操作期 BGM 停住、操作后原地续播。163 的 Phase 1/2 只覆盖 MAG 解码，明文「M1 属结构性，Phase 3 方能根治」。本轮按用户拍板实施**方案 A（中断驱动音泵）**，中断源 = **OPNA Timer-B → PC-98 IRQ3**，窗口化交付（阶段 0 只读自检 → 阶段 1 ISR 骨架），立 `devdocs/164`。
+
+**阶段 0（DPMI 能力只读自检）**：`core/plat/hal_pc98.c::hal_dpmi_probe_run()`（`#if NAIZ_IRQ_PROBE`，默认编译排除）——经 `int386(0x31,…)` 仅调 `0400`（版本/bits32）/`0204`（取 PM 向量，探 INT 0Bh=IRQ3 与 0Ah=vsync）/`0600`（探锁页）→ 打 `[DPMP] ver=… bits32=… vec0B=… vec0A=… lock_ok=…`；**绝不调 `0205`（不挂向量）、不改 IMR**。存在理由 = 工具链现实（`/usr/h` 无 `dpmi.h`/`_go32_dpmi_*`，Watcom+DOS/4GW 下 INT 31h 行为未经证实），先取证再挂接（§九.6 假通过比失败更危险）。`main.c` 在 `hal_irq_probe_run()` 后调用。
+
+**阶段 1（ISR 音泵骨架，`core/plat/hal_irq.c` 新文件）**：`#if NAIZ_BGM_IRQ`（**默认 0**）编译门控。
+- `hal_bgm_irq_init()`：DPMI `0204` 预检 IRQ3 向量 → `0205` 挂 `bgm_irq_handler` → 查 cflag → 解除 master IMR bit3 → 写 `$26`=NB200（≈124Hz）/`$27` LOAD+ENABLE B/`$29`=`0x80|0x02`（SCH+EN_TB）；**绝不碰 `$2D-$2F` 预分频**（F04 §8.3 高危）。
+- `bgm_irq_handler`（`__interrupt __far`，严格有界、无 `malloc`/`fopen`）：`hal_wallclock_smooth_advance()` → `audio_tick()` → 清 `$27` RESET B → **双发 EOI**（slave `PIC1_CMD` 先、master `PIC0_CMD` 后，G09 §3 级联 ACK 硬约束）。
+- `hal_bgm_irq_active()` 供帧泵让出所有权；`hal_bgm_irq_shutdown()` 停表 + 重屏蔽 IRQ3（`ENGINE_EXIT` 经 `NAIZ_BGM_IRQ_CLEANUP()` 调用）。
+- 契约变更（163 §五 C2.4）：`engine_frame_pump()`/`frame_decode_pump()` 在 `hal_bgm_irq_active()` 为真时**跳过** `hal_wallclock_smooth_advance()` 与 `audio_tick()`（防双泵/双步进）；`audio_bgm_start/stop` 状态提交窗以 `bgm_irq_lock()/unlock()`（`_disable/_enable`）包裹防 ISR 竞态。**回退**：装不上则串口告警 + 运行时回落协作路径。
+
+**验证**：`make -C core`（默认）／`EXTRA_DEFS=-DNAIZ_BGM_IRQ=1`／`-DNAIZ_IRQ_PROBE=1` **三构建均 0 诊断**（`core/*.err` 空）；`test_frame_pump.py` 新增 6 条守卫（开关默认关、帧泵/解码泵让出时钟与音泵、ISR 有界 + 双 EOI + 无预分频、状态提交临界区、DPMI 探针只读）**26 passed**；全量 pytest **828 passed, 1 skipped**；`symbol_audit -s A,B` 空；`test_devdoc_refs.py` audio.c 四条 + main.c 三条行号位移更新（旧值入 `SUPERSEDED_SHIFTED_LINE_REFS`）；`bump_version` 0.3.049→**0.3.050**、`export_config` 重生成 `nb_config.h`。
+
+**文档**：新 `devdocs/164`；`docs/B90` 补 `hal_dpmi_probe_run`/`hal_bgm_irq_init/active/shutdown`；`docs/B91 §2.2.1` 新增诊断编译开关表。
+
+**遗留**：**实机验证未执行**——本环境零中断闭环（NP2kai 无实机）。需用户 ①`make -C core EXTRA_DEFS=-DNAIZ_IRQ_PROBE=1` → `build`+`make` → `test --serial`，回报 `[DPMP]` 行（`bits32=1` 且 `0204` 成功 ⇒ 阶段 1 理论可行；失败/`bits32=0` ⇒ 转方案 B）；②阶段 1 后 `-DNAIZ_BGM_IRQ=1` 构建实机听感（是否卡死／EOI 正确／与鼠标 IRQ13 共存）。方案 B（vclock 有界相位追赶）保留为回退。
+
+
 
 **背景**：用户要求合并 `build`（编译项目数据/部署 DOS 树）与 `make`（注入 HDI）两步为一条命令，新选项放交互菜单第一位，原两条保留。新子命令名 = `makegame`。
 
@@ -731,6 +821,10 @@
 
 | 条目 |
 |------|
+| [0.3.053 — 方案 A 实机落地：Timer-B ISR 安全化（去 DOS 反射/FP/日志/堆）+ 定点硬件时基 + 心跳取证；`$27=0x2A` 定论](#c81) |
+| [0.3.052 — 方案 A IRQ 线定论：NP2kai 实为 IRQ12（slave）非 IRQ3，`hal_irq.c` 改双线自适应（IRQ12 优先/IRQ3 回退）+ `DL=0x10` 异常判断撤销](#c80) |
+| [0.3.051 — 方案 A 阶段 0 探针修正 + 重跑：`flags=1` 证实 32-bit DPMI host、`pic=08` 证实 IRQ3→INT 0Bh（原「负向」结论彻底证伪）](#c79) |
+| [0.3.050 — 方案 A 中断驱动音泵：阶段 0 DPMI 只读自检 + 阶段 1 Timer-B/IRQ3 ISR 骨架落地](#c78) |
 | [0.3.049 — `makegame.sh` 新增 `makegame` 子命令（build + make 一步到位）](#c77) |
 | [0.3.048 — BGM 不可打断性立项：Phase 1 取证打点（`[AP]` 泵间隔+债 / `[VC]` 补墙钟）+ Phase 2 解码泵时钟去门控（B2）+ Phase 3 vsync IRQ 投递探针（C1）](#c76) |
 | [0.3.047 — BGM 分配器三项根修：启用 OPNA 六声道（$29=0x80）+「最冷空闲」分配 + `fmseq_stop` 声部 age 复位（场景切换 click）](#c75) |

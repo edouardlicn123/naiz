@@ -102,6 +102,8 @@ def _make_clock():
     lib.vclock_init.restype = None
     lib.vclock_advance.argtypes = [ctypes.POINTER(VClockT), ctypes.c_ulong]
     lib.vclock_advance.restype = None
+    lib.vclock_advance_fixed.argtypes = [ctypes.POINTER(VClockT), ctypes.c_ulong]
+    lib.vclock_advance_fixed.restype = None
     lib.vclock_ms.argtypes = [ctypes.POINTER(VClockT)]
     lib.vclock_ms.restype = ctypes.c_ulong
 
@@ -399,3 +401,28 @@ def test_sustained_rate_change_still_converges():
         f"clock went deaf to a sustained slowdown: target={vc.target} "
         "(25Hz rate is 640 units, 10Hz is 1600)")
 
+
+
+def test_fixed_advance_uses_the_hardware_delta_only():
+    """devdoc 165: the Timer-B ISR cannot read the DOS clock (int 21h is not
+    reentrant), so vclock_advance_fixed() must add a known 1/16-ms delta with
+    no window/step/target measurement.  Two properties: the virtual clock
+    advances by exactly the delta per call, and the measurement state the DOS
+    path owns (step/target/passes/accum/calibrated) is left untouched."""
+    lib, vc = _make_clock()
+    step0, target0 = vc.step, vc.target
+
+    lib.vclock_advance_fixed(ctypes.byref(vc), 129)   # first tick = baseline
+    assert lib.vclock_ms(ctypes.byref(vc)) == 0, (
+        "the first fixed tick must establish the baseline, not emit (started)")
+
+    for _ in range(100):
+        lib.vclock_advance_fixed(ctypes.byref(vc), 129)
+
+    # 100 ticks * 129/16 ms = 806.25 ms -> 806 whole ms.
+    got = lib.vclock_ms(ctypes.byref(vc))
+    assert got == 806, f"fixed advance drifted: got {got} want 806"
+    assert (vc.step, vc.target) == (step0, target0), (
+        "the fixed path must not touch the DOS-rate measurement state")
+    assert vc.passes == 0 and vc.accum == 0 and vc.calibrated == 0, (
+        "the fixed path must not feed the window/calibration machinery")

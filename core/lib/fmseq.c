@@ -20,8 +20,6 @@
 #include "midi.h"
 
 #define FMSEQ_SSG_DECAY_PER_SEC  384   /* 8-bit SSG amplitude units/sec */
-#define FMSEQ_CLOCK              7987200.0
-#define FMSEQ_SSG_DIV            16.0   /* SSG tone = clock/4/16/period */
 #define FMSEQ_ATT_MAX            15     /* velocity -> TL attenuation cap */
 #define FMSEQ_DRUM_FAMILY_TONE   0      /* kick/toms -> SSG0 */
 #define FMSEQ_DRUM_FAMILY_SNARE  1      /* snare/rim/clap -> SSG1 */
@@ -67,19 +65,26 @@ static void fm_op_addr(int ch, int r, uint8_t base, int *bank, uint8_t *addr)
     fmopn_op_addr(ch, reg, bank, addr);
 }
 
-/* SSG tone period for a frequency (clamped to the 12-bit period range). */
-static int period_of_freq(double freq)
+/* SSG tone period for a frequency (clamped to the 12-bit period range).
+ * Integer fixed point (devdoc 165 B2): freq_hz_x256 is Hz*256, and the old
+ * double expression (7987200/4)/16/freq is reproduced in integer math. */
+static int period_of_freq(uint32_t freq_hz_x256)
 {
-    double p;
+    uint64_t num;
+    uint64_t p;
 
-    if (freq <= 0.0)
-        freq = 1.0;
-    p = (FMSEQ_CLOCK / 4.0) / FMSEQ_SSG_DIV / freq;
-    if (p < 1.0)
+    if (freq_hz_x256 == 0)
+        freq_hz_x256 = 256u;                 /* freq <= 0 -> 1 Hz (old guard) */
+    /* p = (CLOCK/4)/SSG_DIV/freq, in the same 1/256-Hz scaling.  Use integer
+     * literals: the CLOCK/SSG_DIV macros are doubles and would drag the x87
+     * unit back onto the ISR path (devdoc 165 B2). */
+    num = (uint64_t)(7987200u / 4u / 16u) * 256u;
+    p = (num + freq_hz_x256 / 2u) / freq_hz_x256;   /* round to nearest */
+    if (p < 1u)
         return 1;
-    if (p > (double)FMOPN_SSG_PERIOD_MAX)
+    if (p > (uint64_t)FMOPN_SSG_PERIOD_MAX)
         return FMOPN_SSG_PERIOD_MAX;
-    return (int)(p + 0.5);
+    return (int)p;
 }
 
 /* GM percussion key -> (ssg channel, mode, noise period). */
@@ -291,7 +296,6 @@ static void ssg_note_on(Fmseq *seq, const FmseqSink *sink, int midi_ch,
     int ssg_ch;
     uint8_t mode, noise_period, amp;
     int period, blk, fn;
-    double freq;
 
     percussion_class(note, &ssg_ch, &mode, &noise_period);
     period = 1;
@@ -299,8 +303,7 @@ static void ssg_note_on(Fmseq *seq, const FmseqSink *sink, int midi_ch,
         fmopn_note_ratio(note, &blk, &fn);
         if (seq->bend[FMSEQ_PERCUSSION_MIDI_CH] != 8192)
             fmopn_bend_ratio(seq->bend[FMSEQ_PERCUSSION_MIDI_CH], &blk, &fn);
-        freq = fmopn_ratio_freq(blk, fn);
-        period = period_of_freq(freq);
+        period = period_of_freq(fmopn_ratio_freq_x256(blk, fn));
         w(sink, 0, (uint8_t)(ssg_ch * 2), fmopn_ssg_period_fine(period));
         w(sink, 0, (uint8_t)(ssg_ch * 2 + 1),
           fmopn_ssg_period_coarse(period));
@@ -391,12 +394,10 @@ static void fm_apply_bend(Fmseq *seq, const FmseqSink *sink, int midi_ch)
         for (i = 0; i < FMSEQ_PERCUSSION_SSG_CH; i++) {
             if (seq->ssg[i].v.active && seq->ssg[i].mode == FMSEQ_SSG_TONE) {
                 int period;
-                double freq;
                 fmopn_note_ratio(seq->ssg[i].v.midi_note, &blk, &fn);
                 if (seq->bend[midi_ch] != 8192)
                     fmopn_bend_ratio(seq->bend[midi_ch], &blk, &fn);
-                freq = fmopn_ratio_freq(blk, fn);
-                period = period_of_freq(freq);
+                period = period_of_freq(fmopn_ratio_freq_x256(blk, fn));
                 w(sink, 0, (uint8_t)(i * 2), fmopn_ssg_period_fine(period));
                 w(sink, 0, (uint8_t)(i * 2 + 1),
                   fmopn_ssg_period_coarse(period));

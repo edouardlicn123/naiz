@@ -1,7 +1,7 @@
 {
   "version": 2,
-  "git_head": "6cc98a6",
-  "checked_at": "2026-10-21T09:05:14",
+  "git_head": "cc4a80c",
+  "checked_at": "2026-10-21T14:06:35",
   "files": {
     "core/build.sh": {
       "sha256": "0e6bb3f41cae8f6c5a014a49767f93990ddd3e2c461a85ec991c01b40b66b11e",
@@ -22,24 +22,24 @@
       ]
     },
     "core/engine/audio.c": {
-      "sha256": "12aeb8cdd6cfc33512d4f14583e6dce64d6e775d0be8c0cd94c84d769c687136",
+      "sha256": "eba30b2cbf90d5037728b5e99bff0341d4753ae7a33001378ed55ca02b49834a",
       "violations": 0,
       "candidates": 2,
       "findings": [
         {
-          "line": 545,
+          "line": 579,
           "rule": "C1",
           "level": "HEUR"
         },
         {
-          "line": 199,
+          "line": 216,
           "rule": "C9",
           "level": "HEUR"
         }
       ]
     },
     "core/engine/audio.h": {
-      "sha256": "f66d4b2cede1468285c8dfc95e460cb9285ea9ef6bf191a995a7ab031ead75ce",
+      "sha256": "7e9dc9214ec97b1f74ac7abd51fb799aefc19925d161e895224165c0291a399b",
       "violations": 0,
       "candidates": 0,
       "findings": []
@@ -87,7 +87,7 @@
       "findings": []
     },
     "core/engine/frame.c": {
-      "sha256": "90607b3252daa8b3c4dc1ecd57530c58fdf0baf3585ac6a6d962eee3afe80a54",
+      "sha256": "bc8c8a1f6057fb6ab77bb83ec371039d3a58fbf9de1fb5da45e6fb922ad1e0f3",
       "violations": 0,
       "candidates": 0,
       "findings": []
@@ -236,7 +236,7 @@
       ]
     },
     "core/engine/main.c": {
-      "sha256": "0d696acaedee98e4368c33f3b2494ff8f9f9c3b37dc318e1c6977ca3d477d172",
+      "sha256": "e1da11456153d1c73d7b6ec638949764b260da8dff52bc25087a15cbc77a6e45",
       "violations": 0,
       "candidates": 0,
       "findings": []
@@ -332,7 +332,7 @@
       "findings": []
     },
     "core/engine/nb_config.h": {
-      "sha256": "d826e0f1287167852f73bf28d2151ea1ec39dbf889c4bc374f8737db098d4a04",
+      "sha256": "faa3c75fae4a36c96347e25bcb1f74103d54446da5a04d35c32a9707579f07f8",
       "violations": 0,
       "candidates": 0,
       "findings": []
@@ -685,25 +685,25 @@
       "findings": []
     },
     "core/lib/fmopn.c": {
-      "sha256": "68700edab2df14fe7fde7c6427293317c436e54b2690df930886cec93567f6bd",
+      "sha256": "c16934275d8f31c3635ba104db09c305c3b95727e4720e9cfff14a3c14227dfb",
       "violations": 0,
       "candidates": 1,
       "findings": [
         {
-          "line": 115,
+          "line": 137,
           "rule": "C35",
           "level": "HEUR"
         }
       ]
     },
     "core/lib/fmopn.h": {
-      "sha256": "585ef4620cc3534cdfc224da046f82409d732fdabf71d859eedd698e428a65aa",
+      "sha256": "0fc618ffc6866605b1a67530cd85c9adff7ffd80cdf5a282c2f2ce79d51cd1a3",
       "violations": 0,
       "candidates": 0,
       "findings": []
     },
     "core/lib/fmseq.c": {
-      "sha256": "3ffb52e4d22dd13cb65507c195d523426d55b922684b6897c669c42c2b7a4c7b",
+      "sha256": "5078fa963b67de5c800304e2566ee5092c6647e6b8413c07c6e78e705f20a17f",
       "violations": 0,
       "candidates": 0,
       "findings": []
@@ -799,13 +799,13 @@
       "findings": []
     },
     "core/lib/vclock.c": {
-      "sha256": "b796219fa71b90a841703976deee885e2ed8661b1fc195d87b57001f15631af3",
+      "sha256": "cc303063ee8d297259de4c625e1898cf9e1af379f69093658bdbd439f7544839",
       "violations": 0,
       "candidates": 0,
       "findings": []
     },
     "core/lib/vclock.h": {
-      "sha256": "101fcbf9145abd0f7754583c2ecb05238d64b73e0d7c98c99d5a7bd0c0849628",
+      "sha256": "21d4d199b1bea76ee4c1651a2587d3f6375800e73f01829487832a09ba6c6136",
       "violations": 0,
       "candidates": 0,
       "findings": []
@@ -823,13 +823,19 @@
       "findings": []
     },
     "core/plat/hal.h": {
-      "sha256": "789498479a0405c54f19a0ca0bd54e3f8cbd4a03872e6e407a0e37c1cdbffe02",
+      "sha256": "1ad3d80293499b7a79fe063063d708e447d6a137cdc81093a9b6224f29888349",
       "violations": 0,
       "candidates": 0,
       "findings": []
     },
     "core/plat/hal_audio.c": {
       "sha256": "44f49dac3ffe5b7ac3e350d5471f375bf98b2e7127f653dc164d7707794dbb76",
+      "violations": 0,
+      "candidates": 0,
+      "findings": []
+    },
+    "core/plat/hal_irq.c": {
+      "sha256": "50a4249378172ac9751791a5df361e38cf9b3926128fd91339e72a732f09bd38",
       "violations": 0,
       "candidates": 0,
       "findings": []
@@ -847,7 +853,7 @@
       "findings": []
     },
     "core/plat/hal_pc98.c": {
-      "sha256": "81cb5e123ad27c5e7cb50a0aa3a357a40f0c1b12038292775711f6cd3277304e",
+      "sha256": "fec92ebf7a4808a2089c0095d242ceee8ff0e610716be3442da93cc5a79fe585",
       "violations": 0,
       "candidates": 0,
       "findings": []
@@ -1567,9 +1573,9 @@
     }
   },
   "summary": {
-    "files": 209,
+    "files": 210,
     "changed": 1,
-    "skipped": 208,
+    "skipped": 209,
     "out_of_scope": 0,
     "violations": 0,
     "candidates": 53,

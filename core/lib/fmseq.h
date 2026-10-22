@@ -46,7 +46,7 @@
  * large clock jump is spread over several frames instead of flushing a whole
  * backlog into a single pass (devdoc 147 A3).  Generous enough that steady
  * playback (0-1 events per frame) is unaffected. */
-#define FMSEQ_PUMP_MAX_PER_CALL 32
+#define FMSEQ_PUMP_MAX_PER_CALL 16
 
 /* SSG voice modes (per voice, mapped onto SSG registers). */
 #define FMSEQ_SSG_TONE      0               /* tone output (kick/toms) */

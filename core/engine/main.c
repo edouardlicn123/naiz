@@ -40,7 +40,18 @@
  *   Non-AUTOEXIT: advance text with Space/Enter/XFER
  * @return 0 on normal exit, 1 on error
  */
-#define ENGINE_EXIT(s) do { hal_video_exit(); return (s); } while(0)
+#define ENGINE_EXIT(s) do { \
+    NAIZ_BGM_IRQ_CLEANUP(); \
+    hal_video_exit(); return (s); } while(0)
+
+/* devdoc 164 phase 1: stop the Timer-B ISR before leaving, so no handler
+ * runs after the engine tears the display down.  Compiles to nothing when
+ * the interrupt pump is disabled. */
+#if NAIZ_BGM_IRQ
+#define NAIZ_BGM_IRQ_CLEANUP() hal_bgm_irq_shutdown()
+#else
+#define NAIZ_BGM_IRQ_CLEANUP() ((void)0)
+#endif
 
 /* devdoc 150 diagnostic bench: play one BGM on repeat, headlessly, so a
  * capture reflects the steady-state BGM path with no host input.  Off by
@@ -92,6 +103,9 @@ int main(void)
      * build only; compiles out by default).  Runs after video_init so the
      * GDC is initialised, and reports via serial [IRQP]. */
     hal_irq_probe_run();
+    /* devdoc 164 phase 0: read-only DPMI interrupt-capability probe, to
+     * decide whether the toolchain can hook a hardware IRQ at all. */
+    hal_dpmi_probe_run();
 #endif
 
     /* palette[0]=black first + fill_rect(black) as redundant safety net. */

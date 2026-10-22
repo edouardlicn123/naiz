@@ -12,9 +12,41 @@
 void engine_frame_pump(void)
 {
     vblank_wait();                     /* pace the frame */
+#if NAIZ_BGM_IRQ
+    /* devdoc 164 phase 1: when the Timer-B ISR owns the beat it is also the
+     * sole virtual-clock writer (hal.h contract).  Advancing here too would
+     * double-step the clock.  audio_tick() is likewise the ISR's job; skip it
+     * so the pump does not race the handler.  anim_tick/reveal stay here:
+     * they are display-paced, not audio-paced. */
+    if (!hal_bgm_irq_active()) {
+        hal_wallclock_smooth_advance();
+        audio_tick();
+    } else {
+        /* devdoc 165: the handler cannot log (not ISR-safe).  Sample its tick
+         * count here, every ~2s, so a silent Timer-B (installed but not
+         * firing) is visible from a serial capture instead of looking like a
+         * working-but-frozen BGM. */
+        static unsigned long shown;
+        static unsigned frame_ctr;
+        if (++frame_ctr >= 64) {
+            unsigned long now = hal_bgm_irq_ticks();
+            frame_ctr = 0;
+            if (now != shown) {
+                /* devdoc 167: v is produced solely by the handler (fixed
+                 * 129-unit advance per tick), so v vs the real wall clock w
+                 * says whether the ISR is actually keeping time or silently
+                 * dropping ticks. */
+                hal_logf("[ISR] ticks=%lu v=%lu w=%lu\r\n",
+                         now, hal_wallclock_smooth_ms(), hal_wallclock_ms());
+                shown = now;
+            }
+        }
+    }
+#else
     hal_wallclock_smooth_advance();    /* advance virtual clock (sole writer) */
-    anim_tick();                       /* advance animation frame */
     audio_tick();                      /* advance BGM cursor + pump PCM FIFO */
+#endif
+    anim_tick();                       /* advance animation frame */
     nb_dialog_reveal_tick();           /* advance typewriter reveal (no-op off) */
 }
 
@@ -43,9 +75,19 @@ void engine_frame_pump(void)
  */
 void frame_decode_pump(void)
 {
+#if NAIZ_BGM_IRQ
+    /* ISR active: it owns the clock advance and the audio pump, so this hook
+     * must not double-step them.  Animation still needs its display-paced
+     * tick, which stays here. */
+    if (!hal_bgm_irq_active()) {
+        hal_wallclock_smooth_advance();/* self-measuring clock: call-rate safe */
+        audio_tick();                  /* pump BGM/PCM (non-blocking) */
+    }
+#else
     hal_wallclock_smooth_advance();/* self-measuring clock: call-rate safe */
+    audio_tick();                  /* pump BGM/PCM (non-blocking) */
+#endif
     if (hal_vblank_poll())         /* animation stays display-paced */
         anim_tick();
-    audio_tick();                  /* pump BGM/PCM (non-blocking) */
     nb_dialog_reveal_tick();       /* keep the typewriter flowing */
 }
