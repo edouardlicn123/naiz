@@ -63,14 +63,16 @@ LINE_REF_WHITELIST = {
     ("nb_setting.c", 122): "snprintf",
     ("nb_setting.c", 140): "Text Speed",
     ("nb_setting.c", 152): "Read Progress",
-    ("audio.c", 278): "g_bgm_on",
-    ("audio.c", 453): "g_snd_on",
-    ("audio.c", 462): "g_vc_on",
-    ("audio.c", 349): "audio_bgm_stop",
+    ("audio.c", 327): "g_bgm_on",
+    ("audio.c", 502): "g_snd_on",
+    ("audio.c", 511): "g_vc_on",
+    ("audio.c", 398): "audio_bgm_stop",
+    ("audio.c", 599): "audio_init",
+    ("audio.c", 601): "frame_decode_pump",
     ("hal_audio.c", 88): "PCM_CTRL_A46A_IRQ",
     ("hal_audio.c", 94): "PCM_IRQ_INTERVAL_MAX",
-    ("hal_audio.c", 122): "hal_pcm_set_volume",
-    ("hal_audio.c", 156): "PCM_VOL_PATH_PCM",
+    ("hal_audio.c", 132): "hal_pcm_set_volume",
+    ("hal_audio.c", 166): "PCM_VOL_PATH_PCM",
     ("nb_asset_table.h", 70): "CG_COUNT",
     ("save.h", 16): "CG_TOTAL",
     ("save_sys.c", 12): "SYSTEM.SAV",
@@ -233,6 +235,16 @@ SUPERSEDED_SHIFTED_LINE_REFS = {
     # above the toggle gates.  The current coordinates are checked in
     # LINE_REF_WHITELIST; the pre-this-round ones are recorded here.
     ("audio.c", 277), ("audio.c", 452), ("audio.c", 461), ("audio.c", 348),
+    # devdoc 167 (BGM wait rework) rewrote the whole audio.c BGM block and
+    # shifted the toggle gates and audio_bgm_stop; the HAL boundary cleanup of
+    # this round (the raw `extern int bgm_irq_is_in_isr(void)` in audio.c was
+    # replaced by the hal.h accessor, -1 line) moved them one line further up.
+    # The current coordinates are checked in LINE_REF_WHITELIST; the ones the
+    # finished devdocs 129 / 146 print are recorded here.
+    ("audio.c", 278), ("audio.c", 453), ("audio.c", 462), ("audio.c", 349),
+    # devdoc 167 also moved hal_audio.c's PCM helpers (hal_pcm_set_volume and
+    # the A466 volume write); the current coordinates are in LINE_REF_WHITELIST.
+    ("hal_audio.c", 122), ("hal_audio.c", 156),
 }
 
 # References to files RENAMED in 0.3.014.  devdocs 118/119 are finished and may

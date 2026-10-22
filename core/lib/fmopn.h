@@ -115,7 +115,11 @@ uint8_t fmopn_op_sl_rr(const FmopnPatch *p, int regslot);
  * bank 1 -> 0x18C/0x18E (F03 §3.8). */
 void fmopn_op_addr(int ch, uint8_t reg, int *bank, uint8_t *addr);
 
-/* (bank, addr) for a channel-level register (0xA0/0xA4/0xB0/0xB4). */
+/* (bank, addr) for a channel-level register (0xA0/0xA4/0xB0/0xB4).
+ *
+ * Both entry points share one addressing rule (bank by channel, address =
+ * base + channel slot); they exist as two names because the caller knows
+ * which register class it is writing, not because the arithmetic differs. */
 void fmopn_ch_addr(int ch, uint8_t reg, int *bank, uint8_t *addr);
 
 #endif /* LIB_FMOPN_H */

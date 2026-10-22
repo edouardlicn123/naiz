@@ -51,18 +51,17 @@
  * In ISR context this is a pure no-op: the handler already runs with IF
  * cleared, and calling _enable() there would let it re-enter itself
  * (devdoc 166). */
-extern int bgm_irq_is_in_isr(void);
 static int g_irq_lock_depth;
 
 static void bgm_irq_lock(void)
 {
-    if (bgm_irq_is_in_isr()) return;
+    if (hal_bgm_irq_in_isr()) return;
     if (g_irq_lock_depth++ == 0)
         _disable();
 }
 static void bgm_irq_unlock(void)
 {
-    if (bgm_irq_is_in_isr()) return;
+    if (hal_bgm_irq_in_isr()) return;
     if (g_irq_lock_depth > 0 && --g_irq_lock_depth == 0)
         _enable();
 }

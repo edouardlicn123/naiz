@@ -25,6 +25,7 @@ Assertions cover:
 
 import ctypes
 import os
+import re
 import struct
 import subprocess
 import sys
@@ -607,14 +608,35 @@ def test_loop_start_preserves_phase(lib):
     assert f(1000, 0, 1300) == 1300
 
 
+def _pump_max_per_call():
+    """The per-call dispatch cap, read from the header.
+
+    devdoc 167 halved it (32 -> 16) while this test still hardcoded 32, so
+    the expectation went stale: 40 events then need three pumps, not two.
+    Deriving the cap keeps the test true for whatever the header says.
+    """
+    src = open(os.path.join(REPO_ROOT, "core", "lib", "fmseq.h"),
+               encoding="utf-8").read()
+    m = re.search(r"#define\s+FMSEQ_PUMP_MAX_PER_CALL\s+(\d+)", src)
+    assert m, "FMSEQ_PUMP_MAX_PER_CALL not found in fmseq.h"
+    return int(m.group(1))
+
+
 def test_pump_budget_spreads_a_backlog(lib):
-    # 40 note-ons all due at t=0: well beyond FMSEQ_PUMP_MAX_PER_CALL (32), so
-    # one pump must not drain the whole backlog (devdoc 147 A3).
+    # More note-ons than one pump may dispatch, all due at t=0: the backlog
+    # must be spread over several calls, not flushed in a single pass
+    # (devdoc 147 A3).
+    cap = _pump_max_per_call()
+    n = cap * 2 + 8
     s = Seq(lib)
-    for i in range(40):
+    for i in range(n):
         s.push([(0, 0x90, 40 + i, 0x40)])
     s.load()
     s.pump(0)
     assert lib.fmseq_finished(ctypes.addressof(s._seq)) == 0   # backlog remains
-    s.pump(0)
-    assert lib.fmseq_finished(ctypes.addressof(s._seq)) == 1   # now drained
+    pumps = 1
+    while not lib.fmseq_finished(ctypes.addressof(s._seq)):
+        s.pump(0)
+        pumps += 1
+        assert pumps <= 8, "the backlog never drained"
+    assert pumps == (n + cap - 1) // cap   # exactly ceil(n / cap) calls

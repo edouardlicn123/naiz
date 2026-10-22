@@ -283,6 +283,11 @@ int  hal_bgm_irq_active(void);
  * samples this to prove the Timer-B is actually firing.  Monotone while the
  * ISR is active; frozen if it is not. */
 unsigned long hal_bgm_irq_ticks(void);
+/* 1 while the Timer-B ISR is running (devdoc 166).  The engine's audio
+ * critical section must become a no-op there: the handler already runs with
+ * IF cleared, and re-enabling interrupts inside it would let it re-enter
+ * itself. */
+int  hal_bgm_irq_in_isr(void);
 /* Stop the timer and restore the previous vector (scene shutdown). */
 void hal_bgm_irq_shutdown(void);
 #endif

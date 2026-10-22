@@ -235,39 +235,57 @@ uint8_t fmopn_patch_pms(const FmopnPatch *p)
     return (uint8_t)(p->data[25] & 0x07);          /* PMS field (bits 2-0) */
 }
 
+/* One byte of an operator block: the op block is 6 bytes per operator
+ * (DT/MUL, TL, KS/AR, AM/D1R, D2R, SL/RR) in the order the chip registers
+ * use.  Every per-operator accessor below differs only in the byte index,
+ * so the addressing lives here once. */
+static uint8_t fmopn_op_byte(const FmopnPatch *p, int regslot, int idx)
+{
+    return p->data[fmopn_file_slot(regslot) * 6 + idx];
+}
+
 uint8_t fmopn_op_dt_mul(const FmopnPatch *p, int regslot)
 {
-    return p->data[fmopn_file_slot(regslot) * 6 + 0];
+    return fmopn_op_byte(p, regslot, 0);
 }
 
 uint8_t fmopn_op_tl(const FmopnPatch *p, int regslot)
 {
-    return p->data[fmopn_file_slot(regslot) * 6 + 1];
+    return fmopn_op_byte(p, regslot, 1);
 }
 
 uint8_t fmopn_op_ks_ar(const FmopnPatch *p, int regslot)
 {
-    return p->data[fmopn_file_slot(regslot) * 6 + 2];
+    return fmopn_op_byte(p, regslot, 2);
 }
 
 uint8_t fmopn_op_am_d1r(const FmopnPatch *p, int regslot)
 {
-    return p->data[fmopn_file_slot(regslot) * 6 + 3];
+    return fmopn_op_byte(p, regslot, 3);
 }
 
 uint8_t fmopn_op_d2r(const FmopnPatch *p, int regslot)
 {
-    return p->data[fmopn_file_slot(regslot) * 6 + 4];
+    return fmopn_op_byte(p, regslot, 4);
 }
 
 uint8_t fmopn_op_sl_rr(const FmopnPatch *p, int regslot)
 {
-    return p->data[fmopn_file_slot(regslot) * 6 + 5];
+    return fmopn_op_byte(p, regslot, 5);
 }
 
 /* --- register addressing ------------------------------------------------ */
 
-void fmopn_op_addr(int ch, uint8_t reg, int *bank, uint8_t *addr)
+/* (bank, addr) for one FM channel: bank 0 = FM1-3 (ports 0x188/0x18A),
+ * bank 1 = FM4-6 (0x18C/0x18E); the register address is the base register
+ * plus the channel's slot inside its bank (F03 §3.8).
+ *
+ * The addressing does not depend on the register class: an operator-level
+ * base (0x30-0x90) and a channel-level register (0xA0/0xA4/0xB0/0xB4) are
+ * offset the same way.  The two public entry points below therefore share
+ * this one implementation and differ only in which base registers the
+ * caller is expected to pass. */
+static void fmopn_reg_addr(int ch, uint8_t reg, int *bank, uint8_t *addr)
 {
     if (ch < 0)
         ch = 0;
@@ -277,12 +295,12 @@ void fmopn_op_addr(int ch, uint8_t reg, int *bank, uint8_t *addr)
     *addr = (uint8_t)(reg + (ch % 3));
 }
 
+void fmopn_op_addr(int ch, uint8_t reg, int *bank, uint8_t *addr)
+{
+    fmopn_reg_addr(ch, reg, bank, addr);
+}
+
 void fmopn_ch_addr(int ch, uint8_t reg, int *bank, uint8_t *addr)
 {
-    if (ch < 0)
-        ch = 0;
-    if (ch >= FMOPN_FM_CHANNELS)
-        ch = FMOPN_FM_CHANNELS - 1;
-    *bank = (ch >= 3) ? 1 : 0;
-    *addr = (uint8_t)(reg + (ch % 3));
+    fmopn_reg_addr(ch, reg, bank, addr);
 }

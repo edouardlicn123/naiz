@@ -1,7 +1,7 @@
 {
   "version": 2,
-  "git_head": "cc4a80c",
-  "checked_at": "2026-10-21T14:06:35",
+  "git_head": "7486c0a",
+  "checked_at": "2026-10-22T20:29:33",
   "files": {
     "core/build.sh": {
       "sha256": "0e6bb3f41cae8f6c5a014a49767f93990ddd3e2c461a85ec991c01b40b66b11e",
@@ -22,17 +22,17 @@
       ]
     },
     "core/engine/audio.c": {
-      "sha256": "eba30b2cbf90d5037728b5e99bff0341d4753ae7a33001378ed55ca02b49834a",
+      "sha256": "7d1da0368319c65dadc3848c49667c3a6b957b0af67911eff643d084a18bb1b7",
       "violations": 0,
       "candidates": 2,
       "findings": [
         {
-          "line": 579,
+          "line": 628,
           "rule": "C1",
           "level": "HEUR"
         },
         {
-          "line": 216,
+          "line": 249,
           "rule": "C9",
           "level": "HEUR"
         }
@@ -87,7 +87,7 @@
       "findings": []
     },
     "core/engine/frame.c": {
-      "sha256": "bc8c8a1f6057fb6ab77bb83ec371039d3a58fbf9de1fb5da45e6fb922ad1e0f3",
+      "sha256": "86489f217adfe18de53fd3ff55b4c5b4cb5e9a0494336df4e15161cf29bbac21",
       "violations": 0,
       "candidates": 0,
       "findings": []
@@ -332,7 +332,7 @@
       "findings": []
     },
     "core/engine/nb_config.h": {
-      "sha256": "faa3c75fae4a36c96347e25bcb1f74103d54446da5a04d35c32a9707579f07f8",
+      "sha256": "01b43a2d776dcda4706b7009a8292454443a58a91b9b61575504c369609809c6",
       "violations": 0,
       "candidates": 0,
       "findings": []
@@ -685,19 +685,13 @@
       "findings": []
     },
     "core/lib/fmopn.c": {
-      "sha256": "c16934275d8f31c3635ba104db09c305c3b95727e4720e9cfff14a3c14227dfb",
+      "sha256": "f059d4977d5e91de5546c821eeb1a9124dbd6845908c463d53153288562df998",
       "violations": 0,
-      "candidates": 1,
-      "findings": [
-        {
-          "line": 137,
-          "rule": "C35",
-          "level": "HEUR"
-        }
-      ]
+      "candidates": 0,
+      "findings": []
     },
     "core/lib/fmopn.h": {
-      "sha256": "0fc618ffc6866605b1a67530cd85c9adff7ffd80cdf5a282c2f2ce79d51cd1a3",
+      "sha256": "d0b807eebf31d85a8a7ff720c64cd1d50f86a1e35b5ac29000916a0980e928e0",
       "violations": 0,
       "candidates": 0,
       "findings": []
@@ -709,7 +703,7 @@
       "findings": []
     },
     "core/lib/fmseq.h": {
-      "sha256": "6f56241c8bdc43e3b9ca33a4ea7f191cc86c5d55878cf4ae043b52596f88abf8",
+      "sha256": "c6662f08aee303343b4f3f96ac88abf85d40816e9125a82ad0caa627f9b89245",
       "violations": 0,
       "candidates": 0,
       "findings": []
@@ -823,19 +817,19 @@
       "findings": []
     },
     "core/plat/hal.h": {
-      "sha256": "1ad3d80293499b7a79fe063063d708e447d6a137cdc81093a9b6224f29888349",
+      "sha256": "f32dd723af336e9504340e63dada750cc2c8d932b9005079b0920cfe98794421",
       "violations": 0,
       "candidates": 0,
       "findings": []
     },
     "core/plat/hal_audio.c": {
-      "sha256": "44f49dac3ffe5b7ac3e350d5471f375bf98b2e7127f653dc164d7707794dbb76",
+      "sha256": "7bacdd21296b48e858e073acca965b5f9421ac63e435f55ee4eef790dcd840cc",
       "violations": 0,
       "candidates": 0,
       "findings": []
     },
     "core/plat/hal_irq.c": {
-      "sha256": "50a4249378172ac9751791a5df361e38cf9b3926128fd91339e72a732f09bd38",
+      "sha256": "4946d7c71a4b099b4a13237437772d9d9f244418974b631d602949dabda16021",
       "violations": 0,
       "candidates": 0,
       "findings": []
@@ -1578,11 +1572,11 @@
     "skipped": 209,
     "out_of_scope": 0,
     "violations": 0,
-    "candidates": 53,
+    "candidates": 52,
     "fresh_violations": 0,
-    "fresh_candidates": 2,
+    "fresh_candidates": 0,
     "verified": 22,
     "stale": 1,
-    "open": 30
+    "open": 29
   }
 }

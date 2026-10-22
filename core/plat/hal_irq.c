@@ -109,15 +109,16 @@ static volatile unsigned long g_isr_ticks = 0;
  * Watcom's `__interrupt` saves/restores the full register set and iret's; the
  * handler takes no arguments.
  */
-/* Set by audio.c to know whether we're in ISR context (devdoc 166). */
+/* Set by the ISR handler itself; the engine reads it through the HAL
+ * accessor hal_bgm_irq_in_isr() (devdoc 166). */
 static volatile int g_bgm_irq_in_isr_flag;
 
-void bgm_irq_set_in_isr(int on)
+static void bgm_irq_set_in_isr(int on)
 {
     g_bgm_irq_in_isr_flag = on ? 1 : 0;
 }
 
-int bgm_irq_is_in_isr(void)
+int hal_bgm_irq_in_isr(void)
 {
     return g_bgm_irq_in_isr_flag;
 }

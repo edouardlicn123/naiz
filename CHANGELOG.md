@@ -2,6 +2,52 @@
 
 自 R1 起全部 Bug 修复与功能演进记录（条目顺序沿用 AGENTS.md 既有历史排列）；`AGENTS.md` 仅保留当前版本与规则。**新条目约定**：每轮修复/演进完成后，在下方 `---` 分隔线之后（第一条位置）追加变更摘要，并在 AGENTS.md 头部同步「当前版本」。**条目格式**：每条以 `### <版本号> — <标题>` 开头（版本号化标题行 + `<a id="cN">` 锚点，N 按条目序递增），正文整段或分小节；历史速查直接读下方「版本索引」。
 
+<a id="c83"></a>
+### 0.3.055 — 封装审查落地：HAL 边界收口（`hal_bgm_irq_in_isr`）+ A 节 static 化 + `fmopn` 同构重复合并；pytest 欠账清零（842 passed, 0 failed）
+
+**动机**：按最新审查日志 `logs/symbol_audit_20261022_200239.log`（扫描 70 源 / 53 头 / 377 公开函数 / 2 文件级全局）逐项核实封装可能性，落地低风险高收益项，并清掉 2 条既存 pytest 失败。
+
+**改动**：
+
+1. **HAL 边界收口（AGENTS §五违规）**：`core/engine/audio.c` 曾以裸 `extern int bgm_irq_is_in_isr(void);` 直接引用平台符号（未在任何头文件声明），违反「engine 只能经 `core/plat/hal.h` 访问硬件」。改为在 `hal.h` 的 `#if NAIZ_BGM_IRQ` 块内声明 **`hal_bgm_irq_in_isr()`**，`hal_irq.c` 实现改名、`audio.c` 的临界区（`bgm_irq_lock/unlock`）改调该访问器，裸 `extern` 删除。
+2. **A 节候选清零**：`hal_irq.c` 的 `bgm_irq_set_in_isr()` 仅本文件 ISR 用到 ⇒ 改 `static`（`symbol_audit -s A,B` 现为空 ⇒ `fullaudit` 第 6 步 `--gate` 恢复绿）。同时订正其上方注释（原写「Set by audio.c」，实为 **ISR handler 自己置位**）。
+3. **同构重复合并（`core/lib/fmopn.c`）**：`fmopn_op_addr()` 与 `fmopn_ch_addr()` 实现逐行相同（bank/addr 计算一致，差异只在调用方传入的寄存器类），收敛为单一静态实现 `fmopn_reg_addr()` + 两个具名入口；6 个 `fmopn_op_*` 取值器的重复下标表达式收敛为 `fmopn_op_byte()`；`fmopn.h` 注释点明「两者共用同一寻址规则」。
+4. **测试欠账清零（既存 2 条失败，非本轮引入）**：
+   - `test_devdoc_refs.py::test_devdoc_line_refs_resolve`——行号 pin 随 c81/167 位移失效：`audio.c` 的三处开关判定与 `audio_bgm_stop`、`hal_audio.c` 的 `hal_pcm_set_volume` 与 A466 音量写入行**校准到现行坐标**（gates 327/502/511、`audio_bgm_stop` 398、`hal_pcm_set_volume` 132、音量写入 166），旧坐标登记进 `SUPERSEDED_SHIFTED_LINE_REFS`；并按 devdoc 129 §2 真值表补登记 `audio_init`（599）与 `frame_decode_pump` 钩子（601）现行坐标。
+   - `test_fm_seq.py::test_pump_budget_spreads_a_backlog`——**过期断言**：c81/167 把 `FMSEQ_PUMP_MAX_PER_CALL` 由 32 改为 16，测试仍按「两次泵即排空 40 事件」写死 ⇒ 改为**从 `fmseq.h` 读取上限**并按 `ceil(n/cap)` 断言泵次数（上限再变也不用改测试）。
+
+**验证**：
+
+- `./start.sh fullaudit` **7/7 全绿**：规则增量审计 ✓ / pytest ✓ / NB 校验 ✓ / py_compile ✓ / bash -n ✓ / symbol_audit（A/B 空，--gate）✓ / `make -C core`（0 err / 0 warn）。
+- pytest **842 passed, 2 skipped, 0 failed**（此前 2 failed ⇒ 清零）。
+- `make -C core` 后 `core/*.err` 全空；**`NAIZ_BGM_IRQ=1` 变体单独全量编译 + 链接通过**（`wcl386 -DNAIZ_BGM_IRQ=1`，0 诊断）——默认构建该宏为 0，不单独验会漏验本轮改动的代码路径。
+- `symbol_audit` A 节由 1 项变 0 项（`bgm_irq_set_in_isr` 转 static）。
+
+**文档**：`docs/B90-参考-函数索引.md`（登记 `hal_bgm_irq_in_isr()` 并注明「engine 不得裸 extern 平台符号」）。
+
+<a id="c82"></a>
+### 0.3.054 — AGENTS.md 历史归位与瘦身（53029→184 字符）+ 6 条长期定论提升为正文规则 + 文档卫生守卫
+
+**动机与根因**：`AGENTS.md` 头部「最新条目」行本应只是一行指针，但每轮 AI 把**整轮摘要续写进该行**，累积成 **53029 字符 / 47 条历史（c47–c80）**——直接违反本文件「开发历史唯一载体 = `CHANGELOG.md`」（`AGENTS.md` §7 与 §十三「变更后更新规约」）。后果是双向的：`AGENTS.md` 头重且**已知错误结论易长期存活**（如「141 tick 相位精确」「误差 <0.02%」曾埋 therein）；而 `CHANGELOG.md` 反而漏条目——`c21`/`c77` 只有索引死链、`c57` 只有标题无正文。
+
+**改动**：
+
+1. **`CHANGELOG.md`（历史归位）**：补 `c77` 正文（0.3.049 `makegame` 子命令，自 `AGENTS.md` 归位，插入位置按文件惯例排为版本倒序）；`c21` 缺口显式标注（补 c21 锚点 + 「正文缺失」说明，索引行同步标注，**不伪造内容**）；`c57` 正文重建（依据 `AGENTS.md` §二「音频三层命名与引擎归一」小节与现存守卫代码，并注明为事后重建）。锚点 `c1..c82` 连续无缺口、版本索引死链清零、每条目均有正文。
+2. **`AGENTS.md`（瘦身 + 定论提升）**：头部「最新条目」行 **53029 → 184 字符**（只留指针 + 「当前未闭合」4 条：Timer-B 周期常量、 PCM 时间源、真机未取证、2 条既存 pytest 失败），历史摘要 c47–c80 全清；同时把仍需长期遵守的 6 条从历史堆**提升为正文规则**——
+   - §八 新增**第 6 禁**「构建开关只传一半管线」（`EXTRA_DEFS` 须 `export` 覆盖整条 `build`+`make` 管线，否则混用陈旧对象、探针被静默编译掉），标题「五禁」→「六禁」且交叉引用同步；
+   - §十 新增「速率/时序断言必须有**独立于被测实现**的对照量」（`devdocs/168` 教训：拿假设周期自比不构成验证）；
+   - §十四 新增「Timer-B 中断驱动音泵（方案 A）」小节，四条定论：`$27` 标志清除必须 `0x2A`、ISR 上下文四类不安全构造（B1 DOS 反射 / B2 x87 / B3 日志 / B4 `free()`）、IRQ 线归属 = IRQ12（slave）双线自适应、**Timer-B 周期真机 129 units vs NP2kai 258 units（2× 差异）** + 判据 `[ISR]` 的 `v/w ≈ 1.0`。
+3. **新增 `tools/tests/test_agents_md_hygiene.py`（6 项守卫）**：① 头部「最新条目」行 ≤ 2000 字符（禁历史堆灌回）② `AGENTS.md` 正文禁「前序 `cN`」历史摘要 ③ 全文历史条目引用 ≤ 3 处 ④ `CHANGELOG.md` 的 `c` 锚点连续无缺口 ⑤ 版本索引每个 `#cN` 都有锚点（死链清零）⑥ 每条目有正文（显式标注「正文缺失」者豁免）。
+
+**验证**：
+
+- pytest **840 passed, 2 skipped, 2 failed**——2 条失败为**既存欠账**，非本轮引入：`test_devdoc_refs.py::test_devdoc_line_refs_resolve`（`audio.c:278` 行号 pin 已随 c81 未提交代码位移）、`test_fm_seq.py::test_pump_budget_spreads_a_backlog`；两者在 HEAD `cc4a80c` 的干净树上均通过。
+- **守卫自证**（防「假通过」）：注入三类负向样本——历史堆灌回头部行 / 正文混入「前序 `cN`」/ 挖掉 `CHANGELOG.md` 一个锚点 ⇒ 对应 4 项守卫转红，还原后 6/6 绿。
+- `make -C core` 0 诊断（`core/*.err` 为空）；`core/engine.exe` == `games/demo-a2/engine.exe`；HDI 重新注入（33 new, 3 updated, 36 total）。
+- 体积：`AGENTS.md` 53029+29926 → **32624 字符**（449 → 462 行，其中新增 13 行为 6 条定论正文）。
+
+**文档**：`AGENTS.md`（§八 / §十 / §十四）、`docs/B90-参考-函数索引.md`（登记新守卫入口）。
+
 <a id="c81"></a>
 ### 0.3.053 — 方案 A 实机落地：Timer-B ISR 安全化（去 DOS 反射/FP/日志/堆）+ 定点硬件时基 + 心跳取证；`$27=0x2A` 定论
 
@@ -108,6 +154,11 @@
 **文档**：`docs/B91 §2` 命令表补 `makegame` 一条。
 
 **遗留**：无。
+
+<a id="c77"></a>
+### 0.3.049 — `makegame.sh` 新增 `makegame` 子命令（build + make 一步到位）
+
+**动机与验收**：用户要求合并 `build`（编译项目数据/部署 DOS 树）与 `make`（注入 HDI）两步为一条命令，新选项放交互菜单第一位、原两条保留。**改动**（仅 `makegame.sh` + `docs/B91`）：新增 `makegame <game>` case 分支——先调 `build_game`（**不用 `exec`**，否则第二步不执行），再 `cd "$ROOT" && exec` 注入 HDI（末跳），语义 = `build` 超集；`build`/`make` 分支一字未动。交互菜单重排 `1) makegame` / `2) build` / `3) make` / `4) test` / `5) test --porttest` / `6) audio` / `0) 返回`（提示改 `[0-6]`）；帮助文本与顶部注释头同步；`docs/B91 §2` 命令表补一行。**验证**：`bash -n` 通过；守卫测试 `test_hdi_freshness_guard.py`（切片 `test)`→`build)` 不受 `makegame)` 影响）+ `test_makegame_audio.py` **10 passed, 1 skipped**；**冒烟实跑** `./makegame.sh makegame demo-a2` 两步串联成功（HDI 刷新 `32 new, 3 updated, 35 total`）；全量 pytest **822 passed, 1 skipped**；`./start.sh fullaudit --no-make` **6/6**；`bump_version` 0.3.048→**0.3.049**、`export_config` 重生成 `nb_config.h`、`make -C core` 0 诊断。
 
 <a id="c76"></a>
 ### 0.3.048 — BGM 不可打断性立项：Phase 1 取证打点（`[AP]` 泵间隔+债 / `[VC]` 补墙钟）+ Phase 2 解码泵时钟去门控（B2）+ Phase 3 vsync IRQ 投递探针（C1）
@@ -446,6 +497,16 @@
 
 <a id="c57"></a>
 ### 0.3.026 — 引擎按 8.3 短名解析音频键（str_toc8）：修 AUDIO.DAT 截断名失配 + 全素材面同名风险审计
+
+**症状与根因**：脚本键 `melody_town` 在 `AUDIO.DAT` 的 TOC 名里是 8.3 截断后的 `MELODY_T`；`audio.c` 三处查表（FM patch 装载 / `audio_bgm_start` / `pcm_play`）用**全名**直接查，而 `farchive_name_match` 只做大写不区分、**不做 8.3 截断** ⇒ 永久失配。根因在三层命名（源文件名 / 脚本键 / DOS TOC 名）中缺了「②→③」归一这一步。
+
+**修复**：新增 `str_toc8()`（`core/lib/strutil.c`，忠实镜像打包公式 `to_dos_name()[0].strip()`），`audio.c` 三处查表均先经 `str_toc8()` 归一后再调 `farchive_lookup_name`。
+
+**全素材面审计结论**：`IMAGE.DAT` 引擎按 id 取数（`farchive_lookup_id`）免疫；`SCENE.DAT` 按名查但场景基名 ≤8 强约束；`FONT`/`CJK` 单文件无 TOC ⇒ **仅 AUDIO 存在②→③失配类**。新增任何按名查归档的取数路径前，先过此审计表。
+
+**防呆**：`tools/tests/test_strutil.py` 断言 `str_toc8` 输出 ≡ 工具侧 `to_dos_name()[0].strip()`（键矩阵含 melody_town / icy_garden / 9 字符 / 带点多段 / 空串）——删守卫或引擎与打包公式漂移即红；`tools/tests/test_audio_toolchain.py::test_pack_audio_long_name_stored_as_8_3_toc_key` 钉死打包侧必须存 8.3 短名。
+
+> ℹ 本条正文为事后重建（原 `CHANGELOG.md` 条目正文缺失，内容依据 `AGENTS.md` §二 「音频三层命名与引擎归一」小节与现存守卫代码）。
 <a id="c59"></a>
 ### 0.3.028 — BGM 颤动根修：虚拟时钟废止 floor/ceiling 钳制，改平滑变步进（`lib/vclock`）
 
@@ -821,6 +882,8 @@
 
 | 条目 |
 |------|
+| [0.3.055 — 封装审查落地：HAL 边界收口（`hal_bgm_irq_in_isr`）+ A 节 static 化 + `fmopn` 同构重复合并；pytest 欠账清零（842 passed, 0 failed）](#c83) |
+| [0.3.054 — AGENTS.md 历史归位与瘦身（53029→184 字符）+ 6 条长期定论提升为正文规则 + 文档卫生守卫](#c82) |
 | [0.3.053 — 方案 A 实机落地：Timer-B ISR 安全化（去 DOS 反射/FP/日志/堆）+ 定点硬件时基 + 心跳取证；`$27=0x2A` 定论](#c81) |
 | [0.3.052 — 方案 A IRQ 线定论：NP2kai 实为 IRQ12（slave）非 IRQ3，`hal_irq.c` 改双线自适应（IRQ12 优先/IRQ3 回退）+ `DL=0x10` 异常判断撤销](#c80) |
 | [0.3.051 — 方案 A 阶段 0 探针修正 + 重跑：`flags=1` 证实 32-bit DPMI host、`pic=08` 证实 IRQ3→INT 0Bh（原「负向」结论彻底证伪）](#c79) |
@@ -881,7 +944,7 @@
 | [0.2.141 — Special 菜单视觉修正：Back 文字截断根修 + 行按钮缩半居中（devdoc 114 反馈轮）](#c24) |
 | [0.2.140 — Special 菜单落地：LOAD 范式全屏列表 + 菜单归属场景收口（devdoc 114）](#c23) |
 | [0.2.139 — 资产市场工具落地：整包下载器 market.sh（独立 naiz_assets 仓库）](#c22) |
-| [0.2.138 — 光标移动残影根治：splice 只进一次性书写副本，持久合成缓冲不烘烙（devdoc 111）](#c21) |
+| [0.2.138 — 光标移动残影根治：splice 只进一次性书写副本，持久合成缓冲不烘烙（devdoc 111）](#c21)（正文缺失） |
 | [0.2.137 — 光标写入全程零缺窗：对话框合成缓冲预拼光标（devdoc 110）](#c20) |
 | [0.2.136 — 光标揭示顿闪消除：写后直绘 + 不透明矩形快路径（devdoc 109）](#c19) |
 | [0.2.135 — 软件光标层契约落地 + 对话框抹字根因收口（devdoc 108）](#c18) |
@@ -1477,6 +1540,9 @@ NP2kai 目检反馈两处问题并修复：
 - `bump_version` → 0.2.140（demo-a2/animatest 同步）。
 
 ---
+
+<a id="c21"></a>
+> ⚠ **本条目正文缺失**：R 时代历史缺口，正文未随仓库留存。索引行保留以记其存在，内容以 `devdocs/` 与 `CHANGELOG.md` 其它条目为准。
 
 <a id="c22"></a>
 ### 0.2.139 — 资产市场工具落地：整包下载器 market.sh（独立 naiz_assets 仓库）
