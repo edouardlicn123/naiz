@@ -3,7 +3,7 @@
 > **当前版本**: `0.3.055`（`projects/demo-a2/config.toml`）
 >
 > **最新条目**: `CHANGELOG.md` `c83` — 封装审查落地（HAL 边界收口 `hal_bgm_irq_in_isr` + A 节 static 化 + `fmopn` 同构重复合并）+ pytest 欠账清零（842 passed, 0 failed）。**本行只放当前状态指针**：历史条目正文一律只写进 `CHANGELOG.md`（规则见 §十三「变更后更新规约」），本文件不承载任何开发历史摘要——§一–§十七 只存**规则与当前状态**。
-> **当前未闭合**：① **Timer-B 周期常量仍是真机值 129 units**，NP2kai 需 258 ⇒ ISR 构建虚拟钟速率仅 49.8%（BGM 半速、SE 欠喂断续）；根因与分档方案见 `devdocs/168`，待实施。② **`hal_pcm_tick(elapsed_ms)` 的时间源仍取虚拟钟**（`hal_wallclock_smooth_ms()`）⇒ 协作构建的 SE/voice 速率随虚拟钟漂移（钳制带 ±25%），待实施。③ **真机（非 NP2kai）Timer-B 周期未取证**——分档的真机档 129 units 取自 `docs/refdocs/F04_opna_timer_a_b_specs.md` 手册值。
+> **当前未闭合**：① **`BGM_TIMER_B_UNITS` 仍是 129，应为 258**——真机 Timer-B 每步 **2304 主时钟**（NB=200、φM=7.9872 MHz ⇒ 16.154 ms ≈ 258.5 units），NP2kai 化简后 16.128 ms（−0.16% 即标称 8 MHz 与实测晶振之差），**两宿主通用、无需分档**；129 是「把手册 1152 当成 φM 个数」得到的半周期值 ⇒ ISR 构建虚拟钟速率仅 49.8%（BGM 半速、SE 欠喂断续）。推导与证据见 `devdocs/168` + `docs/refdocs/F07_opn_timer_clock_reference.md`，待实施。② **`hal_pcm_tick(elapsed_ms)` 的时间源仍取虚拟钟**（`hal_wallclock_smooth_ms()`）⇒ 协作构建的 SE/voice 速率随虚拟钟漂移（钳制带 ±25%），待实施。③ **真机（非 NP2kai）Timer-B 周期无示波器实测**——现有值由「ymfm / Nuked-OPN2 / BlastEm / NP2kai 四份实现 + PMD/MUCOM88 节拍常数 + 86 板晶振 7.9872 MHz + TmEE 实机读数」交叉推出，属间接强证据；上真机后判据是 `[ISR]` 的 `v/w ≈ 1.0`。
 >
 > **开发历史已移至 [`CHANGELOG.md`](CHANGELOG.md)**: R1–R30、0.2.109–0.2.117 及动画工具链等全部 Bug 修复/功能演进记录均以条目形式存于根目录 `CHANGELOG.md`，**本文件（AGENTS.md）不承载任何开发历史摘要，只存规则与当前版本**；历史速查一律读 CHANGELOG.md（最新：c83 / 0.3.055），新条目追加到 CHANGELOG.md 顶部而**不是**本文件。
 >
@@ -322,7 +322,7 @@ BGM 音泵除协作路径外还有一条**中断驱动**路径（`core/plat/hal_
 1. **`$27` 标志清除必须写 `0x2A`**（`RESET_B|ENABLE_B|LOAD_B`）——缺 bit1（LOAD B）⇒ NP2kai `opna_settimer` 走 `nevent_reset` 停事件；缺 bit3（ENABLE B）⇒ 不再置 status、不 `pic_setirq`（裸 ISR 实测 `isr_count` 1→3600+）。
 2. **ISR 上下文四类不安全构造**：**B1** `hal_wallclock_ms()`（DOS 反射 `int386(0x21,AH=2Ch)`，经 `hal_wallclock_smooth_advance()` / `AUDIO_PUMP_TRACE` 触达 ⇒ 不可重入死锁）；**B2** x87/FPU + `pow()`（Watcom `__interrupt` 不存 x87 栈）；**B3** `hal_logf`/串口阻塞 I/O；**B4** `free()` 堆操作（`audio_tick()` 协作路径正确、ISR 下完全不可用）。ISR 内只能用 `hal_wallclock_fixed_advance()` + `audio_tick_isr()`。
 3. **IRQ 线归属 = IRQ12（slave）**，非 IRQ3：NP2kai 默认 `snd86opt=0x7f` ⇒ `nIrq=0xD0` ⇒ `opntimer.c` 取 IRQ12。`hal_irq.c` 走**双线自适应**（IRQ12 优先 / IRQ3 回退），双发 EOI 对两线均正确；DPMI 报的 `DL=0x10` 是 PC-98 的 **slave 基向量**（IBM PC 才 0x70），**不是异常**。
-4. **Timer-B 周期真机与 NP2kai 差 2×**：真机 `tB = 1152*(256-NB)/8MHz` ⇒ NB=200 为 8.064 ms；NP2kai `opntimer.c` 的 `l = 288*(256-NB)` 配 8 MHz 模式 baseclock 2.0 MHz 折算后为 16.102 ms。`hal_irq.c` 的 `BGM_TIMER_B_UNITS` 必须与**宿主**匹配，否则虚拟钟速率失准（NP2kai 上实测 49.8% ⇒ BGM 半速、SE 欠喂断续）。判据 = `[ISR]` 行的 `v/w`（虚拟钟增量 / 墙钟增量）≈ 1.0。详见 `devdocs/168`。
+4. **Timer-B 每步 = 2304 个主时钟（不是手册写的 1152）**：YM2608 手册的 `tB = 1152·(256−NB)/φM` 里，1152 配的是 **φM/2** 时钟（等价 `2304·(256−NB)/φM`）；ymfm（`period×24×6`）、Nuked-OPN2（`subcnt==16`×144 clk/样点）、BlastEm（每 144 clk 窗口 +1、`sub_timer_b += 0x10`）、NP2kai（`288×(256−NB) µs`）**四份实现**一致，PMD 的 `10800000` 与 MUCOM88 的 `t198` 也只在 2304 口径下自洽。86 板 φM=**7.9872 MHz**（MAME `pc9801_86.cpp:85`）⇒ NB=200 为 **16.154 ms = 258 units**（1/16 ms；NP2kai 16.128 ms ⇒ 258）——`hal_irq.c` 的 `BGM_TIMER_B_UNITS` 必须取 **258**，取 129 会让虚拟钟以 49.8% 速率前进（BGM 半速、SE 欠喂断续）。判据 = `[ISR]` 行的 `v/w`（虚拟钟增量 / 墙钟增量）≈ 1.0。**分档方案已作废**（两宿主只差 0.16%）。推导见 `docs/refdocs/F07_opn_timer_clock_reference.md`，事故记录见 `devdocs/168`。
 
 ## 十五、Token 管理
 

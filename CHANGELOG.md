@@ -37,6 +37,8 @@
    - §八 新增**第 6 禁**「构建开关只传一半管线」（`EXTRA_DEFS` 须 `export` 覆盖整条 `build`+`make` 管线，否则混用陈旧对象、探针被静默编译掉），标题「五禁」→「六禁」且交叉引用同步；
    - §十 新增「速率/时序断言必须有**独立于被测实现**的对照量」（`devdocs/168` 教训：拿假设周期自比不构成验证）；
    - §十四 新增「Timer-B 中断驱动音泵（方案 A）」小节，四条定论：`$27` 标志清除必须 `0x2A`、ISR 上下文四类不安全构造（B1 DOS 反射 / B2 x87 / B3 日志 / B4 `free()`）、IRQ 线归属 = IRQ12（slave）双线自适应、**Timer-B 周期真机 129 units vs NP2kai 258 units（2× 差异）** + 判据 `[ISR]` 的 `v/w ≈ 1.0`。
+
+> ⚠ **订正（2026-10-24，纯文档）**：上一条括注 **「真机 129 units vs NP2kai 258 units（2× 差异）」结论反了**。真机 Timer-B 每步是 **2304 个主时钟**（手册 `1152·(256−NB)/φM` 的 1152 配的是 φM/2 时钟），86 板 φM=7.9872 MHz ⇒ NB=200 为 **16.154 ms ≈ 258 units**；NP2kai 化简后的 16.128 ms 是**忠实建模**（−0.16%，= 标称 8 MHz 与实测晶振之差）。故 `BGM_TIMER_B_UNITS` 应为 **258**（非分档、非 129），129 会让虚拟钟跑在一半速率。证据链与推导见 `docs/refdocs/F07_opn_timer_clock_reference.md`，事故记录与本轮订正见 `devdocs/168`（§三/§5.1）；`AGENTS.md` §十四 该条已就地订正。本条目其余三条定论（`$27=0x2A`、ISR 四类禁用构造、IRQ12 双线）不受影响。
 3. **新增 `tools/tests/test_agents_md_hygiene.py`（6 项守卫）**：① 头部「最新条目」行 ≤ 2000 字符（禁历史堆灌回）② `AGENTS.md` 正文禁「前序 `cN`」历史摘要 ③ 全文历史条目引用 ≤ 3 处 ④ `CHANGELOG.md` 的 `c` 锚点连续无缺口 ⑤ 版本索引每个 `#cN` 都有锚点（死链清零）⑥ 每条目有正文（显式标注「正文缺失」者豁免）。
 
 **验证**：
@@ -65,6 +67,8 @@
 - **心跳**：handler `g_isr_ticks++`（volatile），经 `hal_bgm_irq_ticks()` 由**帧路径**采样打 `[ISR] ticks=… v=…`（handler 自身绝不打日志）。
 
 **实机验证**（`EXTRA_DEFS=-DNAIZ_BGM_IRQ=1`，NP2kai）：`BGM IRQ: _dos_setvect(INT 14h)` → `Timer-B installed (NB=200, ~124Hz, IRQ12 (slave))` → `bootmenu: enter`；主循环跑满 **3836 次鼠标轮询、无卡死**；`[ISR] ticks` **2454→3439 单调递增**，每 ~141 tick 虚拟钟步 ≈1136ms（=141×8.064ms，**相位精确**）；`core/*.err` 空、无 panic。
+
+> ⚠ **订正（2026-10-24，纯文档）**：本段「=141×8.064ms，**相位精确**」以及上面的 `BGM_TIMER_B_UNITS=129`（`1152*56/8e6`、误差「<0.02%」）**都是自洽假象**——真机 Timer-B 每步是 **2304 个主时钟**（手册 1152 配的是 φM/2 时钟），86 板 φM=7.9872 MHz ⇒ NB=200 为 **16.154 ms = 258 units**；NP2kai 的 16.128 ms 是忠实建模。129 只有真值一半，实机 `[ISR]` 的 `Δv/Δw` 实测 49.8%（本条目当时的「相位精确」是用错误周期自比得出的，正是 `AGENTS.md` §十「速率断言须有独立对照量」规则的来源）。正确常量 = **258**（两宿主通用，不分档）。证据链见 `docs/refdocs/F07_opn_timer_clock_reference.md`，事故记录见 `devdocs/168`（含文首订正表）。**2026-10-25 补充取证（仍为纯文档）**：BlastEm 的 `ym_run_timers()`（每 144 clk 窗口跑一次、`sub_timer_b += 0x10` 满 16 次）、Plutiedev 按 7.67 MHz 的修正值（`18.77µs` / `300.34µs`）、MUCOM88 的 `t198`（PC-8801，OPNA 同为 7.9872 MHz，社区实测 ≈1/60 s/步、`C60` 全音符≈1 s ⇒ ♩≈239）与 TmEE 的实机 `~100Hz` 读数均指向同一结论，详见 `F07` §2.2 / §3.4 / §4.4。本条目其余内容（ISR 安全化、B1–B4、`$27=0x2A`）不受影响。
 
 **验证**：默认构建（开关关）0 诊断；`test_frame_pump.py` 改写 `test_isr_sequence_is_bounded_and_eois_both_pics`（否定断言禁 `hal_wallclock_smooth_advance`/`hal_wallclock_ms`/`audio_tick();`/`hal_logf`/`free(`/`pow(`/`double `）+ 新增 `test_isr_timer_b_reset_keeps_load_and_enable`/`test_isr_heartbeat_is_sampled_from_the_frame_path`（**29 passed**）；`test_vclock.py` 新增 `test_fixed_advance_uses_the_hardware_delta_only`；全量 pytest **832 passed, 1 skipped**；`symbol_audit -s A,B` 空（B3 曾使 `fmseq_fm_voices()` 成死导出，已由帧路径回绕日志恢复调用方）；`./start.sh fullaudit --no-make` **全绿**；`test_devdoc_refs.py` 18 passed（`audio.c` pin 移位更新）；`bump_version` 0.3.052→**0.3.053**（全项目同步）、`export_config` 重生成 `nb_config.h`。
 

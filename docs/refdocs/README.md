@@ -47,6 +47,7 @@ Naiz 引擎项目整理的外部 PC-98 知识参考资料。
 | `F04_opna_timer_a_b_specs.md` | **Timer A/B 硬件规格**（F03 未收段）：`$24-$27`/`$29`(SCH+IRQ ENABLE)/`$2D-$2F` 预分频；tA/tB 公式（9µs/144µs@8MHz）；PC-98 端口 0x188-0x18E 与 FM timer→IRQ3 事实；devdoc 131 方案 C 的硬件基础；含 $29 默认位行为待核实项 |
 | `F05_pmd_driver_architecture.md` | **PMD 常驻驱动架构与 Timer-B 节拍模型**：GAME.BAT 预加载 + AH 功能号 API（ReC98 实证）、`#Timer`/`#Tempo`/`#Zenlen` 语义与 TimerB 公式、`.M` 序列二进制格式；解释「原版游戏为什么不颤」——音乐节拍由 Timer-B 中断驱动，与主循环解耦 |
 | `F06_pmd_mml_manual_en.md` | PMD 4.8 MML Command Manual 英译**全文落盘**（原著 M.Kajihara，英译 Blaze and Pigu）：通道-音源对应表/@ 乐器定义/全部 MML 命令参考。**注意 PMD 是驱动输入语言，本项目 BGM 输入已定 MIDI**，本文作音乐生态参考 |
+| `F07_opn_timer_clock_reference.md` | **OPN Timer 计时口径定论（2304 clk vs 手册 1152）**：手册 2× 之谜（φM/2 计数）+ ymfm / Nuked-OPN2 / BlastEm / NP2kai 四实现逐行对照 + PMD `10800000` / MUCOM88 `t198` 软件侧反证 + 86 板与 PC-8801 同为 7.9872 MHz ⇒ NB=200 真机 16.154 ms vs NP2kai 16.128 ms（−0.16%）+ 工程取值 **258 units**（旧值 129 是半个周期）+ 未确认项 |
 
 ### G — 编程参考 (Programming Reference)
 
