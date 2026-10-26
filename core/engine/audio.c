@@ -429,7 +429,7 @@ static int g_pcm_channel;
 
 static void pcm_release(void)
 {
-    /* devdoc 165: the ISR pumps the PCM FIFO (hal_pcm_tick) and the frame path
+    /* devdoc 165: the ISR pumps the PCM FIFO (hal_pcm_advance_units) and the frame path
      * may release here -- the stop + buffer swap must be atomic against it. */
     bgm_irq_lock();
     hal_pcm_stop();
@@ -590,7 +590,7 @@ int audio_get_pcm_volume(void) { return g_pcm_vol; }
 void audio_tick(void);
 /* devdoc 165: ISR-safe pump core -- no DOS clock read, no hal_logf, no free.
  * The Timer-B handler advances the virtual clock then calls this. */
-void audio_tick_isr(void);
+void audio_tick_isr(unsigned long delta_units);
 /* devdoc 131 方案 B: the MAG decode progress hook runs one decode-time frame
  * step (advance clock on vblank edge + pump audio) instead of a bare
  * audio_tick(), so a long decode no longer freezes the BGM schedule. */
@@ -638,8 +638,13 @@ void audio_init(void)
          * long CPU-bound pass can no longer starve it.  Only attempted once
          * the FM backend is up; a failed install logs and the co-operative
          * pump keeps running (frame.c checks hal_bgm_irq_active()). */
-        if (g_fm_ok && !hal_bgm_irq_init())
-            hal_log("BGM IRQ install failed; co-operative pump stays active\r\n");
+        if (g_fm_ok) {
+            int irq_ok = hal_bgm_irq_init();
+            if (!irq_ok)
+                hal_log("BGM IRQ install failed; co-operative pump stays active\r\n");
+            else
+                hal_log("BGM IRQ: installed; co-operative pump disabled (ISR active)\r\n");
+        }
 #endif
     }
 
@@ -662,25 +667,24 @@ static void bgm_rewind_phase(unsigned long now)
  * not read the platform clock here), no hal_logf, no free: a hardware handler
  * may only touch the OPNA/PCM ports and the sequence state.  The clock must be
  * advanced by the caller before this runs. */
-void audio_tick_isr(void)
+void audio_tick_isr(unsigned long delta_units)
 {
-    unsigned long now;
+    unsigned long now = hal_wallclock_smooth_ms();  /* FM scheduling only; PCM uses delta_units */
     unsigned long cur;
     /* devdoc 167: the PCM pump is sized by the real time this tick covers, so
      * it must not push a fixed burst.  The caller has already advanced the
      * virtual clock, so its millisecond delta is exactly that span. */
-    static unsigned long last_pcm_ms;
-    unsigned long pcm_dt;
+    unsigned long pcm_units;
+    /* devdoc 168: PCM pump sized by the fixed clock step (units, not ms),
+     * so the virtual-clock rate is exactly the hardware timer rate (258 units
+     * per tick at NB=200 / φM=7.9872 MHz). No virtual-clock read needed. */
+    pcm_units = delta_units;
+    if (pcm_units == 0 || pcm_units > 258UL * 4)
+        pcm_units = 258UL;  /* default tick at 60Hz-equivalent rate; guard overflow */
 
-    now = hal_wallclock_smooth_ms();
-    pcm_dt = now - last_pcm_ms;
-    last_pcm_ms = now;
-    if (pcm_dt > 1000UL)      /* first call / clock jump: never a huge burst */
-        pcm_dt = 1000UL;
-
-    /* PCM push first.  hal_pcm_tick stops the channel at EOF but does NOT free
-     * the buffer here (free() is not ISR-safe); the frame path releases it. */
-    hal_pcm_tick((uint32_t)pcm_dt);
+    /* PCM push first.  hal_pcm_advance_units stops the channel at EOF but
+     * does NOT free the buffer here (free() is not ISR-safe). */
+    hal_pcm_advance_units(pcm_units);
 
     if (!g_bgm.active) return;
 
@@ -756,7 +760,7 @@ void audio_tick(void)
     }
 #endif
 
-    audio_tick_isr();
+    audio_tick_isr(hal_wallclock_last_advance_units());  /* stage 4: pass last emitted advance (devdoc 169) */
 
     /* The FM rewind note is logged here, not in the ISR (B3): the handler only
      * raised g_bgm.rewound.  fmseq_fm_voices() reports how many voices are

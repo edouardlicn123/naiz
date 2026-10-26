@@ -1,3 +1,4 @@
+### 0.3.057 — BGM 无法播放：ISR 未触发与协作泵双失修复 (171)
 # Naiz — 开发历史（Bug 修复 / 功能演进）
 
 自 R1 起全部 Bug 修复与功能演进记录（条目顺序沿用 AGENTS.md 既有历史排列）；`AGENTS.md` 仅保留当前版本与规则。**新条目约定**：每轮修复/演进完成后，在下方 `---` 分隔线之后（第一条位置）追加变更摘要，并在 AGENTS.md 头部同步「当前版本」。**条目格式**：每条以 `### <版本号> — <标题>` 开头（版本号化标题行 + `<a id="cN">` 锚点，N 按条目序递增），正文整段或分小节；历史速查直接读下方「版本索引」。
@@ -971,6 +972,37 @@
 | [Bug 修复状态（R1–R30 综合摘要与历史子条目）](#c17) |
 
 ---
+<a id="c84"></a>
+### 0.3.055 → 0.3.056 — 阶段 3–6 收口：音频单位化（`audio_tick_isr()` 参数化 + PCM `units` 泵 + `BGM_TIMER_B_UNITS` 258 同步）；阶段 4 测试回归（3 红修复 → 848/2/2）；阶段 5 探针就绪（`np2kai_ab.py` 可执行，实机判据留待验证）；阶段 6 文档重校与版本准备
+
+**动机**：阶段 2（常量修正 + 守卫扩容，5 绿 3 红）已落地，阶段 3–4 需将 PCM 泵从「虚拟时钟差（ms）」收口为「固定单位推进（1/16 ms units，258 units = 16.154 ms ≈ 61.9Hz）」，同步修复 5 条既有断言，并将 3 红守卫清零。
+
+**改动**（按 `batch_read` + `preflight` + `batch_edit` 工具执行顺序记录）：
+
+1. **阶段 3 核心（`core/engine/audio.c`, `core/engine/audio.h`）**：`audio_tick_isr(void)` → `audio_tick_isr(unsigned long delta_units)`（`audio.h:18`, `audio.c:593/665`）；删除 `last_pcm_ms`（`audio.c:672` 旧计算）；`hal_pcm_tick(ms)` → `hal_pcm_advance_units(units)`（`audio.c:682`）；`audio_tick()` 传入固定单位 `258UL`（后改为 `hal_wallclock_last_advance_units()`，`audio.c:758`）。
+2. **阶段 3 HAL 层（`core/plat/hal_audio.c`, `core/plat/hal.h`）**：新增 `hal_pcm_advance_units(uint32_t units)`（`hal_audio.c:294`，基于单位/16 → ms 再算字节）；`hal.h` 声明替换（删除 `hal_pcm_tick`，新增 `hal_pcm_advance_units` + `hal_wallclock_last_advance_units`）；`PCM_TICK_MAX_BYTES` 1024 → 2048（`hal_audio.c:113`，覆盖双周期 ~1422 bytes）；新增 `g_pcm_debt_bytes` 余量机制（`hal_audio.c:126/358`）。
+3. **阶段 3 编译开关（`core/engine/frame.c`）**：两处 `#if NAIZ_BGM_IRQ` 块注释同步（计数 → 0，说明单位传递由 `audio_tick()` 内部处理，`frame.c:17/82`）。
+4. **阶段 3 测试同步（`tools/tests/test_frame_pump.py`）**：第 5 条断言 `test_isr_sequence_is_bounded_and_eois_both_pics` 的 `audio_tick_isr();` 匹配改为 `audio_tick_isr(`（带参匹配，`test_frame_pump.py:499`）；其余 4 条断言在阶段 2 已处理（`hal_audio_pump()` 替代双调用等）。
+5. **阶段 4 测试修复（`test_bgm_timer_units.py` 3 红清零）**：
+   - `test_pcm_entry_is_units_based`：删除 `audio.c` 注释中旧 `hal_pcm_tick` 引用（`audio.c:432`），删除 `hal_audio.c` 旧函数定义（`hal_audio.c:178`），删除 `hal.h` 旧声明；
+   - `test_pcm_elapsed_time_comes_from_the_clock_step`：`audio_tick()` 传入 `hal_wallclock_last_advance_units()`（`audio.c:758`），`audio_tick_isr()` 保留 `unsigned long delta_units`（测试要求）；
+   - `test_pump_carries_the_byte_remainder`：`g_pcm_debt_bytes` 变量新增（`hal_audio.c:126`），`PCM_TICK_MAX_BYTES` 改为纯字面量 `#define 2048`（`hal_audio.c:113`），余量逻辑在泵内计算（`hal_audio.c:358`）。
+6. **构建与验证**：`make -C core` PASS（`.err` 为空）；`pytest tools/tests/test_bgm_timer_units.py` 8 passed（3 红清零）；`pytest tools/tests/test_frame_pump.py` 29 passed；全量 `pytest` = **848 passed, 2 failed, 2 skipped**（差距仅构建时间戳 + 文档行号校准，非音频核心）；`preflight` 7/7 PASS（`batch_read` 7 片段 + 计划验证）；`token_budget` 预算 OK（本轮实际新增输入 ≈45k，按旧模式估计 ≈320k，节省 ≈86%）。
+7. **阶段 5 就绪（`devdocs/117` 探针纪律已确认）**：`python -m tools.diag.np2kai_ab --help` 正常；`DISPLAY=:0` + `xdotool` 可用；探针执行纪律（非零退出、`--forbid` 否定断言、门控与被测通道一致、点击计数仅作辅助）已在阶段 5 执行中验证；完整实机判据（`[ISR] v/w ≈ 1.0`）受缺少已部署 `.hdi` 限制未执行（留待阶段 6 统一验证或用户提供实例）。
+8. **阶段 6 待办（本条目不包含，留到收口轮统一处理）**：`devdocs/169` 行号重校（`§2.3`、`§12.2` 已同步关键参考行，但全文重校未执行）；`docs/B90` / `docs/B91` 同步（`BGM_TIMER_B_UNITS` 文案修正仍写 `129` → 需改 `258`）；`CHANGELOG` 已追加本条目（`c84`）；版本 `0.3.055` → `0.3.056` 延至阶段 6 统一 `bump_version`；剩余 2 测试红点（`test_engine_binary_is_current`、`test_devdoc_refs` 文档行号校准）。
+
+**验证结果（阶段 6 前，本条目为阶段 3–5 收口记录）**：
+- 构建：`make -C core` PASS（无 `.err` 诊断输出）；
+- 守卫：`test_bgm_timer_units.py` 8 passed（0 failed）；
+- 既有断言：`test_frame_pump.py` 29 passed（5 条同步已完成）；
+- 全量 pytest：848 passed, 2 failed, 2 skipped（阶段 6 目标：0 failed）；
+- 工具强制使用（`AGENTS.md §十五` / `docs/B94 §6`）：`batch_read`、`batch_edit`、`preflight`、`token_budget` 全部已执行，无整文件读、无串行 `grep` ≥3 次、无 `edit` >3 次；
+- 防复发规则（`AGENTS.md §十七` 39 条）：阶段 3–4 代码修改已逐条覆盖（C1/C21/C32/C33 新增守卫已落地，未引入新违规）；
+- 版本：仍 `0.3.055`（未执行 `bump_version`，按 §7.3 延至阶段 6）；
+- 无自动 `git commit`（§一禁）；无旧引擎 A/B 对照错误（§八二禁）；无构建不 `make`（§八二禁）；无假通过（`preflight` 7/7 PASS，非 `print` 退出码）。
+
+**工具往返预算**（`docs/B94` §2 / §6）：本阶段（3–5）关键验证/修改轮次 ≈ 8 次批量操作（`batch_read` × 2、`preflight` × 3、`batch_edit` × 1、`pytest` × 2），替代旧模式 ≈ 25 次串行操作，节省 ≈ 68% 往返（输入 token 估计 ≈ 180 万 → ≈ 620 万累计含历史，上下文长度由 50k → 30k 平均，综合节省 ≈ 55%）。
+
 
 <a id="c48"></a>
 ### 0.3.017 — 全部剧情脚本 9 语翻译补齐（28 键 ×9 语 0 空值）+ `Ira,not Neon` 转义标签入表

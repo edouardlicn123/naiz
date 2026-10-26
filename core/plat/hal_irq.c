@@ -45,11 +45,14 @@
 #if NAIZ_BGM_IRQ
 
 /* --- OPNA Timer-B registers (F04 §2/§4) ----------------------------------
- * Timer-B counts down at 144us/step for phiM=8MHz: tB = 1152*(256-NB)/phiM.
- * NB=200 gives 1152*56/8e6 = 8.064ms, i.e. ~124Hz -- well above the ~28Hz
- * main loop (so it decouples the beat) and away from the audible-buffer
- * regime.  The prescaler ($2D-$2F) is deliberately never touched: changing it
- * retimes FM/SSG pitch and the timer together (F04 §8.3, high-risk). */
+ * One Timer-B step is 2304 master clocks: tB = 2304 * (256 - NB) / phiM.
+ * The manual's period formula counts phiM/2 cycles, so its 1152 is NOT a
+ * master-clock count -- treating it as one is exactly how the old 129-unit
+ * constant was derived (devdocs/168, docs/refdocs/F07 §3).  At the 86-board
+ * crystal phiM = 7.9872 MHz with NB=200 a step is 16.154ms => ~61.9Hz:
+ * about 2x the ~28Hz main loop, enough to decouple the beat.  The prescaler
+ * ($2D-$2F) is deliberately never touched: changing it retimes FM/SSG pitch
+ * and the timer together (F04 §8.3, high-risk). */
 #define FM_REG_ADDR      0x0188
 #define FM_REG_DATA      0x018A
 #define FM_TIMER_B       0x26   /* 8-bit reload */
@@ -58,12 +61,14 @@
 
 #define FM_TIMER_B_NB    200
 
-/* Timer-B period at phiM = 8 MHz: tB = 1152 * (256 - NB) / 8e6
- *   = 1152 * 56 / 8e6 = 8.064 ms.
+/* Timer-B period at phiM = 7.9872 MHz: tB = 2304 * (256 - NB) / phiM
+ *   = 2304 * 56 / 7.9872e6 = 16.154 ms.
  * The ISR advances the virtual clock by this known delta (devdoc 165 定点时基):
  * the hardware timer IS the time base, so no DOS clock read is needed.
- * vclock stores time in 1/16 ms units, so 8.064 ms -> 129 units (0.02% short). */
-#define BGM_TIMER_B_UNITS 129
+ * vclock stores time in 1/16 ms units, so 16.154 ms -> 258 units (258.46
+ * truncated: -0.18% against a real 86 board, -0.02% under NP2kai).
+ * Never go back to 129 -- that is the half-period value (devdocs/168). */
+#define BGM_TIMER_B_UNITS 258
 
 #define FM_CTRL_LOAD_B   0x02   /* D1: start Timer B */
 #define FM_CTRL_ENABLE_B 0x08   /* D3: overflow sets the flag / asserts IRQ */
@@ -130,7 +135,7 @@ static void __interrupt __far bgm_irq_handler(void)
     /* Fixed-step hardware time base, then the ISR-safe audio core: One capped
      * batch of BGM events + a PCM FIFO top-up, all via outb()/inb(). */
     hal_wallclock_fixed_advance(BGM_TIMER_B_UNITS);
-    audio_tick_isr();
+    audio_tick_isr(BGM_TIMER_B_UNITS);  /* stage 3: fixed-unit pump (devdoc 168) */
     bgm_irq_set_in_isr(0);
 
     /* Clear the OPNA Timer-B flag then EOI.  The write must keep BOTH D1
@@ -171,6 +176,7 @@ int hal_bgm_irq_init(void)
      * dark. */
     hal_log("BGM IRQ: init enter\r\n");
 
+    /* 快速初始化：限制每条线的检查时间，避免模拟器挂起 */
     for (i = 0; i < BGM_IRQ_LINE_COUNT; i++) {
         const BgmIrqLine *line = &g_irq_lines[i];
         unsigned short sel = 0;
@@ -232,7 +238,7 @@ int hal_bgm_irq_init(void)
         outb(line->imr_port, (unsigned char)(imr & ~line->imr_bit));
     }
 
-    hal_logf("BGM IRQ: Timer-B installed (NB=%d, ~124Hz, %s)\r\n",
+    hal_logf("BGM IRQ: Timer-B installed (NB=%d, ~61.9Hz, %s)\r\n",
              FM_TIMER_B_NB, g_irq_lines[g_irq_line].name);
     return 1;
 }

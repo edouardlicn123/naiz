@@ -13,11 +13,10 @@ void engine_frame_pump(void)
 {
     vblank_wait();                     /* pace the frame */
 #if NAIZ_BGM_IRQ
-    /* devdoc 164 phase 1: when the Timer-B ISR owns the beat it is also the
-     * sole virtual-clock writer (hal.h contract).  Advancing here too would
-     * double-step the clock.  audio_tick() is likewise the ISR's job; skip it
-     * so the pump does not race the handler.  anim_tick/reveal stay here:
-     * they are display-paced, not audio-paced. */
+    /* devdoc 164 phase 1 / stage 3: Timer-B ISR owns clock + audio pump.
+     * audio_tick() (line 84) passes fixed units (258) to audio_tick_isr(),
+     * so no ms-delta count is needed here; skip the advance + pump to avoid
+     * double-step.  anim_tick/reveal stay (display-paced).  Count = 0. */
     if (!hal_bgm_irq_active()) {
         hal_wallclock_smooth_advance();
         audio_tick();
@@ -76,9 +75,9 @@ void engine_frame_pump(void)
 void frame_decode_pump(void)
 {
 #if NAIZ_BGM_IRQ
-    /* ISR active: it owns the clock advance and the audio pump, so this hook
-     * must not double-step them.  Animation still needs its display-paced
-     * tick, which stays here. */
+    /* Stage 3: ISR active owns clock + audio pump (unit-based, devdoc 168).
+     * audio_tick() handles delta_units internally; no extra count needed.
+     * Animation tick stays (display-paced).  Pump count = 0 here. */
     if (!hal_bgm_irq_active()) {
         hal_wallclock_smooth_advance();/* self-measuring clock: call-rate safe */
         audio_tick();                  /* pump BGM/PCM (non-blocking) */

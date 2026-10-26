@@ -175,7 +175,7 @@ void vclock_advance_fixed(VClock *vc, unsigned long delta_units)
      * Timer-B tick is a known fixed period, so no platform clock is read and
      * no DOS/BIOS call is made -- which is exactly what keeps this callable
      * from a hardware ISR.  `delta_units` is in 1/16 ms units, so a
-     * non-integer-millisecond timer period (e.g. 8.064 ms -> 129 units) keeps
+     * non-integer-millisecond timer period (e.g. 16.154 ms -> 258 units) keeps
      * its phase instead of rounding to whole ms.  `started` is still honoured
      * so the very first tick after an origin establishes the baseline rather
      * than emitting. */

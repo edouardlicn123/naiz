@@ -27,6 +27,7 @@ ROOT = Path(__file__).resolve().parent.parent.parent
 HAL_IRQ_C = ROOT / "core" / "plat" / "hal_irq.c"
 HAL_H = ROOT / "core" / "plat" / "hal.h"
 HAL_AUDIO_C = ROOT / "core" / "plat" / "hal_audio.c"
+VCLOCK_C = ROOT / "core" / "lib" / "vclock.c"
 AUDIO_C = ROOT / "core" / "engine" / "audio.c"
 AUDIO_H = ROOT / "core" / "engine" / "audio.h"
 
@@ -128,12 +129,18 @@ def test_comments_do_not_keep_the_old_numbers():
     """A half-edited file is worse than an unedited one: the stale comment
     tells the next reader that 8.064 ms / ~124 Hz is correct, so they "fix"
     the code back.  devdoc 169 §5.1.4 pins both the value and the prose.
+
+    vclock.c is scanned too: its fixed-advance comment carried the same
+    retracted 8.064 ms -> 129 units example, a second copy of the bug that
+    the hal_irq.c-only scan would have let through.
     """
-    src = _read(HAL_IRQ_C)
-    stale = [s for s in STALE_TEXT if s in src]
+    stale = []
+    for path in (HAL_IRQ_C, VCLOCK_C):
+        src = _read(path)
+        stale.extend(f"{path.name}:{s}" for s in STALE_TEXT if s in src)
     assert not stale, (
-        "hal_irq.c still carries the retracted period text "
-        f"{stale} -- update the Timer-B comment blocks as well"
+        "source files still carry the retracted period text "
+        f"{stale} -- update the Timer-B / vclock comment blocks as well"
     )
 
 
@@ -143,7 +150,8 @@ def test_install_log_reports_the_real_rate():
     nb = _timer_b_nb()
     want = f"{_expected_hz(nb):.1f}Hz"
     src = _read(HAL_IRQ_C)
-    assert want in src, (
+    found = want in src
+    assert found, (
         f"the Timer-B install log must report {want} (NB={nb}), "
         f"not a stale rate; expected the literal {want!r} in hal_irq.c"
     )
@@ -157,7 +165,8 @@ def test_pcm_entry_is_units_based():
     as a second way in -- two entry points means two time bases again.
     """
     for path in (HAL_H, HAL_AUDIO_C, AUDIO_C):
-        assert "hal_pcm_tick" not in _read(path), (
+        retired = "hal_pcm_tick" in _read(path)
+        assert not retired, (
             f"{path.name} still references the retired hal_pcm_tick(); "
             "use hal_pcm_advance_units()"
         )
@@ -186,7 +195,8 @@ def test_pcm_elapsed_time_comes_from_the_clock_step():
     deliberate slew into the sample rate in the co-operative path.
     """
     audio_c = _read(AUDIO_C)
-    assert "last_pcm_ms" not in audio_c, (
+    derived = "last_pcm_ms" in audio_c
+    assert not derived, (
         "audio.c still derives the PCM step from a virtual-clock delta; the "
         "caller must pass the clock-advance amount instead"
     )
@@ -202,11 +212,13 @@ def test_pcm_elapsed_time_comes_from_the_clock_step():
         "the Timer-B handler must feed the pump its own hardware period "
         "(audio_tick_isr(BGM_TIMER_B_UNITS))"
     )
-    assert "hal_wallclock_last_advance_units" in _read(HAL_H), (
+    declared = "hal_wallclock_last_advance_units" in _read(HAL_H)
+    assert declared, (
         "the co-operative path needs the emitted advance in units: declare "
         "hal_wallclock_last_advance_units() in hal.h"
     )
-    assert "hal_wallclock_last_advance_units" in audio_c, (
+    used = "hal_wallclock_last_advance_units" in audio_c
+    assert used, (
         "audio_tick() must pass the last emitted advance to audio_tick_isr()"
     )
 
@@ -216,7 +228,8 @@ def test_pump_carries_the_byte_remainder():
     pump, and the remainder must be carried -- otherwise a single stall leaves
     the stream permanently short (devdoc 169 §2.3 defect 2)."""
     src = _read(HAL_AUDIO_C)
-    assert "g_pcm_debt" in src, (
+    carries_debt = "g_pcm_debt" in src
+    assert carries_debt, (
         "hal_audio.c must carry the un-fed remainder (g_pcm_debt_bytes) "
         "instead of dropping it at the per-pump cap"
     )

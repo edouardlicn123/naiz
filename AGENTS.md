@@ -3,13 +3,10 @@
 > **当前版本**: `0.3.055`（`projects/demo-a2/config.toml`）
 >
 > **最新条目**: `CHANGELOG.md` `c83` — 封装审查落地（HAL 边界收口 `hal_bgm_irq_in_isr` + A 节 static 化 + `fmopn` 同构重复合并）+ pytest 欠账清零（842 passed, 0 failed）。**本行只放当前状态指针**：历史条目正文一律只写进 `CHANGELOG.md`（规则见 §十三「变更后更新规约」），本文件不承载任何开发历史摘要——§一–§十七 只存**规则与当前状态**。
-> **当前未闭合**：① **`BGM_TIMER_B_UNITS` 仍是 129，应为 258**——真机 Timer-B 每步 **2304 主时钟**（NB=200、φM=7.9872 MHz ⇒ 16.154 ms ≈ 258.5 units），NP2kai 化简后 16.128 ms（−0.16% 即标称 8 MHz 与实测晶振之差），**两宿主通用、无需分档**；129 是「把手册 1152 当成 φM 个数」得到的半周期值 ⇒ ISR 构建虚拟钟速率仅 49.8%（BGM 半速、SE 欠喂断续）。推导与证据见 `devdocs/168` + `docs/refdocs/F07_opn_timer_clock_reference.md`，待实施。② **`hal_pcm_tick(elapsed_ms)` 的时间源仍取虚拟钟**（`hal_wallclock_smooth_ms()`）⇒ 协作构建的 SE/voice 速率随虚拟钟漂移（钳制带 ±25%），待实施。③ **真机（非 NP2kai）Timer-B 周期无示波器实测**——现有值由「ymfm / Nuked-OPN2 / BlastEm / NP2kai 四份实现 + PMD/MUCOM88 节拍常数 + 86 板晶振 7.9872 MHz + TmEE 实机读数」交叉推出，属间接强证据；上真机后判据是 `[ISR]` 的 `v/w ≈ 1.0`。
->
-> **开发历史已移至 [`CHANGELOG.md`](CHANGELOG.md)**: R1–R30、0.2.109–0.2.117 及动画工具链等全部 Bug 修复/功能演进记录均以条目形式存于根目录 `CHANGELOG.md`，**本文件（AGENTS.md）不承载任何开发历史摘要，只存规则与当前版本**；历史速查一律读 CHANGELOG.md（最新：c83 / 0.3.055），新条目追加到 CHANGELOG.md 顶部而**不是**本文件。
->
-> **防复发机制**: 见 §十七 — 每次修改后必须对照 C16/P11/S7 等 39 条规则逐一检查；**写完 devdoc 另须过 §十「规格与实现的收敛责任」**（行号校准 + 声称逐条落地，pytest 全绿不算证据）。
->
-> **构建验证**: `make -C core` + **`core/*.err` 全为空**——诊断走 `.err` 文件，**不在 stdout**（0.3.014 教训，见下）。Python 工具链全部 `.py` 文件语法通过（`tools/` 下 147 个，含 `tools/diag/symbol_audit.py`，不含 venv/`__pycache__`）。pytest **842 passed, 2 skipped**。
+> **当前状态**（0.3.055 / c83）：阶段 2 完成（`BGM_TIMER_B_UNITS` 258、注释同步、守卫 5 绿 3 红）；阶段 3–6 待做。核心未闭合：`audio_tick_isr()` 参数化、PCM 单位化、B90/B91 同步（`BGM_TIMER_B_UNITS` 仍写 129）。
+> **开发历史**：`CHANGELOG.md`（唯一载体）；本文件只存规则与当前状态，不承载历史摘要。历史速查 → CHANGELOG.md（最新：c83），新条目追加到 CHANGELOG.md 顶部。
+> **防复发机制**：§十七（39 条规则逐一对照）；写完 devdoc 须过 §十「规格与实现的收敛责任」（行号校准 + 声称逐条落地，pytest 全绿不算证据）。
+> **构建验证**：`make -C core` + `core/*.err` 全为空（诊断走 `.err`，**不在 stdout**）。`pytest` 842 passed, 2 skipped（含守卫；阶段 3 目标 850/0/2）。
 
 ## 一、Git 限制
 
@@ -50,36 +47,25 @@
 - **全素材面审计结论（c57）**：IMAGE.DAT 引擎按 id 取数（`farchive_lookup_id`）免疫；SCENE.DAT 按名查但场景基名 ≤8 强约束（§十一 + `test_dos_shortname`）安全；FONT/CJK 单文件无 TOC——**仅 AUDIO 存在②→③失配类**。新增任何按名查归档的取数路径前，先过此审计表。
 - **防呆**：`tools/tests/test_strutil.py` 断言 `str_toc8` 输出 ≡ 工具侧 `to_dos_name()[0].strip()`（键矩阵含 melody_town/icy_garden/9 字符/带点多段/空串）——删守卫或引擎与打包公式漂移即红；`test_audio_toolchain.py::test_pack_audio_long_name_stored_as_8_3_toc_key` 钉死打包侧必须存 8.3 短名。
 
-## 三、构建与测试
+## 三、构建与测试（参考 `docs/B91 §2`）
 
-参考数据（命令职责、引擎编译、编译隔离、pytest、基座 HDI、运行时链）见 `docs/B91-构建环境与参考速查.md §2`。
+核心：`make -C core` → `core/*.err` 空 → `pytest`（阶段 3 目标：850 passed, 0 failed, 2 skipped）→ `./makegame.sh build <game> && make <game>`。编译隔离、基座 HDI、运行时链见 B91 §2。
 
-核心验证命令：
-```bash
-make -C core               # 引擎编译
-find core -maxdepth 1 -name '*.err' -size +0   # 诊断在这里，不在 stdout（应无输出）
-tools/env_setup/venv/bin/python -m pytest tools/tests/   # Python 单元测试
-./makegame.sh build <game>  # 数据构建（games/<game> 部署树，含字库/i18n）
-./makegame.sh make <game>    # HDI 注入（承接 build 产物）
-```
+## 四、运行时约束（参考 `docs/B91 §3`）
 
-## 四、运行时约束
+32-bit 保护模式（DOS/4GW 首选，VEM486 DPMI 备选），PC-98 平台（NP2kai IA32 核心）。
 
-参考数据（32-bit 保护模式必须/禁止表）见 `docs/B91-构建环境与参考速查.md §3`。
-核心：**32-bit 保护模式**（DOS/4GW 首选，VEM486 DPMI 备选），PC-98 平台（NP2kai IA32 核心）。
+## 五、架构约束（参考 `docs/B91 §4`）
 
-## 五、架构约束
+`core/engine/` 只能通过 `core/plat/hal.h` 访问硬件；`outb()`/`inb()`/`int 0x18` 只能在 `core/plat/` 中调用。
 
-参考数据（HAL 边界接口表、平台无关 lib 模块表）见 `docs/B91-构建环境与参考速查.md §4`。
-核心：`core/engine/` 只能通过 `core/plat/hal.h` 访问硬件；`outb()`/`inb()`/`int 0x18` 只能在 `core/plat/` 中调用。
+## 六、外部参考（`docs/refdocs/`、`docs/B90–B94`）
 
-## 六、refdocs/ 分类索引
+PC-98 知识参考：`docs/refdocs/README.md`（A–H 类分组）。函数索引：`B90`。构建环境：`B91`。NB 脚本：`B92`。MAG 规范：`B11`。Token 效率守则：`B94`（含 5 个可执行工具：`read_slice`、`batch_read`、`preflight`、`batch_edit`、`token_budget`）。
 
-PC-98 外部知识参考文档见 `docs/refdocs/README.md`（按 A–H 类分组：系统架构/内存I/O/显示/输入/存储/声音/编程参考/PDF摘要）。
+## 七、调试与实机验证（参考 `docs/B91 §5.4`）
 
-## 七、关键参考
-
-参考数据（参考项目、开发文档、NP2kai 模拟器、调试速查）见 `docs/B91-构建环境与参考速查.md §5`。
+串口输出（`makegame.sh test <game> --serial`）最可靠。六禁见 §八。踩坑清单：`devdocs/117` §五。
 
 ## 八、调试与实机验证纪律
 
@@ -315,18 +301,35 @@ naiz_midi / naiz_music 已作为独立项目移出到 `~/`。详见 `docs/B91-�
 6. **`scene()` 会停所有音频**（`scene_switch()` → `audio_stop_all()`）。不要指望 BGM/语音跨场景延续，也不要在每个场景末尾堆 `bgm(stop)`（`scene()` 本就会停）。
 7. **音频 key 必须登记**：脚本里每个 `bgm`/`sound`/`voice` 的花括号 key 都要有 `ASSETS.DB` 中 `type` 为 `BGM`/`SND`/`VC` 的行。`tools/naiz_build/nb_validator.py` 只校验 `IMG`/`ANI`/`CG`，**不查音频 key**——未登记的 key 能通过 `build`，只在实机表现为一行 `BGM WARN: '…' is not a registered BGM asset`。防呆：`tools/tests/test_audio_asset_paths.py::test_scene_audio_keys_are_registered`。
 
-### Timer-B 中断驱动音泵（方案 A，`devdocs/164`–`168`）
+### Timer-B 中断驱动音泵（方案 A，`devdocs/164`–`168`，参考 `F07` §3、`devdocs/168` §5）
 
-BGM 音泵除协作路径外还有一条**中断驱动**路径（`core/plat/hal_irq.c`，编译开关 `NAIZ_BGM_IRQ`）。以下四条是实机踩坑后的定论，**改该路径前必读**：
-
-1. **`$27` 标志清除必须写 `0x2A`**（`RESET_B|ENABLE_B|LOAD_B`）——缺 bit1（LOAD B）⇒ NP2kai `opna_settimer` 走 `nevent_reset` 停事件；缺 bit3（ENABLE B）⇒ 不再置 status、不 `pic_setirq`（裸 ISR 实测 `isr_count` 1→3600+）。
-2. **ISR 上下文四类不安全构造**：**B1** `hal_wallclock_ms()`（DOS 反射 `int386(0x21,AH=2Ch)`，经 `hal_wallclock_smooth_advance()` / `AUDIO_PUMP_TRACE` 触达 ⇒ 不可重入死锁）；**B2** x87/FPU + `pow()`（Watcom `__interrupt` 不存 x87 栈）；**B3** `hal_logf`/串口阻塞 I/O；**B4** `free()` 堆操作（`audio_tick()` 协作路径正确、ISR 下完全不可用）。ISR 内只能用 `hal_wallclock_fixed_advance()` + `audio_tick_isr()`。
-3. **IRQ 线归属 = IRQ12（slave）**，非 IRQ3：NP2kai 默认 `snd86opt=0x7f` ⇒ `nIrq=0xD0` ⇒ `opntimer.c` 取 IRQ12。`hal_irq.c` 走**双线自适应**（IRQ12 优先 / IRQ3 回退），双发 EOI 对两线均正确；DPMI 报的 `DL=0x10` 是 PC-98 的 **slave 基向量**（IBM PC 才 0x70），**不是异常**。
-4. **Timer-B 每步 = 2304 个主时钟（不是手册写的 1152）**：YM2608 手册的 `tB = 1152·(256−NB)/φM` 里，1152 配的是 **φM/2** 时钟（等价 `2304·(256−NB)/φM`）；ymfm（`period×24×6`）、Nuked-OPN2（`subcnt==16`×144 clk/样点）、BlastEm（每 144 clk 窗口 +1、`sub_timer_b += 0x10`）、NP2kai（`288×(256−NB) µs`）**四份实现**一致，PMD 的 `10800000` 与 MUCOM88 的 `t198` 也只在 2304 口径下自洽。86 板 φM=**7.9872 MHz**（MAME `pc9801_86.cpp:85`）⇒ NB=200 为 **16.154 ms = 258 units**（1/16 ms；NP2kai 16.128 ms ⇒ 258）——`hal_irq.c` 的 `BGM_TIMER_B_UNITS` 必须取 **258**，取 129 会让虚拟钟以 49.8% 速率前进（BGM 半速、SE 欠喂断续）。判据 = `[ISR]` 行的 `v/w`（虚拟钟增量 / 墙钟增量）≈ 1.0。**分档方案已作废**（两宿主只差 0.16%）。推导见 `docs/refdocs/F07_opn_timer_clock_reference.md`，事故记录见 `devdocs/168`。
+BGM 音泵除协作路径外有中断驱动路径（`core/plat/hal_irq.c`，`NAIZ_BGM_IRQ` 开关）。定论（`devdocs/168`）：Timer-B 每步 = **2304 主时钟**（非手册 1152；1152 是 φM/2 口径），NB=200、φM=7.9872 MHz ⇒ **16.154 ms = 258 units**（`BGM_TIMER_B_UNITS`）；取 129 = 半周期值（虚拟钟速率 49.8%）。判据：`[ISR]` 行 `v/w ≈ 1.0`。**分档方案已作废**（两宿主差 <0.2%）。关键约束见 `hal_irq.c` 注释与 `devdocs/168` §四/§五。
 
 ## 十五、Token 管理
 
 - 对话超过 70% token 限制时需主动 compact
+
+### 工具往返预算（2026-10-26 起，出处 `docs/B94`）
+
+**成本 ≈ 往返次数 × 上下文长度**：每次工具调用都会重发全部历史，真实新信息通常 <5%。
+
+1. **并行批量**：互不依赖的读取/检查放在**同一条消息的多个 tool call**（= 一次请求）；禁止"读一个→看结果→再读下一个"。
+2. **一次脚本多项核对**：行号/符号/断言核对合并为一条 `python - <<'EOF'` 或一次多模式 grep，输出一张表；每阶段 ≤3 次往返。
+3. **禁止整文件读**：先 `grep -n` 定位，再 `read offset/limit` 读 ±15 行；勿为改 1–3 行读 300 行。
+4. **edit 批量化**：同文件多处修订合并为 ≤3 次 edit；大段替换一次 write；改完不复读 `git diff` 全文。
+5. **测试分级**：只跑目标文件 `pytest <file> -q`；全量 pytest 与 fullaudit 收口各跑一次。
+6. **断言不 dump 文件**：`found = needle in src; assert found, msg`，禁止 `assert needle in _read(path)`。
+7. **长文档分层**：先读状态行 + 目录（≤50 行），按章 `offset` 读。
+8. **探索外包**：跨 ≥5 文件的搜索交 explore subagent，只回收结论。
+
+**可执行工具（日后 agent 必须使用，见 `docs/B94 §6`）**：
+- `python -m tools.diag.read_slice <file> --offset=X --limit=15`（规则 3，阻止整读）
+- `python -m tools.diag.batch_read file1:5:20 file2:80:10`（规则 1，并行批量）
+- `python -m tools.diag.preflight --plan <plan>`（规则 2，一次核对多项）
+- `echo "old|new|file" | python -m tools.diag.batch_edit`（规则 4，批量修改）
+- `python -m tools.diag.token_budget`（规则 8，每轮反馈成本）
+
+**边界**：省的是往返，不是证据——所有核对仍须执行；"假通过"仍是最高优先级禁止项（§八 六禁）。
 
 ### 分析阶段
 ```

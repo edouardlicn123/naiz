@@ -69,6 +69,7 @@ static int          wallclock_inited = 0;
  * frame pump) and hal_wallclock_smooth_ms() only reads.
  */
 static VClock g_vclock;
+static unsigned long last_advance_units = 258UL;  /* stage 3/4: default = one BGM_TIMER_B_UNIT tick */
 
 /* devdoc 133: serial tempo probe toggle (0 = off).  Defaults on so a single
  * build is verifiable; the [VC] line is emitted every 64 advances. */
@@ -140,6 +141,7 @@ void hal_wallclock_smooth_advance(void)
         }
     }
 #endif
+    last_advance_units = 258UL;  /* stage 4: co-op path uses fixed unit (devdoc 169) */
 }
 
 /* devdoc 165: fixed-step clock advance for the Timer-B ISR.  No DOS call
@@ -149,7 +151,13 @@ void hal_wallclock_smooth_advance(void)
 void hal_wallclock_fixed_advance(unsigned long delta_units)
 {
     vclock_advance_fixed(&g_vclock, delta_units);
+    last_advance_units = delta_units;
 }
+unsigned long hal_wallclock_last_advance_units(void)
+{
+    return last_advance_units;  /* stage 4: last emitted clock step in 1/16 ms units */
+}
+
 
 /*
  * Vertical-retrace sync and frame-boundary detection (devdoc 131 A/B).

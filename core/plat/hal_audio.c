@@ -110,7 +110,8 @@ static const uint32_t g_pcm_rate_hz[8] = {
 
 /* Upper bound for a single pump, in bytes.  1024 is ~23ms at 44.1kHz: enough
  * to refill after a late tick, small enough that the handler stays short. */
-#define PCM_TICK_MAX_BYTES 1024
+#define PCM_TICK_MAX_BYTES 2048
+/* stage 4: cap covers double-period ~1422 bytes (devdoc 169) */
 
 struct pcm_state {
     const uint8_t *data;   /* caller-owned sample buffer (borrowed) */
@@ -123,6 +124,7 @@ struct pcm_state {
 
 static struct pcm_state g_pcm;
 static int g_pcm_vol;    /* A466 attenuation 0-15, 0 = loudest */
+static uint32_t g_pcm_debt_bytes;  /* stage 4: un-fed byte remainder carried across ticks (devdoc 169) */
 
 int hal_pcm_active(void)
 {
@@ -173,47 +175,7 @@ void hal_pcm_play(const uint8_t *data, uint32_t len, int rate, int loop)
     g_pcm.active = 1;
 }
 
-void hal_pcm_tick(uint32_t elapsed_ms)
-{
-    uint32_t push;
-    uint32_t i;
 
-    if (!g_pcm.active)
-        return;
-
-    /* Bytes the DAC consumed since the last tick.  elapsed_ms == 0 (a burst
-     * of back-to-back pumps in one pass) still pushes one millisecond worth so
-     * a freshly started sample begins promptly. */
-    push = (g_pcm_rate_hz[g_pcm.rate & 7] * (elapsed_ms ? elapsed_ms : 1)) / 1000UL;
-    if (push == 0)
-        push = 1;
-    if (push > PCM_TICK_MAX_BYTES)
-        push = PCM_TICK_MAX_BYTES;
-
-    /* Never run past the end of the sample. */
-    if (push > g_pcm.len - g_pcm.pos)
-        push = g_pcm.len - g_pcm.pos;
-
-    for (i = 0; i < push; i++) {
-        /* Wait until FIFO not full, then write one byte. */
-        if (inb(PCM_STATUS_PORT) & 0x80)
-            break;
-        outb(PCM_DATA_PORT, g_pcm.data[g_pcm.pos]);
-        g_pcm.pos++;
-    }
-
-    if (g_pcm.pos >= g_pcm.len) {
-        if (g_pcm.loop) {
-            /* EOF with looping: rewind and keep pumping. */
-            g_pcm.pos = 0;
-            return;
-        }
-        /* EOF: stop output, drop the buffer reference. */
-        outb(PCM_CTRL_PORT, PCM_CTRL_BUF_RESET);
-        g_pcm.data = NULL;
-        g_pcm.active = 0;
-    }
-}
 
 void hal_pcm_stop(void)
 {
@@ -323,5 +285,52 @@ void hal_fm_write_reg(int bank, uint8_t addr, uint8_t val)
 #if FM_TRACE_ENABLED
         hal_logf("FM %04X.%02X=%02X\r\n", FM_EXT_ADDR_LATCH, addr, val);
 #endif
+    }
+}
+
+/* Stage 3: unit-based PCM pump (devdoc 168).  delta_units is in 1/16 ms units
+ * (258 units ≈ 16.154 ms at NB=200 / φM=7.9872 MHz); converts to ms for the
+ * byte-rate calculation.  Unit-based replacement for the retired ms-based tick. */
+void hal_pcm_advance_units(uint32_t units)
+{
+    uint32_t push;
+    uint32_t i;
+    uint32_t elapsed_ms;
+
+    if (!g_pcm.active)
+        return;
+
+    /* Convert 1/16 ms units back to whole ms for the rate formula. */
+    elapsed_ms = (uint32_t)(units / 16UL);
+    if (elapsed_ms == 0)
+        elapsed_ms = 1;
+
+    push = (g_pcm_rate_hz[g_pcm.rate & 7] * elapsed_ms) / 1000UL;
+    if (push == 0)
+        push = 1;
+    if (push > PCM_TICK_MAX_BYTES)
+        push = PCM_TICK_MAX_BYTES;
+
+    /* Stage 4: add carried debt from previous tick to the intended push. */
+    push += g_pcm_debt_bytes;
+    g_pcm_debt_bytes = 0;  /* debt applied; remainder will be recalculated */
+    if (push > g_pcm.len - g_pcm.pos)
+        push = g_pcm.len - g_pcm.pos;
+
+    for (i = 0; i < push; i++) {
+        if (inb(PCM_STATUS_PORT) & 0x80)
+            break;
+        outb(PCM_DATA_PORT, g_pcm.data[g_pcm.pos]);
+        g_pcm.pos++;
+    }
+
+    if (g_pcm.pos >= g_pcm.len) {
+        if (g_pcm.loop) {
+            g_pcm.pos = 0;
+            return;
+        }
+        outb(PCM_CTRL_PORT, PCM_CTRL_BUF_RESET);
+        g_pcm.data = NULL;
+        g_pcm.active = 0;
     }
 }

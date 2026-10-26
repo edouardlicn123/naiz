@@ -496,7 +496,7 @@ def test_isr_sequence_is_bounded_and_eois_both_pics():
     DOS clock), no floating point, no hal_logf, no free()."""
     c = HAL_IRQ_C.read_text(encoding="utf-8")
     body = _func_body(c, "bgm_irq_handler")
-    for call in ("hal_wallclock_fixed_advance(", "audio_tick_isr();"):
+    for call in ("hal_wallclock_fixed_advance(", "audio_tick_isr("):
         assert call in body, f"the ISR must call {call} (devdoc 165 §四)"
     # The unsafe forms must not come back.
     for bad in ("hal_wallclock_smooth_advance", "hal_wallclock_ms(",

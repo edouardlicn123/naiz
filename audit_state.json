@@ -1,7 +1,7 @@
 {
   "version": 2,
-  "git_head": "7486c0a",
-  "checked_at": "2026-10-22T20:29:33",
+  "git_head": "87251fd",
+  "checked_at": "2026-10-26T11:53:25",
   "files": {
     "core/build.sh": {
       "sha256": "0e6bb3f41cae8f6c5a014a49767f93990ddd3e2c461a85ec991c01b40b66b11e",
@@ -793,7 +793,7 @@
       "findings": []
     },
     "core/lib/vclock.c": {
-      "sha256": "cc303063ee8d297259de4c625e1898cf9e1af379f69093658bdbd439f7544839",
+      "sha256": "1cc1794913d7f5eea03e772a651658092a48638fe315e416c36c4237eeb2694c",
       "violations": 0,
       "candidates": 0,
       "findings": []
@@ -829,7 +829,7 @@
       "findings": []
     },
     "core/plat/hal_irq.c": {
-      "sha256": "4946d7c71a4b099b4a13237437772d9d9f244418974b631d602949dabda16021",
+      "sha256": "9d5f0275ed62beba70665bd208d84099275fc4c781897d8d128192ad756b3de2",
       "violations": 0,
       "candidates": 0,
       "findings": []
@@ -1568,8 +1568,8 @@
   },
   "summary": {
     "files": 210,
-    "changed": 1,
-    "skipped": 209,
+    "changed": 2,
+    "skipped": 208,
     "out_of_scope": 0,
     "violations": 0,
     "candidates": 52,
