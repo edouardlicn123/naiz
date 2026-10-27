@@ -11,6 +11,9 @@
 /* Public NB API (nb_load lives here) is visible to all sub-modules. */
 #include "nb.h"
 
+/* Scene preload queue (devdoc 177): nb.c pushes, frame.c drains. */
+#include "preload_queue.h"
+
 /*=== Constants ============================================================*/
 
 #define NB_LINE_MAX      1152
@@ -84,6 +87,9 @@ void nb_get_line(int line_num, char *out, int out_size);
 /*=== Shared function declarations =========================================*/
 
 /* nb.c: core — nb_load moved to nb.h (public API) */
+
+/* nb.c: queue the freshly loaded script's display assets (devdoc 177). */
+void nb_preload_scene(void);
 
 /* nb_mainmenu.c: menu-parent scene routing.  Sub-menus (dlgview) read the
  * parent scene via nb_get_menu_return(); empty falls back to mainmenu.nb. */

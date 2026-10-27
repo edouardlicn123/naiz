@@ -27,6 +27,11 @@
 #include "audio.h"
 #include "nb_asset_table.h"
 
+/* devdoc 177 Phase 4: read + parse a BGM asset into an event table without
+ * touching FM/MPU state; shared by audio_bgm_start() and audio_preload_bgm(). */
+static int bgm_load_events(const char *key, MidEvent **ev, int *count,
+                           uint32_t *len_ms);
+
 #define AUDIO_ARCHIVE "AUDIO.DAT"
 #define AUDIO_MAX_ENTRIES 8192    /* TOC cap, mirrors IMAGE.DAT usage */
 #define PCM_HDR_SIZE 16           /* "NAIZPCM" + rate + flags + reserved */
@@ -91,6 +96,20 @@ typedef struct {
 } BgmState;
 
 static BgmState g_bgm;
+
+/* devdoc 177 Phase 4: single-entry BGM preload cache.  nb_preload_scene()
+ * parses the incoming scene's bgm asset while the transition covers the
+ * screen; audio_bgm_start() takes that table over instead of re-reading the
+ * archive on the frame that starts the music.  One entry is enough — a script
+ * has one BGM at a time, and a new preload replaces (and frees) the old one. */
+typedef struct {
+    char      key[32];
+    MidEvent *ev;
+    int       count;
+    uint32_t  len_ms;
+} BgmPreload;
+
+static BgmPreload g_bgm_pre;
 
 /* Player switches (devdoc 118).  Defaults are on: preserving the pre-0.3.011
  * behaviour means a missing USER.CFG plays everything. */
@@ -312,9 +331,7 @@ static void bgm_apply_volume(void)
 
 void audio_bgm_start(const char *key)
 {
-    long off, size;
-    uint8_t *raw;
-    MidEvent *ev;
+    MidEvent *ev = NULL;
     int count = 0;
     uint32_t len_ms = 0;
 
@@ -340,30 +357,19 @@ void audio_bgm_start(const char *key)
         hal_logf("BGM WARN: '%s' is not a registered BGM asset\r\n", key);
         return;
     }
-    {
-        char k8[9];
-        str_toc8(k8, sizeof k8, key);
-        if (farchive_lookup_name(&g_arc, k8, &off, &size, NULL) != 0) {
-            hal_logf("BGM WARN: '%s' missing in %s\r\n", key, AUDIO_ARCHIVE);
-            return;
-        }
-    }
-    raw = farchive_read_alloc(&g_arc, off, size, NULL);
-    if (!raw) {
-        hal_logf("BGM WARN: read '%s' failed\r\n", key);
-        return;
-    }
-    if (midi_parse(raw, (uint32_t)size, &ev, &count, &len_ms) != 0) {
-        hal_logf("BGM WARN: parse '%s' failed\r\n", key);
-        free(raw);
-        return;
-    }
-    free(raw);   /* event table is independently owned by midi_parse */
-
-    /* An empty/zero-length stream loops forever; treat as no BGM. */
-    if (count <= 0 || len_ms == 0) {
-        hal_logf("BGM WARN: '%s' has no playable events\r\n", key);
-        midi_free(ev);
+    /* devdoc 177 Phase 4: take the event table the scene preload already
+     * parsed; otherwise read + parse now (the old blocking path).  A hit
+     * consumes the cache so the table keeps exactly one owner. */
+    if (g_bgm_pre.ev && strcmp(g_bgm_pre.key, key) == 0) {
+        ev = g_bgm_pre.ev;
+        count = g_bgm_pre.count;
+        len_ms = g_bgm_pre.len_ms;
+        g_bgm_pre.ev = NULL;
+        g_bgm_pre.key[0] = '\0';
+        g_bgm_pre.count = 0;
+        g_bgm_pre.len_ms = 0;
+    } else if (bgm_load_events(key, &ev, &count, &len_ms) != 0) {
+        hal_logf("BGM WARN: '%s' could not be read/parsed\r\n", key);
         return;
     }
 
@@ -589,8 +595,8 @@ int audio_get_pcm_volume(void) { return g_pcm_vol; }
 
 void audio_tick(void);
 /* devdoc 165: ISR-safe pump core -- no DOS clock read, no hal_logf, no free.
- * The Timer-B handler advances the virtual clock then calls this. */
-void audio_tick_isr(unsigned long delta_units);
+ * The handler advances the clock then calls this with the covered moment (177). */
+void audio_tick_isr(unsigned long delta_units, unsigned long now_ms_abs);
 /* devdoc 131 方案 B: the MAG decode progress hook runs one decode-time frame
  * step (advance clock on vblank edge + pump audio) instead of a bare
  * audio_tick(), so a long decode no longer freezes the BGM schedule. */
@@ -666,10 +672,15 @@ static void bgm_rewind_phase(unsigned long now)
 /* ISR-safe audio core (devdoc 165 §四 B3/B4).  No DOS call (the caller must
  * not read the platform clock here), no hal_logf, no free: a hardware handler
  * may only touch the OPNA/PCM ports and the sequence state.  The clock must be
- * advanced by the caller before this runs. */
-void audio_tick_isr(unsigned long delta_units)
+ * advanced by the caller before this runs.
+ *
+ * devdoc 177: now_ms_abs is the moment THIS chunk covers, supplied by the
+ * caller.  A split drain calls this once per Timer-B period with an
+ * evenly-advancing timestamp, so a stall no longer stamps every FM event with
+ * the same post-stall clock reading (the burst that made the beat uneven). */
+void audio_tick_isr(unsigned long delta_units, unsigned long now_ms_abs)
 {
-    unsigned long now = hal_wallclock_smooth_ms();  /* FM scheduling only; PCM uses delta_units */
+    unsigned long now = now_ms_abs;  /* FM scheduling only; PCM uses delta_units */
     unsigned long cur;
     /* devdoc 167: the PCM pump is sized by the real time this tick covers, so
      * it must not push a fixed burst.  The caller has already advanced the
@@ -742,10 +753,31 @@ void audio_tick_isr(unsigned long delta_units)
 void audio_tick_isr_pending(void)
 {
     unsigned long units = hal_bgm_irq_take_pending_units();
+    unsigned long now, start;
 
     if (units == 0)
         return;
-    audio_tick_isr(units);
+
+#if NAIZ_BGM_IRQ
+#define AUDIO_ISR_PERIOD_UNITS BGM_TIMER_B_UNITS
+#else
+#define AUDIO_ISR_PERIOD_UNITS 258UL
+#endif
+    /* devdoc 177 split drain: a stall banks several Timer-B periods, and
+     * handing all of them to fmseq in one call stamps every event with the
+     * same "now", so the burst lands on the OPNA at once and the following
+     * frames have nothing left to do.  Feed one period at a time, advancing
+     * the timestamp by one period's worth of whole milliseconds (258/16 = 16,
+     * vclock.h VCLOCK_UNITS_PER_MS), so the write rhythm matches the ticks. */
+    now = hal_wallclock_smooth_ms();
+    start = (now > units / 16UL) ? now - units / 16UL : 0UL;
+    while (units > AUDIO_ISR_PERIOD_UNITS) {
+        audio_tick_isr(AUDIO_ISR_PERIOD_UNITS, start);
+        units -= AUDIO_ISR_PERIOD_UNITS;
+        start += AUDIO_ISR_PERIOD_UNITS / 16UL;
+    }
+    audio_tick_isr(units, now);
+#undef AUDIO_ISR_PERIOD_UNITS
 }
 
 /* Called from the 60Hz heartbeat every frame (AUTOEXIT, main and the
@@ -780,7 +812,8 @@ void audio_tick(void)
     }
 #endif
 
-    audio_tick_isr(hal_wallclock_last_advance_units());  /* stage 4: pass last emitted advance (devdoc 169) */
+    audio_tick_isr(hal_wallclock_last_advance_units(),
+                   hal_wallclock_smooth_ms());  /* stage 4: pass last emitted advance (devdoc 169) + devdoc 177 timestamp */
 
     /* The FM rewind note is logged here, not in the ISR (B3): the handler only
      * raised g_bgm.rewound.  fmseq_fm_voices() reports how many voices are
@@ -811,4 +844,72 @@ void audio_stop_all(void)
     /* OPNA hard silence as a final fallback even if no BGM was active. */
     if (g_fm_ok)
         hal_fm_shutdown();
+}
+
+/*=== BGM preload (devdoc 177 Phase 4) ====================================*/
+
+/* Read + parse one BGM asset into an event table.  Pure archive/MIDI work:
+ * no FM state, no ISR lock, no playback.  Returns 0 on success and transfers
+ * *ev to the caller (release with midi_free); -1 on any failure, having
+ * allocated nothing. */
+static int bgm_load_events(const char *key, MidEvent **ev, int *count,
+                           uint32_t *len_ms)
+{
+    long off, size;
+    uint8_t *raw;
+    char k8[9];
+
+    if (!key || !key[0]) return -1;
+    if (!g_arc_ok) return -1;
+    if (audio_map_find(bgm_map, key) < 0) return -1;
+
+    str_toc8(k8, sizeof k8, key);
+    if (farchive_lookup_name(&g_arc, k8, &off, &size, NULL) != 0)
+        return -1;
+
+    raw = farchive_read_alloc(&g_arc, off, size, NULL);
+    if (!raw) return -1;
+    if (midi_parse(raw, (uint32_t)size, ev, count, len_ms) != 0) {
+        free(raw);
+        return -1;
+    }
+    free(raw);   /* event table is independently owned by midi_parse */
+
+    /* An empty/zero-length stream loops forever; treat as no BGM. */
+    if (*count <= 0 || *len_ms == 0) {
+        midi_free(*ev);
+        *ev = NULL;
+        *count = 0;
+        *len_ms = 0;
+        return -1;
+    }
+    return 0;
+}
+
+/* devdoc 177 Phase 4: parse a scene's BGM during the preload window, so the
+ * bgm command that starts it does not pay the archive read + parse on the
+ * frame the music begins.  Failures are silent — the command falls back to
+ * the blocking path in audio_bgm_start(). */
+void audio_preload_bgm(const char *key)
+{
+    MidEvent *ev = NULL;
+    int count = 0;
+    uint32_t len_ms = 0;
+
+    if (!key || !key[0]) return;
+    if (!g_bgm_on) return;
+    if (!g_mpu_ok && !g_fm_ok) return;
+    if (!g_arc_ok) return;
+    if (g_bgm_pre.ev && strcmp(g_bgm_pre.key, key) == 0)
+        return;                       /* already staged for this key */
+    if (bgm_load_events(key, &ev, &count, &len_ms) != 0)
+        return;
+
+    if (g_bgm_pre.ev)
+        midi_free(g_bgm_pre.ev);
+    str_copy(g_bgm_pre.key, sizeof(g_bgm_pre.key), key);
+    g_bgm_pre.ev = ev;
+    g_bgm_pre.count = count;
+    g_bgm_pre.len_ms = len_ms;
+    hal_logf("[PRELOAD] bgm '%s' (%d events)\r\n", key, count);
 }

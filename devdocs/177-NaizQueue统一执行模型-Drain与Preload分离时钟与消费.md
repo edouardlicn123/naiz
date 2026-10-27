@@ -1,6 +1,6 @@
 # 177 — Naiz Queue：统一执行模型（Drain + Preload 分离时钟与消费）
 
-> **状态**：**设计阶段**（尚未落地，Phase 0-6 待执行）
+> **状态**：**已实施（Phase 0-5 + Phase 6）**——2026-10-27；落地记录见文末 §九
 > **创建于**：2026-10-27
 > **承接**：`devdocs/176`（ISR 路径 FM 静音根因，修复后进入 v176 ISR drain 架构）、`devdocs/175`（ISR 路径回退与根因待解）、`devdocs/173`（虚拟时钟停顿保护与追赶爆发根因收束）、`devdocs/131`（立绘加载拖慢分析）
 > **影响**：`core/engine/frame.c`、`core/engine/audio.c`、`core/engine/transition.c`、`core/engine/image.c`、`core/engine/image_cache.c`、`core/engine/layer_sprite.c`、`core/plat/hal_irq.c`、`core/lib/vclock.c`
@@ -318,6 +318,7 @@ int preload_step(void)
 
 > **范围**：Phase 0-3 的前置调研全部跑完；Phase 4-5 未覆盖
 > **方法**：纯代码 grep + Read 切片 + 静态分析（无实机探针）
+> **参考项目**：ADV98 已定位在 `/home/edo/pc98`，源码与性能笔记已逐条核对，结论见 §K
 
 ### A. VRAM page 1 API → ❌ 无独立 page flip，但 PEGC bank 窗口可用
 
@@ -328,7 +329,13 @@ int preload_step(void)
 | 引擎使用者 | `render.c`, `render_vram.c`, `render_text.c`, `render_blit.c`, `cursor.c` 全部在用 |
 | 无 | 无 "page 0/page 1" 双页翻页 API，bank select 切换需要 CPU 主动写端口 |
 
-**对设计的修正**：ADV98 "page 1 预合成"方案不能直接叫 page flip，但 bank 1-7 可以当后台缓冲。Phase 3 预合成不存整张 256KB 全 8 bank（代价高），改为 **transition 前把所有 image_load 提前做完、decoded MagImage 存在 image_cache 里，transition 期间只做 render copy + bank select 切换 —— 零文件 I/O**。
+**对设计的修正**：ADV98 "page 1 预合成"方案在 Naiz 上不能叫 page flip（见下方复核）。Phase 3 预合成不存整张 256KB 全 8 bank（代价高），改为 **transition 前把所有 image_load 提前做完、decoded MagImage 存在 image_cache 里，transition 期间只做 render copy + bank select 切换 —— 零文件 I/O**。
+
+**参考项目复核（2026-10-27，`/home/edo/pc98` = ADV98）**：ADV98 确实在用 page 0/1 双页预合成，但那是 **16 色 planar 模式**的机制（A4h 显示页 / A6h CPU 访问页，每页 4 平面 × 32,000B = 128,000B，两页共 256KB）。Naiz 走的是 **PEGC 256 色 packed-pixel 模式**（`video.c:59` 的 Mode set 序列），整屏一帧即占满 256KB，HAL 暴露的 8×32KB bank（`hal_pc98.c:384`）恰好等于一帧用量，**没有余量做后台页**。因此：
+
+- ADV98 的双页方案**不能移植**，"无独立 page flip"的结论**成立，不改**；
+- 但 ADV98 的**执行结构**完全可移植：演出前把数据全部备好 → 演出期间文件 I/O = 0 次 → 只做定长分阶段搬运。这正是 Phase 1/3 要的形状，且已在 PC-98 实机（V13 / Ra43 / T98-NEXT）验证；
+- 只有在将来引入 16 色兼容模式时，才谈得上 bank 4-7 当后台页；当前 256 色路线下不成立。
 
 ### B. 共用图像工作缓冲 → ❌ 无全局/模块级，全 per-instance malloc；但 mag_decode_into 已存在可复用
 
@@ -382,6 +389,18 @@ Phase 3 逐行 mag_decode_row 拆分（降级为 fallback）：
   仅当 farchive_read_alloc 耗时实测 > 100ms（极少见的大文件/慢盘）时启用
   或用于启动时 preload（bootmenu 收尾期无 transition 可利用）
 ```
+
+**参考项目补充（ADV98 第23話 AB 对比表）**：ADV98 做过六项对照，结论是 `G98 fread 回数 = 効いた`（减少**调用次数**有效），而 `SPR fread 回数 = ほぼ効かない`、`背景復元 = 犯人ではない`、`SPR 再描画 = 1 回だけ`、`graph98_pset 高速化 = 体感変化なし`、`8ドット単位描画 = 体感変化なし`。说明 DOS 下 **stdio 函数调用次数本身就是独立成本项**，不等价于字节数。
+
+对 Phase 3 的含义：`farchive_read_alloc` 每图一次 `fseek+read`，调用次数已是最小，所以 §3.0 第 2、3 项实机探针应拆成三问分别测量：
+
+| 探针 | 测什么 | 若结果偏高的对策 |
+|---|---|---|
+| ① 单图 read 调用耗时 | `farchive_read_alloc` 单独计时 | 区分"调用次数成本"与"实际读盘时间"；前者无解（已最小），后者说明盘慢 → 走 3.1d fallback |
+| ② 单图 mag_decode 耗时 | 含无 pump 的 header/malloc/cropping 段 | 若 > 100ms 才启用逐行拆分；否则 preload 一次性解码即可 |
+| ③ 同场景二次 image_load 是否再读盘 | cache 命中率 | **若"是"，则 Phase 2 扩容（8→32）的收益高于 Phase 3 预加载**，应先做 Phase 2 再评估 Phase 3 |
+
+③ 是本次复核新增的判据：ADV98 **完全没有 image_cache**、每次从文件重读，在 i486SX/8MHz 上立绘显示速度仍与既有商业 ADV「ほぼ同程度」——这说明它的卡顿不来自绘制或解码，而来自 I/O 次数。Naiz 已有 8 slot cache，若实测显示 8 slot 不足以装下一个场景（10-13 张图）导致反复重解码，那"preload 到 32 slot"本身就能解决大部分体感问题，不需要提前引入逐行拆分。
 
 ### D. audio_tick_isr 时间源 + 调用点 + 常量 → 精确定位
 
@@ -455,6 +474,42 @@ Phase 3 逐行 mag_decode_row 拆分（降级为 fallback）：
 | **bootmenu → 场景 1 调用链** | bootmenu → main loop → **mainmenu.nb**（主菜单） → 用户点击 Start → `scene_switch("nbook001.nb", SCENE_SWITCH_MENU)`（`nb_mainmenu.c:89`）。**bootmenu 不直接进入 nbook001.nb**，中间有 mainmenu 层 | bootmenu 收尾期（bootmenu_run 返回后 → main loop 第一帧）→ **进入 main loop 后每帧 drain preload_step** 等用户点击 Start 时 nbook001 可能已 preload 完 |
 | **bootmenu 收尾期空闲时间** | bootmenu_run 返回 → main loop → mainmenu.nb 加载 → 等待用户操作 → 用户点击 Start → nbook001.nb。这段时间主循环正常跑 frame pump，可以在 frame pump 里偷偷 drain preload | Phase 5 的 preload 触发点不是 bootmenu 内，而是 **engine_frame_pump 里检测"首次进主循环"后自动 preload 场景 1** |
 | **场景 1 名称** | demo-a2 硬编码 `"nbook001.nb"`（`nb_mainmenu.c:83/89`）。不是从 config.toml 读的。不同工程的场景 1 名不同 | Phase 5 需要 **从 mainmenu.nb 的 start 命令自动提取目标文件名**（和 Phase 3.1c 用同一套 .nb 解析工具），或者在 config.toml 新增 `bootmenu.first_scene` 配置 |
+
+### K. ADV98 参考项目实证（`/home/edo/pc98`）→ ✅ 已定位并核对源码
+
+> **项目**：ADV98.EXE（upstream `yarufu/pc98`），面向 PC-9801/9821 的 **16 色** ADV 引擎，ia16-elf-gcc **small model**，`-Os -march=v30`
+> **凭据**：`README.md` 自述、`docs/030.performance_notes.md`（分章实测记录）、`src/graph98.c`（共享工作缓冲）
+> **注意**：ADV98 与 Naiz 是**不同色深**的两套显示模型，结论须逐条判定适用性，不可整体搬用
+
+#### K.1 可引用的实测数据
+
+| 项目 | 数值 | 出处 |
+|---|---|---|
+| 共享图像工作缓冲 | `graph98_image_work[8192]` 替代 6 个重复 static 缓冲（2×2,560B + 80B + 3×8,192B），前提是"这些处理不会同时执行" | `graph98.c:113` 起多处 `static assert` 校验不越界 |
+| 合并收益 | `.bss` 42,824B → 21,240B（-21,584B）；DGROUP 静态负载 62,168B → 40,584B；最低栈预留后余量 2,568B → 24,152B | 030 §「画像作業用バッファの共通化」 |
+| 背景矩形 520×299 | 一方向 78,936B（中央 76,544B + 左右边界 2,392B）；桥接 157,872B；38 段；**演出期文件 I/O = 0 次** | 030 §2026-08-02 |
+| 全画面 640×400 | 4 平面 × 32,000B = 128,000B；桥接 256,000B；VSYNC 等 2 次；**演出期 I/O = 0 次** | 030 §「通常背景の裏画面完成合成方式」 |
+| 立绘部分更新（8 ライン） | 290 ライン、37 小単位、RAM 37,120B、最大缓冲 8,192B、VSYNC 1 次 | 030 §「通常立ち絵部分更新」 |
+| 立绘显示速度 | i486SX/8MHz 实机与既有商业 ADV 对比「ほぼ同程度」→ 判定绘制速度不是瓶颈 | 030 §第23話「追加確認（結論）」 |
+
+#### K.2 对 177 的适用性判定
+
+| ADV98 结论 | 适用 Naiz？ | 理由 |
+|---|---|---|
+| page 0/1 双页预合成 | ❌ **不适用** | ADV98 是 16 色 planar：A4h 显示页 / A6h CPU 访问页，2 × 128,000B。Naiz 是 PEGC 256 色 packed-pixel，整屏占满 256KB，HAL 只暴露 8×32KB bank，无后台页余量。详见 §A 复核段 |
+| 演出前备齐数据 → 演出期 0 文件 I/O → 定长分阶段搬运 | ✅ **完全适用** | 与 Phase 1 `transition_tick` + Phase 3 `preload_step` 同构，且在 T98-NEXT / V13 / Ra43 三环境验证过 |
+| 单一共享图像工作缓冲 | ✅ 适用（形态不同） | Naiz 是 DOS/4GW 保护模式，堆不受 DGROUP 64KB 约束；但"同一时刻只有一个解码 job"的假设可用于省 malloc，对应 Phase 3.1a slot 预分配 buffer |
+| 减少 fread **调用次数** 优于减少字节数 | ✅ 适用（需实机确认） | 见 §C 补充的三问探针表 |
+| 立绘绘制速度不是瓶颈 | ⚠️ 需独立验证 | ADV98 无 image_cache、每次重读文件仍达商用水平；Naiz 已有 8 slot cache，其卡顿更可能来自 **cache miss 重复解码** 而非绘制本身 |
+
+#### K.3 一条反例警告：DGROUP 压力
+
+ADV98 记录过：仅新增 2,560B static 缓冲后，DGROUP 余量被压到 2,568B，症状是**背景/立绘绘制异常变慢、BGM 变调、文字乱码**，但**无崩溃、无越界、无栈破坏**——根因是 libc 的第二份 stdio 缓冲（约 1,024B/文件）拿不到空间而退化到小缓冲。
+
+映射到 Naiz：Naiz 是保护模式 + 正常 malloc，不受 DGROUP 约束，但同类风险的现代形态是**堆碎片**。因此：
+
+- Phase 4 的 Tier 1 `try-malloc-fail-skip` 守卫**不可省略**；
+- 不能用"链接通过 / 启动成功 / 单次跑通"当作内存安全证据——ADV98 的症状恰恰是"没有报错但一切都变慢"。
 
 ---
 
@@ -610,6 +665,7 @@ cd /home/edo/naiz && python3 -m pytest tools/tests/ -v -k "image" 2>&1 | tail -2
 1. 连续切换 3 个场景，每个场景 ≥10 张立绘
 2. 串口观察 image_load 的 cache hit 日志——前几次是 miss（首次加载），之后应该全 hit
 3. 不应该再有 LRU 淘汰（因为 32 slots 足够容纳所有场景图）
+4. **记录同一场景内第二次访问同一张图的 hit 率**（§C 探针 ③）：这是决定 Phase 3 预加载是否必要的关键判据。若扩到 32 slot 后 hit 率已接近 100%，Phase 3 可只做"transition 期间 preload"而无需任何解码拆分
 
 #### 2.4 回滚方案
 
@@ -849,3 +905,42 @@ cd /home/edo/naiz && python3 -m tools.naiz_img.inject --game demo-a2 --yes
 # 4. 实机验证（手动）
 ./makegame.sh test demo-a2 --serial
 ```
+
+---
+
+## 九、落地记录（2026-10-27）
+
+### 9.1 已落地
+
+| Phase | 内容 | 落点 |
+| :---- | :---- | :---- |
+| 0 | BGM split drain + 参数化 timestamp | `hal.h`（`BGM_TIMER_B_UNITS 258UL`）、`hal_irq.c`、`audio.c`（`audio_tick_isr(delta_units, now_ms_abs)`、`audio_tick_isr_pending()` 按硬件周期循环重放、子 tick 时间戳步进 16 units） |
+| 1 | transition 帧驱动 | `transition.c`（`transition_start/tick/active` + `TransitionState g_transition`，删 `transition_run()`）、`transition.h`、`layer.c`、`frame.c`、`nb.c`（`nb_process()` 闸门） |
+| 2 | image_cache 扩容 + ready | `image_cache.c`（`IMAGE_CACHE_SLOTS 32`、slot `ready`、`mark_ready/is_ready`）、`image_internal.h` |
+| 3 | preload 队列 + 场景预加载 | 新增 `preload_queue.c/h`（64 项、BG/CHAR 两级）、`nb.c`（`nb_preload_scene()`，`nb_load()` 在 `scene_end()` 前调用）、`image.c`（miss 前 `preload_cancel`）、`frame.c`（`preload_step()`，过渡期双消费） |
+| 4 | BGM preload + Tier 1 堆守卫 | `audio.c`（`bgm_load_events()` / `audio_preload_bgm()` / 单条 `g_bgm_pre`，`audio_bgm_start()` 命中接管）、`audio.h`、`nb.c`（`bgm` 命令分支） |
+| 5 | 首个场景覆盖 | 无需新代码：`nb_mainmenu.c` 的三处 `scene_switch("nbook001.nb")` 全部经 `nb_load()` → `nb_preload_scene()`，过渡期即预载窗口 |
+| 6 | 测试与文档固化 | 新增 `tools/tests/test_naiz_queue.py`（8 条契约）；`test_devdoc_refs.py` 行号锚点同步；`docs/B90` 函数索引更新 |
+
+### 9.2 决策对照（D1-D8，含实施期修正）
+
+- **D1 preload 解码方式**：按 `image_prefetch()` 整图解码 + 插入 cache + pin 实施，未引入 `mag_decode_into` 的 slot 预分配缓冲（32 slot × ~0.5 MB 会吃掉 16 MB 堆）。
+- **D2 `ready` 位**：已实施。`insert` 两处置 1，`lookup` 见 `ready==0` 直接当 miss（本设计中解码是整图完成，`ready` 作契约守卫）。
+- **D3 `image_load()` miss**：保持同步解码；解码前 `preload_cancel(id)` 摘掉同 id 排队 job。
+- **D4 触发点**：`nb_load()` 内、`scene_end()` 之前；复用 `nb.c` 既有的 `nb_get_line` / `nb_parse_line` / `nb_prefetch_key`，不新建模块、不重读 .nb。
+- **D5 VM 闸门（实施修正）**：原设计写 `vm_pause_process(); break;`，实测路径上**只保留 `break`**。原因：`main.c` 非 AUTOEXIT 的 input-wait 内层循环只在输入事件时 break，清掉 `VMFLAG_PROCESS` 会让过渡结束后一直停在等待按键，直到玩家按键才继续执行脚本。与 `nb.c` display-yield 分支既有注释（"break, NOT vm_pause_process()"）一致；`transition_tick()` 完成帧仍 `vm_request_process()`。
+- **D6 Phase 4 范围**：Tier 1 守卫已实施——`preload_step()` 先弹出再解码，失败返回 0，`frame.c` 的 `if (preload_step() && transition_active())` 保证失败后本帧不再消费第二个 job。BGM 走单条 cache（key[32] + `MidEvent*` + count + len_ms），未命中回落原阻塞读档路径。整脚本扫描时**只预载第一条 `bgm`**：单条 cache 会被该场景开场的那次 `audio_bgm_start()` 取走，继续扫描后一条只会把前一条挤掉。
+- **D7 Phase 5**：未硬编码 `nbook001.nb`；场景预加载对每次 `scene_switch()` 生效，已覆盖 mainmenu → 场景 1。
+- **D8 常量来源**：`BGM_TIMER_B_UNITS` 上移到 `hal.h` 的 `#if NAIZ_BGM_IRQ` 段，`hal_irq.c` 的本地定义删除，`audio.c` 经 `AUDIO_ISR_PERIOD_UNITS` 复用同一常量。
+
+### 9.3 未做项（后续可评估）
+
+- **PCM / SE 预加载**：共享单通道 + ISR 锁下的 buffer 生命周期，收益小于风险，暂不做。
+- **DPMI 0500H Tier 2（动态堆阈值）**：177 中标为可选；启动探针风险大于收益。
+- **逐行 `mag_decode_row` 拆分（3.1d）**：177 §D 已判定为 fallback；preload 的价值在时机而非拆循环，故不实施。
+
+### 9.4 验证
+
+- `make -C core` 零 `.err`；`make clean && make` 终检通过。
+- `tools/tests/test_naiz_queue.py` 8/8 通过；`test_bgm_timer_units.py`、`test_frame_pump.py`、`test_isr_pump_boundary.py` 全通过。
+- `test_devdoc_refs.py` 仅剩既有 12 条「devdoc 118-139 文件已不在仓库」的失败，与本次改动无关。

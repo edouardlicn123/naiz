@@ -80,14 +80,25 @@ def test_pending_units_are_drained_on_the_main_thread():
     assert "void audio_tick_isr_pending(void)" in AUDIO_C
     drain = _func_body(AUDIO_C, "audio_tick_isr_pending")
     assert "hal_bgm_irq_take_pending_units()" in drain
-    assert "audio_tick_isr(units)" in drain
+    # devdoc 177: the drain is now split into whole Timer-B periods, with the
+    # remainder handed over last; both calls must carry a timestamp.
+    assert "audio_tick_isr(BGM_TIMER_B_UNITS" in drain or \
+           "audio_tick_isr(AUDIO_ISR_PERIOD_UNITS" in drain, (
+        "audio_tick_isr_pending() must split the drain into Timer-B periods")
+    assert "audio_tick_isr(units" in drain, (
+        "audio_tick_isr_pending() must drain the remainder last")
 
     # Every path that can advance the audio during the ISR-owned mode must
-    # drain, otherwise BGM stalls in that phase (main loop, decode, transition).
-    for name, src in (("frame.c", FRAME_C), ("transition.c", TRANSITION_C)):
+    # drain, otherwise BGM stalls in that phase (main loop, decode).  The
+    # transition no longer pumps on its own: devdoc 177 made it frame-driven,
+    # so engine_frame_pump() is the single drain point there.
+    for name, src in (("frame.c", FRAME_C),):
         assert "audio_tick_isr_pending()" in src, (
             f"{name} never drains the Timer-B pending units (devdoc 176)"
         )
+    assert "audio_tick_isr_pending()" in _func_body(FRAME_C,
+                                                     "frame_decode_pump"), (
+        "the decode pump must keep draining the Timer-B pending units")
 
 
 def test_pending_units_use_a_main_thread_cursor():

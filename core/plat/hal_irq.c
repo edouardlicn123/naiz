@@ -66,8 +66,9 @@
  * the hardware timer IS the time base, so no DOS clock read is needed.
  * vclock stores time in 1/16 ms units, so 16.154 ms -> 258 units (258.46
  * truncated: -0.18% against a real 86 board, -0.02% under NP2kai).
- * Never go back to 129 -- that is the half-period value (devdocs/168). */
-#define BGM_TIMER_B_UNITS 258
+ * Never go back to 129 -- that is the half-period value (devdocs/168).
+ * The constant itself lives in hal.h now (devdoc 177): the engine's split
+ * drain steps by one period and must agree with the handler. */
 
 #define FM_CTRL_LOAD_B   0x02   /* D1: start Timer B */
 #define FM_CTRL_ENABLE_B 0x08   /* D3: overflow sets the flag / asserts IRQ */

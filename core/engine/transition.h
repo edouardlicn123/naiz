@@ -3,12 +3,14 @@
  *
  * Owned by transition.c; scene_end() (layer.c) is the caller.
  *
- * All progressive transitions block for 'frames' frames.  The blinds
- * family sweeps N thin parallel strips (see PBLINDS_* in transition.c)
- * that grow from thin bars to full black; only the newly covered cells
- * are written to VRAM each frame, so the scene stays visible until the
- * front covers it.  The palette fade rewrites palette entries only (no
- * VRAM pixel writes).
+ * Progressive transitions are frame-driven (devdoc 177): scene_end() arms
+ * one with transition_start(), engine_frame_pump() calls transition_tick()
+ * once per frame, and nb_process() holds the script while transition_active().
+ * The blinds family sweeps N thin parallel strips (see PBLINDS_* in
+ * transition.c) that grow from thin bars to full black; only the newly
+ * covered cells are written to VRAM each frame, so the scene stays visible
+ * until the front covers it.  The palette fade rewrites palette entries only
+ * (no VRAM pixel writes).
  */
 #ifndef TRANSITION_H
 #define TRANSITION_H
@@ -32,12 +34,19 @@
 #define NAIZ_TRANSITION_FRAMES 16
 #endif
 
-/* Run a transition on a VRAM rectangle (blocking, multi-frame).
- * Progressive types transition toward solid 'color' (0 = black) and the
- * rectangle is fully covered by the final frame.  type TRANSITION_CUT
- * paints 'color' immediately and returns. */
-void transition_run(int x, int y, int w, int h,
-                    unsigned char type, unsigned char frames,
-                    unsigned char color);
+/* Arm a transition on a VRAM rectangle (frame-driven, devdoc 177).
+ * Progressive types render one step per transition_tick() until the rectangle
+ * is covered by 'color' (0 = black).  type TRANSITION_CUT paints 'color'
+ * immediately and arms nothing. */
+void transition_start(int x, int y, int w, int h,
+                      unsigned char type, unsigned char frames,
+                      unsigned char color);
+
+/* Render one transition frame; the last step covers the rectangle, forces the
+ * palette black and requests VM processing. */
+void transition_tick(void);
+
+/* Non-zero while a transition is armed; nb_process() holds the script then. */
+int transition_active(void);
 
 #endif

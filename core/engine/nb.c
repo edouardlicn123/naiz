@@ -270,6 +270,9 @@ static void nb_load(const char *filename)
                  filename, n, NB_BUF_SIZE);
     }
 
+    /* devdoc 177: queue the incoming scene's display assets before the
+     * transition is armed; the frame pump decodes them behind the sweep. */
+    nb_preload_scene();
     /* Full scene reset (skip transition for logo/op — both entering and exiting) */
     scene_end(nb_old_skip || strcmp(filename, "logo.nb") == 0 || strcmp(filename, "op.nb") == 0);
     nb_dialog_reset();
@@ -352,9 +355,63 @@ void nb_set_lang(const char *lang)
 /*=== Display-image cache prefetch (devdoc 131 方案 D) ======================*/
 
 /* Forward decls are kept local: nb.c must NOT gain new top-of-file includes,
- * because test_devdoc_refs pins nb.c lines 166/171/337 to symbols. */
+ * because test_devdoc_refs pins nb.c lines 166/171/340 to symbols. */
 int image_prefetch(unsigned short id);
 int nb_prefetch_key(const char *cmd, const char *key, const char *expr);
+
+/*=== Scene preload (devdoc 177 Phase 3) ===================================*/
+
+/* Queue every display asset the freshly loaded script will need so the frame
+ * pump can decode it while the transition still covers the screen.  Runs
+ * after nb.buf holds the new script and before scene_end() arms the
+ * transition.  Images go to the decode queue (bg/cg before char); a bgm key is
+ * handed to audio_preload_bgm() instead, which parses it in the same window.
+ *
+ * The full-script scan reuses the same parser as nb_prefetch_lookahead(), and
+ * a local brace variable keeps the module-level last_brace_arg untouched. */
+void nb_preload_scene(void)
+{
+    char line[NB_LINE_MAX];
+    char cmd[64];
+    const char *args[NB_ARGS_MAX];
+    int i, argc, brace, id;
+    int bgm_done = 0;
+
+    preload_queue_init();
+
+    for (i = 0; i < nb.num_lines; i++) {
+        nb_get_line(i, line, sizeof(line));
+        if (line[0] == '\0' || line[0] == '#')
+            continue;
+
+        argc = nb_parse_line(line, cmd, sizeof(cmd), args, NB_ARGS_MAX,
+                             &brace);
+        if (argc < 0 || brace < 0 || brace >= argc)
+            continue;
+
+        if (strcmp(cmd, "bg") == 0 || strcmp(cmd, "cg") == 0) {
+            id = nb_prefetch_key(cmd, args[brace], "normal");
+            if (id >= 0)
+                preload_push(id, PRELOAD_PRIO_BG);
+        } else if (strcmp(cmd, "char") == 0) {
+            id = nb_prefetch_key(cmd, args[brace],
+                                 (argc >= 3) ? args[1] : "normal");
+            if (id >= 0)
+                preload_push(id, PRELOAD_PRIO_CHAR);
+        } else if (strcmp(cmd, "bgm") == 0 && !bgm_done) {
+            /* cmd_bgm() requires the key as the brace argument, so a
+             * bgm(stop) line cannot reach here (brace < 0 is skipped).
+             * Only the FIRST bgm is staged: the single-entry cache is
+             * consumed by the scene's opening start, and a later key would
+             * just evict it again. */
+            audio_preload_bgm(args[brace]);
+            bgm_done = 1;
+        }
+    }
+
+    hal_logf("[PRELOAD] scene='%s' jobs=%d\r\n",
+             nb.filename, preload_pending());
+}
 
 #define NB_PREFETCH_LOOKAHEAD 24
 
@@ -425,6 +482,15 @@ int nb_process(void)
      * whole loop to a few Hz. Event logs ([LOAD]/[INPUT]/lifecycle) only. */
 
     while (vm_get_flags() & VMFLAG_PROCESS) {
+        /* devdoc 177: scene transitions are frame-driven now; hold the script
+         * until transition_tick() finishes.  break WITHOUT vm_pause_process():
+         * keeping VMFLAG_PROCESS set makes the main loop re-enter next frame
+         * (engine_frame_pump advances the transition), whereas pausing would
+         * park a non-AUTOEXIT build in main.c's input-wait loop until a key. */
+        if (transition_active()) {
+            break;
+        }
+
         /* waitanima hold: stay paused until the animation terminates;
          * anim_stop_internal() re-requests processing when it ends, so
          * spurious wakeups (input, delay expiry) can never skip the wait. */

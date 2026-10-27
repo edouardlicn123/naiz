@@ -8,6 +8,8 @@
 #include "nb_anim.h"     /* anim_tick */
 #include "audio.h"       /* audio_tick */
 #include "nb_dialog.h"   /* nb_dialog_reveal_tick */
+#include "transition.h"   /* transition_tick (devdoc 177) */
+#include "preload_queue.h"
 
 void engine_frame_pump(void)
 {
@@ -55,6 +57,12 @@ void engine_frame_pump(void)
 #endif
     anim_tick();                       /* advance animation frame */
     nb_dialog_reveal_tick();           /* advance typewriter reveal (no-op off) */
+    transition_tick();                 /* devdoc 177: one transition step/frame */
+    /* devdoc 177: decode one queued scene asset per frame; while the
+     * transition covers the screen, take a second slot.  A failed decode drops
+     * the job and stops this frame's consumption (Tier 1 heap guard). */
+    if (preload_step() && transition_active())
+        preload_step();
 }
 
 /*

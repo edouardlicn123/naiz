@@ -14,13 +14,20 @@ void audio_init(void);
 void audio_tick(void);
 
 /* ISR-safe pump core (devdoc 165): the Timer-B handler calls this after
- * advancing the virtual clock.  No DOS call, no hal_logf, no free. */
-void audio_tick_isr(unsigned long delta_units);
-/* Main-thread drain of the Timer-B handler's pending clock units (devdoc 176). */
+ * advancing the virtual clock.  No DOS call, no hal_logf, no free.
+ * devdoc 177: the caller supplies the moment this chunk represents
+ * (now_ms_abs), so a split drain can stamp each period separately instead
+ * of bursting every event at one clock reading. */
+void audio_tick_isr(unsigned long delta_units, unsigned long now_ms_abs);
+/* Main-thread drain of the Timer-B handler's pending clock units (devdoc 176).
+ * devdoc 177: drains in whole Timer-B periods with evenly spaced timestamps. */
 void audio_tick_isr_pending(void);
 
 void audio_bgm_start(const char *key);
 void audio_bgm_stop(void);
+/* devdoc 177: parse a scene's BGM ahead of its command (silent on failure).
+ * audio_bgm_start() takes the staged table over when the key matches. */
+void audio_preload_bgm(const char *key);
 
 void audio_snd_play(const char *key);
 void audio_vc_play(const char *key);

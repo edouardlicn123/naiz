@@ -35,12 +35,12 @@ void scene_end(int skip_transition)
     if (skip_transition) {
         fill_rect(0, 0, LAYER_SCREEN_W, LAYER_SCREEN_H, 0);
     } else {
-        transition_run(0, 0, LAYER_SCREEN_W, LAYER_SCREEN_H,
-                       NAIZ_TRANSITION_TYPE, NAIZ_TRANSITION_FRAMES, 0);
-        /* Palette fade leaves old VRAM pixels intact; blank them immediately
-         * so the screen stays black (even if the palette gets restored by the
-         * next scene's image_load) until the new background is blitted. */
-        fill_rect(0, 0, LAYER_SCREEN_W, LAYER_SCREEN_H, 0);
+        /* devdoc 177: arm the transition instead of blocking here.  The frame
+         * pump renders one step per frame and its final step blanks the
+         * rectangle (the old immediate fill_rect moved into transition_tick),
+         * so the screen cannot flash the old frame while the new one loads. */
+        transition_start(0, 0, LAYER_SCREEN_W, LAYER_SCREEN_H,
+                         NAIZ_TRANSITION_TYPE, NAIZ_TRANSITION_FRAMES, 0);
     }
     input_drain_boundary();
 }

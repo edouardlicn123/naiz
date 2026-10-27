@@ -27,6 +27,7 @@
 #include "farchive.h"
 #include "hal.h"
 #include "image_internal.h"
+#include "preload_queue.h"
 
 /* Engine-chrome palette slots, skipped by image_set_palette() for every
  * image type.  They belong to the UI subsystems, not to artwork:
@@ -163,6 +164,10 @@ MagImage *image_load(unsigned short id)
             return cached;
         }
     }
+
+    /* devdoc 177: this id is being decoded now; drop any queued preload of it
+     * so the frame pump does not decode the same image twice. */
+    preload_cancel((int)id);
 
     if (farchive_lookup_id(&g_image_arc, (int)id, &offset, &msize) != 0)
         return NULL;

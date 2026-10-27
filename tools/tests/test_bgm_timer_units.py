@@ -48,8 +48,9 @@ def _read(path):
 
 
 def _define_int(src, name):
-    """Integer value of a plain `#define NAME <int>` line, or None."""
-    m = re.search(r"^#define\s+" + re.escape(name) + r"\s+(\d+)\s*$", src, re.M)
+    """Integer value of a plain `#define NAME <int>` (optionally UL/L) or None."""
+    m = re.search(r"^#define\s+" + re.escape(name) + r"\s+(\d+)(?:UL?|L)?\s*$",
+                  src, re.M)
     return int(m.group(1)) if m else None
 
 
@@ -71,9 +72,13 @@ def _timer_b_nb():
 
 
 def _timer_b_units():
-    units = _define_int(_read(HAL_IRQ_C), "BGM_TIMER_B_UNITS")
+    """devdoc 177 moved the constant to hal.h (engine + plat share it), so
+    look there first and keep hal_irq.c as a legal fallback location."""
+    units = _define_int(_read(HAL_H), "BGM_TIMER_B_UNITS")
+    if units is None:
+        units = _define_int(_read(HAL_IRQ_C), "BGM_TIMER_B_UNITS")
     assert units is not None, (
-        "hal_irq.c must define BGM_TIMER_B_UNITS as a plain int literal"
+        "hal.h (or hal_irq.c) must define BGM_TIMER_B_UNITS as a plain literal"
     )
     return units
 
@@ -201,11 +206,13 @@ def test_pcm_elapsed_time_comes_from_the_clock_step():
         "caller must pass the clock-advance amount instead"
     )
     assert re.search(
-        r"void\s+audio_tick_isr\s*\(\s*unsigned\s+long\s+\w+\s*\)", audio_c
-    ), "audio_tick_isr must take the elapsed 1/16 ms units as a parameter"
+        r"void\s+audio_tick_isr\s*\(\s*unsigned\s+long\s+\w+\s*,\s*"
+        r"unsigned\s+long\s+\w+\s*\)", audio_c
+    ), "audio_tick_isr must take (delta units, now_ms_abs) (devdoc 177)"
     assert re.search(
-        r"void\s+audio_tick_isr\s*\(\s*unsigned\s+long\s+\w+\s*\)", _read(AUDIO_H)
-    ), "audio.h must publish the units-taking audio_tick_isr prototype"
+        r"void\s+audio_tick_isr\s*\(\s*unsigned\s+long\s+\w+\s*,\s*"
+        r"unsigned\s+long\s+\w+\s*\)", _read(AUDIO_H)
+    ), "audio.h must publish the two-argument audio_tick_isr prototype"
     assert re.search(
         r"g_irq_units_total\s*\+=\s*BGM_TIMER_B_UNITS", _read(HAL_IRQ_C)
     ), (
@@ -214,10 +221,10 @@ def test_pcm_elapsed_time_comes_from_the_clock_step():
         "segment, so engine code cannot run there)"
     )
     assert re.search(
-        r"audio_tick_isr\s*\(\s*units\s*\)", audio_c
+        r"audio_tick_isr\s*\(\s*units\s*,", audio_c
     ), (
-        "audio_tick_isr_pending() must pass the drained units to "
-        "audio_tick_isr() on the main thread (devdoc 176)"
+        "audio_tick_isr_pending() must pass the drained units (and the "
+        "timestamp) to audio_tick_isr() on the main thread (devdoc 176/177)"
     )
     declared = "hal_wallclock_last_advance_units" in _read(HAL_H)
     assert declared, (

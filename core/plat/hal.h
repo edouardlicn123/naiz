@@ -273,6 +273,12 @@ void hal_fm_set_volume(int atten);
                             （devdoc 175 §十一：toggle 本身是诊断工具，用于实机 A/B） */
 #endif
 #if NAIZ_BGM_IRQ
+/* One Timer-B period in virtual-clock units (1/16 ms), devdoc 168/177.
+ * tB = 2304 * (256 - NB) / phiM at phiM = 7.9872 MHz, NB = 200 => 16.154 ms
+ * => 258 units (truncated: -0.18% against a real 86 board).  The engine's
+ * split drain also steps by this amount, so both sides share one definition. */
+#define BGM_TIMER_B_UNITS 258UL
+
 /*
  * Program Timer-B and start the IRQ line scan (devdoc 174).
  * Returns 1 if a candidate line was hooked, 0 if none had a protected-mode

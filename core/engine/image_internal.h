@@ -32,4 +32,12 @@ void image_cache_insert(int id, MagImage *img);
  * no-op if id is not cached. */
 void image_cache_pin(int id);
 
+/* Publish a resident slot as complete (devdoc 177).  image_cache_insert()
+ * already sets the flag, so this is only needed by a two-step producer.
+ * image_cache_lookup() treats a not-ready slot as a miss. */
+void image_cache_mark_ready(int id);
+
+/* Non-zero when id is cached AND complete (devdoc 177). */
+int image_cache_is_ready(int id);
+
 #endif

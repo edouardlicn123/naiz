@@ -19,7 +19,11 @@
 #include "image_internal.h"
 #include "mag.h"
 
-#define IMAGE_CACHE_SLOTS 8
+/* devdoc 177: 8 -> 32 so a scene preload can stage every bg/char/cg of the
+ * incoming script while the transition covers the screen.  The slot array is
+ * pointer-sized entries only; the decoded images themselves are what cost
+ * heap, and preload only keeps what the script actually references. */
+#define IMAGE_CACHE_SLOTS 32
 
 /* Hit floor for a prefetched image.  Eviction picks the lowest-hits slot, so a
  * just-prefetched image (hits 0) would be the first thrown away before its
@@ -31,6 +35,7 @@ typedef struct {
     int       id;            /* asset_id, -1 = empty */
     MagImage *img;           /* decoded image */
     int       hits;          /* access count for LRU eviction */
+    int       ready;         /* devdoc 177: slot holds a complete image */
 } ImageCacheSlot;
 
 static ImageCacheSlot g_image_cache[IMAGE_CACHE_SLOTS];
@@ -43,6 +48,7 @@ void image_cache_init(void)
         g_image_cache[i].id = -1;
         g_image_cache[i].img = NULL;
         g_image_cache[i].hits = 0;
+        g_image_cache[i].ready = 0;
     }
 }
 
@@ -57,6 +63,7 @@ void image_cache_clear(void)
         }
         g_image_cache[i].id = -1;
         g_image_cache[i].hits = 0;
+        g_image_cache[i].ready = 0;
     }
 }
 
@@ -68,6 +75,10 @@ MagImage *image_cache_lookup(int id)
     if (id < 0) return NULL;
     for (i = 0; i < IMAGE_CACHE_SLOTS; i++) {
         if (g_image_cache[i].id == id) {
+            /* devdoc 177: a slot is only legal to hand out once its image is
+             * complete; a resident-but-not-ready slot is a miss. */
+            if (!g_image_cache[i].ready)
+                return NULL;
             g_image_cache[i].hits++;
             return mag_retain(g_image_cache[i].img);
         }
@@ -91,6 +102,7 @@ void image_cache_insert(int id, MagImage *img)
             mag_release(g_image_cache[i].img);
             g_image_cache[i].img = img;
             g_image_cache[i].hits = 0;
+            g_image_cache[i].ready = 1;
             return;
         }
     }
@@ -111,6 +123,36 @@ void image_cache_insert(int id, MagImage *img)
     g_image_cache[evict].id = id;
     g_image_cache[evict].img = img;
     g_image_cache[evict].hits = 0;
+    g_image_cache[evict].ready = 1;
+}
+
+/* devdoc 177: flip a resident slot to ready.  image_cache_insert() already
+ * sets it (the cache only ever receives whole decoded images); this entry
+ * point exists so a producer that stages a slot in two steps can publish it
+ * explicitly, and it is a no-op for a missing id. */
+void image_cache_mark_ready(int id)
+{
+    int i;
+    if (id < 0) return;
+    for (i = 0; i < IMAGE_CACHE_SLOTS; i++) {
+        if (g_image_cache[i].id == id &&
+            g_image_cache[i].img != NULL) {
+            g_image_cache[i].ready = 1;
+            return;
+        }
+    }
+}
+
+/* Non-zero when id is cached and complete (devdoc 177). */
+int image_cache_is_ready(int id)
+{
+    int i;
+    if (id < 0) return 0;
+    for (i = 0; i < IMAGE_CACHE_SLOTS; i++) {
+        if (g_image_cache[i].id == id)
+            return g_image_cache[i].ready;
+    }
+    return 0;
 }
 
 /* Lift a slot's hit floor so a prefetched image survives until it is used.
