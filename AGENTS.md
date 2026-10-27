@@ -1,12 +1,12 @@
 # Naiz — AI 编程规则
 
-> **当前版本**: `0.3.055`（`projects/demo-a2/config.toml`）
+> **当前版本**: `0.3.061`（`projects/demo-a2/config.toml`）
 >
-> **最新条目**: `CHANGELOG.md` `c83` — 封装审查落地（HAL 边界收口 `hal_bgm_irq_in_isr` + A 节 static 化 + `fmopn` 同构重复合并）+ pytest 欠账清零（842 passed, 0 failed）。**本行只放当前状态指针**：历史条目正文一律只写进 `CHANGELOG.md`（规则见 §十三「变更后更新规约」），本文件不承载任何开发历史摘要——§一–§十七 只存**规则与当前状态**。
-> **当前状态**（0.3.055 / c83）：阶段 2 完成（`BGM_TIMER_B_UNITS` 258、注释同步、守卫 5 绿 3 红）；阶段 3–6 待做。核心未闭合：`audio_tick_isr()` 参数化、PCM 单位化、B90/B91 同步（`BGM_TIMER_B_UNITS` 仍写 129）。
-> **开发历史**：`CHANGELOG.md`（唯一载体）；本文件只存规则与当前状态，不承载历史摘要。历史速查 → CHANGELOG.md（最新：c83），新条目追加到 CHANGELOG.md 顶部。
+> **最新条目**: `CHANGELOG.md` `c89` — 行号白名单自动同步工具（`tools/naiz_docs/sync_line_refs.py`）+ i18n 键 `=` 守卫；`pytest` 851 passed / 2 skipped / 1 pre-existing。**本行只放当前状态指针**：历史条目正文一律只写进 `CHANGELOG.md`（规则见 §十三「变更后更新规约」），本文件不承载任何开发历史摘要——§一–§十七 只存**规则与当前状态**。
+> **当前状态**（0.3.061 / c89）：bootmenu 三焦点 + BGM Mode 注释行就绪，IRQ toggle 双通道可用，待实机 A/B 验证；行号白名单漂移可用 `python3 -m tools.naiz_docs.sync_line_refs` 一键重锚。
+> **开发历史**：`CHANGELOG.md`（唯一载体）；本文件只存规则与当前状态，不承载历史摘要。历史速查 → CHANGELOG.md（最新：c89），新条目追加到 CHANGELOG.md 顶部。
 > **防复发机制**：§十七（39 条规则逐一对照）；写完 devdoc 须过 §十「规格与实现的收敛责任」（行号校准 + 声称逐条落地，pytest 全绿不算证据）。
-> **构建验证**：`make -C core` + `core/*.err` 全为空（诊断走 `.err`，**不在 stdout**）。`pytest` 842 passed, 2 skipped（含守卫；阶段 3 目标 850/0/2）。
+> **构建验证**：`make -C core` + `core/*.err` 全为空（诊断走 `.err`，**不在 stdout**）。`pytest` 850 passed, 2 skipped（含守卫）。
 
 ## 一、Git 限制
 

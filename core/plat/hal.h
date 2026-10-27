@@ -253,32 +253,41 @@ void hal_fm_write_reg(int bank, uint8_t addr, uint8_t val);
 void hal_fm_set_volume(int atten);
 
 /*============================================================================
- * Interrupt-driven audio pump (devdoc 164 phase 1, OPNA Timer-B -> IRQ3)
+ * Interrupt-driven audio pump (devdoc 164 phase 1, devdoc 174 scan)
  *
- * The BGM pump is co-operative by default: audio_tick() only runs from the
- * frame pump, so a long CPU-bound pass starves it and the music stalls (the
- * M1 time-debt of devdoc 163).  When enabled at build time
- * (make -C core EXTRA_DEFS=-DNAIZ_BGM_IRQ=1) these install an OPNA Timer-B
- * timer whose IRQ3 handler advances the virtual clock and pumps FMSeq/PCM,
- * decoupling the beat from the main loop.
+ * The BGM pump is co-operative: audio_tick() only runs from the frame pump, so
+ * a long CPU-bound pass starves it and the music stalls (the M1 time-debt of
+ * devdoc 163).  With NAIZ_BGM_IRQ the HAL also installs an OPNA Timer-B timer
+ * whose handler advances the virtual clock and pumps FMSeq/PCM, decoupling the
+ * beat from the main loop.
  *
- * Default build (NAIZ_BGM_IRQ=0) compiles the whole path out; the engine's
- * co-operative pump is byte-for-byte unchanged.  If installation fails at
- * runtime (DPMI vector hook or timer rejected) the functions report 0 and the
- * co-operative path keeps running -- a failed install must never wedge boot.
+ * The timer's IRQ line is strapped by the host's board DIP switch, so it cannot
+ * be known at compile time.  hal_bgm_irq_init() therefore only programs the
+ * timer; hal_bgm_irq_probe_step() (called once per frame) scans the candidates
+ * and hands the pump to the ISR only after a line actually ticks.  Until then
+ * -- and if no line ever ticks -- the co-operative pump runs unchanged, so
+ * enabling this macro can never silence the BGM.
  *============================================================================ */
 #ifndef NAIZ_BGM_IRQ
-#define NAIZ_BGM_IRQ 1
+#define NAIZ_BGM_IRQ 1  /* ISR path enabled; 运行时可由 hal_bgm_irq_set_on() 切换到协作泵
+                            （devdoc 175 §十一：toggle 本身是诊断工具，用于实机 A/B） */
 #endif
 #if NAIZ_BGM_IRQ
 /*
- * Install the Timer-B IRQ3 handler and start the timer.
- * Returns 1 on success, 0 if the DPMI vector hook or OPNA init failed (the
- * caller then keeps the co-operative pump).  Call once, after hal_fm_init().
+ * Program Timer-B and start the IRQ line scan (devdoc 174).
+ * Returns 1 if a candidate line was hooked, 0 if none had a protected-mode
+ * vector at all.  Either way the co-operative pump keeps running until a
+ * candidate actually ticks -- see hal_bgm_irq_probe_step().  Call once, after
+ * hal_fm_init().
  */
 int  hal_bgm_irq_init(void);
-/* 1 once the ISR owns the clock/audio pump.  The frame pump reads this to
- * yield ownership and avoid double-pumping. */
+/* Advance the candidate scan.  Call once per frame from the main loop; promotes
+ * the hooked line to pump owner once it has ticked, otherwise detaches it and
+ * tries the next one.  No-op once a line is elected or the list is exhausted. */
+void hal_bgm_irq_probe_step(void);
+/* 1 once a candidate has ticked and the ISR owns the clock/audio pump.  The
+ * frame pump reads this to yield ownership and avoid double-pumping; while it
+ * is 0 (including during the scan) the co-operative pump must run. */
 int  hal_bgm_irq_active(void);
 /* ISR tick count (devdoc 165).  The handler must not log, so the frame path
  * samples this to prove the Timer-B is actually firing.  Monotone while the
@@ -289,6 +298,13 @@ unsigned long hal_bgm_irq_ticks(void);
  * IF cleared, and re-enabling interrupts inside it would let it re-enter
  * itself. */
 int  hal_bgm_irq_in_isr(void);
+/* Runtime ownership toggle (devdoc 175 §十一).  ISR path 与协作泵在同一构建
+ * 下实时切换，用于实机 A/B 对比听感与根因定位。
+ *   hal_bgm_irq_set_on(1) → ISR（若 init+probe 已选举出线）；返回 -1 表示未 setup
+ *   hal_bgm_irq_set_on(0) → 协作泵；Timer-B 仍在后台 tick
+ *   hal_bgm_irq_is_on()    → 1 表示当前 ISR 持有所有权 */
+int  hal_bgm_irq_set_on(int on);
+int  hal_bgm_irq_is_on(void);
 /* Stop the timer and restore the previous vector (scene shutdown). */
 void hal_bgm_irq_shutdown(void);
 #endif

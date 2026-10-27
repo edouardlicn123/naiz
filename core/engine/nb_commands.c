@@ -457,14 +457,10 @@ typedef void (*CmdHandler)(int argc, const char **argv, const char *cmd_name);
  * nb_dialog_pending() check in nb_process().  Setting CMD_BLOCKING does NOT
  * make the engine pause, and test_cmd_meta.py only enforces
  * CMD_TOUCHES_DISPLAY — a new blocking handler that forgets its own pause
- * will run the rest of the script in a single pass.  See devdoc 116. */
-enum {
-    CMD_BLOCKING         = 0x01,   /* [doc-only] handler blocks until script may continue */
-    CMD_NEEDS_INPUT      = 0x02,   /* [doc-only] waits for user input (keyboard/mouse) */
-    CMD_TOUCHES_DISPLAY  = 0x04,   /* writes VRAM / layers / palette / animation */
-    CMD_TOUCHES_AUDIO    = 0x08,   /* starts/stops audio */
-    CMD_TERMINATES_SCENE = 0x10    /* switches scene (scene_switch) */
-};
+ * will run the rest of the script in a single pass.  See devdoc 116.
+ *
+ * Flag values live in nb_commands.h (shared with nb_process for the
+ * yield-after-display logic introduced in 0.3.060). */
 
 typedef struct {
     const char *name;
@@ -506,16 +502,29 @@ static const CmdEntry cmd_table[] = {
 /* Execute one command by name.  NOTE: the CmdEntry metadata is not consulted
  * here — no bit is read (see the enum comment above); the handler alone
  * determines whether the script may continue. */
-void nb_commands_dispatch(const char *cmd_name, int argc, const char **argv)
+/* Returns the CmdEntry flags of the dispatched command (0 if unknown).
+ * nb_process uses the flags to decide whether to yield back to the frame
+ * pump — every CMD_TOUCHES_DISPLAY command (bg/cg/char/playanima/...) now
+ * pauses the VM after dispatch so the main loop runs engine_frame_pump
+ * (clock + audio + anim + reveal) before the next command.  This blocks
+ * the old "run N display commands in one pass, accumulate 30-50ms of
+ * VRAM blit with zero audio pump" stall that users heard as BGM pauses
+ * during sprite swaps, text refreshes, and animation playback.
+ *
+ * CMD_BLOCKING handlers (mainmenu/question/fei/ira/neon/...) pause the
+ * script on their own input loops or nb_dialog_pending() — they don't
+ * need an extra yield. */
+unsigned char nb_commands_dispatch(const char *cmd_name, int argc, const char **argv)
 {
     const CmdEntry *entry = cmd_table;
     while (entry->name) {
         if (strcmp(entry->name, cmd_name) == 0) {
             NB_DEBUG("nb_process: executing command '%s'\r\n", cmd_name);
             entry->handler(argc, argv, cmd_name);
-            return;
+            return entry->flags;
         }
         entry++;
     }
     hal_logf("WARN: unknown command '%s'\r\n", cmd_name);
+    return 0;
 }

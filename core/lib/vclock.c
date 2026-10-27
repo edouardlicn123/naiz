@@ -95,6 +95,49 @@ void vclock_advance(VClock *vc, unsigned long real_ms)
 
     delta = real_ms - vc->real_prev;   /* platform clock is monotone */
     vc->real_prev = real_ms;
+
+    /* devdoc 173: stall protection.
+     *
+     * When the main thread stalls on a long VRAM blit, playanima decode, or
+     * transition sweep, hal_wallclock_ms() (the REAL hardware clock) jumps by
+     * the full stall duration on the next call.  Feeding that jump into
+     * accum/passes corrupts the window measurement: a single 200ms delta
+     * dilutes the per-pass rate into a spuriously fast step (e.g. 25ms/pass
+     * instead of 5ms).  The clock then emits 25ms advances for several frames
+     * and audio_tick dispatches 5x too many FM events — audible as "catching
+     * up" after every sprite swap.
+     *
+     * The detection band is bounded on BOTH sides:
+     *   - low  = VCLOCK_MAX_ADVANCE_MS (100 ms): below this the jump is within
+     *     the window-clamp ceiling and cannot corrupt calibration meaningfully
+     *     (the clamp at line ~106 caps any want to 100ms anyway).
+     *   - high  = 500 ms: above this the delta is almost certainly a DOS-clock
+     *     second-quantised jump (NP2kai clusters wall clock updates on whole
+     *     seconds, producing 1000 ms deltas) — treating those as stalls would
+     *     freeze the virtual clock for a full second every time the wall clock
+     *     advances past a second boundary, which is worse than the original
+     *     problem.  Real VRAM blits and playanima decodes are bounded by the
+     *     frame budget (50-200 ms on NP2kai at ~20Hz) and never approach 500ms.
+     *
+     * When stall is detected: update real_prev so the NEXT normal advance has
+     * a correct baseline, but do NOT include this delta in accum/passes and do
+     * NOT advance virtual.  Virtual clock PAUSES during the stall and resumes
+     * at the pre-stall step when the real frame loop recovers.
+     *
+     * The FM pipeline follows this same virtual clock (there is no separate
+     * wall-clock path; devdoc 173 direction B was dropped), so the pause also
+     * stops the BGM for the stall's duration -- which is exactly what the old
+     * catch-up burst sounded like, minus the burst. */
+    if (vc->calibrated
+        && delta > VCLOCK_MAX_ADVANCE_MS
+        && delta < 500UL) {
+        /* Stall detected: reset the window but keep the calibrated step.
+         * Virtual pauses, accum/passes are discarded. */
+        vc->passes = 0;
+        vc->accum = 0;
+        return;
+    }
+
     vc->accum += delta;
     vc->passes++;
 

@@ -217,7 +217,18 @@ void hal_pcm_stop(void)
 int hal_fm_detect(void)
 {
     /* Capability ID read (F03 §3.8 fact 3): latch 0xFF, then read back.
-     * An OPNA answers 1; an empty bus reads 0xFF. */
+     * An OPNA answers 1; an empty bus reads 0xFF.
+     *
+     * Must raise A460 bit0 (select OPNA) BEFORE touching 0188/018A, because
+     * the OPNA's register window is only routed when OPNA is selected
+     * (F03 §3.8 fact 1 — same gate that protects the 018C/018E extended
+     * window).  Without this the detect always fails on cold boot, before
+     * any hal_pcm_play() or hal_fm_init() has set A460.
+     *
+     * bit1 = 0 is critical too: A460 bit1 forces OPNA silent (F02 §3.2),
+     * and hal_pcm_play writes 0x01 for exactly this reason.  We mirror it
+     * here so the detect sequence itself never mutes the chip. */
+    outb(PCM_ID_PORT, 0x01);
     outb(FM_ADDR_LATCH, 0xFF);
     return inb(FM_DATA_PORT) == 1;
 }

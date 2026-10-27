@@ -643,7 +643,7 @@ void audio_init(void)
             if (!irq_ok)
                 hal_log("BGM IRQ install failed; co-operative pump stays active\r\n");
             else
-                hal_log("BGM IRQ: installed; co-operative pump disabled (ISR active)\r\n");
+                hal_log("BGM IRQ: scanning FM IRQ line; co-operative pump stays active\r\n");
         }
 #endif
     }

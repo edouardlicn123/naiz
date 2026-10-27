@@ -1,7 +1,72 @@
-### 0.3.057 — BGM 无法播放：ISR 未触发与协作泵双失修复 (171)
 # Naiz — 开发历史（Bug 修复 / 功能演进）
 
 自 R1 起全部 Bug 修复与功能演进记录（条目顺序沿用 AGENTS.md 既有历史排列）；`AGENTS.md` 仅保留当前版本与规则。**新条目约定**：每轮修复/演进完成后，在下方 `---` 分隔线之后（第一条位置）追加变更摘要，并在 AGENTS.md 头部同步「当前版本」。**条目格式**：每条以 `### <版本号> — <标题>` 开头（版本号化标题行 + `<a id="cN">` 锚点，N 按条目序递增），正文整段或分小节；历史速查直接读下方「版本索引」。
+
+<a id="c89"></a>
+### 0.3.061 — 行号白名单自动同步工具 + i18n 键 `=` 守卫（token 节省工具改进）
+
+**动机**：复盘 0.3.059/0.3.060 两轮工作，发现两个反复消耗工具调用轮次的 sink：① `test_devdoc_refs.py::LINE_REF_WHITELIST` 硬编码精确行号，被守卫文件每次插入行都触发「pytest 失败 → grep 找新行号 → edit → 重跑」循环（仅今天就重校 3 次，`SUPERSEDED_SHIFTED_LINE_REFS` 里还有 ~15 批历史漂移记录）；② i18n 键含 `=` 被 i18n_gen 按第一个 `=` 截断误判 ORPHANED，直到翻译完整性测试失败才暴露，值一个完整 build+pytest 周期。
+
+**改动**：
+
+1. **新建 `tools/naiz_docs/sync_line_refs.py`**：解析 `test_devdoc_refs.py` 里 `("stem", N): "symbol"` 条目，若 `source[N]` 不再含 symbol，则在源文件中找所有含 symbol 的行、取离 N 最近者原地重写条目。`--check` 只报告漂移（exit 1）；默认原地修复。`KNOWN_GOOD_REFS`/`STALE_QUOTED_REFS`/`SUPERSEDED_*` 无 symbol 或故意指错，一律不碰。合成漂移自测通过（100→127 检出并修复，文件复原）。
+2. **新建 `test_engine_tr_literals_have_no_equals_sign`**（`test_user_cfg_settings.py`）：扫描全部 `tr()` 字面量，断言不含 `=`——把 i18n 截断坑从「翻译完整性测试失败」提前到源扫描阶段，毫秒级。
+3. 工具归属判断：行号同步归 `naiz_docs`（devdoc 工具集），i18n 守卫放进既有 `test_user_cfg_settings.py`（i18n 守卫已在那）——均未新建重复模块。
+
+**验证**：`sync_line_refs --check` 对当前白名单报零漂移；合成漂移用例检出并修复成功；`pytest tools/tests/test_user_cfg_settings.py` 20 passed；全量 pytest 851 passed / 2 skipped / 1 pre-existing。
+
+<a id="c88"></a>
+### 0.3.060 — bootmenu BGM Mode 注释行（ISR/COOP 对比说明）
+
+**改动**：bootmenu 的 BGM Mode 选择器正下方（y=198）新增一行绿色注释 `ISR: Timer-B interrupt / COOP: frame pump (stable)`（`BGMMODE_NOTE_Y`），full=1 静态绘制、full=2（语言/模式变更）随名字区一起擦除重绘。bootmenu 阶段 tr_init 尚未运行，`tr()` 回退英文，故实际显示英文；键已登记 `SYSTEM_UI_KEYS` 并补齐 9 语言译文（供守卫测试与将来复用）。
+
+**坑**：i18n sys 文件按**第一个 `=`** 切分键值——含 ` = ` 的 tr() 键（`ISR = Timer-B ...`）会被 i18n_gen 误判 ORPHANED 并重新生成空值行，导致 `test_every_engine_tr_literal_is_translated_in_every_language` 失败。tr() 键一律避免 `=`。
+
+**验证**：`pytest` 850 passed / 2 skipped / 1 pre-existing（market tty）；`test_devdoc_refs.py` whitelist 行号重校（find_lang_index 127、bootmenu_run 255、prefs_set_lang 405）；HDI 已重建。
+
+<a id="c87"></a>
+### 0.3.059 — bootmenu BGM Mode 开关 + runtime IRQ toggle（devdoc 175 §十一 落地）
+
+**动机**：devdoc 175 揭示「ISR 接管后 FM 静音」这条证据被 bootmenu 默认 `bgm = OFF` 污染——bootmenu 里根本没 BGM，`audio_tick_isr()` 一进来就 `return`，无法证明 ISR 路径在 BGM 实际运行时是否静音。要解这个根因，最直接的办法是**同一构建内运行时切换**两条路径，进场景触发真实 BGM 后 A/B 对比听感。
+
+**改动**：
+
+1. **bootmenu.c 加 BGM Mode 行**：三焦点循环 `LANG → BGMMODE → START`，BGMMODE 行用与 Language 行相同的 `< COOP / ISR >` 箭头选择器（y=172，复用 x 几何）。键盘 UP/DOWN 在三焦点间循环，LEFT/RIGHT 在 BGMMODE 焦点时切模式；鼠标点击 BGMMODE 行左右箭头直接切。切换时调 `hal_bgm_irq_set_on()` 提交给 HAL。
+2. **probe 完成自动同步**：bootmenu 主循环每帧从 `hal_bgm_irq_is_on()` 读实际状态——候选扫描在 bootmenu 运行期间通过 `engine_frame_pump()` 推进，选举完成后 `g_irq_active` 从 0 翻到 1，bootmenu 自动把显示从 COOP 切成 ISR 并 hal_log 提示，无需用户操作。
+3. **layer_debug.c 加 serial debug IRQ 命令**：`irq on` / `irq off` / `irq toggle` / `irq status` —— 场景运行中也能通过 serial 热切换，不必重启。
+4. **`NAIZ_BGM_IRQ` 默认值改回 1**（`core/plat/hal.h`）：两条路径必须同时编进同一构建 toggle 才有意义，不再需要用户 `EXTRA_DEFS=-DNAIZ_BGM_IRQ=1` 单独编译。
+5. **守卫更新**：`test_frame_pump.py::test_bgm_irq_is_gated_and_defaults_off` → `..._defaults_on`（默认值断言 0→1 + 新增 toggle 函数声明守卫）；`test_devdoc_refs.py::LINE_REF_WHITELIST` 的 bootmenu.c 三个行号重校（`find_lang_index` 104→122、`bootmenu_run` 201→243、`prefs_set_lang` 304→393）；9 语言 `sys_*.txt` 加 `BGM Mode=...` 译文 + `SYSTEM_UI_KEYS` 登记。
+6. **devdoc 175 ERRATA**：状态行「已回退（默认 0）」被 0→1 翻转覆盖，按 AGENTS §十在头部追加 ERRATA 块说明翻转原因，正文其余记录（候选扫描、bootmenu 无 BGM 污染证据）不变。
+
+**验证**：`make -C core` → 0 诊断；`pytest tools/tests/` → **850 passed / 2 skipped / 1 failed**（唯一失败 `test_naiz_market.py::test_clear_screen_emits_ansi_on_tty` 为 pre-existing tty 环境问题）；`makegame.sh build demo-a2` 重建 `engine.exe` + CJK 字库 + 部署树；`bump_version` **0.3.058 → 0.3.059**；HDI 重建。**实机验证待用户手动**：跑 `./makegame.sh test demo-a2 --serial`（不要 --auto），在 bootmenu 看到 `BGM Mode < ISR >` 进入游戏，触发 BGM 后若想回切，serial 发 `irq off`。
+
+<a id="c86"></a>
+### 0.3.058 — Timer-B 中断线候选扫描 + 看门狗选举（174）与虚拟时钟停顿保护（173）
+
+**动机**：`0.3.057` 之后用户实测两轮反馈固定了残余形态——「速度正常了，但的确还有轻微的拖延和过快」。追赶式爆发已消失，残余是**粒度**问题：`audio_tick()` 只从帧泵调用，NP2kai 下 pass 率约 20 Hz，音符起音被量化到 50 ms 网格，±25 ms 即人耳可闻的「轻微拖延/过快」。唯一不改音乐相位的解法是把音泵挂到 OPNA Timer-B（`16.154 ms ≈ 61.9 Hz`），但此前多轮已把「Timer-B 不可用」当作既定事实并据此关闭 ISR 路径。
+
+**复核结论：「不可用」是过期结论**（devdocs/174 §二）。四条证据：① NP2kai `sound/opntimer.c::fmport_b()` 确实 `pic_setirq()`，`cbus/board86.c` 从板上 option 解 `nIrq` 再取 `s_irqtable[4]={03h,0Dh,0Ah,0Ch}`；② 本项目自身日志 devdocs/168 §3.1 `[ISR] ticks=6999 v=56421 w=110000`（63.6 Hz 单调递增）；③ 真机 PC-9801-86 的 FM 中断是 IRQ12（可配 IRQ10/13/3），NP21w GUI 有「サウンド割り込み番号 / 割り込みの有無」——可关，但不是不支持；④ 用户换声卡时 `USEFMGEN: true → false`（切到 np2kai 原生 OPNA，即上述代码路径）、`SNDboard: 4 → 6`，得出旧结论时的配置已不存在，且 `$27` D3 写坏的 bug（165 §59）此后也已修。
+
+**真正的风险是挂错向量**：PC-98 向量 = PIC base + 线号，四种 strapping → `INT 0Bh`（master IRQ3）/`INT 15h`（slave IRQ5）/`INT 12h`（slave IRQ2）/`INT 14h`（slave IRQ4，NP2kai opt=`7Fh` 默认）。引擎**读不到 DIP**；旧实现「首个非空向量即 `g_irq_active = 1`」会把还在工作的协作泵关掉、挂上一条不 tick 的线——这正是「装上了但 ticks 永不增长」的最可能机制。
+
+**方案：顺序探测 + 看门狗**（`core/plat/hal_irq.c`）：
+
+1. `hal_bgm_irq_init()` 改为**只编程 Timer-B**（`$26` NB=200 → `$27` LOAD|ENABLE → `$29` `80h|02h`），**不夺取所有权**，置 `g_irq_probing`；协作泵全程继续跑，BGM 永不静音。
+2. `bgm_irq_attach()` / `bgm_irq_detach()` 成对保存/恢复**向量 + IMR**（挂错的线必须还原，不能永久屏蔽别人的中断）；候选扩到 4 条（14h → 0Bh → 15h → 12h）。
+3. `hal_bgm_irq_probe_step()`（`engine_frame_pump()` 每帧调用）：8 帧窗口（`BGM_IRQ_PROBE_FRAMES`）内 `g_isr_ticks` 增长 ≥ 6（`BGM_IRQ_PROBE_MIN_TICKS`）→ 该线真的在 tick，`g_irq_active = 1` 交权；否则 detach 换下一条；全耗尽 → `no candidate ticks; co-operative pump stays active`，停 Timer-B，协作泵保持。
+4. handler 先读 `$188` 状态口 **bit1** 自证身份：未置位立即两次 EOI 返回、不碰时钟与音频；探测期仅 `g_isr_ticks++`（否则会与协作泵叠加成双倍速度）。确认应答仍为 `RESET B|ENABLE B|LOAD B`（`0x2A`），保留 D1/D3。
+5. `hal_bgm_irq_shutdown()` 判据改为 `g_irq_line < 0`（不再是 `!g_irq_active`），并走 `bgm_irq_detach()`。
+
+**同期收口（devdocs/173）**：`core/lib/vclock.c` 的 stall protection 注释订正——原先写「FM 管线另有墙钟路径（方向 B）故不受暂停影响」，但方向 B（`fmseq` 的 `wall_ms_cursor` / `fmseq_pump_elapsed()`）已全部撤销回 HEAD；现注明确「FM 跟随同一虚拟时钟，stall 暂停即 BGM 暂停，这是设计选择」。检测带双边有界（`> VCLOCK_MAX_ADVANCE_MS` 且 `< 500 ms`）的理由也在注释中固定：下界防止把正常 20 Hz 帧节奏打成永久暂停，上界防止把 NP2kai 秒级量化的 1000 ms 跳变判成 stall 而每秒冻结一秒。
+
+**接口与守卫**：`hal.h` 的 `NAIZ_BGM_IRQ` 默认改为 **1**（扫描使「挂错线」不再等于静音，才敢默认开），新增 `void hal_bgm_irq_probe_step(void);`，`hal_bgm_irq_active()` 语义改为「**选举完成**才为 1」；`frame.c` 帧泵开头插 `hal_bgm_irq_probe_step();`；`audio.c` 成功日志改为 `BGM IRQ: scanning FM IRQ line; co-operative pump stays active`。`test_frame_pump.py`：`test_bgm_irq_is_gated_and_defaults_off` → `..._defaults_on`（默认值契约变更），新增 `test_bgm_irq_scans_and_falls_back`（init 不得夺取所有权 / step 必须按 ticks 选举 / 静默候选必须 detach / 耗尽必须回落）。
+
+**验证**：`make -C core` 重建 `engine.exe` + `engine_a.exe`，`core/*.err` **不存在**（0 诊断）；`pytest tools/tests/` **850 passed / 2 skipped / 1 failed**——唯一失败 `test_naiz_market.py::test_clear_screen_emits_ansi_on_tty` 在 HEAD（未含本轮改动）上同样失败，属终端/pty 环境问题；`bump_version` 全项目 0.3.057 → **0.3.058**，`nb_config.h` 重生成，`demo-a2.hdi` 重建完成。**实机判定待串口日志**：见 devdocs/174 §七（成功 = `<线名> ticks (N in M frames); ISR owns the pump` + `[ISR] ticks=` 单调递增；失败 = `no candidate ticks`）。
+
+<a id="c85"></a>
+### 0.3.057 — BGM 无法播放：ISR 未触发与协作泵双失修复 (171)
+
+详见 `devdocs/171`（修复执行）与 `devdocs/172`（验证记录）。**该两条的「ISR 已安装」判据已被 `devdocs/174` §九 ERRATA 订正**：`BGM IRQ: installed; co-operative pump disabled (ISR active)` 只表示 `hal_bgm_irq_init()` 返回 1，不表示中断在 tick。
 
 <a id="c83"></a>
 ### 0.3.055 — 封装审查落地：HAL 边界收口（`hal_bgm_irq_in_isr`）+ A 节 static 化 + `fmopn` 同构重复合并；pytest 欠账清零（842 passed, 0 failed）
@@ -887,6 +952,9 @@
 
 | 条目 |
 |------|
+| [0.3.061 — 行号白名单自动同步工具 + i18n 键 `=` 守卫（token 节省工具改进）](#c89) |
+| [0.3.060 — bootmenu BGM Mode 注释行（ISR/COOP 对比说明）](#c88) |
+| [0.3.059 — bootmenu BGM Mode 开关 + runtime IRQ toggle（devdoc 175 §十一 落地）](#c87) |
 | [0.3.055 — 封装审查落地：HAL 边界收口（`hal_bgm_irq_in_isr`）+ A 节 static 化 + `fmopn` 同构重复合并；pytest 欠账清零（842 passed, 0 failed）](#c83) |
 | [0.3.054 — AGENTS.md 历史归位与瘦身（53029→184 字符）+ 6 条长期定论提升为正文规则 + 文档卫生守卫](#c82) |
 | [0.3.053 — 方案 A 实机落地：Timer-B ISR 安全化（去 DOS 反射/FP/日志/堆）+ 定点硬件时基 + 心跳取证；`$27=0x2A` 定论](#c81) |

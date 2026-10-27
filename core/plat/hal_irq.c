@@ -74,12 +74,26 @@
 #define FM_CTRL_ENABLE_B 0x08   /* D3: overflow sets the flag / asserts IRQ */
 #define FM_CTRL_RESET_B  0x20   /* D5: clear the Timer-B flag (self-clearing) */
 
-/* Two candidate IRQ lines for the 86-board timer (devdoc 164 §四).  The
- * slave line (IRQ 12) is tried first because NP2kai -- this project's oracle
- * -- uses it; the master line (IRQ 3) is the QEMU/F04 default kept as a
- * fallback.  PC-98 vector = base + IRQ-within-PIC: master base 0x08 (IRQ 3 ->
- * INT 0Bh), slave base 0x10 (IRQ 12 -> IRQ 4 on the slave -> INT 14h). */
-#define BGM_IRQ_LINE_COUNT 2
+/* Candidate IRQ lines for the 86-board timer (devdoc 164 §四, devdoc 174).
+ *
+ * The line is strapped by the board's DIP switch, and the two reference
+ * sources disagree -- QEMU's pc98-opna maps it to IRQ 3 (master, F04 §6) while
+ * DOSBox-X/Blackbird put it on IRQ 12 (slave, G09 §3).  NP2kai resolves it
+ * from the DIP value (cbus/board86.c): nIrq = 0x10 | ((opt&4)<<5) | ((opt&8)<<3),
+ * and sound/opntimer.c::opna_timer() then indexes s_irqtable[4] =
+ * {03h, 0Dh, 0Ah, 0Ch} with nIrq>>6 -- four possible strappings, four vectors:
+ *
+ *   INT 0Bh <- s_irqtable[0] = 03h  master IRQ3
+ *   INT 15h <- s_irqtable[1] = 0Dh  slave  IRQ5
+ *   INT 12h <- s_irqtable[2] = 0Ah  slave  IRQ2
+ *   INT 14h <- s_irqtable[3] = 0Ch  slave  IRQ4   (NP2kai's opt=7Fh default)
+ *
+ * PC-98 vector = PIC vector base + line: master base 08h, slave base 10h.  The
+ * engine cannot read the DIP switch, so it hooks one candidate at a time and
+ * watches the tick counter (see hal_bgm_irq_probe_step): a hooked timer fires
+ * ~62 times a second, so a handful of frames without a tick is a verdict.  The
+ * observed line is INT 14h on this project's build (devdocs/168). */
+#define BGM_IRQ_LINE_COUNT 4
 
 typedef struct {
     unsigned char vector;    /* real-mode/PM interrupt vector number */
@@ -89,12 +103,29 @@ typedef struct {
 } BgmIrqLine;
 
 static const BgmIrqLine g_irq_lines[BGM_IRQ_LINE_COUNT] = {
-    { 0x14, PIC1_IMR, 0x10, "IRQ12 (slave)" },  /* NP2kai default (this oracle) */
-    { 0x0B, PIC0_IMR, 0x08, "IRQ3 (master)" },  /* QEMU/F04 default (fallback) */
+    { 0x14, PIC1_IMR, 0x10, "IRQ12 (slave 4)" },  /* observed here (devdocs/168) */
+    { 0x0B, PIC0_IMR, 0x08, "IRQ3 (master)" },    /* QEMU/F04 default */
+    { 0x15, PIC1_IMR, 0x20, "IRQ13 (slave 5)" },
+    { 0x12, PIC1_IMR, 0x04, "IRQ10 (slave 2)" },
 };
 
-static int g_irq_active = 0;
-static int g_irq_line = -1;          /* index of the line we actually hooked */
+/* devdoc 174 candidate scan.  One candidate is hooked at a time; ownership of
+ * the clock/audio pump moves to the ISR only after that candidate has actually
+ * ticked, so a wrong guess costs a fraction of a second of co-operative
+ * pumping (which keeps running throughout) instead of silence.  Eight frames
+ * is ~0.4 s under NP2kai's ~20 Hz pass rate and ~0.13 s at 60 Hz, i.e. ~25 or
+ * ~8 Timer-B ticks -- MIN_TICKS rejects a stray edge from an unrelated line. */
+#define BGM_IRQ_PROBE_FRAMES   8
+#define BGM_IRQ_PROBE_MIN_TICKS 6
+
+static int g_irq_active = 0;         /* ISR owns the clock/audio pump */
+static int g_irq_probing = 0;        /* candidate scan in progress */
+static int g_irq_line = -1;          /* index hooked now, -1 = none */
+static unsigned long g_probe_base_ticks = 0;
+static unsigned g_probe_frames = 0;
+static int g_probe_cursor = 0;       /* next candidate index to try */
+static unsigned char g_irq_saved_imr = 0;
+static void (_WCINTERRUPT _WCFAR *g_saved_vect[BGM_IRQ_LINE_COUNT])(void);
 
 /* ISR heartbeat (devdoc 165): incremented in the handler, read from the frame
  * path.  This is the only reliable proof the Timer-B actually fires -- the ISR
@@ -130,12 +161,35 @@ int hal_bgm_irq_in_isr(void)
 
 static void __interrupt __far bgm_irq_handler(void)
 {
+    unsigned char status;
+
     bgm_irq_set_in_isr(1);
+
+    /* devdoc 174: is this tick really ours?  A candidate line may be shared
+     * with another board, and during the candidate scan we are hooked on a
+     * line that may belong to one.  The OPNA status port ($188 read) carries
+     * the Timer-B overflow flag in bit 1; anything without it is somebody
+     * else's interrupt: acknowledge and leave without touching the clock. */
+    status = (unsigned char)inb(FM_REG_ADDR);
+    if (!(status & 0x02)) {
+        bgm_irq_set_in_isr(0);
+        outb(PIC1_CMD, PIC_EOI);
+        outb(PIC0_CMD, PIC_EOI);
+        return;
+    }
+
     g_isr_ticks++;
-    /* Fixed-step hardware time base, then the ISR-safe audio core: One capped
-     * batch of BGM events + a PCM FIFO top-up, all via outb()/inb(). */
-    hal_wallclock_fixed_advance(BGM_TIMER_B_UNITS);
-    audio_tick_isr(BGM_TIMER_B_UNITS);  /* stage 3: fixed-unit pump (devdoc 168) */
+
+    /* While the candidate scan is running the handler only counts: the
+     * co-operative pump still owns the clock and the audio, and pumping here as
+     * well would run the tempo at twice its rate for the duration of the probe
+     * (devdoc 174). */
+    if (g_irq_active) {
+        /* Fixed-step hardware time base, then the ISR-safe audio core: One
+         * capped batch of BGM events + a PCM FIFO top-up, all via outb()/inb(). */
+        hal_wallclock_fixed_advance(BGM_TIMER_B_UNITS);
+        audio_tick_isr(BGM_TIMER_B_UNITS);  /* stage 3: fixed-unit pump (devdoc 168) */
+    }
     bgm_irq_set_in_isr(0);
 
     /* Clear the OPNA Timer-B flag then EOI.  The write must keep BOTH D1
@@ -166,58 +220,86 @@ static unsigned long dpmi_get_pm_vector(int vec, unsigned short *sel_out)
     return ((unsigned long)r.x.ecx << 16) | (r.x.edx & 0xFFFFUL);
 }
 
-int hal_bgm_irq_init(void)
+/* Hook one candidate: install the handler, remember the vector it displaced,
+ * then unmask that line.  Returns 0 if the line has no protected-mode vector at
+ * all (not a real IRQ path on this host). */
+static int bgm_irq_attach(int idx)
 {
-    int i;
+    const BgmIrqLine *line = &g_irq_lines[idx];
+    unsigned short sel = 0;
+    unsigned long off;
 
-    /* Try each candidate line in priority order: the first one with a usable
-     * protected-mode vector wins.  A line whose vector is empty (0:0) is not
-     * a real IRQ path on this host, so we move on rather than write into the
-     * dark. */
-    hal_log("BGM IRQ: init enter\r\n");
-
-    /* 快速初始化：限制每条线的检查时间，避免模拟器挂起 */
-    for (i = 0; i < BGM_IRQ_LINE_COUNT; i++) {
-        const BgmIrqLine *line = &g_irq_lines[i];
-        unsigned short sel = 0;
-        unsigned long off;
-
-        hal_logf("BGM IRQ: probing INT %02Xh (%s)\r\n",
+    hal_logf("BGM IRQ: probing INT %02Xh (%s)\r\n", line->vector, line->name);
+    off = dpmi_get_pm_vector(line->vector, &sel);
+    hal_logf("BGM IRQ: 0204 -> %lx:%04x\r\n", off, (unsigned)sel);
+    if (off == 0 && sel == 0) {
+        hal_logf("BGM IRQ: no PM vector for INT %02Xh (%s); skipping\r\n",
                  line->vector, line->name);
-        off = dpmi_get_pm_vector(line->vector, &sel);
-        hal_logf("BGM IRQ: 0204 -> %lx:%04x\r\n", off, (unsigned)sel);
-        if (off == 0 && sel == 0) {
-            hal_logf("BGM IRQ: no PM vector for INT %02Xh (%s); trying next\r\n",
-                     line->vector, line->name);
-            continue;
-        }
-
-        /* Install our handler.  In the DOS/4GW flat model a far code pointer
-         * is a plain 32-bit offset (no real selector), so DPMI 0205's CX:EDX
-         * sel:off split is wrong here -- it would pass the offset's high word
-         * as a bogus selector and fault on the first IRQ.  _dos_setvect() takes
-         * the handler directly and, for the auto-passup range 8-2Eh (INT 14h
-         * qualifies), DOS/4GW routes both PM and RM to it (DOS/4GW FAQ 4a). */
-        hal_logf("BGM IRQ: _dos_setvect(INT %02Xh) handler=%lx\r\n",
-                 line->vector,
-                 (unsigned long)(void (__interrupt __far *)())bgm_irq_handler);
-        _dos_setvect(line->vector,
-                     (void (_WCINTERRUPT _WCFAR *)())bgm_irq_handler);
-        hal_logf("BGM IRQ: setvect done\r\n");
-
-        g_irq_line = i;
-        break;
-    }
-
-    if (g_irq_line < 0) {
-        hal_log("BGM IRQ: no usable IRQ line; fallback to co-operative pump\r\n");
         return 0;
     }
 
-    /* Program Timer-B FIRST, while the line is still masked: reload value, then
-     * LOAD + ENABLE, then enable its IRQ at the chip ($29 D1).  $29 bit7 (SCH=6
-     * voices) is re-asserted here; only the timer-enable bit is added. */
-    hal_log("BGM IRQ: programming Timer-B\r\n");
+    /* In the DOS/4GW flat model a far code pointer is a plain 32-bit offset
+     * (no real selector), so DPMI 0205's CX:EDX sel:off split is wrong here --
+     * it would pass the offset's high word as a bogus selector and fault on the
+     * first IRQ.  _dos_setvect() takes the handler directly and, for the
+     * auto-passup range 8-2Eh (INT 14h qualifies), DOS/4GW routes both PM and
+     * RM to it (DOS/4GW FAQ 4a). */
+    g_saved_vect[idx] = _dos_getvect(line->vector);
+    _dos_setvect(line->vector,
+                 (void (_WCINTERRUPT _WCFAR *)())bgm_irq_handler);
+
+    g_irq_saved_imr = (unsigned char)inb(line->imr_port);
+    hal_logf("BGM IRQ: unmask %s (imr %02x -> %02x)\r\n",
+             line->name, (unsigned)g_irq_saved_imr,
+             (unsigned)(g_irq_saved_imr & ~line->imr_bit));
+    outb(line->imr_port, (unsigned char)(g_irq_saved_imr & ~line->imr_bit));
+
+    g_irq_line = idx;
+    return 1;
+}
+
+/* Undo bgm_irq_attach(): mask the line again, restore the displaced vector. */
+static void bgm_irq_detach(void)
+{
+    if (g_irq_line < 0)
+        return;
+    {
+        const BgmIrqLine *line = &g_irq_lines[g_irq_line];
+        outb(line->imr_port, g_irq_saved_imr);
+        _dos_setvect(line->vector, g_saved_vect[g_irq_line]);
+    }
+    g_irq_line = -1;
+}
+
+/* Attach the next candidate that has a usable protected-mode vector.  Returns 0
+ * once the list is exhausted; on success the candidate is hooked and the probe
+ * window restarts against it. */
+static int bgm_irq_probe_advance(void)
+{
+    bgm_irq_detach();
+    while (g_probe_cursor < BGM_IRQ_LINE_COUNT) {
+        int idx = g_probe_cursor++;
+        if (bgm_irq_attach(idx)) {
+            g_probe_frames = 0;
+            g_probe_base_ticks = g_isr_ticks;
+            return 1;
+        }
+    }
+    return 0;
+}
+
+int hal_bgm_irq_init(void)
+{
+    /* devdoc 174: program Timer-B while every candidate line is still masked,
+     * then hand the candidate scan to hal_bgm_irq_probe_step(), which promotes a
+     * line to owner only after it has actually ticked.  Which line the board
+     * strapped the timer to depends on the host's DIP switch / board option
+     * (devdoc 164 四), so it is settled by observation rather than assumption.
+     *
+     * Timer-B registers: reload value, then LOAD + ENABLE.  $29 bit7 (SCH = 6
+     * voices) is re-asserted here with the timer-enable bit ($29 D1). */
+    hal_log("BGM IRQ: init enter\r\n");
+
     outb(FM_REG_ADDR, FM_TIMER_B);
     outb(FM_REG_DATA, (unsigned char)(FM_TIMER_B_NB));
     outb(FM_REG_ADDR, FM_TIMER_CTRL);
@@ -225,21 +307,22 @@ int hal_bgm_irq_init(void)
     outb(FM_REG_ADDR, FM_IRQ_ENABLE);
     outb(FM_REG_DATA, (unsigned char)(0x80 | 0x02));  /* SCH + EN_TB */
 
-    /* Publish active state BEFORE unmasking: if the first IRQ lands the instant
-     * the mask drops, the frame pump must already see the ISR as the owner. */
-    g_irq_active = 1;
+    /* Ownership stays with the co-operative pump until a candidate proves it
+     * fires, so the BGM is never silent while the scan runs. */
+    g_irq_active = 0;
+    g_irq_probing = 1;
+    g_probe_cursor = 0;
 
-    /* Unmask the chosen line last (read-modify-write the right PIC's IMR). */
-    {
-        const BgmIrqLine *line = &g_irq_lines[g_irq_line];
-        unsigned char imr = (unsigned char)inb(line->imr_port);
-        hal_logf("BGM IRQ: unmask %s (imr %02x -> %02x)\r\n",
-                 line->name, (unsigned)imr, (unsigned)(imr & ~line->imr_bit));
-        outb(line->imr_port, (unsigned char)(imr & ~line->imr_bit));
+    if (!bgm_irq_probe_advance()) {
+        g_irq_probing = 0;
+        outb(FM_REG_ADDR, FM_TIMER_CTRL);
+        outb(FM_REG_DATA, FM_CTRL_RESET_B);
+        hal_log("BGM IRQ: no candidate with a PM vector; co-operative pump stays active\r\n");
+        return 0;
     }
 
-    hal_logf("BGM IRQ: Timer-B installed (NB=%d, ~61.9Hz, %s)\r\n",
-             FM_TIMER_B_NB, g_irq_lines[g_irq_line].name);
+    hal_logf("BGM IRQ: Timer-B programmed (NB=%d, ~61.9Hz); scanning IRQ lines\r\n",
+             FM_TIMER_B_NB);
     return 1;
 }
 
@@ -253,19 +336,81 @@ unsigned long hal_bgm_irq_ticks(void)
     return g_isr_ticks;
 }
 
+/* Runtime ownership toggle (devdoc 175 §十一).  init() + probe_step() 负责
+ * setup Timer-B 与选举正确候选；toggle 只在两者之间切所有权标志。
+ * 参数语义：
+ *   on = 1 → 若 setup 已完成（g_irq_line >= 0）则移交 ISR；否则打印提示
+ *   on = 0 → 回到协作泵，Timer-B 继续在后台 tick（不重新编程）
+ * 返回 0 = 切到协作泵，1 = 切到 ISR，-1 = ISR setup 未完成（拒绝切换）。
+ * 调用者负责保证切换时没有正在进行的 BGM 状态变更（bgm_irq_lock 临界区
+ * 已覆盖 audio_bgm_start/stop 等）。 */
+int hal_bgm_irq_set_on(int on)
+{
+    if (on) {
+        if (g_irq_line < 0) {
+            hal_log("BGM IRQ: no line hooked yet (init + probe needed)\r\n");
+            return -1;
+        }
+        if (!g_irq_active)
+            hal_logf("BGM IRQ: → ISR (line=%s)\r\n",
+                     g_irq_lines[g_irq_line].name);
+        g_irq_active = 1;
+        return 1;
+    }
+    if (g_irq_active)
+        hal_log("BGM IRQ: → co-operative pump\r\n");
+    g_irq_active = 0;
+    return 0;
+}
+
+int hal_bgm_irq_is_on(void)
+{
+    return g_irq_active;
+}
+
+/* Called once per frame while the candidate scan runs (devdoc 174).  A hooked
+ * timer delivers ~62 ticks/s, so a short window either shows ticks or does not.
+ * Only a candidate that ticked becomes the pump owner; a silent one is detached
+ * (IMR and vector restored) and the next candidate takes its place. */
+void hal_bgm_irq_probe_step(void)
+{
+    unsigned long delta;
+
+    if (!g_irq_probing)
+        return;
+
+    g_probe_frames++;
+    delta = g_isr_ticks - g_probe_base_ticks;
+    if (delta >= BGM_IRQ_PROBE_MIN_TICKS) {
+        g_irq_active = 1;
+        g_irq_probing = 0;
+        hal_logf("BGM IRQ: %s ticks (%lu in %u frames); ISR owns the pump\r\n",
+                 g_irq_lines[g_irq_line].name, delta, g_probe_frames);
+        return;
+    }
+    if (g_probe_frames < BGM_IRQ_PROBE_FRAMES)
+        return;
+
+    hal_logf("BGM IRQ: %s silent (%lu ticks in %u frames); next candidate\r\n",
+             g_irq_lines[g_irq_line].name, delta, g_probe_frames);
+    if (!bgm_irq_probe_advance()) {
+        g_irq_probing = 0;
+        outb(FM_REG_ADDR, FM_TIMER_CTRL);
+        outb(FM_REG_DATA, FM_CTRL_RESET_B);
+        hal_log("BGM IRQ: no candidate ticks; co-operative pump stays active\r\n");
+    }
+}
+
 void hal_bgm_irq_shutdown(void)
 {
-    if (!g_irq_active)
+    if (g_irq_line < 0)
         return;
-    /* Stop Timer-B (drop LOAD B), then mask the line we hooked again. */
+    /* Stop Timer-B (drop LOAD B), then restore the line we hooked. */
     outb(FM_REG_ADDR, FM_TIMER_CTRL);
     outb(FM_REG_DATA, FM_CTRL_RESET_B);
-    if (g_irq_line >= 0) {
-        const BgmIrqLine *line = &g_irq_lines[g_irq_line];
-        unsigned char imr = (unsigned char)inb(line->imr_port);
-        outb(line->imr_port, (unsigned char)(imr | line->imr_bit));
-    }
     g_irq_active = 0;
+    g_irq_probing = 0;
+    bgm_irq_detach();
 }
 
 #endif /* NAIZ_BGM_IRQ */

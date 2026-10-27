@@ -518,7 +518,34 @@ int nb_process(void)
 
             NB_DEBUG("exec[%d]: %s\r\n", nb.pc - 1, line);
 
-            nb_commands_dispatch(cmd_name, argc, args);
+            {
+                unsigned char cflags = nb_commands_dispatch(cmd_name, argc, args);
+                /* devdoc 173: yield after every non-blocking display-touching
+                 * command so the main loop runs engine_frame_pump (clock +
+                 * audio + anim + reveal) before the next command.  The old
+                 * tight loop would dispatch N display commands (bg→char→char
+                 * →playanima) in one pass, and each command's VRAM blit
+                 * (12-15 ms on NP2kai) accumulated into a 30-50 ms stall
+                 * with ZERO audio pumps — users heard this as BGM pausing
+                 * during sprite swaps, text refreshes, and animations.
+                 * Blocking commands (mainmenu/question/fei/ira/neon/...)
+                 * pause the script on their own input loop or via
+                 * nb_dialog_pending() below, so they skip this yield.
+                 * Audio-only commands (bgm/sound/voice) also skip — they
+                 * touch no VRAM and cost <1 ms.
+                 *
+                 * NOTE: break, NOT vm_pause_process().  We keep VMFLAG_PROCESS
+                 * set so the main loop naturally re-enters nb_process on its
+                 * next iteration — the engine_frame_pump at the top of that
+                 * iteration is exactly what we want to run between display
+                 * commands.  vm_pause_process() would strand both AUTOEXIT
+                 * and non-AUTOEXIT builds: the former would lose its "auto"
+                 * property and the latter would park in the input-wait loop
+                 * until the user clicked. */
+                if ((cflags & CMD_TOUCHES_DISPLAY) && !(cflags & CMD_BLOCKING)) {
+                    break;
+                }
+            }
         }
 
         /* A dialog submission holds the script until the page is consumed

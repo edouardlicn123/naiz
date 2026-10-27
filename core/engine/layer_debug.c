@@ -225,7 +225,7 @@ static void debug_dump_status(void)
 void layer_debug_handle(const char *arg)
 {
     if (!arg || !*arg) {
-        hal_log("dump usage: bg|sprite|dialog|anim|all|status\r\n");
+        hal_log("dump usage: bg|sprite|dialog|anim|all|status|irq <on|off|toggle|status>\r\n");
         return;
     }
 
@@ -241,6 +241,26 @@ void layer_debug_handle(const char *arg)
         layer_dump_all("dump");
     else if (strcmp(arg, "status") == 0)
         debug_dump_status();
+#if NAIZ_BGM_IRQ
+    else if (strcmp(arg, "irq") == 0 || strcmp(arg, "irq status") == 0)
+        hal_logf("irq: %s\r\n", hal_bgm_irq_is_on() ? "ISR" : "COOP");
+    else if (strcmp(arg, "irq on") == 0) {
+        int rc = hal_bgm_irq_set_on(1);
+        if (rc < 0) hal_log("irq on: setup incomplete (probe not done?)\r\n");
+        else hal_logf("irq: → %s\r\n", rc ? "ISR" : "COOP");
+    } else if (strcmp(arg, "irq off") == 0) {
+        int rc = hal_bgm_irq_set_on(0);
+        hal_logf("irq: → %s\r\n", rc ? "ISR" : "COOP");
+    } else if (strcmp(arg, "irq toggle") == 0) {
+        int cur = hal_bgm_irq_is_on();
+        int rc = hal_bgm_irq_set_on(!cur);
+        if (rc < 0) hal_log("irq toggle: setup incomplete\r\n");
+        else hal_logf("irq: → %s\r\n", rc ? "ISR" : "COOP");
+    }
+#else
+    else if (strncmp(arg, "irq", 3) == 0)
+        hal_log("irq: NAIZ_BGM_IRQ not compiled in\r\n");
+#endif
     else
-        hal_log("dump usage: bg|sprite|dialog|anim|all|status\r\n");
+        hal_log("dump usage: bg|sprite|dialog|anim|all|status|irq <on|off|toggle|status>\r\n");
 }

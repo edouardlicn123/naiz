@@ -3,8 +3,19 @@
 
 #include <stddef.h>
 
-/* NB command dispatch: look up cmd_name in command table and execute handler. */
-void nb_commands_dispatch(const char *cmd_name, int argc, const char **argv);
+/* Command metadata flags (shared with nb_process for yield-after-display logic).
+ * See nb_commands.c cmd_table for per-command assignments. */
+enum {
+    CMD_BLOCKING         = 0x01,   /* [doc-only] handler blocks until script may continue */
+    CMD_NEEDS_INPUT      = 0x02,   /* [doc-only] waits for user input (keyboard/mouse) */
+    CMD_TOUCHES_DISPLAY  = 0x04,   /* writes VRAM / layers / palette / animation */
+    CMD_TOUCHES_AUDIO    = 0x08,   /* starts/stops audio */
+    CMD_TERMINATES_SCENE = 0x10    /* switches scene (scene_switch) */
+};
+
+/* NB command dispatch: look up cmd_name in command table and execute handler.
+ * Returns the command's metadata flags (0 if unknown). */
+unsigned char nb_commands_dispatch(const char *cmd_name, int argc, const char **argv);
 
 /* Public asset-key lookup (asset_map, then spr_asset_map). Returns id or -1. */
 int  nb_asset_id(const char *key);

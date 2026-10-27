@@ -16,6 +16,7 @@
 #include "hal.h"
 #include "debug.h"
 #include "palette.h"
+#include "audio.h"
 
 /* Run a transition effect (blocking, multi-frame).
  * type TRANSITION_CUT paints 'color' immediately and returns.
@@ -54,6 +55,10 @@ void transition_run(int x, int y, int w, int h,
         }
 
         hal_vblank_wait();
+        hal_wallclock_smooth_advance();  /* devdoc 173: keep BGM/PCM flowing
+                                             during scene transitions (16 frames
+                                             ≈ 267 ms was a silent gap before) */
+        audio_tick();
         hal_mouse_update();
         hal_mouse_draw_cursor();
     }

@@ -33,7 +33,8 @@ SYSTEM_UI_KEYS = {
     "Back", "Yes", "No", "[Yes]", "[No]",
     "LOAD", "SAVE", "Empty",
     "Load to Slot %d?", "Save to Slot %d?", "Overwrite Slot %d?",
-    "Naiz Settings", "Language", "Start Game",
+    "Naiz Settings", "Language", "BGM Mode", "Start Game",
+    "ISR: Timer-B interrupt / COOP: frame pump (stable)",
     "Text Speed", "Instant", "16/s", "32/s", "64/s",
     "SETTINGS",
     # devdoc 118: audio switches + volume ladders + read progress

@@ -384,6 +384,22 @@ def _engine_tr_literals():
     return keys
 
 
+def test_engine_tr_literals_have_no_equals_sign():
+    """i18n sys files split key=value on the FIRST '='.  A tr() literal
+    containing '=' (e.g. "ISR = Timer-B ...") is misparsed by i18n_gen: the
+    key truncates, the entry is marked # ORPHANED, and the translated sys
+    files lose the line on the next regeneration (0.3.060 hit this once,
+    costing a full build+pytest cycle).  Reject '=' in keys at source-scan
+    time instead."""
+    offenders = {k: v for k, v in _engine_tr_literals().items() if "=" in k}
+    assert not offenders, (
+        "tr() literal(s) contain '=', which the i18n sys format cannot "
+        "represent (split on first '=').  Reword with ':' or '/' instead:\n"
+        + "\n".join(f"  {k!r} used in {', '.join(sorted(v))}"
+                    for k, v in sorted(offenders.items()))
+    )
+
+
 def test_every_engine_tr_literal_is_registered():
     """Every system-UI literal wrapped in tr() must be in SYSTEM_UI_KEYS.
 

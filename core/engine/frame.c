@@ -13,6 +13,10 @@ void engine_frame_pump(void)
 {
     vblank_wait();                     /* pace the frame */
 #if NAIZ_BGM_IRQ
+    /* devdoc 174: while the candidate scan runs, the co-operative pump still
+     * owns the clock and the audio -- this call just watches the hooked line's
+     * tick counter and moves on to the next candidate when it stays silent. */
+    hal_bgm_irq_probe_step();
     /* devdoc 164 phase 1 / stage 3: Timer-B ISR owns clock + audio pump.
      * audio_tick() (line 84) passes fixed units (258) to audio_tick_isr(),
      * so no ms-delta count is needed here; skip the advance + pump to avoid

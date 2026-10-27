@@ -414,25 +414,49 @@ def test_prefetch_key_resolves_the_display_commands():
 HAL_IRQ_C = ROOT / "core" / "plat" / "hal_irq.c"
 
 
-def test_bgm_irq_is_gated_and_defaults_off():
-    """NAIZ_BGM_IRQ must default to 0 so the default build compiles the ISR to
-    nothing and the co-operative pump is byte-for-byte unchanged; the guard
-    function must be declared unconditionally in hal.h so frame.c/audio.c can
-    reference it in both configurations."""
+def test_bgm_irq_is_gated_and_defaults_on():
+    """NAIZ_BGM_IRQ 默认 1：bootmenu 开关（devdoc 175 §十一）需要两个路径
+    同时编进同一构建。ISR 在候选扫描选举后自动接管；用户可在 bootmenu
+    或通过 serial debug 的 `irq off` 回切协作泵对比听感。"""
     h = HAL_H.read_text(encoding="utf-8")
-    assert "#define NAIZ_BGM_IRQ 0" in h, (
-        "NAIZ_BGM_IRQ must default to 0 (devdoc 164 §5.5)")
-    # The declarations live inside the gate (the default build has no such
-    # symbols), and the frame/audio call sites are wrapped by the same gate.
+    assert "#define NAIZ_BGM_IRQ 1" in h, (
+        "NAIZ_BGM_IRQ must default to 1 (bootmenu BGM Mode toggle needs both paths compiled in)")
     gated = h[h.index("#if NAIZ_BGM_IRQ"):]
     for decl in ("hal_bgm_irq_init(void)",
+                 "hal_bgm_irq_probe_step(void)",
                  "hal_bgm_irq_active(void)",
                  "hal_bgm_irq_ticks(void)",
+                 "hal_bgm_irq_set_on(int on)",
+                 "hal_bgm_irq_is_on(void)",
                  "hal_bgm_irq_shutdown(void)"):
         assert decl in gated, f"hal.h must declare {decl} under the gate"
     c = HAL_IRQ_C.read_text(encoding="utf-8")
     assert "#if NAIZ_BGM_IRQ" in c and "bgm_irq_handler" in c, (
         "the ISR body must be behind the NAIZ_BGM_IRQ gate")
+
+
+def test_bgm_irq_scans_and_falls_back():
+    """devdoc 174: 候选扫描机制本身是好的 —— 已在实机证实 INT 14h（IRQ12 /
+    slave 4）是正确线，1 帧内 tick 67 次。这条守卫只检查 hal_irq.c 的扫描
+    逻辑，不关心默认值；默认值由上面的 test_bgm_irq_is_gated_and_defaults_on
+    单独判定。"""
+    c = HAL_IRQ_C.read_text(encoding="utf-8")
+    init = _func_body(c, "hal_bgm_irq_init")
+    assert "g_irq_active = 1;" not in init, (
+        "init must not pre-assert ownership; the probe elects the line")
+    assert "g_irq_probing = 1;" in init, "init must start the candidate scan"
+    step = _func_body(c, "hal_bgm_irq_probe_step")
+    assert "g_isr_ticks" in step and "BGM_IRQ_PROBE_MIN_TICKS" in step, (
+        "the step must elect a line on real ticks, not on a timer being armed")
+    assert "g_irq_active = 1;" in step, "the step must promote on a tick"
+    advance = _func_body(c, "bgm_irq_probe_advance")
+    assert "bgm_irq_detach()" in advance, (
+        "a silent candidate must be detached before the next is tried")
+    assert "co-operative pump stays active" in c, (
+        "an exhausted scan must log the fallback to the co-operative pump")
+    fr = _func_body(FRAME_C.read_text(encoding="utf-8"), "engine_frame_pump")
+    assert "hal_bgm_irq_probe_step();" in fr, (
+        "engine_frame_pump() must advance the candidate scan each frame")
 
 
 def test_isr_heartbeat_is_sampled_from_the_frame_path():
