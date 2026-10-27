@@ -207,10 +207,17 @@ def test_pcm_elapsed_time_comes_from_the_clock_step():
         r"void\s+audio_tick_isr\s*\(\s*unsigned\s+long\s+\w+\s*\)", _read(AUDIO_H)
     ), "audio.h must publish the units-taking audio_tick_isr prototype"
     assert re.search(
-        r"audio_tick_isr\s*\(\s*BGM_TIMER_B_UNITS\s*\)", _read(HAL_IRQ_C)
+        r"g_irq_units_total\s*\+=\s*BGM_TIMER_B_UNITS", _read(HAL_IRQ_C)
     ), (
-        "the Timer-B handler must feed the pump its own hardware period "
-        "(audio_tick_isr(BGM_TIMER_B_UNITS))"
+        "the Timer-B handler must bank its own hardware period for the "
+        "main-thread pump (devdoc 176: the handler runs on DOS/4GW's own stack "
+        "segment, so engine code cannot run there)"
+    )
+    assert re.search(
+        r"audio_tick_isr\s*\(\s*units\s*\)", audio_c
+    ), (
+        "audio_tick_isr_pending() must pass the drained units to "
+        "audio_tick_isr() on the main thread (devdoc 176)"
     )
     declared = "hal_wallclock_last_advance_units" in _read(HAL_H)
     assert declared, (

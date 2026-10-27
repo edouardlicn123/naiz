@@ -1,6 +1,28 @@
 # Naiz — 开发历史（Bug 修复 / 功能演进）
 
 自 R1 起全部 Bug 修复与功能演进记录（条目顺序沿用 AGENTS.md 既有历史排列）；`AGENTS.md` 仅保留当前版本与规则。**新条目约定**：每轮修复/演进完成后，在下方 `---` 分隔线之后（第一条位置）追加变更摘要，并在 AGENTS.md 头部同步「当前版本」。**条目格式**：每条以 `### <版本号> — <标题>` 开头（版本号化标题行 + `<a id="cN">` 锚点，N 按条目序递增），正文整段或分小节；历史速查直接读下方「版本索引」。
+---
+
+<a id="c90"></a>
+### 0.3.062 — ISR 路径 FM 静音根因（DOS/4GW 栈段）+ 音泵回主线程（devdoc 176）
+
+**动机**：`nbook001` 在 `NAIZ_BGM_IRQ=1` 时 BGM 精确数字静音（`rms=0.0 peak=0`），同场景切 COOP 后 `rms≈5132`。`devdocs/175` 第一轮把「bootmenu 无 BGM」当污染源而回退到协作泵，没触及真实场景；本轮先排除污染（真实 `BGM start 'melody_town'` 已触发），再做客观抓取与诊断，定位到根源：DOS/4GW 硬件中断栈段与 DS 不同，`fmopn_reg_addr()` 的栈局部出参地址被写错。
+
+**根因（devdoc 176 §三）**：ISR 内 `SS=00B0`, `DS=0160`。`fmopn_reg_addr()` 的 `*bank`/`*addr` 写入栈局部变量时落到错误线性地址，调用方读到旧值 → 所有 FM 写的地址字节为 `0x00`（数据字节正确），表现为「泵在跑、键控在发、数据对、地址 0」的精确静音（可复现于 SDL 磁盘抓取与写序列 dump）。这是 `devdocs/165` 安全审查未覆盖的一类（合法指针、栈局部目标，在 SS 基址 ≠ DS 基址时失效）。
+
+**修复（架构级，不只是修补）**：`bgm_irq_handler()` 不再运行任何引擎代码；只做 `hal_wallclock_fixed_advance(BGM_TIMER_B_UNITS)` + `g_irq_units_total += ...`（全局计数）；主线程 `audio_tick_isr_pending()` 取差分后在主栈（`SS == DS`）执行 `audio_tick_isr(units)`。同时修复 `frame.c`、`transition.c` 的三条泵入口（主循环 / 解码泵 / 场景过渡），确保 ISR 持有时钟时不推进协作时钟（否则双速率）。
+
+**取证链**：① SDL 磁盘抓取 ISR `rms=0.0` vs COOP `rms=5131.9` / ② 逐秒剖面：ISR 只在 PCM 爆发秒有峰值（16000+），FM 归零 / ③ 写序列对照 `30:01...` vs `00:01...`（数据同、地址全 0）/ ④ 计数 `pumps=569 writes=423`（泵在跑）/ ⑤ 指针探针 `ptr stack` 丢失、`glob` 正常、`ss=00B0` / ⑥ 修复后 ISR `rms=5354.9`（与 COOP `5283.2` 相当）、14 秒逐秒无连续静音秒。
+
+**文件**：`core/plat/hal_irq.c`、`core/engine/audio.c`、`audio.h`、`frame.c`、`transition.c`、`core/plat/hal.h`、`devdocs/176-…`、`AGENTS.md` §十四、`CHANGELOG.md`（本条）、`tools/tests/test_isr_pump_boundary.py`（新守卫）、`test_bgm_timer_units.py` / `test_frame_pump.py`（已有守卫适配 ISR 只拥有时钟的定论）。**无提交**（未经用户指示不自动提交）。
+
+**验证**：`make -C core` rc=0、`core/*.err` 空；`pytest tools/tests/test_isr_pump_boundary.py` + 适配后三个测试文件 43 passed；`bump_version` → `0.3.062`（全项目同步）；`cap_bgm.py` ISR/COOP 双路径抓取确认 FM 恢复。
+
+**防复发**：`hal_irq.c` 注释（SS/DS 解释 + `g_irq_units_total` 说明）+ `audio_tick_isr_pending()` 注释 + 守卫 `test_isr_pump_boundary.py`（handler 不含 `audio_tick*`/`fmseq`、不调用引擎、三条泵入口均排水）+ `AGENTS.md` §十四一句话总结。
+
+---
+
+---
 
 <a id="c89"></a>
 ### 0.3.061 — 行号白名单自动同步工具 + i18n 键 `=` 守卫（token 节省工具改进）

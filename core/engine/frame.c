@@ -17,10 +17,11 @@ void engine_frame_pump(void)
      * owns the clock and the audio -- this call just watches the hooked line's
      * tick counter and moves on to the next candidate when it stays silent. */
     hal_bgm_irq_probe_step();
-    /* devdoc 164 phase 1 / stage 3: Timer-B ISR owns clock + audio pump.
-     * audio_tick() (line 84) passes fixed units (258) to audio_tick_isr(),
-     * so no ms-delta count is needed here; skip the advance + pump to avoid
-     * double-step.  anim_tick/reveal stay (display-paced).  Count = 0. */
+    /* devdoc 164 / 168 / 176: the Timer-B handler owns the CLOCK only (fixed
+     * 258-unit steps, ISR-safe: globals only).  The audio pump itself runs
+     * below on this thread via audio_tick_isr_pending() -- DOS/4GW delivers
+     * the IRQ on its own stack segment, where pointer-to-stack-local writes
+     * silently miss (devdoc 176).  anim_tick/reveal stay display-paced. */
     if (!hal_bgm_irq_active()) {
         hal_wallclock_smooth_advance();
         audio_tick();
@@ -31,6 +32,9 @@ void engine_frame_pump(void)
          * working-but-frozen BGM. */
         static unsigned long shown;
         static unsigned frame_ctr;
+        /* devdoc 176: the handler only advances the clock; the pump runs here,
+         * on the main stack, for every unit it accumulated. */
+        audio_tick_isr_pending();
         if (++frame_ctr >= 64) {
             unsigned long now = hal_bgm_irq_ticks();
             frame_ctr = 0;
@@ -85,6 +89,8 @@ void frame_decode_pump(void)
     if (!hal_bgm_irq_active()) {
         hal_wallclock_smooth_advance();/* self-measuring clock: call-rate safe */
         audio_tick();                  /* pump BGM/PCM (non-blocking) */
+    } else {
+        audio_tick_isr_pending();      /* devdoc 176: pump on the main stack */
     }
 #else
     hal_wallclock_smooth_advance();/* self-measuring clock: call-rate safe */

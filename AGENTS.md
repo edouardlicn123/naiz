@@ -1,10 +1,10 @@
 # Naiz — AI 编程规则
 
-> **当前版本**: `0.3.061`（`projects/demo-a2/config.toml`）
+> **当前版本**: `0.3.062`（`projects/demo-a2/config.toml`）
 >
-> **最新条目**: `CHANGELOG.md` `c89` — 行号白名单自动同步工具（`tools/naiz_docs/sync_line_refs.py`）+ i18n 键 `=` 守卫；`pytest` 851 passed / 2 skipped / 1 pre-existing。**本行只放当前状态指针**：历史条目正文一律只写进 `CHANGELOG.md`（规则见 §十三「变更后更新规约」），本文件不承载任何开发历史摘要——§一–§十七 只存**规则与当前状态**。
-> **当前状态**（0.3.061 / c89）：bootmenu 三焦点 + BGM Mode 注释行就绪，IRQ toggle 双通道可用，待实机 A/B 验证；行号白名单漂移可用 `python3 -m tools.naiz_docs.sync_line_refs` 一键重锚。
-> **开发历史**：`CHANGELOG.md`（唯一载体）；本文件只存规则与当前状态，不承载历史摘要。历史速查 → CHANGELOG.md（最新：c89），新条目追加到 CHANGELOG.md 顶部。
+> **最新条目**: `CHANGELOG.md` `c90` — 行号白名单自动同步工具（`tools/naiz_docs/sync_line_refs.py`）+ i18n 键 `=` 守卫；`pytest` 851 passed / 2 skipped / 1 pre-existing。**本行只放当前状态指针**：历史条目正文一律只写进 `CHANGELOG.md`（规则见 §十三「变更后更新规约」），本文件不承载任何开发历史摘要——§一–§十七 只存**规则与当前状态**。
+> **当前状态**（0.3.062 / c90）：ISR 只拥有时钟（`devdocs/176`），音泵回主线程（`audio_tick_isr_pending()`）；`test_isr_pump_boundary.py` 守卫落地；`cap_bgm.py` 客观音频取证（ISR `rms=5354.9`、逐秒无静音、FM 地址归零已修复）；`bump_version` 同步至 `0.3.062`。`devdocs/176` 完结（根因已定位、已修复、已验证）。
+> **开发历史**：`CHANGELOG.md`（唯一载体）；本文件只存规则与当前状态，不承载历史摘要。历史速查 → CHANGELOG.md（最新：c90），新条目追加到 CHANGELOG.md 顶部。
 > **防复发机制**：§十七（39 条规则逐一对照）；写完 devdoc 须过 §十「规格与实现的收敛责任」（行号校准 + 声称逐条落地，pytest 全绿不算证据）。
 > **构建验证**：`make -C core` + `core/*.err` 全为空（诊断走 `.err`，**不在 stdout**）。`pytest` 850 passed, 2 skipped（含守卫）。
 
@@ -304,6 +304,8 @@ naiz_midi / naiz_music 已作为独立项目移出到 `~/`。详见 `docs/B91-�
 ### Timer-B 中断驱动音泵（方案 A，`devdocs/164`–`168`，参考 `F07` §3、`devdocs/168` §5）
 
 BGM 音泵除协作路径外有中断驱动路径（`core/plat/hal_irq.c`，`NAIZ_BGM_IRQ` 开关）。定论（`devdocs/168`）：Timer-B 每步 = **2304 主时钟**（非手册 1152；1152 是 φM/2 口径），NB=200、φM=7.9872 MHz ⇒ **16.154 ms = 258 units**（`BGM_TIMER_B_UNITS`）；取 129 = 半周期值（虚拟钟速率 49.8%）。判据：`[ISR]` 行 `v/w ≈ 1.0`。**分档方案已作废**（两宿主差 <0.2%）。关键约束见 `hal_irq.c` 注释与 `devdocs/168` §四/§五。
+
+**ISR 只拥有时钟，不拥有音泵**（0.3.062，`devdocs/176`）：`bgm_irq_handler()` 仅执行 `hal_wallclock_fixed_advance(BGM_TIMER_B_UNITS)` + 累加全局 `g_irq_units_total`；引擎音泵由主线程 `audio_tick_isr_pending()` 排水执行。**禁止把任何引擎代码搬进 ISR**：DOS/4GW 把硬件中断送入自有栈段（实测 ISR 内 `SS=00B0`、`DS=0160`），经指针写**栈局部变量**会落到错误线性地址且调用方读到旧值——`fmopn_reg_addr()` 的 `bank`/`addr` 出参因此全失效，表现为「泵在跑、键控在发、数据字节全对、地址字节全 0」的**精确数字静音**（`rms=0.0`）加低内存散写。守卫 `tools/tests/test_isr_pump_boundary.py`（handler 内出现 `audio_tick*`/`fmseq`/`hal_log`、`hal_irq.c` 调用 engine 函数、或某条泵路径漏排水即红）。
 
 ## 十五、Token 管理
 

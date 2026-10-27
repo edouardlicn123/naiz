@@ -728,6 +728,26 @@ void audio_tick_isr(unsigned long delta_units)
     }
 }
 
+/* Drain the clock units the Timer-B handler accumulated since the last frame
+ * and run one engine pump for them, on the MAIN thread's stack (devdoc 176).
+ *
+ * Why the pump cannot run inside the handler: DOS/4GW delivers the IRQ on its
+ * own stack segment (SS=0x00B0 on this build) while the flat data selector is
+ * DS=0x0160.  Engine code that writes through a pointer to a *stack* local --
+ * fmopn_reg_addr()'s bank/addr out-params are the fatal example -- then lands
+ * at the wrong linear address, the caller reads a stale value, and every FM
+ * register write goes out as address 0x00 (silent BGM) plus a stray store into
+ * low memory.  The handler now only advances the clock and bumps the counter;
+ * everything that touches the OPNA happens here, where SS == DS. */
+void audio_tick_isr_pending(void)
+{
+    unsigned long units = hal_bgm_irq_take_pending_units();
+
+    if (units == 0)
+        return;
+    audio_tick_isr(units);
+}
+
 /* Called from the 60Hz heartbeat every frame (AUTOEXIT, main and the
  * input-wait inner loop) — pumps MIDI events + PCM FIFO bytes. */
 void audio_tick(void)

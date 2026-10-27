@@ -38,7 +38,6 @@
  */
 #include "hal.h"
 #include "pc98.h"
-#include "audio.h"    /* audio_tick(): engine pump entry (plat->engine precedent: cursor.h) */
 #include <i86.h>
 #include <dos.h>      /* _dos_setvect()/_dos_getvect() */
 
@@ -132,6 +131,13 @@ static void (_WCINTERRUPT _WCFAR *g_saved_vect[BGM_IRQ_LINE_COUNT])(void);
  * itself must not log (hal_logf is not ISR-safe), so the count is sampled by
  * the frame pump instead.  volatile: written in the ISR, read in the main loop. */
 static volatile unsigned long g_isr_ticks = 0;
+/* Monotonic count of clock units produced by the handler (devdoc 176).  The
+ * main thread keeps its own "already consumed" copy and drains the difference,
+ * so no critical section is needed: an aligned 32-bit load/store is atomic on
+ * this target, and a tick landing mid-drain is simply counted next time.  The
+ * handler must not touch the consumer's copy -- that is exactly the
+ * stack-segment hazard documented at bgm_irq_handler(). */
+static volatile unsigned long g_irq_units_total = 0;
 
 /*
  * The handler.  Bounded and allocation-free, and -- critically -- free of any
@@ -185,10 +191,18 @@ static void __interrupt __far bgm_irq_handler(void)
      * well would run the tempo at twice its rate for the duration of the probe
      * (devdoc 174). */
     if (g_irq_active) {
-        /* Fixed-step hardware time base, then the ISR-safe audio core: One
-         * capped batch of BGM events + a PCM FIFO top-up, all via outb()/inb(). */
+        /* Fixed-step hardware time base only.  The engine pump (BGM events +
+         * PCM FIFO) must NOT run here: DOS/4GW delivers this IRQ on its own
+         * stack segment (SS=0x00B0) while the flat data selector is DS=0x0160,
+         * so any engine code that writes through a pointer to a *stack* local
+         * (fmopn_reg_addr's bank/addr out-params, for one) silently writes to
+         * a bogus linear address and the caller keeps a stale value -- every
+         * FM register came out as address 0x00, i.e. a silent BGM, plus a
+         * stray write into low memory (devdoc 176).  The handler therefore
+         * touches globals only and leaves the work to audio_tick_isr_pending()
+         * on the main stack. */
         hal_wallclock_fixed_advance(BGM_TIMER_B_UNITS);
-        audio_tick_isr(BGM_TIMER_B_UNITS);  /* stage 3: fixed-unit pump (devdoc 168) */
+        g_irq_units_total += BGM_TIMER_B_UNITS;
     }
     bgm_irq_set_in_isr(0);
 
@@ -334,6 +348,19 @@ int hal_bgm_irq_active(void)
 unsigned long hal_bgm_irq_ticks(void)
 {
     return g_isr_ticks;
+}
+
+/* Hand the units accumulated by the handler to the main-thread pump.  Drain =
+ * (produced - consumed); the consumed cursor is main-thread-only state, so this
+ * needs no interrupt masking and cannot drop a tick that lands mid-read. */
+unsigned long hal_bgm_irq_take_pending_units(void)
+{
+    static unsigned long consumed;
+    unsigned long total = g_irq_units_total;
+    unsigned long units = total - consumed;
+
+    consumed = total;
+    return units;
 }
 
 /* Runtime ownership toggle (devdoc 175 §十一).  init() + probe_step() 负责

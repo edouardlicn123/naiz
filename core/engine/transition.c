@@ -55,10 +55,21 @@ void transition_run(int x, int y, int w, int h,
         }
 
         hal_vblank_wait();
-        hal_wallclock_smooth_advance();  /* devdoc 173: keep BGM/PCM flowing
-                                             during scene transitions (16 frames
-                                             ≈ 267 ms was a silent gap before) */
-        audio_tick();
+#if NAIZ_BGM_IRQ
+        if (hal_bgm_irq_active()) {
+            /* devdoc 176: the Timer-B clock is already advancing; only drain
+             * the pump here.  Advancing the co-op clock as well would run the
+             * tempo at double rate for the length of the transition. */
+            audio_tick_isr_pending();
+        } else
+#endif
+        {
+            hal_wallclock_smooth_advance();  /* devdoc 173: keep BGM/PCM flowing
+                                                during scene transitions (16
+                                                frames ≈ 267 ms was a silent
+                                                gap before) */
+            audio_tick();
+        }
         hal_mouse_update();
         hal_mouse_draw_cursor();
     }

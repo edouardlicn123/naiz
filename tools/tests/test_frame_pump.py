@@ -510,18 +510,26 @@ def test_decode_pump_yields_pump_but_keeps_anim_pacing():
 
 
 def test_isr_sequence_is_bounded_and_eois_both_pics():
-    """The handler must advance the clock by the fixed hardware delta, pump the
-    ISR-safe audio core once, reset the chip flag, and EOI slave-then-master
-    (G09 §3, correct for either IRQ line).  It must be allocation-free and must
-    never touch the prescaler ($2D-$2F, F04 §8.3).
+    """The handler must advance the clock by the fixed hardware delta, bank that
+    delta for the main-thread pump, reset the chip flag, and EOI slave-then-
+    master (G09 §3, correct for either IRQ line).  It must be allocation-free
+    and must never touch the prescaler ($2D-$2F, F04 §8.3).
 
     devdoc 165 §四: the OS constructs that are NOT ISR-safe must never appear
     in the handler -- no DOS/BIOS call (hal_wallclock_smooth_advance reads the
-    DOS clock), no floating point, no hal_logf, no free()."""
+    DOS clock), no floating point, no hal_logf, no free().
+
+    devdoc 176: the engine pump must not run here either.  DOS/4GW delivers the
+    IRQ on its own stack segment (SS != DS), where pointer-to-stack-local
+    writes are silently lost -- the handler banks units instead and
+    audio_tick_isr_pending() drains them on the main thread."""
     c = HAL_IRQ_C.read_text(encoding="utf-8")
     body = _func_body(c, "bgm_irq_handler")
-    for call in ("hal_wallclock_fixed_advance(", "audio_tick_isr("):
-        assert call in body, f"the ISR must call {call} (devdoc 165 §四)"
+    for call in ("hal_wallclock_fixed_advance(", "g_irq_units_total +="):
+        assert call in body, f"the ISR must contain {call} (devdoc 165/176)"
+    assert "audio_tick_isr(" not in body, (
+        "the ISR must not run the engine pump (devdoc 176: SS != DS in the "
+        "Timer-B handler, pointer-to-stack writes are lost)")
     # The unsafe forms must not come back.
     for bad in ("hal_wallclock_smooth_advance", "hal_wallclock_ms(",
                 "audio_tick();", "hal_logf", "free(", "pow(", "double "):
