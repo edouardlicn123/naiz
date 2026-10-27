@@ -314,179 +314,538 @@ int preload_step(void)
 
 ---
 
-## 六、实施计划（Phase 0-6）
+## 五-A、前置调研结果（2026-10-27 补）
+
+> **范围**：Phase 0-3 的前置调研全部跑完；Phase 4-5 未覆盖
+> **方法**：纯代码 grep + Read 切片 + 静态分析（无实机探针）
+
+### A. VRAM page 1 API → ❌ 无独立 page flip，但 PEGC bank 窗口可用
+
+| 项目 | 现状 |
+|---|---|
+| HAL API | `hal_vram_bank_select(0-7)` + `hal_vram_get_window()`（`hal.h:504-507`, `hal_pc98.c:384-392`） |
+| 架构 | PC-98 PEGC 256-color：640×400 = 256KB VRAM，8×32KB bank，窗口固定在 `0xA8000` |
+| 引擎使用者 | `render.c`, `render_vram.c`, `render_text.c`, `render_blit.c`, `cursor.c` 全部在用 |
+| 无 | 无 "page 0/page 1" 双页翻页 API，bank select 切换需要 CPU 主动写端口 |
+
+**对设计的修正**：ADV98 "page 1 预合成"方案不能直接叫 page flip，但 bank 1-7 可以当后台缓冲。Phase 3 预合成不存整张 256KB 全 8 bank（代价高），改为 **transition 前把所有 image_load 提前做完、decoded MagImage 存在 image_cache 里，transition 期间只做 render copy + bank select 切换 —— 零文件 I/O**。
+
+### B. 共用图像工作缓冲 → ❌ 无全局/模块级，全 per-instance malloc；但 mag_decode_into 已存在可复用
+
+| 项目 | 现状 |
+|---|---|
+| per-instance | `nb_anim.c` 每个动画实例 malloc `decode_buf`（`nb_anim.h:39`） |
+| decoder | `mag_decode` 内部 `malloc(output)` + `malloc(action)`（`mag.c:278-280`） |
+| 可复用的 pool | `mag_decode_into()` **已存在**（`mag.c:536-542`），接受 caller 预分配的 buffer |
+| image_cache slot | 只有 `id`, `img`, `hits` 三个字段（`image_cache.c:30-34`），无 ready 位，无预分配 buffer |
+
+**对设计的修正**：Phase 2 image_cache 扩容 8→32 后，每个 slot 可提前分配好 output/action buffer，用 `mag_decode_into` 直接 decode 到 slot —— 省掉每次 malloc/free。
+
+### C. image_load 阻塞路径静态分析 → mag_decode 解压循环内已有 cooperative pump，但 farchive_read_alloc + malloc 段是 gap
+
+image_load 完整路径（`image.c:147-190`）：
+
+```
+image_load(id)
+  ├─ image_cache_lookup → cache hit? 返回（快）
+  ├─ farchive_lookup_id → 查表（快，内存）
+  ├─ farchive_read_alloc           ← ① 阻塞点：malloc + fseek + fread（磁盘 I/O，无 hook）
+  ├─ mag_decode(raw, size, &img)
+  │   ├─ 签名/头/调色板解析         ← ② 阻塞点：纯 CPU，无 hook（~1-2ms）
+  │   ├─ malloc(output) + malloc(action) ← ③ 阻塞点：两次 malloc
+  │   ├─ 解压主循环 (line 305)      ← ④ ✅ 有 g_mag_progress_hook → frame_decode_pump（每 4KB stride）
+  │   ├─ 4bpp→8bpp 转换 (line 397)  ← ⑤ ✅ 也有 hook（每 4KB）
+  │   ├─ cropping (line 417)        ← ⑥ 阻塞点：mag_crop_rows 纯 CPU，无 hook
+  │   └─ malloc(MagImage) + palette  ← ⑦ 阻塞点：最终 malloc
+  ├─ free(raw)
+  ├─ image_set_palette
+  ├─ image_cache_insert
+  └─ return mag_retain(img)
+```
+
+cooperative pump 只覆盖 mag_decode 内部的解压循环 + 4bpp→8bpp 转换（占 mag_decode 总耗时约 70%），但 farchive_read_alloc（磁盘 I/O）+ header 解析 + 两次 malloc + cropping + 最终 malloc 段（约占总耗时 30-50%）**完全没有泵**。
+
+**对设计的修正**：Phase 3 逐行 `mag_decode_row` 拆分优先级**大幅降低**。核心洞察——**preload 的价值不是拆 decode 循环（循环内已有 pump），而是把整个 image_load（含磁盘读 + 所有无 pump 段）提前到 transition 间隙完成**。修正后的决策树：
+
+```
+Phase 3 核心路径（优先）：
+  transition_start 之前
+    → scene_collect_image_ids(next_scene) 拿到所有待加载图 id
+    → preload_push_batch(ids) 全部入队
+  transition_tick 每帧
+    → preload_step × N：从队列取 job → farchive_read_alloc + mag_decode_into 到 cache slot → 设 ready=1
+    → transition 结束（~800ms）preload 完 10-13 张图绰绰有余
+  scene 进入后
+    → image_load 全 cache hit → 零阻塞
+
+Phase 3 逐行 mag_decode_row 拆分（降级为 fallback）：
+  仅当 farchive_read_alloc 耗时实测 > 100ms（极少见的大文件/慢盘）时启用
+  或用于启动时 preload（bootmenu 收尾期无 transition 可利用）
+```
+
+### D. audio_tick_isr 时间源 + 调用点 + 常量 → 精确定位
+
+**函数体内读 smooth_ms 的位置**（Phase 0 必须改）：
+
+| 位置 | 代码 | 用途 |
+|---|---|---|
+| `audio.c:672` | `unsigned long now = hal_wallclock_smooth_ms();` | FM 路径 `cur = now - g_bgm.wall0` + MIDI fallback 路径（line 708 复用同一个 `now`） |
+
+**调用点**：
+
+| 位置 | 调用 | 说明 |
+|---|---|---|
+| `audio.c:748` | `audio_tick_isr(units)` | `audio_tick_isr_pending()` — Phase 0 改 split drain while 循环 |
+| `audio.c:783` | `audio_tick_isr(hal_wallclock_last_advance_units())` | `audio_tick()` 协作泵外壳 — 需同步加 now 参数 |
+
+**常量定义**：
+
+| 常量 | 值 | 位置 |
+|---|---|---|
+| `BGM_TIMER_B_UNITS` | **258** | `hal_irq.c:70` |
+| `VCLOCK_UNITS_PER_MS` | **16** | `vclock.h:47` |
+
+**对 Phase 0 精确改动清单**（已锁定，动手时无需再调研）：
+1. `audio.h:18` 原型：`audio_tick_isr(unsigned long delta_units)` → `audio_tick_isr(unsigned long delta_units, unsigned long now_ms_abs)`
+2. `audio.c:670` 实现签名同步
+3. `audio.c:672` 删 `unsigned long now = hal_wallclock_smooth_ms();` → 改用参数 `now_ms_abs`
+4. `audio.c:742-748` `audio_tick_isr_pending` 加 while 循环 split drain
+5. `audio.c:783` 同步改 `audio_tick()` 外壳的调用参数
+
+### E. Phase 1 额外确认项
+
+| 项目 | 现状 | 对 Phase 1 的影响 |
+|---|---|---|
+| `transition_run` 唯一调用点 | `layer.c:38` 一处（grep 确认） | Phase 1 改动局限 transition.c + layer.c + frame.c |
+| `g_transition` 全局状态 | **不存在**（grep 无匹配） | Phase 1 需新建 `TransitionState` 结构 + 全局实例 |
+| transition family step-wise render | 全部**无状态依赖** | Phase 1 安全拆 step-by-step |
+| transition_pfade_solid step=0 | step=0 时 capture palette 到 file-scope static `pfade_basis` | Phase 1 `transition_start` 调一次 step=0 的 palette capture（或把 basis 存到 g_transition） |
+| transition_pblinds_wipe | 每步独立计算 front_prev/front_cur/delta，只画新增 strip | 无依赖 |
+| transition_checker_wipe | 每步独立计算所有 cell activation step | 无依赖 |
+
+### F. Phase 2 额外确认项
+
+| 项目 | 现状 | 对 Phase 2 的影响 |
+|---|---|---|
+| ImageCacheSlot 结构 | `id` + `img` + `hits` 三字段（`image_cache.c:30-34`） | Phase 2 需加 `int ready` 位 + 可选预分配 buffer |
+| `image_cache_pin` 调用点 | 仅 `image.c:226` 一处（在 image_prefetch 结尾） | Phase 2 ready 位与 pin 互不影响——pin 管 LRU 淘汰优先级，ready 管 preload 完成状态 |
+| `IMAGE_CACHE_PREFETCH_HITS` | 当前值 4（`image_cache.c:28`） | prefetch 后 pin 把 hits 抬到 4，防止被新 decode 淘汰 |
+
+### G. Phase 3 额外确认项
+
+| 项目 | 现状 | 对 Phase 3.1c 的影响 |
+|---|---|---|
+| **VM script dispatch 暂停时机** | `scene_switch()` → `nb_load(filename)` → **`scene_end()`（启动 transition）** → 读 .nb → `vm_request_scene_change()`。transition 在 .nb 解析之前，期间没有 VM 在跑 | Phase 3.1c 的 preload_push_batch + transition_start 位置正好——在 `scene_end()` 里 transition_start 之前触发 preload，此时 .nb 还没读 |
+| **image id 来源** | .nb 脚本里 `bg(...)`, `char(...)`, `cg(...)` 等命令引用 asset key 字符串；`nb_asset_id(key)` 映射成 TOC index | `scene_collect_image_ids_from_nb(filename)` 实现：`fopen` .nb → 正则提取 asset key → `nb_asset_id` 转 id |
+| **config.toml 不含场景级 asset 配置** | config.toml 只有全局配置（transition 类型/帧数、对话框配色等），没有 "scene N 需要哪些图" 的场景级配置 | 只能从 .nb 脚本解析，不能从 config.toml 拿 |
+
+### H. Phase 4 额外确认项
+
+| 项目 | 现状 | 对 Phase 4 的影响 |
+|---|---|---|
+| **audio_init 只做硬件检测，BGM 按需加载** | `audio_init()`：archive open + MPU/FM detect + patch load + `fmseq_init()`。**BGM 数据在 `audio_bgm_start()` 里按需加载**——`farchive_read_alloc` + MIDI/FM 解析成 MidEvent 数组 + `fmseq_events()` 喂 | `audio_preload_bgm` 复用 `audio_bgm_start` 里的解析逻辑，存 MidEvent 数组但不喂 fmseq、不 start |
+| **MIDI/FM 解析函数** | `fmseq` 库 API：`fmseq_size()` / `fmseq_init()` / `fmseq_events()` / `fmseq_pump()` / `fmseq_stop()`。**无独立 MIDI 解析**——MIDI → MidEvent 在 `audio_bgm_start` 内部（`audio_load_midi` / `audio_load_fm`，audio.c） | preload 时需要把 audio_bgm_start 里的解析逻辑拆成独立函数 |
+| **PCM preload 情况** | `audio_snd_play()` / `audio_vc_play()` → `pcm_play()` → **每次 farchive_read_alloc + hal_pcm_play**。**无 preload**，首次播放有文件 I/O 阻塞 | Phase 4 需要新增 PCM preload 机制（存档 + 复用已解压 buffer） |
+| **farcoreleft 不可用；`_memavl()` 也没用** | `farcoreleft()` 只返回 1MB 以下常规内存剩余；Open Watcom `_memavl()` 只反映 near heap（heap 可 grow，没用）；**正确方案是 DPMI Int 31H Function 0500H（DOS/4GW 官方推荐）**。DPMI 0.9（DOS/4GW 用的版本，不支持 1.0 的 050BH）返回 48-byte buffer，offset 00H 是 Largest available free block in bytes（唯一保证有效的字段）。Naiz 保护模式程序可以直接 `int386(0x31, &in, &out)` 调用 | Phase 4 堆水位守卫用**两层方案**（AdvisorTool 推荐）：① Tier 1（主方案，零开销）：**try-malloc-fail-skip**——preload job malloc 失败就跳过，返回 cache miss 时 image_load 降级同步解码；② Tier 2（可选优化，~10 行 inline asm）：引擎启动时调一次 DPMI 0500H 记初始 free block，preload_heap_ok() 对比估算，避免注定失败的 malloc 尝试（减少堆碎片） |
+
+### I. Phase 5 额外确认项
+
+| 项目 | 现状 | 对 Phase 5 的影响 |
+|---|---|---|
+| **bootmenu → 场景 1 调用链** | bootmenu → main loop → **mainmenu.nb**（主菜单） → 用户点击 Start → `scene_switch("nbook001.nb", SCENE_SWITCH_MENU)`（`nb_mainmenu.c:89`）。**bootmenu 不直接进入 nbook001.nb**，中间有 mainmenu 层 | bootmenu 收尾期（bootmenu_run 返回后 → main loop 第一帧）→ **进入 main loop 后每帧 drain preload_step** 等用户点击 Start 时 nbook001 可能已 preload 完 |
+| **bootmenu 收尾期空闲时间** | bootmenu_run 返回 → main loop → mainmenu.nb 加载 → 等待用户操作 → 用户点击 Start → nbook001.nb。这段时间主循环正常跑 frame pump，可以在 frame pump 里偷偷 drain preload | Phase 5 的 preload 触发点不是 bootmenu 内，而是 **engine_frame_pump 里检测"首次进主循环"后自动 preload 场景 1** |
+| **场景 1 名称** | demo-a2 硬编码 `"nbook001.nb"`（`nb_mainmenu.c:83/89`）。不是从 config.toml 读的。不同工程的场景 1 名不同 | Phase 5 需要 **从 mainmenu.nb 的 start 命令自动提取目标文件名**（和 Phase 3.1c 用同一套 .nb 解析工具），或者在 config.toml 新增 `bootmenu.first_scene` 配置 |
+
+---
+
+## 六、实施计划（Phase 0-6，细化版）
+
+> **前置修正**（devdoc 177 原文勘误）：`image_cache_clear()` **只在 `image_close()` 引擎关闭时调用一次**，不是每次场景切换都清。立绘加载卡顿的根因改为：① image_cache 只有 8 slots，一个场景 10-13 张图 → 频繁 LRU 淘汰 → 再次 image_load 重新解码 ② image_load 同步阻塞 ③ transition 期间未利用空闲 preload
 
 每个 Phase 独立可验证——完成后跑 `make -C core && pytest`，通过才进下一个。
 
-### Phase 0：BGM split drain + 参数化（~20 行改动）
+---
 
-| 文件 | 改动 |
+### Phase 0：BGM split drain + 参数化 timestamp
+
+**目标**：消除 ISR 路径下 stall 后 FM 事件一次性 burst drain 的节奏不均。
+
+#### 0.0 前置调研清单（**全部已确认** §五-A.D）
+
+| # | 确认项 | 状态 |
+|---|---|---|
+| 1 | `audio_tick_isr()` 内读 smooth_ms 位置：**仅 audio.c:672 一处**（`unsigned long now = hal_wallclock_smooth_ms()`） | ✅ 已确认 |
+| 2 | 调用点：`audio_tick_isr_pending()` 内 audio.c:748 + `audio_tick()` 外壳内 audio.c:783 | ✅ 已确认 |
+| 3 | `BGM_TIMER_B_UNITS` = 258，定义在 `hal_irq.c:70` | ✅ 已确认 |
+| 4 | `VCLOCK_UNITS_PER_MS` = 16，定义在 `vclock.h:47` | ✅ 已确认 |
+| 5 | split drain 循环内 FM 累积派发事件量与一次性 drain 相同 | ✅ 逻辑推导成立 |
+
+#### 0.1 详细改动清单
+
+| 文件 | 改动 | 具体操作 |
+|---|---|---|
+| `audio.h` | 改 `audio_tick_isr` 签名 | `void audio_tick_isr(unsigned long delta_units)` → `void audio_tick_isr(unsigned long delta_units, unsigned long now_ms_abs)` |
+| `audio.c` | `audio_tick_isr` 内部改时间源 | 把函数体内的 `unsigned long now = hal_wallclock_smooth_ms();` 改成用参数 `now_ms_abs`；所有读 `now` 的地方不变 |
+| `audio.c` | `audio_tick_isr_pending` 实现 split drain | 当前是 `audio_tick_isr(units)` 一次性 drain；改成 while 循环：每次 drain ≤258 units，每次传递增的 `stall_start_ms + i * (BGM_TIMER_B_UNITS / VCLOCK_UNITS_PER_MS)` |
+| `audio.c` | frame pump 内的 audio_tick 适配 | `audio_tick()` 内部如果有调 `audio_tick_isr` 的协作泵分支，保持传 `hal_wallclock_smooth_ms()`（参数化对协作泵也是好事） |
+| `frame.c:37` | ISR drain 调用点不变 | `audio_tick_isr_pending()` 已经内部 split，调用点不改 |
+| `transition.c:63` | 同上 | transition ISR 分支里的 `audio_tick_isr_pending()` 调用点不改 |
+
+#### 0.2 构建与测试步骤
+
+```bash
+cd /home/edo/naiz/core && make clean && make 2>&1 | tail -20
+# 预期：零 .err 诊断
+
+cd /home/edo/naiz && python3 -m pytest tools/tests/test_frame_pump.py -v 2>&1 | tail -30
+# 预期：现有 ISR 相关测试全过；split drain 守卫测试（新增）过
+```
+
+#### 0.3 实机验证步骤
+
+1. `./makegame.sh test demo-a2 --serial`（不要 --auto，手动进场景）
+2. bootmenu BGM Mode 选 ISR
+3. 进场景后让 BGM 跑起来，触发一次立绘加载（制造 stall）
+4. 串口发 `irq status` 确认 ISR active
+5. 听 stall 前后 BGM 节奏是否均匀
+6. 串口观察 `[ISR] ticks=xxx v=xxx w=xxx` 日志
+
+#### 0.4 回滚方案
+
+如果 split drain 引入 bug（FM 事件丢失或重复派发），只需把 `audio_tick_isr_pending` 里的 while 循环改回一次性 drain `audio_tick_isr(units, now)`，其他文件不变。
+
+#### 0.5 风险点
+
+| 风险 | 缓解 |
 |---|---|
-| `audio.c` | `audio_tick_isr` 加 `now_ms_abs` 参数；内部用参数代替读 `hal_wallclock_smooth_ms()`；`audio_tick_isr_pending` 实现 split drain 循环 |
-| `audio.h` | 声明签名同步 |
-| `test_frame_pump.py` | 新增断言：ISR drain 路径 FM 调用必须传参数化 timestamp |
-
-**前置**：无。Phase 0 是完全自包含的改造。
-**验证**：`pytest` 全过；实机听 BGM stall 后节奏是否均匀。
-
-### Phase 1：transition 从 for 循环改 frame pump 驱动（~50 行改动）
-
-| 文件 | 改动 |
-|---|---|
-| `transition.c` | 拆 `transition_run()` 为 `transition_start()`（只初始化 g_transition 状态，立即返回）+ `transition_tick()`（每帧 render 1 step，内部调 audio_tick_isr_pending 正常 drain） |
-| `transition.h` | 新增 transition_start / transition_tick 声明 |
-| `layer.c` | `scene_end()` 从调 `transition_run()` 改调 `transition_start()` |
-| `frame.c` | `engine_frame_pump()` 末尾加 `transition_tick()` |
-| `test_frame_pump.py` | 新增断言：transition_run 内不得出现 for 循环硬阻塞 |
-
-**前置**：无。Phase 1 和 Phase 0 互不依赖，可并行。
-**验证**：`pytest` 全过；实机场景切换期间 BGM/动画/打字机继续跑。
-
-### Phase 2：image_cache 扩容 + 去掉 scene_clear（~15 行改动）
-
-| 文件 | 改动 |
-|---|---|
-| `image_cache.c` | `IMAGE_CACHE_SLOTS` 8→32；slot 结构加 `ready`；删除 `image_cache_clear()` |
-| `image_cache.h` | 删除 image_cache_clear 声明；新增 `image_cache_mark_ready` / `image_cache_bump_priority` |
-| `image.c` | 删除 `image_cache_clear()` 调用 |
-| `layer.c` | 删除 scene_end 里可能的 image_cache_clear 调用 |
-
-**前置**：无。Phase 2 和 Phase 0/1 互不依赖。
-**验证**：`pytest` 全过；实机连续切换 3 个场景，立绘不再每次重新解码（看串口 `image_load cache hit` 日志）。
-
-### Phase 3：image_decode_step + preload_step 队列（~80 行改动）
-
-| 文件 | 改动 |
-|---|---|
-| `image.c` | 拆 `mag_decode` 为 `mag_decode_tile()`；新增 `image_decode_step()`；`image_load()` cache miss 时画占位 + retry 标志 |
-| `image.h` | 新增 image_decode_step 声明 |
-| `preload_queue.c`（新） | preload 队列管理（push/pop/heap 守卫/优先级） |
-| `preload_queue.h`（新） | 声明 |
-| `frame.c` | `engine_frame_pump()` 末尾加 `preload_step()` |
-
-**前置**：Phase 2（image_cache 扩容 + ready 位）。
-**验证**：`pytest` 全过；实机立绘加载每帧 ≤1ms（串口计时）；stall 不再错过 vblank。
-
-### Phase 4：过渡期间 preload 下一个场景资源（~60 行改动）
-
-| 文件 | 改动 |
-|---|---|
-| `scene.c`（或新增） | `layer_scene_load_preload()` 解析场景配置、收集 image ids、推 preload 队列 |
-| `transition.c` | `transition_start()` 里调 `layer_scene_load_preload()`；`transition_tick()` 里持续 drain preload_step |
-| `frame.c` | transition_tick 已在 Phase 1 接入，preload_step 已在 Phase 3 接入 |
-
-**前置**：Phase 1 + Phase 3。
-**验证**：场景切换进来后所有立绘全是 cache hit（串口日志）；零感知卡顿。
-
-### Phase 5：BGM/音效按场景 preload + 堆水位守卫（~40 行改动）
-
-| 文件 | 改动 |
-|---|---|
-| `audio.c` | 新增 `audio_preload_bgm()`（只读不 start）；`audio_start_preloaded_bgm()` |
-| `audio.h` | 新增声明 |
-| `preload_queue.c` | 堆水位守卫逻辑 |
-| `scene.c` | layer_scene_load_preload 扩展到 BGM 数据 |
-
-**前置**：Phase 4。
-**验证**：场景切换后 BGM 零延迟启动；音效首次播放零延迟。
-
-### Phase 6：启动时 preload 场景 1（~20 行改动）
-
-| 文件 | 改动 |
-|---|---|
-| `bootmenu.c` | Start Game 按钮 → 调 `layer_scene_load_preload("sc01")`；bootmenu 收尾期 preload_step drain |
-| `main.c` | bootmenu 结束后调 `preload_step()` 直到场景 1 资源全 ready |
-
-**前置**：Phase 5。
-**验证**：进入游戏第一个场景，零加载等待。
+| split drain 循环内多次调用 audio_tick_isr 增加 CPU 时间 | 理论上每次 audio_tick_isr(258) 内 FM 推进只覆盖 16ms 范围，fmseq_pump 内部事件派发量和原来一次 drain 3096 总量相同，只是调用次数增加（~12 次 vs 1 次），额外开销 <0.5ms/帧 |
 
 ---
 
-## 七、最终效果量化
+### Phase 1：transition 从 for 循环改 frame pump 驱动
 
-### 7.1 每类排队的改善
+**目标**：消除 transition 期间主线程被独占 800ms，让所有事务（BGM、动画、打字机、preload）在 transition 期间继续 drain。
 
-| 排队类型 | 当前 | Naiz Queue 后 | 改善幅度 |
-|---|---|---|---|
-| **A. 同步阻塞 image_load 卡主线程** | 30-50ms 阻塞 → 错过 1-2 vblank | cache hit：0ms；preload 完成：0ms；decode_step：每帧 ≤1ms | **消除 95%+** |
-| **A. 场景加载卡主线程** | 50-80ms | preload 期间悄悄解完 → 0ms | **消除 100%** |
-| **B. transition for 循环阻塞** | 800ms 内主线程被独占 | transition_tick 每帧 render 1 step → frame pump 照走 | **消除 100%** |
-| **C. burst drain 后空窗** | FM 事件一次性派发 → 后续空窗 | split drain 均匀派发 → 和 ISR tick 对齐 | **消除 100%** |
+#### 1.0 前置调研清单（**全部已确认** §五-A.E）
 
-### 7.2 各事务的最终表现
-
-| 事务 | 当前 | Naiz Queue 后 |
+| # | 确认项 | 状态 |
 |---|---|---|
-| VRAM 刷新 | 每 50ms vblank_wait | 不变（就是 pace） |
-| 打字机 | 每帧推进，display-paced | 不变（本来就不阻塞） |
-| 动画 | stall 后暴冲 | vclock 匀速 → anim_tick 每帧均匀推进 |
-| 立绘切换 | 首次 30ms 卡顿 → 后续 cache hit | 全部 preload → 0ms |
-| 场景切换 | 50-80ms 卡顿 | transition 期间 preload → 0ms |
-| BGM 节奏 | stall 后 burst drain → 抖动 | split drain + 参数化 timestamp → 均匀 |
-| 音效/语音 | 首次播放微延迟 | preload → 零延迟 |
-| 过渡期间 | 只有硬塞进去的事务能跑 | 所有事务正常 drain |
+| 1 | `transition_run()` 唯一调用点：`layer.c:38` 一处 | ✅ 已确认 |
+| 2 | `g_transition` 全局变量**不存在**——Phase 1 需新建 `TransitionState` 结构 | ✅ 已确认 |
+| 3 | transition family 函数全部**无状态依赖**，step-wise render 安全；pfade step=0 做 palette capture（`pfade_basis` 是 file-scope static） | ✅ 已确认 |
+| 4 | transition 期间 VM script dispatch 是否暂停——**已确认：自然暂停**。调用链：`scene_switch()` → `nb_load(filename)` → 读 .nb + `scene_end()` → `transition_run()` → `vm_request_scene_change()`。transition 在 `vm_request_scene_change()` 之前，期间没有 VM 在跑 | ✅ 已确认（无需显式守卫） |
+| 5 | transition 结束时 `palette_set_all(transition_black)`（`transition.c:80`）——需移到 transition_tick 的最后一帧执行 | ✅ 已确认 |
 
-### 7.3 仍不可消除的下限
+#### 1.1 详细改动清单
 
-| 下限 | 原因 | 是否可感知 |
+| 文件 | 改动 | 具体操作 |
 |---|---|---|
-| 50ms 帧 pace | GDC vblank 硬件决定 | ❌ 就是游戏帧率 |
-| DPMI 微秒级抖动 | DOS/4GW 投递 ISR 的极少数延迟 | ❌ 微秒级，非毫秒级 |
-| 磁盘硬等待（极端） | farchive_read 遇到坏块 | ⚠️ 极端场景，preload_step 守卫降级 |
+| `transition.c` | 拆 transition_run → start + tick | ① transition_start() 初始化 g_transition 状态（type, frames, step=0, x,y,w,h,color），立即返回；② transition_tick() 每帧：根据 type 调对应 family 函数 render 本 step；step++；step >= frames 时 palette_set_all(transition_black) + 设 active=0 |
+| `transition.c` | 删除 for 循环内的 audio_tick 硬塞 | transition_tick 不再管 audio——frame pump 里正常 drain |
+| `transition.c` | 新增 g_transition 状态结构 | typedef struct { int active, step, total; unsigned char type, color; int x,y,w,h; } TransitionState; 全局实例 |
+| `transition.h` | 新增声明 | `void transition_start(...); void transition_tick(void); int transition_active(void);` |
+| `layer.c:38` | scene_end 改调用 | `transition_run(...)` → `transition_start(...)` |
+| `frame.c:57 附近` | frame pump 末尾加 transition_tick | 在 `nb_dialog_reveal_tick()` 之后加 `transition_tick();` |
+| `frame.c` | decode pump 里也加 transition_tick（可选） | 如果 transition 期间有 decode 在跑，frame_decode_pump 也应该调 transition_tick |
+
+#### 1.2 构建与测试步骤
+
+```bash
+cd /home/edo/naiz/core && make clean && make 2>&1 | tail -20
+cd /home/edo/naiz && python3 -m pytest tools/tests/test_frame_pump.py -v 2>&1 | tail -30
+```
+
+#### 1.3 实机验证步骤
+
+1. 进场景后执行一次场景切换（触发 transition）
+2. transition 期间观察：BGM 是否继续均匀播放？打字机是否继续显示？动画是否继续推进？
+3. 串口观察 transition 期间 frame pump 是否正常运行
+
+#### 1.4 回滚方案
+
+把 transition_start/tick 删掉，恢复 transition_run 的 for 循环。改动局限在 transition.c + layer.c + frame.c 三个文件。
+
+#### 1.5 风险点
+
+| 风险 | 缓解 |
+|---|---|
+| transition 期间用户输入（鼠标/键盘）导致状态错乱 | transition_tick 期间 hal_mouse_update 仍然在 frame pump 里调，但 VM dispatch 在 transition 期间已经暂停——确认这一点；如果没有暂停，加 transition_active() 守卫 |
+| transition_pfade / blinds / checker 的 step-wise render 是否有状态依赖（比如是否依赖"当前 step 之前已 render 过"） | 读每个 family 函数实现——pfade 是 palette 插值（无依赖），blinds/checker 是 partial wipe（无依赖）。每帧 render 一个 step 是安全的 |
 
 ---
 
-## 八、规约与测试
+### Phase 2：image_cache 扩容 8→32 + slot 加 ready 位
 
-### 8.1 新增测试
+**目标**：一个场景 10-13 张图不再因 cache 容量不够被频繁淘汰，为 Phase 3 的 preload 铺路。
 
-每个 Phase 完成后新增对应的守卫测试，防止未来改动回退：
+#### 2.0 前置调研清单（**全部已确认** §五-A.F）
 
-| Phase | 测试文件 | 守卫内容 |
+| # | 确认项 | 状态 |
 |---|---|---|
-| 0 | `test_frame_pump.py` 扩展 | ISR drain 路径 FM 调用必须传参数化 timestamp（grep `audio_tick_isr(` 参数数量） |
-| 1 | `test_frame_pump.py` 扩展 | transition.c 内不得有 `for.*step.*frames` 硬阻塞循环 |
-| 2 | `test_image_cache.py`（新） | cache slots ≥ 32；image.c 不得调用 image_cache_clear |
-| 3 | `test_frame_pump.py` 扩展 | frame.c engine_frame_pump 末尾必须调 preload_step；mag_decode 必须有 tile 版本 |
-| 4 | `test_preload_queue.py`（新） | preload_queue 基本功能 + 优先级 + heap 守卫 |
-| 5 | `test_frame_pump.py` 扩展 | audio_preload_bgm 存在且被 scene_preload 调用 |
-| 6 | `test_frame_pump.py` 扩展 | bootmenu Start Game 后立即调 scene_preload |
+| 1 | ImageCacheSlot 结构：`int id` + `MagImage *img` + `int hits`，三字段（`image_cache.c:30-34`），**无 ready 位，无预分配 buffer** | ✅ 已确认 |
+| 2 | `image_cache_pin` 调用点：仅 `image.c:226` 一处（在 image_prefetch 结尾）；无 unpin 调用 | ✅ 已确认 |
+| 3 | prefetch pins（devdoc 133）和新 ready 位**互不影响**——pin 管 LRU 淘汰优先级（抬 hits 到 4），ready 管 preload 完成状态 | ✅ 已确认 |
 
-### 8.2 devdoc 编号规划
+#### 2.1 详细改动清单
 
-| 编号 | 内容 | 状态 |
+| 文件 | 改动 | 具体操作 |
 |---|---|---|
-| 177（本文件） | Naiz Queue 完整设计 | 设计中 |
-| 178 | Phase 0：BGM split drain 实施记录 | 待写 |
-| 179 | Phase 1-3：transition + image_cache + decode_step 实施记录 | 待写 |
-| 180 | Phase 4-6：preload 全链实施记录 | 待写 |
+| `image_cache.c:22` | IMAGE_CACHE_SLOTS 8→32 | 宏定义改值 |
+| `image_cache.c:30-34` | slot 结构加 `int ready` | ImageCacheSlot 结构体加 ready 字段 |
+| `image_cache.c:39-45` | cache_init 初始化 ready=0 | image_cache_init 循环里加 slot.ready = 0 |
+| `image_cache.c:147` 附近 | 新增 image_cache_mark_ready | slot.ready = 1；预加载完成时调 |
+| `image_cache.c` | 新增 image_cache_is_ready 查询 | slot.ready 读取 |
+| `image_internal.h` | 声明新函数 | image_cache_mark_ready / image_cache_is_ready |
 
-### 8.3 CHANGELOG 规约
+#### 2.2 构建与测试步骤
 
-每个 Phase 落地后在 CHANGELOG.md 顶部追加条目，标注版本号 + Phase 编号 + 关键改动点。
+```bash
+cd /home/edo/naiz/core && make clean && make 2>&1 | tail -20
+cd /home/edo/naiz && python3 -m pytest tools/tests/ -v -k "image" 2>&1 | tail -20
+# 预期：所有 image 相关测试全过
+```
+
+#### 2.3 实机验证步骤
+
+1. 连续切换 3 个场景，每个场景 ≥10 张立绘
+2. 串口观察 image_load 的 cache hit 日志——前几次是 miss（首次加载），之后应该全 hit
+3. 不应该再有 LRU 淘汰（因为 32 slots 足够容纳所有场景图）
+
+#### 2.4 回滚方案
+
+slot 数改回 8，删掉 ready 位。改动只在 image_cache.c + image_internal.h。
+
+#### 2.5 风险点
+
+| 风险 | 缓解 |
+|---|---|
+| 32 slots 增加堆内存（每个 MagImage 30-80KB，32 × 60KB = 1.92MB） | DOS/4GW 堆通常 16-32MB，2MB 可接受；加上 Phase 5 的堆水位守卫后更安全 |
+| image_cache 操作效率（slot 数增加 → lookup 线性扫描变慢） | 32 slots 线性扫描 32 次 = 微秒级，不敏感 |
 
 ---
 
-## 九、风险与缓解
+### Phase 3：异步 preload 队列 + transition 期间 preload_step
 
-| 风险 | 概率 | 影响 | 缓解 |
-|---|---|---|---|
-| mag_decode_tile 拆分引入解码错误（tile 边界、调色板计算） | 中 | 画面错位或花屏 | Phase 3 加 tile 边界单测 + 实机逐 tile 对比完整 mag_decode 输出 |
-| preload 期间图像资源被同时 access（VM script 突然 dispatch image_load） | 低 | 读到半成品 | image_cache 加 ready 位；image_load 检查 ready 后才返回 |
-| DOS/4GW 堆不足导致 preload 失败 | 低 | 降级为按需加载（和当前一样） | 堆水位守卫主动降级，不崩不卡 |
-| split drain 循环内调用 audio_tick_isr 增加 CPU 时间（从 1 次变 12 次） | 极低 | 每帧多花 ~0.5ms | split drain 每次 audio_tick_isr(258) 内部 FM 推进只覆盖 16ms 范围，fmseq_pump 事件派发量和原来一次 drain 3096 的总量相同，只是调用次数增加 |
-| transition 改 frame pump 后用户在过渡期间输入导致状态错乱 | 低 | 提前操作了下一场景的资源 | transition_tick 期间 VM dispatch 暂停（原有设计就是不可交互），输入只更新但不 dispatch |
+**目标**：transition 期间（~800ms）利用空闲 preload 下一个场景的所有立绘/背景，场景切换进来后 image_load 全 cache hit。
+
+> **§五-A.C 设计修正（关键）**：mag_decode 解压循环内已有 cooperative pump（`g_mag_progress_hook` → `frame_decode_pump`），但 image_load 的前半段——`farchive_read_alloc`（磁盘 I/O）+ header 解析 + 两次 malloc + cropping + 最终 malloc——完全没有泵。**preload 的核心价值不是拆 decode 循环（循环内已有 pump），而是把整个 image_load 同步阻塞路径提前到 transition 间隙完成**。因此 Phase 3 的优先路径是 **mag_decode_into 一次性解码到 cache slot**（利用 Phase 2 的预分配 buffer），`mag_decode_row` 逐行拆分降级为 fallback（仅用于极端慢盘或启动时 preload）。
+
+#### 3.0 前置调研清单（**6 项中 4 项已确认** §五-A.B/C）
+
+| # | 确认项 | 状态 |
+|---|---|---|
+| 1 | mag_decode 可拆逐行吗？**解压循环有行级依赖（引用上 1-3 行），理论上可拆逐行；不可拆 tile**。但 §五-A.C 指出 mag_decode_row 优先级已降级 | ✅ 已确认（但决策修正：降级为 fallback） |
+| 2 | 一张立绘 mag_decode 实际耗时——**本轮未做实机探针**；但 image_load 完整阻塞路径的各段已分析（§五-A.C 树状图） | ⚠️ 需实机 hal_logf 探针确认 |
+| 3 | farchive_read_alloc 读磁盘实际耗时——**本轮未做实机探针**；但静态分析显示它是纯同步阻塞（`malloc` + `fseek` + `fread`，无 hook） | ⚠️ 需实机确认（极关键，§五-A.C 决策树的前提） |
+| 4 | 如何从场景名解析出关联的 image id 列表——**已确认方案**。.nb 脚本里 `bg(normal){homeday}` / `char(l,normal,body){fei}` 等命令引用 asset key；`nb_asset_id(key)` 把 key 字符串映射成 TOC index。实现：`fopen(next_scene.nb)` → 正则匹配 `bg(|char(|cg(` 等命令里的 asset key → `nb_asset_id(key)` 转 id → 收集。**注意**：transition 启动时 .nb 文件还没解析（调用链是 `nb_load` → `scene_end` → transition → 解析 .nb → `vm_request_scene_change`），所以需要在 `scene_end` 里自己读一次 .nb 提取 key | ✅ 已确认实现方案 |
+| 5 | image_load cache miss 当前行为——**已读 image.c:147-190 完整实现**：cache miss → `farchive_read_alloc` + `mag_decode` → `image_cache_insert` → `return mag_retain(img)` | ✅ 已确认 |
+| 6 | 是否已有 preload 队列雏形——**`image_prefetch()` 已存在**（`image.c:197-226`）：cache miss → `farchive_read_alloc` + `mag_decode` → `image_cache_insert` + `image_cache_pin`。可以复用作为 preload_step 的底层，但需要改成逐 job 调用（当前是一次性同步 decode） | ✅ 已确认（可复用为基础） |
+
+#### 3.1 详细改动清单（**路径修正：mag_decode_into 优先，mag_decode_row 降级**）
+
+**这是最大的一个 Phase（~60-100 行改动），建议拆成 3.1a / 3.1b / 3.1c 三个小步分别验证。**
+
+##### 3.1a：preload_queue 基础 + Phase 2 slot 预分配 buffer（与 Phase 2 联动）
+
+| 文件 | 改动 | 具体操作 |
+|---|---|---|
+| `preload_queue.c`（新） | preload 队列基础操作 | `preload_push(img_id, priority)` / `preload_pop()` / `preload_queue_size()` —— 管理待 preload 的 image id 列表，按优先级排序。**栈数组实现，不安易追加 static**（ADV98 启示：共用工作缓冲，DGROUP 压力） |
+| `preload_queue.h`（新） | 声明 | — |
+| `image_cache.c`（Phase 2 联动） | slot 新增预分配 buffer 字段 | ImageCacheSlot 加 `uint8_t *work_out` + `uint8_t *work_action` 预分配 buffer；`image_cache_init` 里提前 malloc；`image_cache_clear` 里 free |
+
+##### 3.1b：preload_step 核心实现（mag_decode_into 一次性路径）
+
+> **§五-A.C 决策**：preload_step 内每个 job 做 **完整的 farchive_read_alloc + mag_decode_into 一次性解码**，不是逐行拆。理由：
+> 1. image_load 的主要阻塞在 farchive_read_alloc（磁盘 I/O）和 malloc 段，解压循环已有 cooperative pump
+> 2. transition 期间 ~800ms 足够 preload 完 10-13 张图（即使每张 50ms）
+> 3. mag_decode_into 已存在，Phase 2 预分配 buffer 后省掉 malloc/free
+
+| 文件 | 改动 | 具体操作 |
+|---|---|---|
+| `preload_queue.c` | 新增 preload_step | 从队列取下一个 job → 查 image_cache 是否已有该 id → 没有则：① farchive_lookup_id 拿 offset/size ② farchive_read_alloc 读 raw ③ mag_decode_into(raw, size, slot->work_out, slot->work_action, &img) ④ 设 slot.ready=1 ⑤ free(raw) |
+| `frame.c` | engine_frame_pump 末尾加 preload_step | 在 transition_tick 之后；每帧调 1-2 次（transition 期间可多调） |
+| `transition.c` transition_tick | 持续 drain preload | 每帧 transition_tick 里调 preload_step × 3-5（transition 期间有充足时间） |
+| `image.c:147` image_load | cache miss 行为改 | 当前是 `farchive_read_alloc + mag_decode` 一次性同步解；改成：① 查 preload_queue 对应 id 的 slot → ready=1 直接用 cache ② ready=0 但 preload queue 里有 → 返回上一张图（占位），设 retry 标志 ③ preload queue 里没有 → 降级为同步 mag_decode（和现在一样，但这种情况极少） |
+
+##### 3.1c：scene_end 触发 preload 下一场景
+
+| 文件 | 改动 | 具体操作 |
+|---|---|---|
+| `scene.c`（或 scene 相关） | 新增 scene_collect_image_ids | 给定场景名，返回该场景所有需要加载的 image id 列表（背景 + 立绘 + 过渡图） |
+| `layer.c` scene_end | transition_start 之前触发 preload | ① `scene_collect_image_ids(next_scene, ids, count)` ② `preload_push_batch(ids, count, PRIORITY_HIGH)` ③ `transition_start(...)` |
+
+##### 3.1d（fallback，可选）：mag_decode_row 逐行拆分
+
+> **§五-A.C 决策**：**仅当实机探针确认 farchive_read_alloc + mag_decode 单张耗时 > 100ms 时才启用**。800ms transition 窗口可能 preload 不完 8 张图时才需要拆。
+> **也可用于启动时 preload**（bootmenu 收尾期无 transition 可利用，只能靠 frame pump 间隙逐行解）。
+
+| 文件 | 改动 | 具体操作 |
+|---|---|---|
+| `mag.c` | 新增 mag_decode_row 函数 | 签名：`int mag_decode_row(MagDecodeState *state, uint8_t **out_row_buf)`；从 state 恢复 BitReader/fb_pos/col_pos/act_idx/action buffer/row_bytes 等中间状态，解一行，更新 state。新增 `MagDecodeState` 结构体（包含所有 mag_decode 内部局部变量） |
+| `mag.h` | 声明新函数 + MagDecodeState | MagDecodeState 是不透明结构体，mag.c 内部定义，外部只传指针 |
+| `preload_queue.c` | preload_step 切换为逐行模式 | 检测 slot->work_out 是否已有 partial data → 有则继续 mag_decode_row，没有则初始化 MagDecodeState 开始解 |
+
+#### 3.2 构建与测试步骤
+
+```bash
+# 3.1a 后（preload_queue + slot 预分配 buffer）
+cd /home/edo/naiz/core && make clean && make 2>&1 | tail -20
+
+# 3.1b 后（preload_step 核心）
+make -C core && python3 -m pytest tools/tests/ -v 2>&1 | tail -20
+
+# 3.1c 后（全量测试）
+make -C core && python3 -m pytest tools/tests/ -v 2>&1 | tail -30
+# 预期：856+ passed
+
+# 3.1d 后（fallback，可选）
+# 手动构造小 MAG 图，逐行 decode 结果和一次性 mag_decode 对比，逐像素一致
+python3 -c "from core.lib.mag import mag_decode_row, MagDecodeState; print('OK')"
+```
+
+#### 3.3 实机验证步骤
+
+1. 在 transition 期间加 hal_logf 探针：每帧 preload_step 解了多少张、剩余多少 job
+2. 记录单张 image_load 耗时（farchive_read_alloc + mag_decode_into 总耗时）
+3. 场景切换进来后立刻触发 show sprite——串口观察 image_load cache hit 日志比例
+4. 理想结果：transition 期间 preload 完所有图 → 场景切换进来后 cache hit 率 100%
+
+#### 3.4 回滚方案
+
+3.1a / 3.1b / 3.1c / 3.1d 分别可回滚：
+- 3.1a：删掉 preload_queue.c + slot 预分配 buffer
+- 3.1b：image_load 恢复同步解码；frame.c / transition.c 删掉 preload_step 调用
+- 3.1c：layer.c 删掉 preload_push_batch 调用；scene_collect_image_ids 删掉
+- 3.1d（fallback）：删掉 mag_decode_row + MagDecodeState（不影响原有 mag_decode / mag_decode_into）
+
+#### 3.5 风险点
+
+| 风险 | 缓解 |
+|---|---|
+| preload 期间图像被 VM script 同时 access（image_load） | image_load 检查 ready 位：ready=0 时如果 preload_queue 有该 id → 画占位 + retry；绝不能读半成品 |
+| 一次性 mag_decode_into 阻塞 preload_step 超过 1 帧（>16ms） | transition 期间每帧可多调几次 preload_step（每帧解多张）；如果单张真的 >100ms，启用 3.1d fallback 逐行拆分 |
+| preload 失败（farchive_read_alloc OOM / mag_decode_into 失败） | image_load 降级为同步 mag_decode（当前行为），场景切换时短暂卡顿但不会崩溃 |
+| **3.1d fallback** mag_decode_row 拆分引入解码错误（行边界、引用偏移计算错） | 必须做逐行 decode 和一次性 decode 结果对比单测，逐像素一致才算过 |
 
 ---
 
-## 十、命名与定位
+### Phase 4：BGM/音效按场景 preload + 堆水位守卫
 
-**Naiz Queue**（ナイツ・キュー）是本引擎的统一执行模型，定位为：
+**目标**：场景切换进来后 BGM 零延迟启动、音效首次播放零延迟；堆不足时主动降级。
 
-> 让 PC-98 单线程 DOS/4GW 环境下的所有时间敏感事务（BGM、动画、立绘、音效、语音、过渡、打字机）在运行过程中**尽可能不暂停、不冲突**。
+#### 4.0 前置调研清单（**3 项已确认，1 项需实机确认** §五-A.H）
 
-核心理念用一句话：
+| # | 确认项 | 状态 |
+|---|---|---|
+| 1 | audio_init 何时载入 BGM 数据——**audio_init 只做硬件检测+patch load+fmseq_init**；BGM 数据在 `audio_bgm_start()` 里按需加载 | ✅ 已确认 |
+| 2 | 是否已有 MIDI/FM 格式解析函数——**fmseq 库 API 已齐全**（`fmseq_events()` 喂 MidEvent），但 MIDI → MidEvent 解析逻辑在 `audio_bgm_start` 内部，需拆成独立函数 | ✅ 已确认（需拆函数） |
+| 3 | PCM preload 情况——**完全没有 preload**，`audio_snd_play()` / `audio_vc_play()` 每次 `farchive_read_alloc` + `hal_pcm_play` | ✅ 已确认 |
+| 4 | **堆水位守卫方案**——**已确认** §五-A.H：Tier 1 try-malloc-fail-skip（零开销，始终有效）+ Tier 2 DPMI Int 31H 0500H 启动 probe（可选，~10 行 inline asm） | ✅ 已确认 |
 
-> **时钟独立推进、生产只记账、消费均匀 drain、重操作拆小步、资源提前 preload。**
+#### 4.1 详细改动清单
 
-这不是 BGM 的单一修复，而是整个引擎的执行架构升级——从"同步泵入、一次性处理"改成"异步排队、均匀消费"。
+| 文件 | 改动 | 具体操作 |
+|---|---|---|
+| `audio.c` | 新增 audio_preload_bgm | 只读文件 + 解析 MIDI/FM 格式，存入预加载缓冲区；**不调 OPNA write、不 start** |
+| `audio.h` | 新增声明 | — |
+| `preload_queue.c` | 扩展 preload 类型 | 除了 IMAGE 类型，新增 BGM 类型 + PCM_SE 类型 |
+| `preload_queue.c` | 新增堆水位守卫 | `preload_heap_ok()` —— **Tier 1（主）**：try-malloc-fail-skip（preload 内部每个 job 分配失败就跳过，`preload_evict_low_priority()` 主动释放 pending job）；**Tier 2（可选，~10 行 inline asm）**：引擎启动时调 DPMI Int 31H Function 0500H（`ax=0x0500, es:edi=&buf`），读 buf[0]（Largest available free block in bytes）存全局变量，`preload_heap_ok()` 对比估算，避免注定失败的 malloc 尝试（减少堆碎片） |
+| `scene.c` | scene_collect_bgm + scene_collect_se | 给定场景名，返回关联的 BGM 名 + 高频 SE 列表 |
+| `layer.c` | scene_end 扩展 preload | transition_start 前除了 image ids，还 preload 下一场景的 BGM + 高频 SE |
+
+#### 4.2 回滚方案
+
+audio_preload_bgm 删掉；preload_queue 的堆守卫和 BGM/SE 类型删掉；layer.c 恢复只 preload image ids。
+
+#### 4.3 风险点
+
+| 风险 | 缓解 |
+|---|---|
+| audio_preload_bgm 解析时内存分配失败 | 和 image preload 一样，堆水位守卫提前降级 |
+| MIDI 解析状态（track position 等）是否需要在 preload 期间正确初始化 | 读 fmseq_open 实现——确认它可以"打开但不 start" |
+
+---
+
+### Phase 5：启动时 preload 场景 1
+
+**目标**：进入游戏第一个场景，零加载等待。
+
+#### 5.0 前置调研清单
+
+| # | 确认项 | 方法 |
+|---|---|---|
+| 1 | bootmenu Start Game 按钮 → 进入场景 1 的调用链 | grep `bootmenu.*start\|main.*scene\|sc01\|scene01` |
+| 2 | bootmenu 收尾期有多少空闲时间可以用来 preload | 实测 bootmenu → game 的切换耗时（hal_logf 探针） |
+| 3 | 场景 1 的配置名是什么 | 读 projects/demo-a2/config.toml |
+
+#### 5.1 详细改动清单
+
+| 文件 | 改动 | 具体操作 |
+|---|---|---|
+| `bootmenu.c` | Start Game 触发 preload | Start Game 按钮回调里调 `scene_collect_all("sc01", ids, count, bgm, ses)` → `preload_push_batch(...)` |
+| `bootmenu.c` 或 `main.c` | bootmenu 收尾期 drain preload | bootmenu 显示"加载中..."或淡出期间，多次调 preload_step 直到场景 1 所有资源 ready |
+
+#### 5.2 回滚方案
+
+删掉 bootmenu preload 相关调用。
+
+#### 5.3 风险点
+
+| 风险 | 缓解 |
+|---|---|
+| bootmenu 收尾期不够 preload 完 | 堆水位守卫 + 降级——如果 bootmenu 收尾期时间不够，进场景后继续 preload_step，但 image_load 会因 cache miss 触发同步 decode（降级为当前行为） |
+
+---
+
+### Phase 6：审计 + 统一守卫（可选）
+
+**目标**：把所有 Naiz Queue 的设计原则固化成测试，防止未来改动回退。
+
+#### 6.1 详细改动清单
+
+| 文件 | 改动 |
+|---|---|
+| `test_frame_pump.py` 扩展 | 断言 audio_tick_isr 签名含 now_ms_abs 参数 |
+| `test_frame_pump.py` 扩展 | 断言 transition.c 内无 for.*step.*frames 阻塞循环 |
+| `test_image_cache.py`（新） | 断言 IMAGE_CACHE_SLOTS >= 32；image_cache_clear 只在 image_close 调用 |
+| `test_preload_queue.py`（新） | preload_push/pop/heap 守卫基本功能 |
+| `test_frame_pump.py` 扩展 | frame.c engine_frame_pump 末尾必须调 preload_step + transition_tick |
+| 所有 devdoc | 标注 Phase 编号落地状态 + 版本号 |
+
+---
+
+## 七、Phase 间依赖关系
+
+```
+Phase 0 ──→ 无依赖
+Phase 1 ──→ 无依赖
+Phase 2 ──→ 无依赖
+Phase 3 ──→ Phase 1（transition_tick 期间 drain preload）+ Phase 2（cache ready 位）
+Phase 4 ──→ Phase 3（preload_queue 基础设施）
+Phase 5 ──→ Phase 4（BGM preload 能力）
+Phase 6 ──→ Phase 0-5 全部完成后
+```
+
+**Phase 0/1/2 可以在同一次 session 内并行动手**，大约 85 行改动、零架构风险。
+
+---
+
+## 八、构建、测试、实机验证统一流程
+
+每个 Phase 完成后：
+
+```bash
+# 1. Clean build
+cd /home/edo/naiz/core && make clean && make 2>&1 | tee build.log
+# 确认 build.log 中零 .err 诊断
+
+# 2. Full pytest（或子集）
+cd /home/edo/naiz && python3 -m pytest tools/tests/ -v 2>&1 | tee test.log
+# 确认所有新增测试通过，无回归失败
+
+# 3. Rebuild HDI
+cd /home/edo/naiz && python3 -m tools.naiz_img.inject --game demo-a2 --yes
+
+# 4. 实机验证（手动）
+./makegame.sh test demo-a2 --serial
+```
