@@ -36,7 +36,7 @@ def generate_autoexec(game_name):
     content = (
         b'@ECHO OFF\r\n'
         b'SET DOS16M=1\r\n'
-        b'QMOUSE -a- -z\r\n'
+        b'CTMOUSE.COM\r\n'
         b'engine.exe\r\n'
     )
     return content

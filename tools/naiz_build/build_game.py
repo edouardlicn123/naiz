@@ -351,7 +351,7 @@ def deploy_runtime(proj_dir: Path, game_dir: Path):
     # DOS extender + memory manager
     dos_dir = Path(COMMERCIAL_DOS_DIR)
     required_runtime = []
-    for name in ("DOS4GW.EXE", "VEM486.EXE", "QMOUSE.COM"):
+    for name in ("DOS4GW.EXE", "VEM486.EXE", "CTMOUSE.COM"):
         src = dos_dir / name
         dst = game_dir / name
         if src.exists():
