@@ -60,9 +60,16 @@ void engine_frame_pump(void)
     transition_tick();                 /* devdoc 177: one transition step/frame */
     /* devdoc 177: decode one queued scene asset per frame; while the
      * transition covers the screen, take a second slot.  A failed decode drops
-     * the job and stops this frame's consumption (Tier 1 heap guard). */
-    if (preload_step() && transition_active())
-        preload_step();
+     * the job and stops this frame's consumption (Tier 1 heap guard).
+     * devdoc 180: a 30-50 ms decode must never land on a typewriter frame --
+     * the reveal tick already spends most of the frame budget on the dialog
+     * composite, so hold the queue while a page is revealing; leftover jobs
+     * drain over the static screen afterwards (a one-frame cursor jump,
+     * imperceptible while reading). */
+    if (!nb_dialog_reveal_active()) {
+        if (preload_step() && transition_active())
+            preload_step();
+    }
 }
 
 /*

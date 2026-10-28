@@ -354,9 +354,8 @@ void nb_set_lang(const char *lang)
 
 /*=== Display-image cache prefetch (devdoc 131 方案 D) ======================*/
 
-/* Forward decls are kept local: nb.c must NOT gain new top-of-file includes,
+/* Forward decl is kept local: nb.c must NOT gain new top-of-file includes,
  * because test_devdoc_refs pins nb.c lines 166/171/340 to symbols. */
-int image_prefetch(unsigned short id);
 int nb_prefetch_key(const char *cmd, const char *key, const char *expr);
 
 /*=== Scene preload (devdoc 177 Phase 3) ===================================*/
@@ -415,11 +414,16 @@ void nb_preload_scene(void)
 
 #define NB_PREFETCH_LOOKAHEAD 24
 
-/* Warm the LRU cache with the next display images while the script is parked
- * on a dialogue page, so the decode cost is paid during the player's reading
- * time rather than on the frame that shows the image.  Runs at most once per
- * script position.  Decode failures are silent (the later image_load() just
- * decodes again).
+/* Warm the display images ahead of the script position while the script is
+ * parked on a dialogue page.  devdoc 180: the matched ids are QUEUED
+ * (preload_push, lowest band) instead of decoded here — the old synchronous
+ * image_prefetch() decoded every not-yet-warm image inside the 24-line window
+ * in ONE frame, which landed right after a page turn (the only moment the
+ * window slides) and froze that frame for K x 30-50 ms.  The frame pump now
+ * spreads the decodes one per frame during the player's reading time; a
+ * warm id costs one cache lookup (image_prefetch) when the job pops.
+ * Runs at most once per script position.  Decode failures are silent (the
+ * later image_load() just decodes again).
  *
  * devdoc 133: exported and called from main.c's loops (not only the paged
  * dialogue branch), because a SINGLE-page line sets text_offset = -1 and never
@@ -453,7 +457,7 @@ void nb_prefetch_lookahead(void)
         id = nb_prefetch_key(cmd, args[brace],
                              (argc >= 3) ? args[1] : "normal");
         if (id >= 0)
-            image_prefetch((unsigned short)id);
+            preload_push(id, PRELOAD_PRIO_LOOKAHEAD);
     }
 }
 

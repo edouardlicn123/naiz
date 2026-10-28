@@ -88,6 +88,19 @@ def test_isr_pending_drains_in_bounded_periods():
         "the remainder must be drained with the live timestamp")
 
 
+def test_audio_tick_isr_clamps_replayed_timestamp_to_wall0():
+    """devdoc 179 regression guard: the drain replays banked periods with
+    timestamps that walk from the past, and audio_bgm_start() sets wall0
+    mid-frame.  A period banked before that moment stamps `now < wall0`, so
+    the unsigned `now - wall0` wraps to ~4e9 and fmseq dumps the head of the
+    event table in one burst -- the crushed intro behind "scene 1/2 BGM
+    sometimes silent" and "scene 3/4 first note dragged".  audio_tick_isr()
+    must clamp the replayed moment to wall0 before computing cur."""
+    body = _func_body(_src(AUDIO_C), "audio_tick_isr")
+    assert re.search(r"if\s*\(\s*now\s*<\s*g_bgm\.wall0\s*\)\s*\n?\s*now\s*=\s*g_bgm\.wall0;", body), (
+        "audio_tick_isr() must clamp now to g_bgm.wall0 before cur = now - wall0")
+
+
 # --- Layer 1: transition state machine --------------------------------------
 
 def test_transition_is_started_and_ticked_not_looped():
@@ -200,3 +213,45 @@ def test_bgm_is_parsed_in_the_preload_window():
     nb = _src(NB_C)
     assert "audio_preload_bgm(args[brace]);" in _func_body(nb, "nb_preload_scene"), (
         "nb_preload_scene() must hand bgm keys to audio_preload_bgm()")
+
+
+# --- Layer 1: mid-script lookahead (devdoc 180) ------------------------------
+
+def test_lookahead_queues_instead_of_synchronous_decode():
+    """devdoc 180: nb_prefetch_lookahead() used to decode every not-yet-warm
+    image inside the 24-line window in ONE frame.  The window only slides when
+    the script position advances -- the exact frame a page turn puts new text
+    on screen -- so K images ahead cost K x 30-50 ms on that visible frame
+    ("text loading hitch").  It must queue the ids instead; the frame pump
+    spreads the decodes one per frame during the player's reading time."""
+    body = _func_body(_src(NB_C), "nb_prefetch_lookahead")
+    assert "preload_push(id, PRELOAD_PRIO_LOOKAHEAD)" in body, (
+        "the lookahead must queue jobs, not decode in-place")
+    assert "image_prefetch(" not in body, (
+        "no synchronous decode may remain in the lookahead")
+    h = _src(PRELOAD_H)
+    m = re.search(r"#define PRELOAD_PRIO_LOOKAHEAD\s+(\d+)", h)
+    assert m, "the lookahead band must exist in preload_queue.h"
+    bands = [int(b.group(1)) for b in
+             re.finditer(r"#define PRELOAD_PRIO_\w+\s+(\d+)", h)]
+    assert int(m.group(1)) == max(bands), (
+        "lookahead jobs must decode last -- a scene's own assets outrank them")
+    assert "int image_prefetch(unsigned short id);" not in _src(NB_C), (
+        "nb.c no longer calls image_prefetch(); the local forward decl must go")
+
+
+def test_pump_holds_the_queue_while_the_typewriter_reveals():
+    """devdoc 180: the reveal tick repaints the whole dialog composite every
+    frame (box + revealed text + a full dialog-rect VRAM write), so a 30-50 ms
+    decode in the same frame judders the typewriter.  The pump must hold the
+    preload queue while a page is revealing; the jobs drain over the static
+    screen afterwards (a one-frame cursor jump, imperceptible while reading).
+    The transition double-drain must survive inside the gate so a scene's own
+    assets still decode behind the sweep."""
+    pump = _func_body(_src(FRAME_C), "engine_frame_pump")
+    m = re.search(r"if \(!nb_dialog_reveal_active\(\)\) \{([^}]*)\}", pump)
+    assert m, "the preload consumption must be gated on the typewriter reveal"
+    assert "preload_step()" in m.group(1), (
+        "preload_step() must run inside the reveal gate")
+    assert "transition_active()" in m.group(1), (
+        "the transition double-drain must survive inside the gate")

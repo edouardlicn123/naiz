@@ -20,6 +20,11 @@
 /* Priority bands (lower = decoded first). */
 #define PRELOAD_PRIO_BG   0   /* backgrounds and CGs: the next screen */
 #define PRELOAD_PRIO_CHAR 1   /* standing portraits */
+/* Mid-script lookahead jobs (devdoc 180): nb_prefetch_lookahead() queues the
+ * display images ahead of the script position instead of decoding them
+ * synchronously, so a page turn can never batch several 30-50 ms decodes into
+ * one visible frame.  Consumed last: a scene's own assets outrank them. */
+#define PRELOAD_PRIO_LOOKAHEAD 2
 
 /* Drop every queued job.  Called when a new scene preload starts. */
 void preload_queue_init(void);

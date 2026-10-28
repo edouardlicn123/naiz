@@ -699,6 +699,21 @@ void audio_tick_isr(unsigned long delta_units, unsigned long now_ms_abs)
 
     if (!g_bgm.active) return;
 
+    /* devdoc 179: the split drain replays banked periods with timestamps that
+     * walk from the past toward `now`, and audio_bgm_start() sets wall0
+     * mid-frame.  A period banked before that moment stamps `now < wall0`, so
+     * the unsigned `now - wall0` wraps to ~4e9 and fmseq dumps the head of
+     * the event table in one burst -- the crushed intro heard as "scene 1/2
+     * BGM sometimes silent" and "scene 3/4 first note dragged".  Clamp the
+     * replayed moment to the BGM's own start: pre-start chunks all carry
+     * wall0, so cur begins at 0 and the opening cluster spreads over the
+     * pump budget instead of collapsing.  The co-operative pump can never
+     * hit this (its timestamp is read after wall0), so the clamp is inert
+     * there.  Rewind keeps wall0 <= now (fmseq_loop_start clamps), so the
+     * clamp never fires mid-loop either. */
+    if (now < g_bgm.wall0)
+        now = g_bgm.wall0;
+
     if (g_bgm.fm) {
         cur = now - g_bgm.wall0;
 

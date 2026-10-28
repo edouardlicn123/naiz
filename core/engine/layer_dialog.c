@@ -16,9 +16,10 @@
 /* Dialog composite buffer (480 x LAYER_DIALOG_H): box + current page text,
  * opaque.  The underneath pixels are seeded at open so dither holes stay
  * optically transparent (the animation/blit clip paths keep the dialog rect
- * untouched, so a static base is pixel-faithful).  The box is re-painted per
- * page to erase the previous page's text (paging shows one page at a time,
- * matching the legacy VRAM semantics).
+ * untouched, so a static base is pixel-faithful).  Each page starts from the
+ * cached clean-box base (dialog_box_base, devdoc 181) to erase the previous
+ * page's text without re-running the box paint loop (paging shows one page at
+ * a time, matching the legacy VRAM semantics).
  *
  * This buffer is the DURABLE composite: it is not repainted on every pass,
  * so the transient software-cursor arrow must NEVER be written into it (a
@@ -31,6 +32,19 @@ static unsigned char *dialog_layer = NULL;
  * Lazily allocated with the other dialog buffers; NULL degrades the blit to
  * the pass-end cursor redraw (no splice). */
 static unsigned char *dialog_blit_tmp = NULL;
+/* Clean-box cache (480 x LAYER_DIALOG_H): the occluder-seeded composite with
+ * the box painted and NO page text.  devdoc 181: the per-page prologue
+ * (seed memcpy + dialog_paint_box's 55,200-iteration fill loop) ran on every
+ * page turn AND every typewriter reveal frame, but the box is pixel-identical
+ * between pages -- only the occluder underneath (sprites/background) and the
+ * style change it.  Paint it once per change and publish it with a single
+ * memcpy per render; dirty is set by dialog_occluder_reset_base() (sprites /
+ * background moved) and dlg_set_style() (fill pattern changed).  Palette
+ * edits never invalidate: the cache stores palette indices, colors are
+ * resolved at VRAM write time.  NULL (OOM) degrades to the old
+ * seed+paint-per-render path. */
+static unsigned char *dialog_box_base = NULL;
+static unsigned char dialog_box_base_dirty = 1;
 /* Non-zero when dialog area is currently drawn on screen. */
 static unsigned char dialog_drawn = 0;
 
@@ -126,6 +140,7 @@ void dlg_set_style(unsigned char s)
     if (s > 9) s = 0;
     g_dialog_style = s;
     dlg_update_palette();
+    dialog_box_base_dirty = 1;   /* devdoc 181: the fill pattern changed */
 }
 
 /* Return current dialog style (0-9). */
@@ -198,6 +213,24 @@ void dialog_occluder_reset_base(void)
         memcpy(dialog_occluder, under, LAYER_DIALOG_W * LAYER_DIALOG_H);
     else
         memset(dialog_occluder, 0, LAYER_DIALOG_W * LAYER_DIALOG_H);
+    dialog_box_base_dirty = 1;   /* devdoc 181: the clean-box cache seeds from the occluder */
+}
+
+/* Seed an arbitrary 480xLAYER_DIALOG_H buffer from the live occluder (or its
+ * degradation chain). */
+static void dialog_seed_into(unsigned char *dst)
+{
+    if (dialog_occluder) {
+        memcpy(dst, dialog_occluder, LAYER_DIALOG_W * LAYER_DIALOG_H);
+        return;
+    }
+    {
+        const unsigned char *under = layer_bg_under_dialog();
+        if (under)
+            memcpy(dst, under, LAYER_DIALOG_W * LAYER_DIALOG_H);
+        else
+            memset(dst, 0, LAYER_DIALOG_W * LAYER_DIALOG_H);
+    }
 }
 
 /* Seed the composite buffer with the live occluder (underneath + sprites) so
@@ -206,16 +239,28 @@ void dialog_occluder_reset_base(void)
  * unavailable (never allocated / OOM). */
 static void dialog_seed_base(void)
 {
-    if (dialog_occluder) {
-        memcpy(dialog_layer, dialog_occluder, LAYER_DIALOG_W * LAYER_DIALOG_H);
+    dialog_seed_into(dialog_layer);
+}
+
+/* Publish the clean box into the composite buffer, erasing any page text.
+ * devdoc 181: rebuild the cached base only when dirty (occluder/style
+ * change), then memcpy it over dialog_layer -- a page turn or a reveal frame
+ * pays one 55 KB memcpy instead of seed + the 55,200-iteration box loop.
+ * Without the cache buffer (OOM) it falls back to the direct seed+paint. */
+static void dialog_box_base_sync(void)
+{
+    if (!dialog_layer)
         return;
-    }
-    {
-        const unsigned char *under = layer_bg_under_dialog();
-        if (under)
-            memcpy(dialog_layer, under, LAYER_DIALOG_W * LAYER_DIALOG_H);
-        else
-            memset(dialog_layer, 0, LAYER_DIALOG_W * LAYER_DIALOG_H);
+    if (dialog_box_base) {
+        if (dialog_box_base_dirty) {
+            dialog_seed_into(dialog_box_base);
+            dialog_paint_box(dialog_box_base, LAYER_DIALOG_W);
+            dialog_box_base_dirty = 0;
+        }
+        memcpy(dialog_layer, dialog_box_base, LAYER_DIALOG_W * LAYER_DIALOG_H);
+    } else {
+        dialog_seed_base();
+        dialog_paint_box(dialog_layer, LAYER_DIALOG_W);
     }
 }
 
@@ -269,17 +314,19 @@ void dialog_layer_blit(void)
     }
 }
 
-/* Unified dialog show: ensure the composite buffer holds the box, then let
- * the caller render the current page into it (layer_dialog_render_page) and
- * blit (dialog_layer_blit).  The box is re-painted per page so a fresh text
- * page starts from the clean box (one page at a time, legacy paging
- * semantics). */
+/* Unified dialog show: ensure the composite buffer holds the clean box, then
+ * let the caller render the current page into it (layer_dialog_render_page)
+ * and blit (dialog_layer_blit).  devdoc 181: the box comes from the cached
+ * clean-box base (rebuilt only after an occluder/style change), so a fresh
+ * text page starts from the clean box without re-running the 55,200-iteration
+ * paint loop (one page at a time, legacy paging semantics). */
 void layer_dialog_show(void)
 {
     if (!dialog_layer) {
         dialog_layer = layer_snapshot_alloc_dialog("dialog_layer");
         dialog_occluder = layer_snapshot_alloc_dialog("dialog_occluder");
         dialog_blit_tmp = layer_snapshot_alloc_dialog("dialog_blit_tmp");
+        dialog_box_base = layer_snapshot_alloc_dialog("dialog_box_base");
     }
     if (!dialog_layer) {
         /* OOM degraded path: paint the box straight to VRAM (legacy). */
@@ -296,7 +343,7 @@ void layer_dialog_show(void)
          * screen) so the box seeds over the actors (pseudo-transparency). */
         layer_sprite_sync_dialog_base();
     }
-    dialog_paint_box(dialog_layer, LAYER_DIALOG_W);
+    dialog_box_base_sync();
 }
 
 /* Publish a clean dialog box (no page text) as the current VRAM state.
@@ -331,8 +378,7 @@ int layer_dialog_render_page(const char *name, const char *text, int off)
                          LAYER_DIALOG_CONTENT_X, LAYER_DIALOG_CONTENT_Y,
                          w, LAYER_DIALOG_CONTENT_Y + 60, 0, PAL_WHITE);
     }
-    dialog_seed_base();
-    dialog_paint_box(dialog_layer, LAYER_DIALOG_W);
+    dialog_box_base_sync();
     text_set_target(dialog_layer, LAYER_DIALOG_W, LAYER_DIALOG_H, LAYER_DIALOG_W,
                     LAYER_DIALOG_X, LAYER_DIALOG_Y);
     if (name && name[0])
@@ -411,8 +457,7 @@ void layer_dialog_recompose(void)
             layer_dialog_render_page(dialog_render_name, dialog_render_text,
                                      dialog_render_off);
         } else {
-            dialog_seed_base();
-            dialog_paint_box(dialog_layer, LAYER_DIALOG_W);
+            dialog_box_base_sync();
         }
         dialog_layer_blit();
     }
@@ -424,6 +469,8 @@ void layer_dialog_reset(void)
     if (dialog_layer) { free(dialog_layer); dialog_layer = NULL; }
     if (dialog_occluder) { free(dialog_occluder); dialog_occluder = NULL; }
     if (dialog_blit_tmp) { free(dialog_blit_tmp); dialog_blit_tmp = NULL; }
+    if (dialog_box_base) { free(dialog_box_base); dialog_box_base = NULL; }
+    dialog_box_base_dirty = 1;
     dialog_drawn = 0;
     dialog_render_valid = 0;
     dialog_render_name[0] = '\0';

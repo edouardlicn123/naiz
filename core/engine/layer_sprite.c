@@ -288,28 +288,25 @@ static void layer_sprite_replace(int sprite_id, int asset_id, int x, int y, int 
     layer_sprite_sync_dialog_base();
 }
 
-/* Hide a specific sprite by ID: restore the background under its rect
- * (dialog rect untouched — clip_dialog=1), drop it from the occluder and
- * recompose the dialog (R20). */
-static void layer_sprite_hide(int id)
-{
-    SpriteEntry *se = find_sprite(id);
-    if (!se) return;
-    hal_mouse_invalidate_cursor();
-    layer_bg_restore_rect(se->x, se->y, LAYER_SPRITE_W, LAYER_SPRITE_H, 1);
-    se->active = 0;
-    layer_sprite_sync_dialog_base();
-}
-
-/* Hide all active sprites. */
+/* Hide all active sprites.  devdoc 182: the occluder/recompose work is
+ * batched — the old loop called layer_sprite_sync_dialog_base() once PER
+ * sprite, so char(hideall) over N sprites paid N x (occluder reset + clean-box
+ * rebuild + recompose blit) inside one frame (a 150-300 ms pause with the
+ * dialog open).  Restore every rect and deactivate first, then rebuild the
+ * occluder and recompose exactly once — same final pixels, one pipeline. */
 void layer_sprite_hide_all(void)
 {
-    int i;
+    int i, hidden = 0;
     for (i = 0; i < LAYER_MAX_SPRITES; i++) {
-        if (sprite_table[i].active) {
-            layer_sprite_hide(sprite_table[i].id);
-        }
+        SpriteEntry *se = &sprite_table[i];
+        if (!se->active) continue;
+        hal_mouse_invalidate_cursor();
+        layer_bg_restore_rect(se->x, se->y, LAYER_SPRITE_W, LAYER_SPRITE_H, 1);
+        se->active = 0;
+        hidden = 1;
     }
+    if (hidden)
+        layer_sprite_sync_dialog_base();
     layer_set_active(LAYER_Z_SPRITE, 0);
     hal_mouse_invalidate_cursor();
 }
