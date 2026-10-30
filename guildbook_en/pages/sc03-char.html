@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="translated-from" content="202610300931">
+<!-- AI-NOTE: translated-from = the guildbook_cn doc-version this page was translated from. If the cn counterpart's doc-version is newer, re-translate this page from the Chinese source. -->
+
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>char — Naiz Guildbook</title>
+<link rel="stylesheet" href="../style.css">
+</head>
+<body>
+<nav class="sidebar" id="sidebar-nav"></nav>
+<script src="../sidebar-scripts.js"></script>
+<main class="main">
+
+<h1>char — Sprites and Dialogue</h1>
+<hr>
+<blockquote><strong>Created</strong>: 2026-07-27</blockquote>
+<p><code>char()</code> controls showing, hiding, and switching the expression of sprites. Character dialogue and narration also belong to this page.</p>
+
+<h2>1. Syntax</h2>
+<pre><code>char(pos[, expr[, type]]){charname}
+char(hideall)</code></pre>
+<p><strong>The object (the character name) goes in the curly-brace payload</strong>; the parentheses carry the display parameters pos/expr/type. This follows the same convention as <code>bg(effect){key}</code>: "object in braces, parentheses = parameters ± keyword".</p>
+<table>
+<tr><th>Parameter</th><th>Type</th><th>Description</th></tr>
+<tr><td><code>charname</code></td><td>string</td><td>Character key, such as <code>fei</code>, <code>ira</code>, written in the curly-brace payload</td></tr>
+<tr><td><code>pos</code></td><td>string</td><td>Position: <code>l</code> (left), <code>c</code> (center), <code>r</code> (right)</td></tr>
+<tr><td><code>expr</code></td><td>string</td><td><strong>Optional</strong>, default <code>normal</code>. Expression name</td></tr>
+<tr><td><code>type</code></td><td>string</td><td><strong>Optional</strong>, inferred automatically by default. <code>body</code> (full body / costume change) or <code>face</code> (expression only)</td></tr>
+</table>
+
+<h2>2. Type Inference</h2>
+<p>If you omit <code>type</code>, the engine chooses:</p>
+<ul>
+<li>Character not shown yet → <code>body</code> (first full-body display)</li>
+<li>Character already shown → <code>face</code> (expression only, the dialogue box is not redrawn)</li>
+</ul>
+
+<h2>3. Subcommands</h2>
+<table>
+<tr><th>Command</th><th>Description</th></tr>
+<tr><td><code>char(hideall)</code></td><td>Hide all sprites and do a clean reset</td></tr>
+</table>
+
+<h2>4. Example</h2>
+<pre><code>char(l, normal, body){fei}    ← first display of fei at the left position
+char(r, normal, body){ira}    ← first display of ira at the right position
+char(r, smile){fei}           ← fei switches to the smile expression
+char(r, sad, face){ira}       ← ira switches to the sad expression
+char(hideall)                 ← hide all sprites</code></pre>
+<div class="note-box"><p><strong>Note</strong>: the <code>char(charname, pos, expr, type)</code> form (character name written inside the parentheses) is deprecated and is rejected by the engine and the scenario validator — the character key must go inside the braces.</p></div>
+
+<hr>
+
+<h2>5. Character Dialogue</h2>
+<p>The <code>charkey(){text}</code> command shows a character's line. The character key matches the <code>characters.key</code> field, and <code>characters.name</code> is used automatically as the displayed name.</p>
+
+<h3>Syntax</h3>
+<pre><code>charkey(){text}</code></pre>
+
+<h3>Paging</h3>
+<p>The engine handles text overflow automatically. When the text exceeds the dialogue box height, it pauses and waits for a keypress; press any key to continue to the next page.</p>
+
+<h3>Example</h3>
+<pre><code>fei(){Hello.}
+ira(){Hi.}
+neon(){Let's begin!}</code></pre>
+
+<hr>
+
+<h2>6. Narration</h2>
+<p>The <code>host(){text}</code> command shows narration text with no character name and no name label.</p>
+
+<h3>Syntax</h3>
+<pre><code>host(){text}</code></pre>
+
+<h3>Example</h3>
+<pre><code>host(){This is Naiz demo.}</code></pre>
+
+</main>
+</body>
+</html>

@@ -131,6 +131,8 @@ static MagImage *anim_decode_frame(AnimState *a, int frame)
     MagImage *img = NULL;
     long off, off_end;
     int blob_size;
+    unsigned long t0;
+    int ms;
 
     if (!a->blob || !a->offs || frame < 0 || frame >= a->nframes)
         return NULL;
@@ -142,6 +144,11 @@ static MagImage *anim_decode_frame(AnimState *a, int frame)
     if (off <= 0 || off_end <= off || off_end > a->data_end)
         return NULL;
     blob_size = (int)(off_end - off);
+    /* devdoc 184: measure the per-frame decode (this cost lands on the
+     * visible frame the animation advances on).  The smooth clock keeps
+     * advancing through the decode via frame_decode_pump's self-measuring
+     * stride, so the delta is a fair millisecond estimate. */
+    t0 = hal_wallclock_smooth_ms();
     if (a->decode_buf && a->decode_buf_size > 0) {
         if (mag_decode_into(a->blob + off, blob_size,
                             a->decode_buf, a->decode_buf_size, &img) != 0)
@@ -150,6 +157,9 @@ static MagImage *anim_decode_frame(AnimState *a, int frame)
         if (mag_decode(a->blob + off, blob_size, &img) != 0)
             return NULL;
     }
+    ms = (int)(hal_wallclock_smooth_ms() - t0);
+    if (ms > 0)
+        hal_logf("[ANIM-DEC] f=%d ms=%d\r\n", frame, ms);
     return img;
 }
 

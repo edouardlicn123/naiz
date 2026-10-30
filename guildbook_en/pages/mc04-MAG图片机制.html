@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="translated-from" content="202610300931">
+<!-- AI-NOTE: translated-from = the guildbook_cn doc-version this page was translated from. If the cn counterpart's doc-version is newer, re-translate this page from the Chinese source. -->
+
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>MAG Image Mechanics — Naiz Guildbook</title>
+<link rel="stylesheet" href="../style.css">
+</head>
+<body>
+<nav class="sidebar" id="sidebar-nav"></nav>
+<script src="../sidebar-reference.js"></script>
+<main class="main">
+
+<h1>MAG Image Mechanics</h1>
+<blockquote><strong>Created</strong>: 2026-08-29<br><strong>Last updated</strong>: 2026-09-11</blockquote>
+<p>This page explains, from a <strong>creator's</strong> point of view, the Naiz engine's MAG image format, archive storage, shared palette, and transparency conventions — i.e. how all backgrounds and character sprites are loaded and displayed on the engine side. For the lower-level byte specification, see <code>docs/B11-MAG图片加载与显示规范.md</code> in the repository.</p>
+<hr>
+
+<h2>1. The MAG format and 256-color mode</h2>
+<p>MAG (MAKI02) is the dominant image format on the PC-98 platform, supporting 16 colors (4bpp) and 256 colors (8bpp). The Naiz engine <strong>always uses 256-color mode</strong> (PEGC, bpp=8, num_colors≤256): decoded pixel values 0–255 map directly to hardware palette indices, with no bit-plane splitting or extra color mapping.</p>
+<table>
+<tr><th>Component</th><th>16-color</th><th>256-color (used by the engine)</th></tr>
+<tr><td>Pixel data</td><td>4bpp (Flag A/B + color stream)</td><td>8bpp</td></tr>
+<tr><td>Embedded palette</td><td>16 GRB entries</td><td>Up to 256 GRB entries</td></tr>
+<tr><td>Screen mode</td><td>screen_mode=0x00</td><td>screen_mode=0x80</td></tr>
+</table>
+
+<h2>2. The two image types and user-string conventions</h2>
+<p>The 16-byte user field in the MAG header identifies the image type, and the engine picks its loading behavior accordingly:</p>
+<table>
+<tr><th>User String</th><th>Type</th><th>Engine behavior</th></tr>
+<tr><td><code>"naiz\x1a"</code></td><td>Background / full screen</td><td>Calls <code>image_set_palette()</code> to set the whole-scene palette + <code>vram_blit()</code> to write the full screen</td></tr>
+<tr><td><code>"sprt\x1a"</code></td><td>Character sprite / sprite</td><td><strong>Does not</strong> call <code>image_set_palette()</code>; uses <code>vram_blit_sprite(idx=15)</code> to skip transparent pixels</td></tr>
+</table>
+<p>Sprites (the character sprites used by the <code>char</code> command) and backgrounds <strong>share the same 256-color palette</strong>: the background loads first and sets the palette; sprites load afterwards and write only pixels, rendered with the background's palette. See <a href="mc03-图层渲染与换装机制.html">mc03 — layer rendering and sprite swapping</a> for details.</p>
+
+<h2>3. The IMAGE.DAT archive and logical IDs</h2>
+<p>Multiple MAG files are packed at build time into a single archive, <code>IMAGE.DAT</code>, reducing HDI root-directory entries; the engine indexes them directly by logical ID in O(1).</p>
+<ul>
+<li>The <code>img_map</code> table of the asset mapping file <code>ASSETS.DB</code>: <code>id</code> (logical_id, i.e. the value passed as the scenario command parameter), <code>filename</code>, and <code>type</code> (<code>'IMG'</code>/<code>'SPR'</code>).</li>
+<li><code>pack_images.py</code> reads <code>img_map</code> and packs the listed files into <code>IMAGE.DAT</code>; the TOC entry array index = logical_id, so the engine's <code>image_load(id)</code> addresses the array directly, with no filename matching.</li>
+<li>Characters and expressions are defined separately in <code>characters.yaml</code>, where <code>char_expressions</code> maps <code>expr</code> to <code>img_map.id</code>.</li>
+</ul>
+
+<h2>4. The shared palette and reserved indices</h2>
+<p>In 256-color mode, all image pixels and UI elements share one palette. To keep UI colors (text, transparency, dialogue-box base color) from colliding with image pixels, the engine uses <strong>10 reserved indices</strong>:</p>
+<table>
+<tr><th>Index</th><th>Default color</th><th>Purpose</th></tr>
+<tr><td>7</td><td>White</td><td>Text / borders / prompts</td></tr>
+<tr><td>15</td><td>Black</td><td>Sprite transparency (skipped during blit)</td></tr>
+<tr><td>248</td><td>Black</td><td>Dialogue box base color (recolored dynamically by <code>[dialog] style</code>)</td></tr>
+<tr><td>249–255</td><td>—</td><td>Spare UI colors (250 = menu text, 251 = menu selection)</td></tr>
+</table>
+<p><strong>Three stages of protection</strong> (each stage blocks conflicts on its own):</p>
+<ul>
+<li>Stage 1, asset generation: <code>mag_convert.py --reserved 7,15,248,...</code> — quantization avoids the reserved indices from the start.</li>
+<li>Stage 2, archive packing: <code>pack_images.py</code> skips <code>PROTECTED_IDX</code> when remapping all images to the shared palette.</li>
+<li>Stage 3, engine runtime: <code>image_set_palette()</code> skips 7/15/248–255 and never overwrites UI colors.</li>
+</ul>
+
+<h2>5. Transparency conventions</h2>
+<ul>
+<li>Sprite PNGs are converted with <code>mag_convert.py --sprite</code>: areas with alpha&lt;128 map to index 15 (the transparency marker), <strong>no resizing</strong> — the original dimensions are kept — and <code>"sprt\x1a"</code> is written.</li>
+<li>For sprites, <code>--reserved</code> <strong>excludes</strong> 15, because index 15 must hold the transparency marker.</li>
+<li>The y≥280 region at the bottom of a character sprite must match the dialogue-box layout (<code>pack_images.py</code> verifies y≥280 consistency across expression sets) so nothing shows through under the semi-transparent dialogue box.</li>
+</ul>
+
+<h2>6. Build pipeline</h2>
+<pre><code>mag_convert.py  PNG → MAG (--sprite / --256 / --reserved)
+        │
+pack_images.py  ASSETS.DB(img_map) → IMAGE.DAT
+        │         (shared-palette quantization + remap + post-check)
+        ▼
+makegame.sh build &lt;game&gt;  injects into the HDI</code></pre>
+<p>Sprite mirroring is decided implicitly by the <code>char</code> command's position argument (<code>l</code> left position mirrors automatically; <code>c</code>/<code>r</code> do not mirror). See <a href="mc02-立绘与角色.html">mc02 — sprites and characters</a>.</p>
+
+<h2>7. Relation to scenario commands</h2>
+<ul>
+<li>The <code>bg</code> command: load the background MAG → set the palette → full-screen blit → redraw sprites → restore the dialogue-box base color (248) → rebuild the dialogue-box active base (<code>dialog_occluder</code>, used for pseudo-transparency and hide-restore). The palette must be written before the pixels, otherwise the screen flickers.</li>
+<li>The <code>char</code> command: load the sprite MAG → write only pixels (shared background palette) → skip transparency index 15.</li>
+</ul>
+<p>For command syntax details, see <a href="sc02-bg.html">sc02 bg — Background Switch</a> and <a href="sc03-char.html">sc03 char — Sprites and Dialogue</a>.</p>
+
+</main>
+</body>
+</html>

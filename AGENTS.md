@@ -1,6 +1,6 @@
 # Naiz — AI 编程规则
 
-> **当前版本**: `0.3.062`（`projects/demo-a2/config.toml`）
+> **当前版本**: `0.4.002`（`projects/demo-a2/config.toml`）
 >
 > **最新条目**: `CHANGELOG.md` `c90` — 行号白名单自动同步工具（`tools/naiz_docs/sync_line_refs.py`）+ i18n 键 `=` 守卫；`pytest` 851 passed / 2 skipped / 1 pre-existing。**本行只放当前状态指针**：历史条目正文一律只写进 `CHANGELOG.md`（规则见 §十三「变更后更新规约」），本文件不承载任何开发历史摘要——§一–§十七 只存**规则与当前状态**。
 > **当前状态**（0.3.062 / c90）：ISR 只拥有时钟（`devdocs/176`），音泵回主线程（`audio_tick_isr_pending()`）；`test_isr_pump_boundary.py` 守卫落地；`cap_bgm.py` 客观音频取证（ISR `rms=5354.9`、逐秒无静音、FM 地址归零已修复）；`bump_version` 同步至 `0.3.062`。`devdocs/176` 完结（根因已定位、已修复、已验证）。
@@ -108,6 +108,7 @@ PC-98 知识参考：`docs/refdocs/README.md`（A–H 类分组）。函数索�
 - 复制代码必须附来源项目 + GitHub + 许可证注释
 - 安装失败先查 `logs/env_install.log` 末尾 200 行
 - **用户要求"写 devdoc"时**：在 `devdocs/` 目录写入带数字前缀的开发文档（编号接续现有最大编号 +1，格式 `NN-描述.md`，如 `67-封装改进访问器收口与模块边界固化.md`）。devdocs/ 为历史存档，**已完成的文档禁止修改**（头部状态标记完结/归档），未完成的文档（计划中/规划中/细化中）可继续修订；编号由工具/人工按当前最大号顺延
+- **手写文档站 `guildbook_cn/`（中文·权威源）/ `guildbook_en/`（英文·译版）**：每页 `<head>` 带版本 meta——cn 页 `doc-version`、en 页 `translated-from`，格式 `YYYYMMDDHHMM`。**每次编辑 guildbook_cn 任一页面后，必须把该页 doc-version 更新为当前时间**；翻译英文时对比两标签，cn 较新则从中文重译该页（各页 HTML 注释内含 AI 可读提示，正常浏览不可见）。更新约定详见 `docs/B91 §1`
 
 ### 结论推翻时的文档订正
 

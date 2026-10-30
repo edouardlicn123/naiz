@@ -1,0 +1,148 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="translated-from" content="202610300931">
+<!-- AI-NOTE: translated-from = the guildbook_cn doc-version this page was translated from. If the cn counterpart's doc-version is newer, re-translate this page from the Chinese source. -->
+
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Variable System — Naiz Guildbook</title>
+<link rel="stylesheet" href="../style.css">
+</head>
+<body>
+<nav class="sidebar" id="sidebar-nav"></nav>
+<script src="../sidebar-reference.js"></script>
+<main class="main">
+<h1>Variable System</h1>
+<hr>
+<blockquote><strong>Created</strong>: 2026-06-27<br><strong>Last updated</strong>: 2026-07-28</blockquote>
+
+<p>A Naiz project manages its configuration through 4 JSON files. They live in the <code>projects/&lt;game&gt;/</code> directory and are compiled into the engine at build time.</p>
+<p><strong>Keep this document in sync after any change</strong> so the docs match the actual definitions.</p>
+
+<hr>
+
+<h2>1. variables.json — variable definitions</h2>
+<p>Defines the variables the game uses at runtime (favorability, story flags, counters, and so on).</p>
+<pre><code>{
+  "variables": [
+    {
+      "id":       "bond_fei",
+      "name":     "Fei好感度",
+      "desc":     "Fei对玩家的好感度",
+      "initial":  0,
+      "min":      0,
+      "max":      100
+    }
+  ]
+}</code></pre>
+
+<table>
+<thead>
+<tr><th>Field</th><th>Type</th><th>Description</th></tr>
+</thead>
+<tbody>
+<tr><td><code>id</code></td><td>string</td><td>Variable identifier (lowercase plus underscores), used by scenario commands and internal lookups</td></tr>
+<tr><td><code>name</code></td><td>string</td><td>Display name (save screen, debug output)</td></tr>
+<tr><td><code>desc</code></td><td>string</td><td>Description text</td></tr>
+<tr><td><code>initial</code></td><td>int</td><td>Initial value; the engine resets the variable to this value on a cold start or a new game</td></tr>
+<tr><td><code>min</code></td><td>int</td><td>Minimum value (default 0); out-of-range values are clamped</td></tr>
+<tr><td><code>max</code></td><td>int</td><td>Maximum value (default 9999); out-of-range values are clamped</td></tr>
+</tbody>
+</table>
+
+<p>Build pipeline: <code>variables.json</code> → <code>export_vars.py</code> → <code>nb_var_table.h</code> (<code>NbVarDef</code> struct array + <code>NB_VAR_COUNT</code>).</p>
+
+<p>The current demo-a2 project defines 3 variables:</p>
+<table>
+<thead>
+<tr><th>id</th><th>name</th><th>Range</th><th>Initial</th></tr>
+</thead>
+<tbody>
+<tr><td><code>bond_fei</code></td><td>Fei favorability</td><td>0–100</td><td>0</td></tr>
+<tr><td><code>bond_ira</code></td><td>Ira favorability</td><td>0–100</td><td>0</td></tr>
+<tr><td><code>bond_neon</code></td><td>Neon favorability</td><td>0–100</td><td>0</td></tr>
+</tbody>
+</table>
+
+<h2>2. characters.json — character definitions</h2>
+<p>Defines the characters available in the game, used by the <code>char</code> command and linked with <code>expressions.json</code>.</p>
+<pre><code>{
+  "characters": [
+    {"id": 9,  "key": "fei",  "name": "Fei"},
+    {"id": 10, "key": "ira",  "name": "Ira"},
+    {"id": 11, "key": "neon", "name": "Neon"}
+  ]
+}</code></pre>
+
+<table>
+<thead>
+<tr><th>Field</th><th>Type</th><th>Description</th></tr>
+</thead>
+<tbody>
+<tr><td><code>id</code></td><td>int</td><td>Character numeric ID. Matches <code>char_id</code> in <code>expressions.json</code>; the <code>id</code> field in <code>char_map[]</code> uses this value too</td></tr>
+<tr><td><code>key</code></td><td>string</td><td>Character key. Used by scenario commands such as <code>char(pos, ...){ira}</code> and <code>fei{...}</code> (the character key goes in the brace payload). Globally unique</td></tr>
+<tr><td><code>name</code></td><td>string</td><td>Display name. The dialogue box name label uses this value</td></tr>
+</tbody>
+</table>
+
+<p>Build pipeline: <code>characters.json</code> → <code>export_asset_table.py</code> → <code>nb_asset_table.h</code> (<code>char_map[]</code>: key→id→name lookup table).</p>
+
+<h2>3. expressions.json — expression mapping</h2>
+<p>Maps each character's expressions to sprite assets for the <code>char(pos, expr){name}</code> command to look up.</p>
+<pre><code>{"expressions": [
+    {"char_id": 9,  "expr": "normal",    "asset_id": 1},
+    {"char_id": 9,  "expr": "sad",       "asset_id": 8},
+    {"char_id": 9,  "expr": "smile",     "asset_id": 9},
+    {"char_id": 9,  "expr": "surprised", "asset_id": 10},
+    {"char_id": 10, "expr": "normal",    "asset_id": 2},
+    ...
+]}</code></pre>
+
+<table>
+<thead>
+<tr><th>Field</th><th>Type</th><th>Description</th></tr>
+</thead>
+<tbody>
+<tr><td><code>char_id</code></td><td>int</td><td>Character ID (matches <code>id</code> in <code>characters.json</code>)</td></tr>
+<tr><td><code>expr</code></td><td>string</td><td>Expression name (such as <code>normal</code>, <code>sad</code>, <code>smile</code>). Used by the <code>char(pos, expr){name}</code> command</td></tr>
+<tr><td><code>asset_id</code></td><td>int</td><td>Sprite asset ID (matches the id of a <code>type='SPR'</code> row in ASSETS.DB)</td></tr>
+</tbody>
+</table>
+
+<p>Build pipeline: <code>expressions.json</code> → <code>export_asset_table.py</code> → <code>nb_asset_table.h</code> (<code>expr_map[]</code>: (char_id, expr)→asset_id lookup table).</p>
+
+<h2>4. config.toml — project configuration</h2>
+<p>Project-level global configuration covering language, title, version, and transitions. It is <strong>compiled into the engine</strong> at build time, with zero runtime parsing. The format is TOML, supports <code>#</code> comments, and the <code>version</code> line is maintained by a tool. See <a href="cf02-项目配置文件.html">cf02 Project Configuration File</a> for the full reference.</p>
+
+<p>Build pipeline: <code>config.toml</code> → <code>export_config.py</code> → <code>nb_config.h</code> (<code>NAIZ_*</code> macros, covering transition, styles, blackletter, default language, and version).</p>
+
+<h2>5. Build pipeline overview</h2>
+<table>
+<thead>
+<tr><th>Config file</th><th>Export script</th><th>Generated header</th><th>Purpose</th></tr>
+</thead>
+<tbody>
+<tr><td><code>variables.json</code></td><td><code>export_vars.py</code></td><td><code>nb_var_table.h</code></td><td>Variable definition table + <code>var()</code> command</td></tr>
+<tr><td><code>characters.json</code></td><td><code>export_asset_table.py</code></td><td><code>nb_asset_table.h</code></td><td><code>char_map[]</code> character lookup table</td></tr>
+<tr><td><code>expressions.json</code></td><td><code>export_asset_table.py</code></td><td><code>nb_asset_table.h</code></td><td><code>expr_map[]</code> expression lookup table</td></tr>
+<tr><td><code>config.toml</code></td><td><code>export_config.py</code></td><td><code>nb_config.h</code></td><td>Transition + version + project configuration</td></tr>
+</tbody>
+</table>
+
+<h2>6. Related scenario commands</h2>
+<p>Related NB scenario commands:</p>
+<ul>
+<li><a href="sc09-var.html">sc09 — var variable operations</a>: read and write variables on their own</li>
+<li><a href="sc08-question.html">sc08 — question choice branches</a>: options driving variables</li>
+<li><a href="sc04-scene.html">sc04 — scene scene jumps</a>: conditional chain jumps</li>
+<li><a href="sc03-char.html">sc03 — char sprite operations</a>: showing characters and switching expressions</li>
+<li><a href="cf05-过渡效果.html">cf05 — Transition Settings</a>: scene transition configuration</li>
+</ul>
+
+<hr>
+<p class="muted-note"><strong>Update reminder</strong>: after changing any of the JSON files above, update the matching section of this document too.</p>
+
+</main>
+</body>
+</html>

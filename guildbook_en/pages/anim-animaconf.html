@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="translated-from" content="202610300931">
+<!-- AI-NOTE: translated-from = the guildbook_cn doc-version this page was translated from. If the cn counterpart's doc-version is newer, re-translate this page from the Chinese source. -->
+
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>animaconf: The Header Declaration — Naiz Guildbook</title>
+<link rel="stylesheet" href="../style.css">
+</head>
+<body>
+<nav class="sidebar" id="sidebar-nav"></nav>
+<script src="../sidebar-animation.js"></script>
+<main class="main">
+
+<h1>animaconf: The Header Declaration</h1>
+<blockquote><strong>Created</strong>: 2026-08-29<br><strong>Last updated</strong>: 2026-08-29</blockquote>
+<p><code>animaconf</code> goes on the <strong>first line</strong> of the storyboard script (the <code>.na</code> file) and states the animation's basic setup — like announcing before you start shooting: fullscreen or a cine strip, frame-swap or recolor, and which project the assets belong to. Back to the <a href="anim-语法.html">Syntax Overview</a>.</p>
+<hr>
+
+<h2>1. How to write it</h2>
+<pre><code>animaconf(全屏还是横条, 整图还是变色, 项目名)</code></pre>
+<p>The three options go in the parentheses, separated by commas — <strong>no braces</strong>. For example:</p>
+<pre><code>animaconf(fullscreen,pixel,眨眼项目)
+animaconf(cine,palette,标题流光)</code></pre>
+
+<h2>2. What goes in each of the three options</h2>
+<table>
+<tr><th>Position</th><th>Allowed values</th><th>Meaning</th></tr>
+<tr><td>First</td><td><code>fullscreen</code> / <code>cine</code></td><td><code>fullscreen</code> = an animation covering the whole screen; <code>cine</code> = only the strip above the dialogue box</td></tr>
+<tr><td>Second</td><td><code>pixel</code> / <code>palette</code></td><td><code>pixel</code> = a pixel animation (images swapped one after another); <code>palette</code> = a palette animation (the image stays put, only the colors change)</td></tr>
+<tr><td>Third</td><td>Your project name</td><td>Tells the tool which project's assets folder to look in; the project must already exist</td></tr>
+</table>
+
+<h2>3. Things to watch out for</h2>
+<ul>
+<li>It is required and must be written <strong>exactly once</strong>, at the very front of the script (blank lines or <code>#</code> comments may precede it).</li>
+<li><strong>Don't declare looping here</strong> — whether the animation plays once or loops is decided by the command that plays it in the game; the script doesn't handle that.</li>
+<li>A misspelled option or a nonexistent project folder — the tool raises an error to alert you.</li>
+</ul>
+
+<h2>4. Examples</h2>
+<pre><code># A fullscreen pixel animation (e.g. an explosion, falling petals)
+animaconf(fullscreen,pixel,特效合集)
+
+# A cine-strip palette animation above the dialogue box (e.g. flickering lights)
+animaconf(cine,palette,标题流光)</code></pre>
+
+<h2>5. Common mistakes</h2>
+<ul>
+<li>Writing <code>animaconf(){...}</code> with braces → parentheses only here, no braces.</li>
+<li>Omitting it, writing it twice, or not putting it on the first line → the tool reports a problem with animaconf.</li>
+<li>A wrong project name or a project that hasn't been created yet → the tool reports the project as missing.</li>
+</ul>
+<p>→ <a href="anim-语法.html">Back to the Syntax Overview</a></p>
+
+</main>
+</body>
+</html>

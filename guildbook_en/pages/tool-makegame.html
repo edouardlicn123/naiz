@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="translated-from" content="202610300931">
+<!-- AI-NOTE: translated-from = the guildbook_cn doc-version this page was translated from. If the cn counterpart's doc-version is newer, re-translate this page from the Chinese source. -->
+
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>makegame.sh Usage Guide — Naiz Guildbook</title>
+<link rel="stylesheet" href="../style.css">
+</head>
+<body>
+<nav class="sidebar" id="sidebar-nav"></nav>
+<script src="../sidebar-tools.js"></script>
+<main class="main">
+
+<h1>makegame.sh Usage Guide</h1>
+<blockquote><strong>Created</strong>: 2026-08-29<br><strong>Last updated</strong>: 2026-08-29</blockquote>
+<p><code>makegame.sh</code> is the <strong>game-data build</strong> script: it packs a project's scenario, assets, and configuration into an HDI image that runs in the emulator, and provides the test entry point. For building the engine, see the Watcom installation in <code>start.sh</code>. <strong>For daily use, running it directly and picking the project and action from the number menu is the recommended way</strong>; command-line subcommands suit scripts or experienced users.</p>
+<hr>
+
+<h2>1. Interactive menu (primary usage)</h2>
+<p>Run it with no arguments:</p>
+<pre><code>./makegame.sh</code></pre>
+<p>You get a two-level menu; <strong>at every step, type a number and press Enter</strong>:</p>
+<ul>
+<li><strong>Step 1</strong>: all projects are listed (e.g. <code>1) demo-a2 …</code>); pick a number to enter that project.</li>
+<li><strong>Step 2</strong>: within the project, choose the action to run — build the data, launch a test, re-inject the HDI, refresh the multilingual text, and so on — again by number.</li>
+</ul>
+<p>A failed menu action does not exit; it returns to the menu so you can retry. This way you never need to remember commands or project names, which makes it the best fit for daily use.</p>
+<p><em>Beginner tip: to see it running, enter a project and pick the "test" item — that launches the emulator.</em></p>
+
+<h2>2. Command-line usage (advanced / scripting)</h2>
+<p>Once familiar, or when writing automation scripts, pass a subcommand directly and skip the menu:</p>
+<pre><code>./makegame.sh &lt;子命令&gt; &lt;game&gt; [选项]</code></pre>
+<table>
+<tr><th>Subcommand</th><th>What it does</th></tr>
+<tr><td><code>build &lt;game&gt;</code></td><td>Full-pipeline build: data build + engine build check + HDI injection</td></tr>
+<tr><td><code>make &lt;game&gt;</code></td><td>Only produce the HDI image (inject the existing data into <code>disks/&lt;game&gt;.hdi</code>)</td></tr>
+<tr><td><code>test &lt;game&gt; [--serial] [--porttest] [--auto]</code></td><td>Launch the emulator test</td></tr>
+<tr><td><code>i18n-gen &lt;game&gt; [--force]</code></td><td>Generate/refresh the internationalized text</td></tr>
+</table>
+
+<h2>3. Option reference</h2>
+<ul>
+<li><code>&lt;game&gt;</code>: the project directory name, located at <code>projects/&lt;game&gt;/</code> (e.g. <code>demo-a2</code>).</li>
+<li><code>--serial</code>: emit debug output over the serial port during tests (the most reliable debugging channel).</li>
+<li><code>--porttest</code>: only check whether the emulator's serial port is usable; does not launch the game.</li>
+<li><code>--auto</code>: if <code>games/&lt;game&gt;/engine_a.exe</code> exists, inject it preferentially.</li>
+<li><code>--force</code> (i18n-gen): ignore the incremental check and force regeneration of the text.</li>
+</ul>
+
+<h2>4. Common usage examples</h2>
+<pre><code># In the interactive menu, pick a project → pick "Build" (recommended)
+./makegame.sh
+# Equivalent command-line form:
+./makegame.sh build demo-a2
+
+# Repack the HDI only (data unchanged)
+./makegame.sh make demo-a2
+
+# Run in the emulator over serial and watch the log
+./makegame.sh test demo-a2 --serial</code></pre>
+
+<h2>5. Related</h2>
+<ul>
+<li><a href="tool-start.html">start.sh</a> — environment setup and audit entry point.</li>
+<li><a href="tool-anima.html">anima.sh</a> — the animation production tool (its output is packed into the HDI by this script too).</li>
+</ul>
+
+</main>
+</body>
+</html>

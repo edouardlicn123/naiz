@@ -17,8 +17,26 @@ COMMERCIAL_BIOS_DIR = os.path.join(COMMERCIAL_DIR, 'pc9821bios')
 """NEC PC-98 BIOS ROM directory (commercial firmware)."""
 COMMERCIAL_DOS_DIR = os.path.join(COMMERCIAL_DIR, 'dos_system')
 """DOS system files (DOS4GW.EXE, VEM486.*, IO.SYS, ...)."""
-DOS_SYSTEM_DIR = COMMERCIAL_DOS_DIR
-"""Deprecated alias for COMMERCIAL_DOS_DIR (kept for backward compatibility)."""
+TOOLS_OPEN_DIR = os.path.join(PROJECT_ROOT, 'tools_open')
+"""Directory holding open-source build assets (naiz-openpack); preferred over tools_commercial."""
+OPEN_DOS_DIR = os.path.join(TOOLS_OPEN_DIR, 'dos_system')
+"""Open-source DOS system files (FreeDOS(98) kernel, FDXMS/EMM386, CTMOUSE, ...)."""
+OPEN_BASE_HDI = os.path.join(TOOLS_OPEN_DIR, 'base_freedos98_scsi_48m_clean.hdi')
+"""FreeDOS(98) base HDI image (open-source chain, devdoc 185)."""
+
+
+def resolve_dos_dir():
+    """DOS system dir: prefer tools_open/dos_system, fall back to tools_commercial."""
+    return OPEN_DOS_DIR if os.path.isdir(OPEN_DOS_DIR) else COMMERCIAL_DOS_DIR
+
+
+def resolve_base_hdi():
+    """Base HDI: prefer the open-source image when present, fall back to commercial."""
+    return OPEN_BASE_HDI if os.path.isfile(OPEN_BASE_HDI) else COMMERCIAL_BASE_HDI
+
+
+DOS_SYSTEM_DIR = resolve_dos_dir()
+"""Deprecated alias (kept for backward compatibility); auto-selects tools_open over tools_commercial."""
 VENV_DIR = os.path.join(PROJECT_ROOT, 'tools', 'env_setup', 'venv')
 """Shared Python virtualenv directory (single source of truth)."""
 VENV_PYTHON = os.path.join(VENV_DIR, 'bin', 'python3')

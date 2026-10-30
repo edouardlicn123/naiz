@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="translated-from" content="202610300931">
+<!-- AI-NOTE: translated-from = the guildbook_cn doc-version this page was translated from. If the cn counterpart's doc-version is newer, re-translate this page from the Chinese source. -->
+
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>pal: Making the Colors Change — Naiz Guildbook</title>
+<link rel="stylesheet" href="../style.css">
+</head>
+<body>
+<nav class="sidebar" id="sidebar-nav"></nav>
+<script src="../sidebar-animation.js"></script>
+<main class="main">
+
+<h1>pal: Making the Colors Change</h1>
+<blockquote><strong>Created</strong>: 2026-08-29<br><strong>Last updated</strong>: 2026-08-29</blockquote>
+<p><code>pal</code> is for <strong>palette animations</strong> (the kind whose header declaration picked <code>palette</code>). It states how the colors change this time and how long the result stays on screen. The image itself doesn't move — only its colors change — which makes it perfect for flickering lights, magic glows, and gradual color-tone shifts. Back to the <a href="anim-语法.html">Syntax Overview</a>.</p>
+<hr>
+
+<h2>1. How to write it</h2>
+<pre><code>pal(停留秒数){色表昵称}</code></pre>
+<ul>
+<li>The parentheses hold <strong>one number</strong> (seconds; decimals allowed).</li>
+<li>The braces hold the <strong>palette-table nickname</strong> used by this change (a palette table says which colors become what). You may write several, separated by commas; they take effect in turn and share the same duration.</li>
+</ul>
+
+<h2>2. What a palette-table file (.pal) looks like</h2>
+<p>A palette table is a very simple text file; each line says: take the color with this index and change it to these red/green/blue values:</p>
+<pre><code># Light example: change index 0 to red, index 15 to black
+0 255 0 0
+15 0 0 0</code></pre>
+<ul>
+<li>Each line has four numbers: <code>index red green blue</code>, all values between 0 and 255.</li>
+<li>A <code>#</code> at the start of a line is a comment and is ignored.</li>
+<li>Don't write the same index twice in one palette table.</li>
+<li>Colors not mentioned keep how they looked after the previous step (so a chain of pal commands keeps building on the previous step).</li>
+</ul>
+
+<h2>3. A galgame example</h2>
+<pre><code># Title-screen light: normal → dark → bright, breathing back and forth
+animaconf(cine,palette,标题流光)
+base(){正常}
+pal(0.2){暗}
+pal(0.2){亮}</code></pre>
+
+<h2>4. Things to watch out for</h2>
+<ul>
+<li><strong>Only for palette animations</strong> (the header declaration picked <code>palette</code>). Writing <code>pal</code> in a pixel animation is an error.</li>
+<li>It <strong>must come after base</strong> (base image first, then the changes).</li>
+<li>A palette animation needs <strong>at least one</strong> <code>pal</code>.</li>
+<li>The palette-table nickname must also be registered with <code>register</code> first; a malformed palette-table file (e.g. lines that aren't four numbers) makes the tool raise an error.</li>
+</ul>
+
+<h2>5. Common mistakes</h2>
+<ul>
+<li>Using pal in a pixel animation by mistake → use frame instead.</li>
+<li>Writing pal before base → put base first.</li>
+<li>It reports a malformed .pal → check that every line is the four numbers index red green blue and that no index is repeated.</li>
+</ul>
+<p>→ <a href="anim-语法.html">Back to the Syntax Overview</a></p>
+
+</main>
+</body>
+</html>

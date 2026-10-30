@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="translated-from" content="202610300931">
+<!-- AI-NOTE: translated-from = the guildbook_cn doc-version this page was translated from. If the cn counterpart's doc-version is newer, re-translate this page from the Chinese source. -->
+
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>cgvmenu / musicmenu — Naiz Guildbook</title>
+<link rel="stylesheet" href="../style.css">
+</head>
+<body>
+<nav class="sidebar" id="sidebar-nav"></nav>
+<script src="../sidebar-scripts.js"></script>
+<main class="main">
+
+<h1>cgvmenu / musicmenu — Gallery Mode</h1>
+<hr>
+<blockquote><strong>Created</strong>: 2026-07-27<br><strong>Last updated</strong>: 2026-09-11</blockquote>
+<p><code>cgvmenu()</code> opens the CG gallery; <code>musicmenu()</code> is the music gallery — still a reserved stub with no effect yet.</p>
+
+<h2>1. Syntax</h2>
+<pre><code>cgvmenu()
+musicmenu()</code></pre>
+<p>Neither takes parameters; calling them jumps to the CG gallery scene.</p>
+
+<h2>2. CG Gallery (cgvmenu, implemented)</h2>
+<ul>
+<li><strong>Grid</strong>: full-screen black background + title, <code>4×2</code> thumbnail cells per page; "&lt; / &gt; / page number" for paging at the top, "Back" at the bottom right</li>
+<li><strong>Unlock bitmap</strong>: locked CGs show as grey placeholders; unlock state is read from the save (cached once on entry)</li>
+<li><strong>Preview</strong>: select an unlocked cell and press Enter / click to enter the full-screen preview; the preview is drawn on top of the gallery background (returning puts you back at the same grid position)</li>
+<li><strong>Rendering</strong>: the grid is drawn into a separate menu composite buffer (<code>menu_layer</code>, 0.2.093); focus moves use incremental partial publish, and the whole base is restored on exit</li>
+<li><strong>Collection progress</strong>: shown above the grid, updated in step with unlocks</li>
+</ul>
+
+<h2>3. Status</h2>
+<table>
+<tr><th>Command</th><th>Status</th></tr>
+<tr><td><code>cgvmenu()</code></td><td><strong>Implemented</strong> (see the section above)</td></tr>
+<tr><td><code>musicmenu()</code></td><td>Reserved stub (not implemented)</td></tr>
+</table>
+
+</main>
+</body>
+</html>

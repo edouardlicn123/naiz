@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="translated-from" content="202610300931">
+<!-- AI-NOTE: translated-from = the guildbook_cn doc-version this page was translated from. If the cn counterpart's doc-version is newer, re-translate this page from the Chinese source. -->
+
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>base: The Palette Animation's Base Image — Naiz Guildbook</title>
+<link rel="stylesheet" href="../style.css">
+</head>
+<body>
+<nav class="sidebar" id="sidebar-nav"></nav>
+<script src="../sidebar-animation.js"></script>
+<main class="main">
+
+<h1>base: The Palette Animation's Base Image</h1>
+<blockquote><strong>Created</strong>: 2026-08-29<br><strong>Last updated</strong>: 2026-08-29</blockquote>
+<p><code>base</code> is for <strong>palette animations</strong> (the kind whose header declaration picked <code>palette</code>). It declares the first base image — the picture as it looks before any changes; every later recolor is applied on top of this image. Back to the <a href="anim-语法.html">Syntax Overview</a>.</p>
+<hr>
+
+<h2>1. How to write it</h2>
+<pre><code>base(){素材昵称}</code></pre>
+<p>The braces hold <strong>exactly one</strong> asset nickname (the base image); no number goes in the parentheses.</p>
+
+<h2>2. A galgame example</h2>
+<pre><code># Flickering light: start from a base image at normal brightness, then darken and brighten it
+animaconf(cine,palette,标题流光)
+base(){正常亮度}
+pal(0.2){暗一点}
+pal(0.2){亮回来}</code></pre>
+<p>Each palette table that follows modifies the base image's colors on top of it — colors not mentioned keep the base image's look.</p>
+
+<h2>3. Things to watch out for</h2>
+<ul>
+<li><strong>Only for palette animations</strong> (the header declaration picked <code>palette</code>). Writing <code>base</code> in a pixel animation is an error.</li>
+<li>In a palette animation, <code>base</code> may be written <strong>only once</strong>.</li>
+<li>It <strong>must come before pal</strong> (base image first, then the changes). Writing pal first and base after makes the tool raise an error.</li>
+<li>The base image's nickname must also be registered with <code>register</code> first.</li>
+</ul>
+
+<h2>4. Common mistakes</h2>
+<ul>
+<li>Using base in a pixel animation by mistake → use frame instead.</li>
+<li>Writing base twice → keep just one.</li>
+<li>Writing pal before base → move base to the front.</li>
+</ul>
+<p>→ <a href="anim-语法.html">Back to the Syntax Overview</a></p>
+
+</main>
+</body>
+</html>

@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="translated-from" content="202610300931">
+<!-- AI-NOTE: translated-from = the guildbook_cn doc-version this page was translated from. If the cn counterpart's doc-version is newer, re-translate this page from the Chinese source. -->
+
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>NB Scenario Overview — Naiz Guildbook</title>
+<link rel="stylesheet" href="../style.css">
+</head>
+<body>
+<nav class="sidebar" id="sidebar-nav"></nav>
+<script src="../sidebar-scripts.js"></script>
+<main class="main">
+
+<h1>NB Scenario Overview</h1>
+<hr>
+
+<blockquote><strong>Created</strong>: 2026-07-27<br><strong>Last updated</strong>: 2026-10-03</blockquote>
+
+<h2>1. Overview</h2>
+<p>NB (Naiz Book) is the Naiz engine's high-level scenario format: UTF-8 plain text, one command per line. The engine loads and executes NB files directly, with no compile step to bytecode.</p>
+
+<hr>
+
+<h2>2. File Organization</h2>
+
+<h3>2.1 Naming Rules</h3>
+<table>
+<tr><th>File</th><th>Scene</th></tr>
+<tr><td><code>logo.nb</code></td><td>Startup logo</td></tr>
+<tr><td><code>op.nb</code></td><td>Opening</td></tr>
+<tr><td><code>mainmenu.nb</code></td><td>Main menu</td></tr>
+<tr><td><code>savescene.nb</code></td><td>Save menu</td></tr>
+<tr><td><code>loadscene.nb</code></td><td>Load menu</td></tr>
+<tr><td><code>nbook001.nb</code> ~ <code>nbook020.nb</code></td><td>Story scenes 001–020</td></tr>
+</table>
+
+<h3>2.2 Format Conventions</h3>
+<ul>
+<li>UTF-8 encoding, LF line endings</li>
+<li>One command per line</li>
+<li>Lines starting with <code>#</code> are comments</li>
+<li>Blank lines are ignored</li>
+<li>Parameters are comma-separated (the <code>question</code> and <code>scene</code> commands use a semicolon <code>;</code> as the top-level separator, with commas inside sub-segments; a comma inside field content is escaped as <code>\,</code>, and <code>\\</code> is a literal backslash — see <a href="sc08-question.html">sc08 question</a>)</li>
+<li>Parameters go inside <code>()</code>, text content goes inside <code>{}</code></li>
+</ul>
+
+<hr>
+
+<h2>3. Scene Chain Example</h2>
+<pre><code>logo.nb  ──scene(op)────→  op.nb  ──scene(mainmenu)──→  mainmenu.nb
+                                                               │
+                  ┌─────────┬─────────┬─────────┬──────┬──────┬──┴──┬──────┐
+                  │continue │ load    │ start   │music │gallery│sett.│ exit │
+                  └─────────┴─────────┴────┬────┴──────┴──────┴─────┴──────┘
+                                            ▼
+                                       nbook001.nb
+                                            │
+                                        scene(end)
+                                            │
+                                            ▼
+                                       mainmenu.nb</code></pre>
+
+<hr>
+
+<h2>4. Change History</h2>
+<table>
+<tr><th>Date</th><th>Change</th></tr>
+<tr><td>2026-07-27</td><td>Split from C02: the concept material now lives in this document. Command details are in the topic-specific documents.</td></tr>
+</table>
+
+</main>
+</body>
+</html>

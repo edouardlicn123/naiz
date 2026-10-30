@@ -1,0 +1,37 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="translated-from" content="202610300931">
+<!-- AI-NOTE: translated-from = the guildbook_cn doc-version this page was translated from. If the cn counterpart's doc-version is newer, re-translate this page from the Chinese source. -->
+
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>waitanima — Naiz Guildbook</title>
+<link rel="stylesheet" href="../style.css">
+</head>
+<body>
+<nav class="sidebar" id="sidebar-nav"></nav>
+<script src="../sidebar-scripts.js"></script>
+<main class="main">
+
+<h1>waitanima — Wait for Animation</h1>
+<hr>
+<blockquote><strong>Created</strong>: 2026-08-29</blockquote>
+<p><code>waitanima{}</code> pauses scenario progression until the current animation has finished playing.</p>
+
+<h2>1. Syntax</h2>
+<pre><code>waitanima{}</code></pre>
+<table>
+<tr><th>Parameter</th><th>Type</th><th>Description</th></tr>
+<tr><td>—</td><td>—</td><td>No parameters</td></tr>
+</table>
+
+<h2>2. Example</h2>
+<pre><code>playanima(){opening}
+waitanima{}</code></pre>
+
+<div class="note-box"><p>Input is swallowed while waiting (no line skipping, no animation abort); a <code>once</code> animation resumes the scenario by itself when it ends, with no keypress needed. Use it together with <code>playanima</code> — see <code>sc15-playanima.html</code>.</p></div>
+
+</main>
+</body>
+</html>

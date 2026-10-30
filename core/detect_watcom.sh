@@ -40,3 +40,11 @@ if [ -d "$WATCOM/binl64" ]; then
 elif [ -d "$WATCOM/binl" ]; then
     export PATH="$WATCOM/binl:$PATH"
 fi
+
+# CauseWay linker stub (devdoc 178): `wlink -l=causeway` needs cwstub.exe
+# from the cwd or PATH. Some Watcom installs ship it, ours does not; fall
+# back to $HOME/watcom-extras when present. core/Makefile hard-fails when
+# the stub is still unreachable (W1093 alone would emit a broken LE EXE).
+if ! command -v cwstub.exe >/dev/null 2>&1 && [ -f "$HOME/watcom-extras/cwstub.exe" ]; then
+    export PATH="$HOME/watcom-extras:$PATH"
+fi

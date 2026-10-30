@@ -10,14 +10,13 @@ import os
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
 
 from naiz_img import NAIZFatFS, open_image
-from naiz_lib import COMMERCIAL_BASE_HDI
-
-
-HDI_PATH = COMMERCIAL_BASE_HDI
+from naiz_lib import resolve_base_hdi
 
 
 def main():
-    img = open_image(HDI_PATH)
+    # Optional argv[1] = HDI path; default is the resolved base image.
+    hdi_path = sys.argv[1] if len(sys.argv) > 1 else resolve_base_hdi()
+    img = open_image(hdi_path)
     fs = NAIZFatFS(img)
 
     print(f"Partition offset: {fs.part_offset} (0x{fs.part_offset:x})")

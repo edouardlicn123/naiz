@@ -1,0 +1,173 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="translated-from" content="202610300931">
+<!-- AI-NOTE: translated-from = the guildbook_cn doc-version this page was translated from. If the cn counterpart's doc-version is newer, re-translate this page from the Chinese source. -->
+
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Project Configuration File — Naiz Guildbook</title>
+<link rel="stylesheet" href="../style.css">
+</head>
+<body>
+<nav class="sidebar" id="sidebar-nav"></nav>
+<script src="../sidebar-reference.js"></script>
+<main class="main">
+
+<h1>Project Configuration File (config.toml)</h1>
+<hr>
+<blockquote><strong>Created</strong>: 2026-08-04</blockquote>
+
+<p>Every project root holds a <code>config.toml</code> that manages project-level global configuration (language, title, version, transition, blackletter switches). At build time several tools read it and generate the <code>NAIZ_*</code> macros in <code>core/engine/nb_config.h</code>, <strong>compiled into the engine</strong>; at runtime no project configuration file is deployed or parsed any more.</p>
+
+<h2>1. Value type conventions</h2>
+<table>
+<tr><th>Type</th><th>Syntax</th><th>Example</th></tr>
+<tr>
+  <td>String</td>
+  <td>Wrapped in double quotes</td>
+  <td><code>title = "Demo-A2"</code></td>
+</tr>
+<tr>
+  <td>Boolean</td>
+  <td><code>true</code> / <code>false</code>, <strong>without quotes</strong></td>
+  <td><code>title = false</code></td>
+</tr>
+<tr>
+  <td>Integer</td>
+  <td>Decimal integer</td>
+  <td><code>frames = 2</code></td>
+</tr>
+<tr>
+  <td>String array</td>
+  <td>Brackets, comma separated</td>
+  <td><code>targets = ["chi", "jpn"]</code></td>
+</tr>
+<tr>
+  <td>Nested section</td>
+  <td>Use <code>[section name]</code></td>
+  <td><code>[blackletter]</code></td>
+</tr>
+</table>
+<div class="note-box">
+<strong>Reminder</strong>: do not quote booleans. <code>"false"</code> is a string, not a boolean, and the build tool reads it as "present → on", turning on a feature you meant to keep off.
+</div>
+
+<h2>2. Full configuration with comments</h2>
+<pre><code># =============================================================
+# Naiz game project configuration (TOML) — # comments supported
+# Sole exception: the version line below is maintained by
+# bump_version; do not edit it by hand, other lines are free.
+# =============================================================
+
+# ---- Internationalization (i18n) ----
+[i18n]
+# Source language (text baseline), required. i18n_gen generates translations from it.
+source_lang = "eng"
+# Target languages to generate translations for (used by i18n_gen). Must not include source_lang itself.
+targets = ["chi", "jpn"]
+
+# ---- Project information ----
+[project]
+# Game title (shown on the main menu / startup screen)
+title = "Demo-A2"
+# Game description (short note, used only to identify the project)
+description = "Naiz Engine 技术演示"
+# Version number X.Y.ZZZ — maintained by bump_version, do not edit by hand
+version = "0.1.053"
+
+# ---- Scene transitions ----
+[transition]
+# Scene transition type: cut | fade | vblinds | hblinds | dblinds | rdblinds
+type = "vblinds"
+# Transition frame count (1-64); the higher the value the slower the transition
+frames = 2
+
+# ---- Blackletter ----
+[blackletter]
+# Whether the LOAD / SAVE titles on the load/save pages use blackletter MAG
+title = false
+# Whether ASCII body text uses blackletter 16×16 (BLACK.DAT)
+dialog = false</code></pre>
+<p>For the blackletter fields, see <a href="cf06-黑花字.html">cf06 Blackletter</a>.</p>
+
+<h2>3. Key reference table</h2>
+<table>
+<tr><th>Section</th><th>Key</th><th>Type</th><th>Default</th><th>Description</th></tr>
+<tr>
+  <td><code>i18n</code></td><td><code>source_lang</code></td><td>string</td><td>—</td>
+  <td>Source language (text baseline), required. Used by <code>i18n_gen</code>.</td>
+</tr>
+<tr>
+  <td><code>i18n</code></td><td><code>targets</code></td><td>string[]</td><td>—</td>
+  <td>Target languages to generate translations for; must not include <code>source_lang</code>.</td>
+</tr>
+<tr>
+  <td><code>project</code></td><td><code>title</code></td><td>string</td><td>—</td>
+  <td>Game title.</td>
+</tr>
+<tr>
+  <td><code>project</code></td><td><code>description</code></td><td>string</td><td>—</td>
+  <td>Game description.</td>
+</tr>
+<tr>
+  <td><code>project</code></td><td><code>version</code></td><td>string</td><td>—</td>
+  <td>Version number <code>X.Y.ZZZ</code>, maintained by <code>bump_version</code>; do not edit by hand.</td>
+</tr>
+<tr>
+  <td><code>transition</code></td><td><code>type</code></td><td>string</td><td><code>vblinds</code></td>
+  <td>Scene transition type. — <a href="cf05-过渡效果.html">cf05 details</a></td>
+</tr>
+<tr>
+  <td><code>transition</code></td><td><code>frames</code></td><td>int</td><td><code>16</code></td>
+  <td>Transition frame count (1–64). — <a href="cf05-过渡效果.html">cf05 details</a></td>
+</tr>
+<tr>
+  <td><code>blackletter</code></td><td><code>title</code> / <code>dialog</code></td><td>table</td><td>—</td>
+  <td>Blackletter switches (effective only for non-CJK languages). — <a href="cf06-黑花字.html">cf06 details</a></td>
+</tr>
+</table>
+
+<h2>4. Toolchain consumption matrix</h2>
+<table>
+<tr><th>Section</th><th>Key</th><th>Reading tool</th><th>Destination / purpose</th></tr>
+<tr>
+  <td><code>i18n</code></td><td><code>source_lang</code>, <code>targets</code></td>
+  <td><code>tools/naiz_conv/i18n_gen.py</code></td>
+  <td>Generates / merges translation files.</td>
+</tr>
+<tr>
+  <td><code>project</code> / <code>blackletter</code></td><td><code>title</code>, <code>version</code>, <code>title</code> / <code>dialog</code></td>
+  <td><code>tools/naiz_build/export_config.py</code></td>
+  <td>Generates the <code>NAIZ_VERSION</code> / <code>NAIZ_BLACKLETTER_TITLE</code> / <code>NAIZ_BLACKLETTER_DIALOG</code> macros in <code>nb_config.h</code>, <strong>compiled into the engine</strong>.</td>
+</tr>
+<tr>
+  <td><code>transition</code></td><td><code>type</code>, <code>frames</code></td>
+  <td><code>tools/naiz_build/export_config.py</code></td>
+  <td>Generates the engine header <code>nb_config.h</code> (macros <code>NAIZ_TRANSITION_*</code>), embedded at compile time.</td>
+</tr>
+<tr>
+  <td><code>project</code></td><td><code>version</code></td>
+  <td><code>tools/naiz_build/bump_version.py</code></td>
+  <td>Version bump (§5 below).</td>
+</tr>
+</table>
+
+<h2>5. Version bump</h2>
+<p>Run this after every source change:</p>
+<pre><code>python -m tools.naiz_build.bump_version &lt;game&gt;</code></pre>
+<ul>
+  <li>Increments the rightmost segment of <code>version</code> (for example <code>0.1.052 → 0.1.053</code>).</li>
+  <li>Writes back by <strong>line replacement</strong>: only the <code>version = "…"</code> line changes, while every other <code>#</code> comment and the layout <strong>stay intact</strong> (the TOML reader <code>tomllib</code> is read-only, so the file is no longer serialized back wholesale).</li>
+  <li>The <code>version</code> line must exist and must be exactly one line, otherwise the tool reports an error.</li>
+</ul>
+
+<h2>6. Runtime chain</h2>
+<ul>
+  <li><strong>Project-level configuration</strong> (version / dialogue box / buttons / blackletter / default language / transitions): everything goes through <strong>compile-time macros</strong> — <code>config.toml</code> → <code>export_config.py</code> → <code>nb_config.h</code> with its <code>NAIZ_*</code> macros → compiled into the engine, <strong>zero runtime parsing</strong>. The old <code>settings.txt</code> and its parser (<code>settings.c</code> / <code>settings.h</code>) are <strong>fully deleted</strong>; at build time a leftover <code>settings.txt</code> is only ever <strong>deleted</strong> from the deployment directory.</li>
+  <li><strong>Compile-time group</strong> (transitions): <code>config.toml</code> → <code>export_config.py</code> → <code>nb_config.h</code> macros → embedded at engine compile time.</li>
+</ul>
+
+</main>
+</body>
+</html>

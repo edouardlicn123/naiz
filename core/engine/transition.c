@@ -17,6 +17,7 @@
 #include "render.h"
 #include "transition.h"
 #include "transition_internal.h"
+#include "preload_queue.h"
 #include "debug.h"
 #include "palette.h"
 #include "vm.h"
@@ -28,10 +29,17 @@ typedef struct {
     int active;
     int step;
     int frames;
+    int hold;               /* devdoc 185: drain-hold ticks on the black cover */
     int x, y, w, h;
     unsigned char type;
     unsigned char color;
 } TransitionState;
+
+/* devdoc 185: hard cap on the black-cover drain hold, in pump ticks.  The
+ * hold always terminates on its own (a failed decode drops its job), so this
+ * only bounds pathological cases (e.g. a huge queue on a very slow machine)
+ * at ~10 s on 60 Hz hardware. */
+#define TRANSITION_HOLD_MAX 600
 
 static TransitionState g_transition;
 
@@ -51,6 +59,7 @@ void transition_start(int x, int y, int w, int h,
     g_transition.color = color;
     g_transition.step = 0;
     g_transition.frames = frames;
+    g_transition.hold = 0;
 
     if (type == TRANSITION_CUT) {
         fill_rect(x, y, w, h, color);
@@ -72,6 +81,25 @@ void transition_tick(void)
 {
     if (!g_transition.active)
         return;
+
+    if (g_transition.step >= g_transition.frames) {
+        /* devdoc 185: drain-hold phase.  The cover is already full black;
+         * the new scene's script is still held back (nb_process waits for
+         * transition_active() to clear), so nothing repaints over the cover.
+         * Under NP2kai one MAG decode costs 250-500 ms, so lifting the cover
+         * with jobs pending turned the drain into a visible stall train
+         * (185 capture #2: 77 hitches of 250-1500 ms right after scene
+         * entries).  Sit on the black cover -- the pump still drains two
+         * queue slots per frame while transition_active() -- until the queue
+         * empties (or the cap trips), then hand over. */
+        if (g_transition.hold < TRANSITION_HOLD_MAX && preload_pending() > 0) {
+            g_transition.hold++;
+            return;
+        }
+        g_transition.active = 0;
+        vm_request_process();
+        return;
+    }
 
     switch (g_transition.type) {
     case TRANSITION_PFADE:
@@ -108,10 +136,11 @@ void transition_tick(void)
     /* The sweep families may stop just short of the far edge with integer
      * rounding; the palette fade interpolates toward near-black.  Force full
      * black for a clean hand-over, then blank the covered pixels so a palette
-     * restore by the new scene's image_load cannot resurrect the old frame. */
+     * restore by the new scene's image_load cannot resurrect the old frame.
+     * devdoc 185: the cover stays ARMED with step==frames -- the next tick
+     * enters the drain-hold phase and lifts the cover only once the preload
+     * queue has drained (or TRANSITION_HOLD_MAX tripped). */
     palette_set_all(transition_black);
     fill_rect(g_transition.x, g_transition.y,
               g_transition.w, g_transition.h, g_transition.color);
-    g_transition.active = 0;
-    vm_request_process();
 }

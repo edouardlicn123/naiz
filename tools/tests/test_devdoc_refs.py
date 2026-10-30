@@ -67,12 +67,15 @@ LINE_REF_WHITELIST = {
     # audio_preload_bgm() and the BgmPreload cache, shifting every later
     # audio.c citation by +6 (327/502/511/398 -> 344/508/517/404) except
     # audio_init/frame_decode_pump, which moved by +6 and +2 respectively.
-    ("audio.c", 344): "g_bgm_on",
-    ("audio.c", 508): "g_snd_on",
-    ("audio.c", 517): "g_vc_on",
-    ("audio.c", 404): "audio_bgm_stop",
-    ("audio.c", 605): "audio_init",
-    ("audio.c", 603): "frame_decode_pump",
+    # devdoc 186 (same-key guard) added the key field + guard block + commit
+    # line, shifting 344->345, 404->415, 508->520, 517->529 (+1/+11/+12/+12);
+    # audio_init/frame_decode_pump sit past those and moved by +14/+12.
+    ("audio.c", 345): "g_bgm_on",
+    ("audio.c", 520): "g_snd_on",
+    ("audio.c", 529): "g_vc_on",
+    ("audio.c", 415): "audio_bgm_stop",
+    ("audio.c", 617): "audio_init",
+    ("audio.c", 615): "frame_decode_pump",
     ("hal_audio.c", 88): "PCM_CTRL_A46A_IRQ",
     ("hal_audio.c", 94): "PCM_IRQ_INTERVAL_MAX",
     ("hal_audio.c", 134): "hal_pcm_set_volume",
@@ -90,7 +93,7 @@ LINE_REF_WHITELIST = {
     ("nb_setting.c", 171): "SET_VAL_W",
     ("nb_setting.c", 242): "draw_text",
     ("nb_saveload.c", 45): "clipped",
-    ("build_game.py", 448): "nb_asset_table.h",
+    ("build_game.py", 449): "nb_asset_table.h",
     ("render_text.c", 235): "text_width",
     # devdoc 119 §3.4 renamed this key; the row literal moved with it
     ("nb_setting.c", 150): "Sound & Voice Vol",
@@ -119,8 +122,8 @@ LINE_REF_WHITELIST = {
     ("tr.c", 28): "tr_table",
     ("tr.c", 168): "break",
     ("build_game.py", 325): "stale_settings.unlink",
-    ("build_game.py", 466): "export_config_py",
-    ("build_game.py", 470): "compile_engine",
+    ("build_game.py", 464): "export_config_py",
+    ("build_game.py", 471): "compile_engine",
 }
 
 # References a finished devdoc quotes on purpose, and which therefore must NOT

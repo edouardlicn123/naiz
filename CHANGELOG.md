@@ -3,6 +3,24 @@
 自 R1 起全部 Bug 修复与功能演进记录（条目顺序沿用 AGENTS.md 既有历史排列）；`AGENTS.md` 仅保留当前版本与规则。**新条目约定**：每轮修复/演进完成后，在下方 `---` 分隔线之后（第一条位置）追加变更摘要，并在 AGENTS.md 头部同步「当前版本」。**条目格式**：每条以 `### <版本号> — <标题>` 开头（版本号化标题行 + `<a id="cN">` 锚点，N 按条目序递增），正文整段或分小节；历史速查直接读下方「版本索引」。
 ---
 
+<a id="c91"></a>
+### 0.3.063 — 音频升级计划收敛（devdoc 186）：同键守卫 + S98/FMP 导出工具落地，158–162 收敛删档
+
+**动机**：`devdocs/模仿升级计划/`（158–162，0.3.047 时代立项）八天未动，坐标漂移（`audio_bgm_start` 238→332）且运行条件已变（`USEFMGEN` true→false）。逐项核查发现五份的价值几乎全部押在"未来素材"上（现曲 CC1=0、CC10=64、bend 居中、ch10 零音符），只有两项即时可做。
+
+**收敛决策（devdoc 186 §一）**：158-D 同键守卫 + 161-A/B 工具**本轮实施**；158-A/B/C、159、160、161-C、162 候选池**显式暂缓**并逐条登记重验条件（§四，含 159 闸门按 `USEFMGEN=false` 重写：MAME 内核 YM2608 内置 rhythm ROM，wav 门槛可能作废）。旧档删除，**许可来源清单**（98fmplayer BSD-2 / BGMPlayerBase MIT）随 186 §五保留。
+
+**实施 1 — 同键重入守卫（158-D）**：`BgmState` 增 `key[32]`；`audio_bgm_start()` 在事件表接管前拦截 `g_bgm.active && strcmp(g_bgm.key, key)==0`（保持相位不重播，BGMPlayerBase onresume 语义）；提交时写键、`audio_bgm_stop()` 清键（跨场景同键重播不受影响，AGENTS 十四.6）。守卫：`test_devdoc_186.py` 4 条（守卫先于接管、须 active、键提交/清除、计划收敛完整性）。
+
+**实施 2 — S98 dump（161-A）**：`tools/naiz_audio/s98_dump.py` 用宿主 gcc 编 `fmseq+fmopn+midi`，`midi_parse` 解析真 SMF，`fmseq_pump` 逐 ms 泵全曲（含回绕：`fmseq_stop` 复位游标 + `fmseq_loop_start` 重定相，与引擎 ISR 路径一致），记录型 sink 收 `(t, bank, reg, val)` 写 S98 v3（tick=1ms、OPNA@7987200、无压缩）。**bank=6 声道 port 拆分**（`fmopn_reg_addr`）映射为 S98 的 0x00-0x7F（port0）/0x80-0xBF（port1）双端口命令——icy_garden 有 10.6k 条 port1 写，压平会毁 oracle。内置读回器镜像校验 round-trip。基线已产出 `logs/s98/icy_garden.s98`（22770 writes/129s）与 `logs/s98/lisedj.s98`（loop 2 遍）。
+
+**实施 3 — FMP/VOPM 导出（161-B）**：`tools/naiz_audio/fmp_export.py` 按单一事实源（fm_patch.py 32 字节布局）分解出 FMP `@` 文本（F03 §4.3 字段序：AR DR SR RR SL TL KS ML DT AMS）与 VOPM 粘贴文本（DT2=0）。守卫：`test_fmp_export.py` 5 条（字段分解/行序/VOPM 形状/信息无损/夹具与 to_bytes 锁步）。
+
+**文件**：`core/engine/audio.c`（BgmState+守卫）、`tools/naiz_audio/s98_dump.py`、`fmp_export.py`（新）、`tools/tests/test_s98_dump.py`、`test_fmp_export.py`、`test_devdoc_186.py`（新）、`test_devdoc_refs.py`（audio.c 6 处行号 +6 处 build_game.py 行号随守卫/178 部署链漂移重校）、`devdocs/186-…`（新，取代 158–162）、`devdocs/模仿升级计划/`（删 5 档）、`merge_devdocs.py`（注释指向 186；该工具本身为改名前遗留死工具，116-176 号文件已不存在，未复活）。**无提交**。
+
+**验证**：pytest 全量 **880 passed / 14 failed**（失败均为既有类别：devdoc 重命名残留 12 + market ANSI 1 + version 分叉 1 组）；16 条新测试全过；`make -C core` 0 诊断；HDI 重打。真实素材基线：icy_garden 22770 writes（12158 port0/10612 port1）、lisedj 349668 writes（loop）。
+
+---
 <a id="c90"></a>
 ### 0.3.062 — ISR 路径 FM 静音根因（DOS/4GW 栈段）+ 音泵回主线程（devdoc 176）
 

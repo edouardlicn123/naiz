@@ -185,6 +185,19 @@ case "$SUBCOMMAND" in
         fi
 
         echo "=== 制作 HDI 镜像: $GAME ==="
+        # devdoc 184: `build` 部署 DOS 树（含 core/engine*.exe → games/<game>/），
+        # `make` 只打包。若 core 引擎比 games/<game>/ 里的新，说明这次改动
+        # 没经过 build —— 打包会静默跑旧引擎（本次量化踩过：埋点不在日志里，
+        # 白跑一轮）。与 test 的 HDI 过期守卫同一策略：报错指路。
+        for CORE_EXE in "$ROOT/core/engine.exe" "$ROOT/core/engine_a.exe"; do
+            GAME_EXE="$ROOT/games/$GAME/$(basename "$CORE_EXE")"
+            if [ -f "$CORE_EXE" ] && { [ ! -f "$GAME_EXE" ] || [ "$GAME_EXE" -ot "$CORE_EXE" ]; }; then
+                echo "=== ERROR: games/$GAME/$(basename "$CORE_EXE") 落后于 core/ ==="
+                echo "    make 只注入 games/<game>/，不部署引擎。"
+                echo "    修复: ./makegame.sh build $GAME && ./makegame.sh make $GAME"
+                exit 1
+            fi
+        done
         cd "$ROOT" && exec "$VENV_PYTHON" -m tools.naiz_img.inject --game "$GAME" --yes
         ;;
 

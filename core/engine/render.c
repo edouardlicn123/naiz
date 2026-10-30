@@ -244,8 +244,51 @@ void fill_rect_pattern(int x, int y, int w, int h,
 }
 
 /* Wait for next VBLANK (vertical retrace start).
- * Delegates to HAL for platform-specific port I/O. */
+ * Delegates to HAL for platform-specific port I/O.
+ *
+ * devdoc 185: frame-budget watchdog.  Every engine loop paces through here
+ * (frame pump, dialog input-wait, menus, transition), so the wall time
+ * between two calls is the true frame interval no matter which loop ran --
+ * a gap means something monopolised the CPU between waits (decode, command
+ * dispatch, save I/O, ...).  The clock MUST be hal_wallclock_smooth_ms():
+ * the DOS GETTIME clock it replaced is chunky under NP2kai (frozen 3-6 s,
+ * then +1000..+6000 ms jumps -- see hal_pc98.c), which read as 93 phantom
+ * "stalls" of exactly 1000 ms in the first capture (devdoc 185 §2).  In the
+ * shipped BGM-IRQ configuration the smooth clock is driven by the Timer-B
+ * ISR at ~62 ticks/s (real time, ~16 ms resolution), so the 40 ms threshold
+ * flags >=2 dropped frames without quantisation false positives.  Serial
+ * runs at 9600 baud, so stall records throttle to one per 125 ms and a
+ * compact [FPS] summary emits about every 10 s; correlate stall records
+ * with the surrounding [NB] command / [PRELOAD] / [ANIM-DEC] records. */
 void vblank_wait(void)
 {
+    unsigned long now = hal_wallclock_smooth_ms();
+    static unsigned long last_ms, last_log_ms, window_ms;
+    static unsigned int frames, stalls;
+    static unsigned long stall_max;
+    unsigned long dt;
+
+    if (last_ms != 0) {
+        dt = now - last_ms;
+        frames++;
+        window_ms += dt;
+        if (dt >= 40) {
+            stalls++;
+            if (dt > stall_max) stall_max = dt;
+            if (now - last_log_ms >= 125) {
+                hal_logf("[STALL] dt=%lu\r\n", dt);
+                last_log_ms = now;
+            }
+        }
+        if (window_ms >= 10000) {
+            hal_logf("[FPS] %u fr/%lu ms stall=%u max=%lu\r\n",
+                     frames, window_ms, stalls, stall_max);
+            frames = 0;
+            window_ms = 0;
+            stalls = 0;
+            stall_max = 0;
+        }
+    }
+    last_ms = now;
     hal_vblank_wait();
 }

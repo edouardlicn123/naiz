@@ -10,7 +10,7 @@ gen_canvas_image.py — 生成 C03 / C04 示意图
 import os
 from PIL import Image, ImageDraw, ImageFont
 
-OUT_DIR = os.path.join(os.path.dirname(__file__), '..', '..', 'naiz-guildbook', 'imgs')
+OUT_DIR = os.path.join(os.path.dirname(__file__), '..', '..', 'guildbook_cn', 'imgs')
 
 # Canvas dimensions (logical)
 W, H = 200, 400

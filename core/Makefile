@@ -1,4 +1,4 @@
-# Naiz Engine — Open Watcom build (DOS/4GW only)
+# Naiz Engine — Open Watcom build (CauseWay extender, devdoc 178)
 #   make          → engine.exe + engine_a.exe
 #   make engine   → engine.exe only
 #   make engine-a → engine_a.exe（AUTOEXIT，不等待键盘）
@@ -18,6 +18,13 @@ endif
 ifeq ($(WATCOM),)
 $(error Open Watcom not found. Run build.sh or set $$WATCOM)
 endif
+# CauseWay stub gate (devdoc 178): wlink -l=causeway embeds cwstub.exe by
+# searching the cwd and $PATH. A missing stub only raises warning W1093 and
+# still emits a broken 5KB LE executable, so fail fast here instead.
+CWSTUB := $(shell which cwstub.exe 2>/dev/null)
+ifeq ($(CWSTUB),)
+$(error cwstub.exe not found in cwd/PATH - install the CauseWay devkit cwstub.exe into the Watcom bin dir, or add its directory to PATH (devdoc 178))
+endif
 NAIZ_DEBUG ?= ON
 # Extra compile-time defines for diagnostic builds (devdoc 150):
 #   make -C core EXTRA_DEFS=-DBGM_TICK_TRACE=1
@@ -28,7 +35,7 @@ BUILD   = build
 
 # 编译隔离：每层只能看到自己的头文件和共享的 lib/。
 # engine/ 需要 -Iplat 以访问 hal.h；plat/ 需要 -Iengine 以访问 cursor.h。
-BASE    = -bt=dos -l=dos4g -zq -os -s -DNAIZ_DEBUG=$(NAIZ_DEBUG) $(EXTRA_DEFS)
+BASE    = -bt=dos -l=causeway -zq -os -s -DNAIZ_DEBUG=$(NAIZ_DEBUG) $(EXTRA_DEFS)
 ENG_CFLAGS = $(BASE) -Iengine -Ilib -Iplat -I$(WATCOM)/h
 PLAT_CFLAGS = $(BASE) -Iplat -Ilib -Iengine -I$(WATCOM)/h -DHAL_BUILD_ALLOWED
 LIB_CFLAGS  = $(BASE) -Ilib -I$(WATCOM)/h

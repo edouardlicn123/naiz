@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="translated-from" content="202610300931">
+<!-- AI-NOTE: translated-from = the guildbook_cn doc-version this page was translated from. If the cn counterpart's doc-version is newer, re-translate this page from the Chinese source. -->
+
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>cg — Naiz Guildbook</title>
+<link rel="stylesheet" href="../style.css">
+</head>
+<body>
+<nav class="sidebar" id="sidebar-nav"></nav>
+<script src="../sidebar-scripts.js"></script>
+<main class="main">
+
+<h1>cg — Full-screen CG Display</h1>
+<hr>
+<blockquote><strong>Created</strong>: 2026-09-11</blockquote>
+<p>The <code>cg()</code> command displays a CG across the whole screen, or hides the dialogue box to restore the background area. Like <code>bg(){key}</code> (<a href="sc02-bg.html">sc02</a>) it follows the same convention: "the object lives in the brace payload, the paren slot holds parameters ± keywords".</p>
+
+<h2>1. Syntax</h2>
+<pre><code>cg(){key}
+cg(hidedialog)</code></pre>
+<table>
+<tr><th>Parameter</th><th>Type</th><th>Description</th></tr>
+<tr><td><code>key</code></td><td>string</td><td>CG asset name, matching <code>asset_map.name</code> (<code>CG</code> type), written in the brace payload</td></tr>
+<tr><td><code>hidedialog</code></td><td>keyword</td><td>Only hides the dialogue box and restores the background area; no new image is loaded</td></tr>
+</table>
+
+<h2>2. Behaviour</h2>
+<ul>
+<li><strong>Full-screen event</strong>: <code>cg(){key}</code> covers the whole screen with the CG and <strong>automatically hides the dialogue box and clears the current line</strong> — the next line pops a new box</li>
+<li><strong>Permanent unlock</strong>: a displayed CG is recorded in the unlock state (visible in the gallery <code>cgvmenu()</code>, see <a href="sc06-gallery.html">sc06</a>)</li>
+<li><strong>Difference from bg</strong>: after <code>bg(){key}</code> changes the background the dialogue box <strong>survives across images</strong> (box + current page text kept); <code>cg(){key}</code> is a "full-screen event" and hides the box on its own — to hide it explicitly use <code>cg(hidedialog)</code></li>
+</ul>
+
+<h2>3. Example</h2>
+<pre><code>cg(){cg01}        # show the CG full-screen, hide the dialogue box, clear the line
+cg(hidedialog)    # only hide the dialogue box and restore the background</code></pre>
+<div class="note-box"><p><strong>Note</strong>: the <code>cg(key)</code> form (key inside the parentheses) is deprecated and is rejected by both the engine and the scenario validator — the CG key must go in the braces. The paren slot is reserved for future parameters.</p></div>
+
+</main>
+</body>
+</html>

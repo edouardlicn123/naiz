@@ -35,4 +35,6 @@ core/ecg.err
 tools/mhvn_build/
 tools_commercial/
 tools_commercial.zip
+tools_open/
+tools_open.zip
 assets_samples/

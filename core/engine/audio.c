@@ -86,6 +86,7 @@ static int g_fm_ok;               /* OPNA present (hal_fm_detect) */
 
 typedef struct {
     MidEvent     *ev;             /* parsed event table (resident) */
+    char          key[32];        /* asset key now playing (186 same-key guard) */
     int           count;
     int           idx;            /* next event to fire (MIDI backend) */
     unsigned long wall0;          /* hal_wallclock_smooth_ms() at pass start */
@@ -357,6 +358,15 @@ void audio_bgm_start(const char *key)
         hal_logf("BGM WARN: '%s' is not a registered BGM asset\r\n", key);
         return;
     }
+    /* devdoc 186 (was 158 §三 D): same-key re-entry guard.  A script replaying
+     * bgm(){key} while that exact BGM is still playing must not restart it --
+     * keep the current phase instead (BGMPlayerBase onresume semantics).
+     * Cross-scene replays are unaffected: scene() -> audio_stop_all() ->
+     * audio_bgm_stop() clears the key first (AGENTS 14.6 rule). */
+    if (g_bgm.active && strcmp(g_bgm.key, key) == 0) {
+        hal_logf("BGM '%s' already playing - skip (same-key guard)\r\n", key);
+        return;
+    }
     /* devdoc 177 Phase 4: take the event table the scene preload already
      * parsed; otherwise read + parse now (the old blocking path).  A hit
      * consumes the cache so the table keeps exactly one owner. */
@@ -384,6 +394,7 @@ void audio_bgm_start(const char *key)
         fmseq_stop(g_fm_seq, &g_fm_sink);
     bgm_release();
     g_bgm.ev = ev;
+    snprintf(g_bgm.key, sizeof g_bgm.key, "%s", key);
     g_bgm.count = count;
     g_bgm.idx = 0;
     g_bgm.len_ms = len_ms;
@@ -417,6 +428,7 @@ void audio_bgm_stop(void)
         }
     }
     bgm_release();
+    g_bgm.key[0] = '\0';   /* devdoc 186: a stopped BGM is no longer "playing" */
     bgm_irq_unlock();
     hal_log("BGM stop\r\n");
 }

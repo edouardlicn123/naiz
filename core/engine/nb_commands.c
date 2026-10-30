@@ -280,7 +280,12 @@ static void cmd_char(int argc, const char **argv, const char *cmd_name)
 
     (void)cmd_name;
     if (argc == 1 && strcmp(argv[0], "hideall") == 0) {
-        layer_sprite_hide_all();
+        /* devdoc 183: no recompose here — layer_dialog_hide() below restores
+         * the whole dialog rect from the pristine underneath, overwriting the
+         * recomposed pixels on the same frame.  The sprite rects are already
+         * bg-restored and every entry deactivated, so the hide's own
+         * redraw/sync paths no-op. */
+        layer_sprite_hide_all_ex(0);
         layer_dialog_hide();
         nb_dialog_reset();
         NB_DEBUG("char: hideall\r\n");

@@ -1,8 +1,8 @@
 """
-build_docs.py — 生成 naiz-guildbook 辅助资源
+build_docs.py — 生成 guildbook 辅助资源
 
 保留功能：
-  - 复制 logo-mini.png → naiz-guildbook/
+  - 复制 logo-mini.png → guildbook_cn/
   - 生成 canvas 示意图（C03 HTML 引用）
 
 用法：

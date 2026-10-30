@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="translated-from" content="202610300931">
+<!-- AI-NOTE: translated-from = the guildbook_cn doc-version this page was translated from. If the cn counterpart's doc-version is newer, re-translate this page from the Chinese source. -->
+
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>sceneconf — Naiz Guildbook</title>
+<link rel="stylesheet" href="../style.css">
+</head>
+<body>
+<nav class="sidebar" id="sidebar-nav"></nav>
+<script src="../sidebar-scripts.js"></script>
+<main class="main">
+
+<h1>sceneconf — Scene Configuration</h1>
+<hr>
+<blockquote><strong>Created</strong>: 2026-08-29</blockquote>
+<p>The <code>sceneconf()</code> command sets the chapter title and type of the current scene. The title is recorded with the save, and the type controls behaviour such as the save hotkey.</p>
+
+<h2>1. Syntax</h2>
+<pre><code>sceneconf(){title[, type]}</code></pre>
+<p><strong>Brace-only form</strong>: both the title and the type go in the brace payload (the paren alias is deprecated).</p>
+<table>
+<tr><th>Parameter</th><th>Type</th><th>Description</th></tr>
+<tr><td><code>title</code></td><td>string</td><td>Chapter title text, recorded with the save and displayed (written in the brace payload)</td></tr>
+<tr><td><code>type</code></td><td>string</td><td>Scene type <code>normal</code> / <code>cg</code> / <code>menu</code>, default <code>normal</code></td></tr>
+</table>
+
+<h3>1.1 Type Reference</h3>
+<table>
+<tr><th>Type</th><th>Description</th></tr>
+<tr><td><code>normal</code></td><td>Normal scene (default)</td></tr>
+<tr><td><code>cg</code></td><td>CG gallery scene</td></tr>
+<tr><td><code>menu</code></td><td>Menu scene; the save hotkey is disabled</td></tr>
+</table>
+
+<h2>2. Example</h2>
+<pre><code>sceneconf(){序章, normal}
+sceneconf(){画廊, cg}
+sceneconf(){, menu}   # menu-type scene: the title may be omitted</code></pre>
+
+<div class="note-box"><p><strong>Note</strong>: with <code>type=menu</code> the save hotkey is disabled, so a save is not triggered by accident inside the main menu or a settings scene.</p></div>
+
+</main>
+</body>
+</html>

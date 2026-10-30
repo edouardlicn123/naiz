@@ -71,6 +71,12 @@ Naiz 引擎项目整理的外部 PC-98 知识参考资料。
 | `H02_pdf_bios_techdata.md` | Technical Data Book BIOS 篇摘要 + 本地 PDF (`pc98_bios.pdf`, 73MB) |
 | `H03_pdf_hw_techdata.md` | Technical Data Book Hardware 篇摘要 + 本地 PDF (`pc98_hw.pdf`, 35MB) |
 
+### I — DOS 基座 (DOS Base)
+
+| 文件 | 内容 |
+|------|------|
+| `I01_freedos98_base_sources.md` | **FreeDOS(98) 基座生态拆解**：kernel INT 陷阱机制源码级定案（0x40-0xFE 全陷阱 + 4C7F 终止 + 转储顺序修正）；官方源码/镜像落盘清单（`/media/edo/data/studysource/`，KWC8616.sys 与盘上 KERNEL.SYS 逐字节相同）；文档原文在 `raw/`（nec98int/sys_fd98/emm386 README/bauxite 页快照）；对 step2 的帮助评估与两条 kernel 级修复路线 |
+
 ## 来源索引
 
 | 来源 | URL | 类型 |
@@ -112,6 +118,12 @@ Naiz 引擎项目整理的外部 PC-98 知识参考资料。
 | DCEmulation《Streaming Music Playback CPU Usage》 | https://dcemulation.org/phpBB/viewtopic.php?t=105823 | 论坛 |
 | Defold 论坛(加载 stutter 两帖) | https://forum.defold.com/t/sound-stutter-while-loading-a-collection-factory-solved/14271 ; https://forum.defold.com/t/sound-stops-while-loading-collection-proxy-solved/3565 | 论坛 |
 | MIDAS Sound System prgguide §5.1(屏幕同步定时器) | https://files.mpoli.fi/pub/unpacked/skene/music/mutils/midas061.zip/doc/html/prgguide/node21.html | HTML 文档 |
+| lpproj/fdkernel(FreeDOS(98) kernel 源码+镜像, I01 主源) | https://github.com/lpproj/fdkernel/tree/nec98test ; release: https://github.com/lpproj/fdkernel/releases/tag/test-20220120-cherrypick | GitHub 源码 |
+| lpproj/freecom_dbcs2(FreeCom DBCS) | https://github.com/lpproj/freecom_dbcs2/ | GitHub 源码 |
+| lpproj/emm386.nec(EMM386 98 版) | https://github.com/lpproj/emm386.nec | GitHub 源码 |
+| lpproj/himemx.nec(HimemX 98 版) | https://github.com/lpproj/himemx.nec/ | GitHub 源码 |
+| bauxite.sakura.ne.jp FreeDOS 方面(lpproj 配布页, raw/ 快照) | http://bauxite.sakura.ne.jp/software/dos/freedos.htm | HTML 文档 |
+| tori FreeDOS(98) 原版 | http://www.retropc.net/tori/freedos/ | HTML 文档 |
 | Wikibooks NEC PC Programmers Reference: Sound BIOS | https://en.wikibooks.org/wiki/NEC_PC_Programmers_Reference/Sound_BIOS | ⚠ **未获取**(网络不可达;G08 列为待核实) |
 
 ## 使用说明

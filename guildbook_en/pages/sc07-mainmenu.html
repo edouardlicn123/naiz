@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="translated-from" content="202610300931">
+<!-- AI-NOTE: translated-from = the guildbook_cn doc-version this page was translated from. If the cn counterpart's doc-version is newer, re-translate this page from the Chinese source. -->
+
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>mainmenu — Naiz Guildbook</title>
+<link rel="stylesheet" href="../style.css">
+</head>
+<body>
+<nav class="sidebar" id="sidebar-nav"></nav>
+<script src="../sidebar-scripts.js"></script>
+<main class="main">
+
+<h1>mainmenu — Main Menu Command</h1>
+<hr>
+<blockquote><strong>Created</strong>: 2026-07-27<br><strong>Last updated</strong>: 2026-09-11</blockquote>
+<p>The <code>mainmenu()</code> command builds the game's main menu. For the visual spec see <a href="cf04-按钮样式方案.html">cf04 — button style scheme</a>; for the design guide see <a href="ui01-主菜单设计.html">ui01 — main menu design</a>.</p>
+
+<h2>1. Syntax</h2>
+<pre><code>mainmenu(x, y, cols, _, opt1, opt2, opt3, ...)</code></pre>
+<table>
+<tr><th>Parameter</th><th>Type</th><th>Description</th></tr>
+<tr><td><code>x</code></td><td>int</td><td>Main menu top-left x coordinate (0–640)</td></tr>
+<tr><td><code>y</code></td><td>int</td><td>Main menu top-left y coordinate (0–400)</td></tr>
+<tr><td><code>cols</code></td><td>int</td><td>Column count (1 or 2)</td></tr>
+<tr><td><code>_</code></td><td>int</td><td>Reserved parameter, always pass 0</td></tr>
+<tr><td><code>optN</code></td><td>string</td><td>Menu options, ordered column-first</td></tr>
+</table>
+
+<h2>2. Options</h2>
+<table>
+<tr><th>Option</th><th>Status</th><th>Behavior</th></tr>
+<tr><td><code>continue</code></td><td>Implemented</td><td>Loads the save with the newest timestamp; with no save, falls back to starting a new game at <code>nbook001.nb</code></td></tr>
+<tr><td><code>load</code></td><td>Implemented</td><td>Preserves the current state (temporary save) and jumps to the load scene <code>loadscene.nb</code> (see <a href="sc05-saveload.html">sc05</a>)</td></tr>
+<tr><td><code>start</code></td><td>Implemented</td><td>Start a new game → <code>nbook001.nb</code></td></tr>
+<tr><td><code>scenes</code></td><td>Reserved</td><td>Scene selection is not implemented yet</td></tr>
+<tr><td><code>special</code></td><td>Reserved</td><td>Special content is not implemented yet</td></tr>
+<tr><td><code>music</code></td><td>Reserved</td><td>Music gallery is not implemented yet</td></tr>
+<tr><td><code>gallery</code></td><td>Implemented</td><td>Jumps to the CG gallery scene <code>cgview.nb</code> (see <a href="sc06-gallery.html">sc06</a>)</td></tr>
+<tr><td><code>settings</code></td><td>Reserved</td><td>System settings live in <code>startsetting()</code> (<a href="sc13-startsetting.html">sc13</a>); the main menu entry is not wired up yet</td></tr>
+<tr><td><code>exit</code></td><td>Implemented</td><td>Quit the game</td></tr>
+</table>
+
+<h2>3. Example</h2>
+<pre><code>mainmenu(400, 200, 2, 0, continue, load, start, music, gallery, settings, exit)</code></pre>
+
+</main>
+</body>
+</html>

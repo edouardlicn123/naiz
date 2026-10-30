@@ -293,8 +293,12 @@ static void layer_sprite_replace(int sprite_id, int asset_id, int x, int y, int 
  * sprite, so char(hideall) over N sprites paid N x (occluder reset + clean-box
  * rebuild + recompose blit) inside one frame (a 150-300 ms pause with the
  * dialog open).  Restore every rect and deactivate first, then rebuild the
- * occluder and recompose exactly once — same final pixels, one pipeline. */
-void layer_sprite_hide_all(void)
+ * occluder and recompose exactly once — same final pixels, one pipeline.
+ * devdoc 183: recompose=0 skips that one recompose for callers that hide the
+ * dialog right after (cmd_char(hideall) -> layer_dialog_hide()) — the dialog
+ * rect restore overwrites the recomposed pixels immediately, so the pipeline
+ * would be pure waste; with the dialog closed the sync guard no-ops anyway. */
+void layer_sprite_hide_all_ex(int recompose)
 {
     int i, hidden = 0;
     for (i = 0; i < LAYER_MAX_SPRITES; i++) {
@@ -305,10 +309,15 @@ void layer_sprite_hide_all(void)
         se->active = 0;
         hidden = 1;
     }
-    if (hidden)
+    if (hidden && recompose)
         layer_sprite_sync_dialog_base();
     layer_set_active(LAYER_Z_SPRITE, 0);
     hal_mouse_invalidate_cursor();
+}
+
+void layer_sprite_hide_all(void)
+{
+    layer_sprite_hide_all_ex(1);
 }
 
 /* Check if a sprite with the given ID exists. */

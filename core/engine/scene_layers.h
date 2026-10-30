@@ -121,6 +121,9 @@ void dialog_layer_blit(void);
 void layer_sprite_face(int sprite_id, int asset_id, int x, int y, int mirror);
 /* 隐藏所有精灵 + 清理状态 */
 void layer_sprite_hide_all(void);
+/* 同上，但 recompose=0 时跳过对话框重组（调用方随即会隐藏对话框、
+ * 整框还原会覆盖重组结果 —— char(hideall) 用，devdoc 183） */
+void layer_sprite_hide_all_ex(int recompose);
 /* 查询指定精灵是否存在 */
 int  layer_has_sprite(int id);
 /* 重绘所有激活的精灵 */

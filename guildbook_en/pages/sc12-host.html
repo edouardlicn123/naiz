@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="translated-from" content="202610300931">
+<!-- AI-NOTE: translated-from = the guildbook_cn doc-version this page was translated from. If the cn counterpart's doc-version is newer, re-translate this page from the Chinese source. -->
+
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>host — Naiz Guildbook</title>
+<link rel="stylesheet" href="../style.css">
+</head>
+<body>
+<nav class="sidebar" id="sidebar-nav"></nav>
+<script src="../sidebar-scripts.js"></script>
+<main class="main">
+
+<h1>host — System Narration</h1>
+<hr>
+<blockquote><strong>Created</strong>: 2026-08-29</blockquote>
+<p>The <code>host()</code> command displays system narration (no character name). It differs from the <code>fei/ira/neon</code> character lines in <code>sc03-char.html</code>: narration shows no character-name prefix.</p>
+
+<h2>1. Syntax</h2>
+<pre><code>host(){text}</code></pre>
+<table>
+<tr><th>Parameter</th><th>Type</th><th>Description</th></tr>
+<tr><td><code>text</code></td><td>string</td><td>Narration text (written in the <strong>brace payload</strong>; the paren slot takes no parameter)</td></tr>
+</table>
+
+<h2>2. Example</h2>
+<pre><code>host(){暴风雨渐息，海面恢复平静。}</code></pre>
+
+<div class="note-box"><p>Narration is not shown with a character-name prefix; its layout is decided by the current dialogue style preset (see the <code>cf03</code> page, Dialogue Style Presets).</p></div>
+
+</main>
+</body>
+</html>

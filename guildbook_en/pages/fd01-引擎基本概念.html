@@ -1,0 +1,169 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="translated-from" content="202610300931">
+<!-- AI-NOTE: translated-from = the guildbook_cn doc-version this page was translated from. If the cn counterpart's doc-version is newer, re-translate this page from the Chinese source. -->
+
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Engine Fundamentals — Naiz Guildbook</title>
+<link rel="stylesheet" href="../style.css">
+</head>
+<body>
+<nav class="sidebar" id="sidebar-nav"></nav>
+<script src="../sidebar-reference.js"></script>
+<main class="main">
+<h1>Engine Fundamentals</h1>
+<blockquote><strong>Created</strong>: 2026-06-09<br><strong>Last updated</strong>: 2026-09-11</blockquote>
+<p>This is the first chapter of the Naiz engine creator's manual. It introduces the core concepts of the engine from a creator's perspective — no source paths, toolchain commands, or internal implementation details.</p>
+<p>Concepts marked <strong>[Reserved]</strong> are not implemented yet and cannot be used; they are described here only to explain the design intent, for reference.</p>
+<hr>
+<h2>1. Screen Specifications</h2>
+<h3>1.1 Resolution and Mode</h3>
+<p>The engine runs in the standard PC-98 <strong>640×400 pixel, 256-color</strong> graphics mode (PEGC packed-pixel). This is the classic visual novel display specification — 400 vertical lines give a 16:10 frame, close to the visual feel of modern 16:9.</p>
+<h3>1.2 Default Screen</h3>
+<p>After startup the engine loads the first <code>.nb</code> scenario file, whose <code>bg</code> command loads a background MAG image (if there is none, VRAM keeps its initial state). The dialogue box is overlaid on the background:</p>
+<pre><code>640×400 screen overview
+┌────────────────────────────────────────────┐
+│                                            │
+│        Background MAG image (256c)         │  ← about 280px high
+│        (loaded by the bg command)          │
+│                                            │
+├────────────────────────────────────────────┤  ← y=280
+│  Dialogue bg (palette 248, 480×115)        │
+│  │ "这里是 Naiz 演示"  (UTF-8, white)      │  ← y=308
+│  │                                         │
+└────────────────────────────────────────────┘</code></pre>
+<ul>
+<li>Upper part: background image (MAG format, 256 colors)</li>
+<li>Lower part: dialogue box (fixed position, shows dialogue)</li>
+</ul>
+<h3>1.3 256-Color Palette</h3>
+<p>The engine uses the PC-98 256-color emulated palette. These are the colors the engine reserves (other indices are set dynamically by MAG images):</p>
+<table>
+<thead>
+<tr><th>Index</th><th>Color</th><th>Purpose</th></tr>
+</thead>
+<tbody>
+<tr><td>0</td><td><code>#000000</code> black</td><td>Initial value</td></tr>
+<tr><td>7</td><td><code>#FFFFFF</code> white</td><td>Text, borders</td></tr>
+<tr><td>15</td><td><code>#000000</code> black</td><td>Sprite transparent color (skipped by blit)</td></tr>
+<tr><td>248</td><td><code>#000000</code> (dynamic black/blue)</td><td>Dialogue box background</td></tr>
+<tr><td>249–255</td><td>—</td><td>Reserved UI colors (reserved)</td></tr>
+</tbody>
+</table>
+<blockquote>The palette is updated on every <code>bg</code> command. Indices 248–255 are evacuated by <code>pack_images.py</code> at build time, and protected at runtime by <code>cmd_bg</code> (restores 248) and the menu modules (save/restore 250/251). Indices 7 and 15 are skipped in SPR types. See B11 §5.2 for details.</blockquote>
+<h3 id="1.4">1.4 PC-98 Display Architecture</h3>
+<p>PC-98 PEGC display hardware has three parts:</p>
+<table>
+<thead>
+<tr><th>Hardware layer</th><th>Description</th><th>Engine usage</th></tr>
+</thead>
+<tbody>
+<tr><td><strong>Graphic Plane A</strong></td><td>Graphics plane A (4-bit/pixel)</td><td rowspan="2">✅ Merged into 8-bit 256-color packed-pixel 640×400 VRAM, the only render target</td></tr>
+<tr><td><strong>Graphic Plane B</strong></td><td>Graphics plane B (4-bit/pixel)</td></tr>
+<tr><td><strong>Text Plane</strong></td><td>Independent hardware text layer (character generator + attribute memory)</td><td>❌ Unused. Invisible under DOS/4GW protected mode; text is drawn into graphics VRAM as bitmaps via <code>draw_text()</code></td></tr>
+</tbody>
+</table>
+<p>All "software layers" of the engine (background, sprites, dialogue box, text) are composited on a single graphics VRAM layer through a <strong>multi-pass drawing order</strong>; there is no hardware compositing. The menu overlay (<code>menu_layer</code>) is the exception: it is composited in its own RAM buffer first, then blitted to VRAM as a full screen. This is why the engine uses pixel operations such as <code>fill_rect</code>/<code>vram_blit</code> instead of <code>printf</code>.</p>
+<p>See <a href="mc03-图层渲染与换装机制.html">mc03 — layer rendering and sprite swapping §1</a> for details.</p>
+<hr>
+<h2>2. Dialogue</h2>
+<p>Dialogue is the most central UI element of a visual novel engine. In Naiz, <strong>dialogue is a text box at a fixed position</strong> — its position, size, and style stay the same for the whole game.</p>
+<h3>2.1 What Dialogue Is</h3>
+<p>In most ADV/VN games, character speech ("lines") and narration are presented line by line in a <strong>dialogue box</strong> at the bottom of the screen. The player reads one line and presses a key to turn to the next — that is the basic model of a <strong>dialogue system</strong>.</p>
+<p>Naiz's dialogue model is <strong>in-place replacement</strong>: each time a line is shown, the old text is wiped completely and the new text appears in the <strong>same position</strong>.</p>
+<h3>2.2 Dialogue Box Layout</h3>
+<p>The dialogue box is a rectangle at the bottom of the screen, overlaid on the background:</p>
+<table>
+<thead>
+<tr><th>Property</th><th>Value</th><th>Description</th></tr>
+</thead>
+<tbody>
+<tr><td>Horizontal position (X)</td><td><strong>80 px</strong></td><td>80px from the left edge of the screen</td></tr>
+<tr><td>Vertical position (Y)</td><td><strong>280 px</strong></td><td>280px from the top edge of the screen</td></tr>
+<tr><td>Width</td><td><strong>480 px</strong></td><td>About 3/4 of the screen width</td></tr>
+<tr><td>Height</td><td><strong>115 px</strong></td><td>5px from the bottom edge of the screen</td></tr>
+<tr><td>Background color</td><td><strong>palette 248 (dynamic black/blue)</strong></td><td>Covers the background image</td></tr>
+<tr><td>Border</td><td><strong>white (index 7), 2px wide</strong></td><td>Outer rectangle</td></tr>
+</tbody>
+</table>
+<pre><code>Dialogue box close-up:
+  ┌──────────────────────────────────────────────────────────┐
+  │ White border (draw_rect, 2px wide, color 7)              │
+  │                                                          │
+  │  24px indent → "这里是 Naiz 演示"                         │  ← text area, y+28
+  │                                                          │
+  └──────────────────────────────────────────────────────────┘
+  ← 80px →←─────────────── 480px ──────────────────→← 80px →</code></pre>
+<h3>2.3 Text</h3>
+<p>Dialogue text is drawn inside the dialogue box:</p>
+<table>
+<thead>
+<tr><th>Property</th><th>Value</th><th>Description</th></tr>
+</thead>
+<tbody>
+<tr><td>Horizontal origin (X)</td><td><strong>104 px</strong></td><td>Left edge of the dialogue box + 24px indent</td></tr>
+<tr><td>Vertical origin (Y)</td><td><strong>308 px</strong></td><td>Top of the dialogue box + 28px offset</td></tr>
+<tr><td>ASCII font</td><td><strong>8×16 bitmap, monospaced</strong></td><td>Each ASCII character takes 8×16 pixels (32 bytes/glyph)</td></tr>
+<tr><td>CJK font</td><td><strong>16×16 bitmap, monospaced</strong></td><td>Each CJK character takes 16×16 pixels (32 bytes/glyph)</td></tr>
+<tr><td>Color</td><td><strong>white (index 7)</strong></td><td>Same color as the dialogue box border</td></tr>
+<tr><td>Max ASCII characters per line</td><td><strong>about 57</strong></td><td>Dialogue text area width 456px / 8</td></tr>
+<tr><td>Max CJK characters per line</td><td><strong>about 28</strong></td><td>Dialogue text area width 456px / 16</td></tr>
+</tbody>
+</table>
+<p><strong>Current limits</strong>:</p>
+<ul>
+<li>Supports <strong>ASCII (7-bit) + CJK (UTF-8 3-byte encoding)</strong></li>
+<li><strong>No automatic line wrapping</strong> — overlong sentences overflow the dialogue box and get clipped, so the creator must control the character count per line</li>
+<li>The text area background is cleared with palette 248 and does not rely on a fixed color index</li>
+</ul>
+<h3>2.4 Player Operations</h3>
+<p>Naiz's dialogue system is <strong>key-driven</strong>:</p>
+<table>
+<thead>
+<tr><th>Operation</th><th>Key</th><th>Behavior</th></tr>
+</thead>
+<tbody>
+<tr><td><strong>Turn to the next line</strong></td><td>Space</td><td>Shows the next line of dialogue given by <code>host{}</code></td></tr>
+<tr><td><strong>Turn to the next line (alternative)</strong></td><td>Enter</td><td>Same as Space</td></tr>
+<tr><td><strong>Fast-forward</strong></td><td>Ctrl (hold down)</td><td>Skips all dialogue and scene events in sequence at maximum speed</td></tr>
+</tbody>
+</table>
+<p><strong>Design details</strong>:</p>
+<ul>
+<li>Space / Enter are <strong>consuming triggers</strong> — each press turns exactly one line. Holding the key does not turn pages continuously, which avoids accidentally skipping text.</li>
+<li>Ctrl is <strong>fast-forward mode</strong> — while held, the engine advances frame by frame, useful for testing jumps or for players who want to skim story they have already seen.</li>
+</ul>
+<h3>2.5 What to Know When Designing Dialogue</h3>
+<p>Assumptions and limits of the dialogue system that creators should know:</p>
+<table>
+<thead>
+<tr><th>Point</th><th>Description</th></tr>
+</thead>
+<tbody>
+<tr><td><strong>Fixed position</strong></td><td>All dialogue appears at the same position — you cannot put "line one at the top, line two at the bottom"</td></tr>
+<tr><td><strong>In-place replacement</strong></td><td>Showing new dialogue clears the previous text (palette 248) and draws the new text; there is no "text scrolling" or "history rewind"</td></tr>
+<tr><td><strong>One line per unit</strong></td><td>One complete block of text is shown at a time; the dialogue box height does not support multiple lines of text at once</td></tr>
+<tr><td><strong>Character name slot</strong></td><td>The top of the dialogue box can show the speaker's name: dialogue commands such as <code>fei</code>/<code>ira</code>/<code>neon</code> carry the name automatically, while <code>host</code> narration does not</td></tr>
+<tr><td><strong>No text effects</strong></td><td>Text does not fade out, fade in, or change color — all dialogue appears in the same color at the same position</td></tr>
+<tr><td><strong>256-color limit</strong></td><td>Dialogue box colors are bound by the 256-color palette; the protected UI colors are index 7 (white), 15 (transparent), and 248 (dialogue box background)</td></tr>
+</tbody>
+</table>
+<hr>
+<h2>3. Scene</h2>
+<h3>3.1 What a Scene Is</h3>
+<p>A <strong>scene</strong> is a unit of game flow executed in order. A visual novel consists of several scenes, and the player goes through them in sequence — like the "scenes" of a film.</p>
+<p>Inside a scene the engine executes a series of <strong>NB commands</strong>. A command can "show dialogue", "wait for player input", "jump to another scene", and so on.</p>
+<h3>3.2 Scene Flow Example</h3>
+<pre><code>  Scene starts
+    │
+    ├─ host{"这里是 Naiz 演示"}        → show dialogue, wait for the player to turn the page
+    ├─ host{"Naiz 是一个文字冒险引擎"} → show dialogue, wait for the player to turn the page
+    ├─ scene end                      → scene ends
+    ▼
+  Next scene / game over</code></pre>
+<p>See <a href="sc01-NB剧本概述.html">sc01 — NB scenario overview</a> for the full syntax reference.</p>
+</main>
+</body>
+</html>

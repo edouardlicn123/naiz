@@ -197,6 +197,8 @@ void mouse_update(void)
     int dx = 0, dy = 0;
     int use_np2 = 0;
     int use_abs = 0;
+    int dbg_nx = -1, dbg_ny = -1;   /* devdoc 185: raw-port coords for the
+                                     * unified [MOUSE] record (-1 = not NP2) */
 
     if (!mouse_is_initialized) return;
 
@@ -208,13 +210,8 @@ void mouse_update(void)
             mouse_read_8255(&_dxd, &_dyd, &btn);
         }
         mouse_np2_getpos(&nx, &ny);
-#ifdef NAIZ_DEBUG
-        {
-            char _dbg[80];
-            snprintf(_dbg, sizeof(_dbg), "[MOUSE] NP2 raw port: nx=%d ny=%d\r\n", nx, ny);
-            hal_log(_dbg);
-        }
-#endif
+        dbg_nx = nx;
+        dbg_ny = ny;
 
         if (mouse_pos_explicit) {
             mouse_pos_explicit = 0;
@@ -347,15 +344,22 @@ void mouse_update(void)
             mouse_idle_frames = 0;
     }
 
-#ifdef NAIZ_DEBUG
+    /* devdoc 185 capture #1: this per-frame record flooded the serial log
+     * (~3300 lines per play session) and buried the [STALL]/[NB] evidence.
+     * Off by default; define NAIZ_MOUSE_LOG (on top of NAIZ_DEBUG) to bring
+     * it back temporarily.  This is the ONE mouse debug emitter -- the raw
+     * NP2 port coords (pre-clamp) are folded in here (raw=-1/-1 off the NP2
+     * path); the former standalone "[MOUSE] NP2 raw port" record is gone. */
+#if defined(NAIZ_DEBUG) && defined(NAIZ_MOUSE_LOG)
     {
-        char _dbg[160];
+        char _dbg[180];
         snprintf(_dbg, sizeof(_dbg),
-                 "[MOUSE] g=%d/%d d=%d/%d b=%d dr=%d/%d np2=%d i33=%d/%d idle=%d\r\n",
+                 "[MOUSE] g=%d/%d d=%d/%d b=%d dr=%d/%d np2=%d raw=%d/%d i33=%d/%d idle=%d\r\n",
                  mouse_x_game, mouse_y_game,
                  mouse_x_now, mouse_y_now, mouse_buttons_now,
                  dx_raw, dy_raw,
                  mouse_np2kai ? 1 : 0,
+                 dbg_nx, dbg_ny,
                  mouse_int33_available, mouse_int33_active,
                  mouse_idle_frames);
         hal_log(_dbg);

@@ -58,6 +58,21 @@ void engine_frame_pump(void)
     anim_tick();                       /* advance animation frame */
     nb_dialog_reveal_tick();           /* advance typewriter reveal (no-op off) */
     transition_tick();                 /* devdoc 177: one transition step/frame */
+    {
+        /* devdoc 184: quantify post-transition decode spill.  The cover
+         * drains 2 jobs/frame, but a scene with more assets than the cover's
+         * lifetime leaves the rest draining on VISIBLE frames (1 decode =
+         * 1-3 dropped frames each).  Log the leftover once, at the moment
+         * the cover lifts. */
+        static int was_trans = 0;
+        int trans = transition_active();
+        if (was_trans && !trans) {
+            int left = preload_pending();
+            if (left > 0)
+                hal_logf("[PRELOAD-SPILL] jobs=%d\r\n", left);
+        }
+        was_trans = trans;
+    }
     /* devdoc 177: decode one queued scene asset per frame; while the
      * transition covers the screen, take a second slot.  A failed decode drops
      * the job and stops this frame's consumption (Tier 1 heap guard).

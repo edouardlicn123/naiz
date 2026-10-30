@@ -2,7 +2,7 @@
 
 # Naiz — PC-98 Visual Novel Engine
 
-> **なにいえ** — 基于 PC-98（NEC PC-9801/9821）的电子小说引擎，使用 NB 纯文本剧本格式。
+> **ナイズ** — 基于 PC-98（NEC PC-9801/9821）的电子小说引擎，使用 NB 纯文本剧本格式。
 > A PC-98 visual novel engine with NB (Naiz Book) text-based scripting.
 
 ---
@@ -61,6 +61,7 @@ Naiz 是面向 PC-98 的视觉小说（ADV）制作套件：剧本与配置都�
 - [MHVNVisualNovelEngine](https://github.com/maxotaku11niku/MHVNVisualNovelEngine) — MIT, 场景格式参考
 - [98Bridge](https://github.com/NullMagic2/98Bridge) — MIT, HDI 注入设计参考
 - [ADV98](https://github.com/yarufu/pc98) — MIT, PC-98 ADV 引擎；游戏侧 PMD 集成与 BGM 生命周期参考
+- [ADVS98](https://alammofm.com/advs98/) — 闭源（无公开仓库）, PC-98 视觉小说网页编辑器（浏览器内编译与模拟器）；`studio/` 剧本工坊的界面设计参考
 - [98fmplayer](https://github.com/myon98/98fmplayer) — BSD-2-Clause, PMD/FMP 驱动与 OPN 寄存器实现参考
 - [NP2kai](https://github.com/AZO234/NP2kai) — MIT, 模拟器宿主与 fmgen FM 核（实机 oracle）
 - [ymfm](https://github.com/aaronsgiles/ymfm) — BSD-3-Clause, Yamaha FM 模拟核（离线音色 oracle，已 vendor 于 `tools/vendor/ymfm`）

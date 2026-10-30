@@ -30,7 +30,7 @@ if not VENV_PYTHON.exists():
 
 sys.path.insert(0, str(ROOT / "tools"))
 
-from naiz_lib import PROTECTED_IDX_ALL, COMMERCIAL_DOS_DIR, to_dos_name
+from naiz_lib import PROTECTED_IDX_ALL, resolve_dos_dir, to_dos_name
 from naiz_lib.toc_archive import make_toc_archive
 from naiz_lib.palette_utils import validate_skin_palette, VALIDATE_DE_MAX
 from naiz_lib.mag_codec import decode_mag_palette
@@ -348,10 +348,11 @@ def deploy_runtime(proj_dir: Path, game_dir: Path):
     # SCENE.DAT TOC 归档（共享 IMAGE.DAT 布局，新增数据管线）
     pack_scenes(proj_dir, game_dir)
 
-    # DOS extender + memory manager
-    dos_dir = Path(COMMERCIAL_DOS_DIR)
+    # DOS extender + memory manager.  CauseWay (devdoc 178) is embedded in
+    # engine.exe by wlink; no external extender file is tracked anymore.
+    dos_dir = Path(resolve_dos_dir())
     required_runtime = []
-    for name in ("DOS4GW.EXE", "VEM486.EXE", "CTMOUSE.COM"):
+    for name in ("VEM486.EXE", "CTMOUSE.COM"):
         src = dos_dir / name
         dst = game_dir / name
         if src.exists():
@@ -360,7 +361,7 @@ def deploy_runtime(proj_dir: Path, game_dir: Path):
                 print(f"  {name} 已部署")
             required_runtime.append(dst)
         else:
-            print(f"  WARNING: {name} not found in tools_commercial/dos_system/")
+            print(f"  WARNING: {name} not found in {dos_dir}/")
     for name in ("FONT.DAT", "BLACK.DAT"):
         if not (game_dir / name).exists():
             print(f"  WARNING: {name} not deployed to game directory")

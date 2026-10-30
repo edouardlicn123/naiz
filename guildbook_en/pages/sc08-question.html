@@ -1,0 +1,69 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="translated-from" content="202610300931">
+<!-- AI-NOTE: translated-from = the guildbook_cn doc-version this page was translated from. If the cn counterpart's doc-version is newer, re-translate this page from the Chinese source. -->
+
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>question — Naiz Guildbook</title>
+<link rel="stylesheet" href="../style.css">
+</head>
+<body>
+<nav class="sidebar" id="sidebar-nav"></nav>
+<script src="../sidebar-scripts.js"></script>
+<main class="main">
+
+<h1>question — Choice Branches</h1>
+<hr>
+<blockquote><strong>Created</strong>: 2026-07-27 <strong>Last updated</strong>: 2026-10-03</blockquote>
+<p>The <code>question()</code> command shows choice branches whose options are tied to variables. For variable definitions see <a href="cf01-变量系统.html">cf01 — variable system</a>.</p>
+
+<h2>1. Syntax</h2>
+<pre><code>question(text;opt1,var1,op1,delta1;opt2,var2,op2,delta2;...)</code></pre>
+<p>The semicolon <code>;</code> is the top-level separator; inside each option segment, commas <code>,</code> separate four fields:</p>
+<table>
+<tr><th>Field</th><th>Description</th></tr>
+<tr><td><code>text</code></td><td>Question text (first segment)</td></tr>
+<tr><td><code>label</code></td><td>Option display text</td></tr>
+<tr><td><code>var</code></td><td>Variable id (must be defined in variables.json)</td></tr>
+<tr><td><code>op</code></td><td>Operator: <code>+</code> (add), <code>-</code> (subtract), <code>=</code> (assign)</td></tr>
+<tr><td><code>delta</code></td><td>Integer value</td></tr>
+</table>
+
+<h3>1.1 Commas Inside Fields (Escaping)</h3>
+<p>When the option <code>label</code> itself needs a comma, escape it with a backslash, <code>\,</code>:</p>
+<pre><code>question(Pick one?;Ira\, Jr.,bond_ira,+,1;Neon,bond_neon,+,1)</code></pre>
+<ul>
+<li><code>\,</code> → a literal comma (stays in the label, not treated as a field separator)</li>
+<li><code>\\</code> → a literal backslash</li>
+<li>Any other <code>\x</code> is kept as-is (so <code>C:\path</code> does not lose its backslash)</li>
+<li>Leading and trailing whitespace in a field is trimmed: <code>Yes ,bond_ira,+,1</code> equals <code>Yes,bond_ira,+,1</code></li>
+<li><strong>The question text <code>text</code> (first segment) is not split on commas</strong> — commas in it are literal and need no escaping</li>
+</ul>
+<p>Escaping is handled by the engine's <code>nb_next_field()</code>; the scenario validator and the translation extractor use the same rule set, so the extracted translation keys always match the keys looked up at runtime.</p>
+
+<h2>2. Limits</h2>
+<ul>
+<li>At most 10 option segments (parser limit)</li>
+<li>At most 4 options shown at once (UI limit)</li>
+<li>On selection the op is applied, bounded by the min/max in variables.json</li>
+<li>The result is stored in <code>last_choice</code> (0-based index)</li>
+</ul>
+
+<h2>3. Example</h2>
+<pre><code>question(Where to?;Forest,bond_fei,+,5;Cave,bond_ira,=,10;Town,bond_neon,-,3)</code></pre>
+<ul>
+<li>Choose Forest → bond_fei += 5</li>
+<li>Choose Cave → bond_ira = 10</li>
+<li>Choose Town → bond_neon -= 3</li>
+</ul>
+<p>When a label contains a comma (escaped as <code>\,</code>):</p>
+<pre><code>question(Go with whom?;Ira\, Jr.,bond_ira,+,1;Neon,bond_neon,+,1)</code></pre>
+<ul>
+<li>The first option displays as <code>Ira, Jr.</code>; written unescaped as <code>Ira, Jr.,bond_ira,+,1</code> it is wrongly split into 5 fields, the label is left as <code>Ira</code>, and every following field is shifted</li>
+</ul>
+
+</main>
+</body>
+</html>

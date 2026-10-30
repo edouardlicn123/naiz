@@ -12,13 +12,13 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from .hdi import HDIImage
-from naiz_lib import to_dos_name, COMMERCIAL_BASE_HDI
+from naiz_lib import to_dos_name, resolve_base_hdi
 from .fat import NAIZFatFS, make_fat_entry, make_alloc_fn
 from .fat import ATTR_DIRECTORY, ATTR_ARCHIVE, FAT12_EOC, FAT16_EOC
 from .fat import get_entry_cluster
 
 
-DEFAULT_BASE = COMMERCIAL_BASE_HDI
+DEFAULT_BASE = resolve_base_hdi()
 
 
 def _generate_config(game_name):
@@ -33,9 +33,9 @@ def _generate_config(game_name):
 
 
 def generate_autoexec(game_name):
+    # SET DOS16M=1 was DOS/4GW-specific and a no-op under CauseWay (devdoc 178).
     content = (
         b'@ECHO OFF\r\n'
-        b'SET DOS16M=1\r\n'
         b'CTMOUSE.COM\r\n'
         b'engine.exe\r\n'
     )

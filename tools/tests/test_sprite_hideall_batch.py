@@ -24,8 +24,8 @@ def test_hideall_syncs_the_dialog_base_once():
     layer_sprite_sync_dialog_base() call, guarded so an empty stage skips it
     entirely."""
     src = SPRITE.read_text(encoding="utf-8")
-    m = re.search(r"\bvoid layer_sprite_hide_all\(void\)\n\{", src)
-    assert m, "layer_sprite_hide_all must exist"
+    m = re.search(r"\bvoid layer_sprite_hide_all_ex\(int recompose\)\n\{", src)
+    assert m, "layer_sprite_hide_all_ex must exist"
     depth, i = 0, src.index("{", m.start())
     body = None
     for j in range(i, len(src)):
@@ -39,10 +39,28 @@ def test_hideall_syncs_the_dialog_base_once():
     assert body, "unbalanced braces in layer_sprite_hide_all"
     n = body.count("layer_sprite_sync_dialog_base()")
     assert n == 1, (
-        f"hide_all calls sync_dialog_base {n} times -- it must run exactly "
+        f"hide_all_ex calls sync_dialog_base {n} times -- it must run exactly "
         f"once after the whole sweep (N x sync is the char(hideall) pause)")
-    assert "if (hidden)" in body, (
-        "an empty stage must not pay the occluder/recompose pipeline")
+    assert "if (hidden && recompose)" in body, (
+        "the sync must be skippable (recompose=0) and skipped on an empty stage")
     assert "layer_sprite_hide(" not in src, (
         "the per-sprite hide helper must stay deleted -- a per-sprite sync "
         "path is the regression this guard exists for")
+    wrapper = re.search(r"\bvoid layer_sprite_hide_all\(void\)\n\{([^}]*)\}", src)
+    assert wrapper and "layer_sprite_hide_all_ex(1)" in wrapper.group(1), (
+        "the plain hide_all wrapper must keep the recompose (scene reset path)")
+
+
+def test_cmd_char_hideall_skips_the_recompose_it_overwrites():
+    """devdoc 183: cmd_char(hideall) runs layer_sprite_hide_all_ex(0) before
+    layer_dialog_hide() -- the dialog rect restore overwrites the recomposed
+    pixels on the same frame, so paying the occluder+recompose pipeline would
+    be pure waste."""
+    nbcmd = (ROOT / "core" / "engine" / "nb_commands.c").read_text(encoding="utf-8")
+    i = nbcmd.index('"hideall"')
+    block = nbcmd[i:nbcmd.index("return;", i)]
+    assert "layer_sprite_hide_all_ex(0)" in block, (
+        "char(hideall) must suppress the recompose (it is overwritten by the "
+        "dialog rect restore on the same frame)")
+    assert "layer_dialog_hide()" in block, (
+        "char(hideall) must still close the dialog")

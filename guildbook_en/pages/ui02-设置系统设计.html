@@ -1,0 +1,118 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="translated-from" content="202610300931">
+<!-- AI-NOTE: translated-from = the guildbook_cn doc-version this page was translated from. If the cn counterpart's doc-version is newer, re-translate this page from the Chinese source. -->
+
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Settings System Design — Naiz Guildbook</title>
+<link rel="stylesheet" href="../style.css">
+</head>
+<body>
+<nav class="sidebar" id="sidebar-nav"></nav>
+<script src="../sidebar-reference.js"></script>
+<main class="main">
+<h1>Settings System Design</h1>
+<blockquote><strong>Created</strong>: 2026-06-27<br><strong>Last updated</strong>: 2026-07-01</blockquote>
+<p>This page covers the configuration side of the game settings system, including the two <strong>separately owned</strong> configuration files (<code>config.toml</code> and <code>USER.CFG</code>) and the <code>settingmenu</code> command.</p>
+<hr>
+
+<h2>1. Split Configuration Files</h2>
+<div class="note-box"><strong>Key concept: configuration is split into a "project" copy and a "player" copy, with opposite ownership.</strong>An earlier <code>settings.txt</code> mixed the two together and <strong>is now abolished</strong> — the engine no longer parses any project configuration file at runtime.</div>
+
+<table>
+<thead>
+<tr><th>Carrier</th><th>Owner</th><th>What it holds</th><th>How it reaches the engine</th></tr>
+</thead>
+<tbody>
+<tr>
+  <td><code>config.toml</code></td>
+  <td><strong>Project</strong></td>
+  <td>Dialogue box style, button colors, blackletter toggle, default language, version number, title, transitions</td>
+  <td><strong>Compiled into the engine at build time</strong>: <code>export_config.py</code> generates the <code>NAIZ_*</code> macros in <code>nb_config.h</code> → <strong>zero parsing at runtime</strong></td>
+</tr>
+<tr>
+  <td><code>USER.CFG</code></td>
+  <td><strong>Player</strong></td>
+  <td><code>lang</code> <code>text_speed</code> <code>bgm</code> <code>snd</code> <code>vc</code> <code>bgm_vol</code> <code>pcm_vol</code></td>
+  <td>Read at runtime by <code>prefs_load()</code> and written back by <code>prefs_save()</code>, <strong>the only runtime write point in the whole system</strong></td>
+</tr>
+</tbody>
+</table>
+
+<p><code>USER.CFG</code> is plain-text key/value pairs, one <code>key=value</code> per line:</p>
+<pre><code>lang=chi
+text_speed=2
+bgm=1
+bgm_vol=8</code></pre>
+
+<p><strong>Why they must be separate</strong>: the <code>lang</code> key <strong>exists only in <code>USER.CFG</code> across the whole system</strong>. It used to exist in both files, and the function that read it and the function that wrote it were each bound to a different copy — the player picked Traditional Chinese in the boot menu, yet the game still started in English. Same key name, opposite ownership, is exactly the breeding ground for that mismatch, so project-side keys are always named differently (<code>default_lang</code> rather than <code>lang</code>).</p>
+
+<p><strong>Two ways to change configuration</strong>: change project configuration → edit <code>config.toml</code> and rebuild (the macros are compile-time); reset player settings → delete <code>USER.CFG</code>.</p>
+
+<div class="note-box"><strong>Why is <code>config.toml</code> not read at runtime?</strong>Because project configuration is fixed long before the player gets the game, so there is no reason for it to change at runtime. Compiling it into the engine removes the parsing code and also makes "wrong configuration" show up at build time, instead of the player entering the game and seeing a garbled screen.</div>
+
+<hr>
+
+<h2>2. Dialogue Box Style (config.toml's <code>[dialog] style</code>)</h2>
+<pre><code>[dialog]
+style = 5</code></pre>
+<p>Sets the dialogue box background style. <code>style</code> is an integer from 0–9, corresponding to 10 presets. Each preset defines the background color, border color, and how translucency is handled.</p>
+<p>See <a href="cf03-对话框样式方案.html">cf03 — dialogue box style presets</a> for the full presets.</p>
+
+<hr>
+
+<h2>3. Button Colors (config.toml's <code>[button] style</code>)</h2>
+<pre><code>[button]
+style = 2</code></pre>
+<p>Sets the menu button colors. <code>style</code> is an integer from 0–4:</p>
+<table>
+<thead>
+<tr><th>Value</th><th>Colors</th></tr>
+</thead>
+<tbody>
+<tr><td><code>0</code></td><td>Black</td></tr>
+<tr><td><code>1</code></td><td>Blue</td></tr>
+<tr><td><code>2</code></td><td>Dark red</td></tr>
+<tr><td><code>3</code></td><td>Green</td></tr>
+<tr><td><code>4</code></td><td>Purple</td></tr>
+</tbody>
+</table>
+<p>See <a href="cf04-按钮样式方案.html">cf04 — button style presets</a> for the full color and visual specifications.</p>
+
+<hr>
+
+<h2>4. lang — Multilingual Switching (USER.CFG's <code>lang</code>)</h2>
+<pre><code>lang=chi</code></pre>
+<p><code>lang</code> sets the game's display language and is written in <code>USER.CFG</code>. It is the player's own choice and <strong>does not belong to project configuration</strong> — which is why it is not in <code>config.toml</code>. All 9 languages are supported:</p>
+<table>
+<thead>
+<tr><th>Value</th><th>Language</th></tr>
+</thead>
+<tbody>
+<tr><td><code>eng</code></td><td>English</td></tr>
+<tr><td><code>chi</code></td><td>Simplified Chinese</td></tr>
+<tr><td><code>cht</code></td><td>Traditional Chinese</td></tr>
+<tr><td><code>jpn</code></td><td>Japanese</td></tr>
+<tr><td><code>kor</code></td><td>Korean</td></tr>
+<tr><td><code>fre</code></td><td>Français</td></tr>
+<tr><td><code>ger</code></td><td>Deutsch</td></tr>
+<tr><td><code>ita</code></td><td>Italiano</td></tr>
+<tr><td><code>spa</code></td><td>Español</td></tr>
+<tr><td><code>por</code></td><td>Português</td></tr>
+</tbody>
+</table>
+<p>A missing <code>USER.CFG</code> is a normal first-run state; the engine then falls back to <code>default_lang</code> from <code>config.toml</code>.</p>
+<div class="note-box"><strong>Language must be chosen in the boot menu; it cannot be changed inside the game.</strong>The boot menu runs <em>before</em> the translation tables are loaded and can only draw pure ASCII; and since the language must be chosen <em>before</em> the translation tables exist, it can no longer be changed once you are in the game. That is why the Language line stays in the boot menu permanently.</div>
+<p>When displaying command text, the engine uses <code>tr()</code> to look up the translation file for the corresponding language, <code>i18n/*_&lt;lang&gt;.txt</code>.</p>
+
+<hr>
+
+<h2>5. The settingmenu Command</h2>
+<pre><code>settingmenu()</code></pre>
+<p>The settings menu command; currently a reserved stub with no effect yet. In the future it will provide a runtime settings screen, letting players change <strong>player-level</strong> preferences such as language and volume (<code>USER.CFG</code>) during the game — project-level styles (<code>config.toml</code>) are not in scope — and other options.</p>
+
+</main>
+</body>
+</html>

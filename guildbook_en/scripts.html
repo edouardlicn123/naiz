@@ -1,0 +1,165 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="translated-from" content="202610300931">
+<!-- AI-NOTE: translated-from = the guildbook_cn doc-version this page was translated from. If the cn counterpart's doc-version is newer, re-translate this page from the Chinese source. -->
+
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Game Scenario — Naiz Guildbook</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<nav class="sidebar" id="sidebar-nav"></nav>
+<script src="sidebar-scripts.js"></script>
+<main class="main">
+
+<h1>Game Scenario</h1>
+<hr>
+<p class="page-intro">
+  Command reference for NB (Naiz Book) scenario scripts. One page per command, covering syntax, parameters, and examples.
+</p>
+
+<div class="index-section">
+  <div class="index-section-title sec-script">NB Scenario Commands</div>
+  <div class="index-grid-3">
+    <div class="index-card">
+      <a href="pages/sc01-NB剧本概述.html">
+        <span class="card-badge b-script">sc</span>
+        <h3>NB Scenario Overview</h3>
+        <p>Format, file organization, scene chain</p>
+      </a>
+    </div>
+    <div class="index-card">
+      <a href="pages/sc02-bg.html">
+        <span class="card-badge b-script">sc</span>
+        <h3>bg — Background Switch</h3>
+        <p>Show and hide backgrounds</p>
+      </a>
+    </div>
+    <div class="index-card">
+      <a href="pages/sc19-cg.html">
+        <span class="card-badge b-script">sc</span>
+        <h3>cg — Full-screen CG Display</h3>
+        <p>Full-screen CG events, dialogue box retracted</p>
+      </a>
+    </div>
+    <div class="index-card">
+      <a href="pages/sc03-char.html">
+        <span class="card-badge b-script">sc</span>
+        <h3>char — Sprites and Dialogue</h3>
+        <p>Sprite operations, character dialogue, narration</p>
+      </a>
+    </div>
+    <div class="index-card">
+      <a href="pages/sc04-scene.html">
+        <span class="card-badge b-script">sc</span>
+        <h3>scene — Scene Transitions</h3>
+        <p>Unconditional and conditional chain jumps</p>
+      </a>
+    </div>
+    <div class="index-card">
+      <a href="pages/sc05-saveload.html">
+        <span class="card-badge b-script">sc</span>
+        <h3>loadscene — Load Game</h3>
+        <p>Load-game menu (saving is triggered from the main menu / hotkey)</p>
+      </a>
+    </div>
+    <div class="index-card">
+      <a href="pages/sc06-gallery.html">
+        <span class="card-badge b-script">sc</span>
+        <h3>cgvmenu / musicmenu</h3>
+        <p>CG gallery implemented / music appreciation reserved</p>
+      </a>
+    </div>
+    <div class="index-card">
+      <a href="pages/sc07-mainmenu.html">
+        <span class="card-badge b-script">sc</span>
+        <h3>mainmenu — Main Menu Command</h3>
+        <p>Command syntax and options</p>
+      </a>
+    </div>
+    <div class="index-card">
+      <a href="pages/sc08-question.html">
+        <span class="card-badge b-script">sc</span>
+        <h3>question — Choice Branches</h3>
+        <p>Choice branches linked with variables</p>
+      </a>
+    </div>
+    <div class="index-card">
+      <a href="pages/sc09-var.html">
+        <span class="card-badge b-script">sc</span>
+        <h3>var — Variable Operations</h3>
+        <p>Variable assignment, increment and decrement</p>
+      </a>
+    </div>
+    <div class="index-card">
+      <a href="pages/sc10-audio.html">
+        <span class="card-badge b-script">sc</span>
+        <h3>bgm/sound/voice — Audio Commands</h3>
+        <p>Background music, sound effects, and voice</p>
+      </a>
+    </div>
+    <div class="index-card">
+      <a href="pages/sc11-sceneconf.html">
+        <span class="card-badge b-script">sc</span>
+        <h3>sceneconf — Scene Configuration</h3>
+        <p>Chapter title and scene type</p>
+      </a>
+    </div>
+    <div class="index-card">
+      <a href="pages/sc12-host.html">
+        <span class="card-badge b-script">sc</span>
+        <h3>host — System Narration</h3>
+        <p>Narration text without a character name</p>
+      </a>
+    </div>
+    <div class="index-card">
+      <a href="pages/sc13-startsetting.html">
+        <span class="card-badge b-script">sc</span>
+        <h3>startsetting — Startup Settings</h3>
+        <p>Open the settings menu and save</p>
+      </a>
+    </div>
+    <div class="index-card">
+      <a href="pages/sc14-settingmenu.html">
+        <span class="card-badge b-script">sc</span>
+        <h3>settingmenu — Settings Menu</h3>
+        <p>Reserved command (not implemented)</p>
+      </a>
+    </div>
+    <div class="index-card">
+      <a href="pages/sc15-playanima.html">
+        <span class="card-badge b-script">sc</span>
+        <h3>playanima — Play Animation</h3>
+        <p>Play a .ANI animation within the scenario</p>
+      </a>
+    </div>
+    <div class="index-card">
+      <a href="pages/sc16-waitanima.html">
+        <span class="card-badge b-script">sc</span>
+        <h3>waitanima — Wait for Animation</h3>
+        <p>Pause the scenario until the animation finishes</p>
+      </a>
+    </div>
+    <div class="index-card">
+      <a href="pages/sc17-stopanima.html">
+        <span class="card-badge b-script">sc</span>
+        <h3>stopanima — Stop Animation</h3>
+        <p>Stop the current animation immediately</p>
+      </a>
+    </div>
+    <div class="index-card">
+      <a href="pages/sc18-delay.html">
+        <span class="card-badge b-script">sc</span>
+        <h3>delay — Scenario Delay</h3>
+        <p>Pause the scenario for a given number of seconds</p>
+      </a>
+    </div>
+  </div>
+</div>
+
+</main>
+<script src="topnav.js"></script>
+</body>
+</html>
