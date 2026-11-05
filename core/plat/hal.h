@@ -1,0 +1,520 @@
+/*
+ * hal.h — 硬件抽象层（HAL）接口
+ *
+ * 引擎的 platform 无关代码通过此接口访问平台特定的硬件功能。
+ * 每个支持的平台提供一组实现文件（如 PC-98 的 hal_pc98.c / hal_kbd.c /
+ * hal_mouse.c / hal_video.c）。
+ *
+ * 当前定义的接口：
+ *   基础:
+ *   - hal_init()         平台初始化（串口、中断等）
+ *   - hal_log()          调试日志输出
+ *   - hal_set_palette()  调色板 RGB 写入
+ *   - hal_read_palette() 调色板 RGB 读取
+ *   显示:
+ *   - hal_video_init()   视频模式设置
+ *   - hal_video_exit()   视频模式恢复
+ *   - hal_vblank_wait()  垂直同步等待
+ *   键盘:
+ *   - hal_kbd_init()     键盘初始化
+ *   - hal_kbd_update()   每帧轮询
+ *   - hal_kbd_is_down()    消耗性查询
+ *   - hal_kbd_flush()      清空缓冲
+ *   - hal_kbd_drain_advance() 确认键释放等待
+ *   - hal_kbd_wait_any()     任意键等待
+ *   - hal_kbd_set_ignore_frames() 帧忽略设置
+ *   鼠标:
+ *   - hal_mouse_init()     鼠标初始化
+ *   - hal_mouse_update()   每帧轮询
+ *   - hal_mouse_get_x/y()  坐标查询
+ *   - hal_mouse_was_clicked() 按钮状态
+ *   - hal_mouse_flush/drain() 缓冲操作
+ *   - hal_mouse_set_pos()   位置设置
+ *   - hal_mouse_draw_cursor() 光标绘制
+ *   音频:
+ *   - hal_audio_detect()   探测 MPU-401（BGM 后端）
+ *   - hal_midi_out()       MPU-401 UART 字节输出
+ *   - hal_pcm_play/tick/stop()  86 板 PCM FIFO（sound/voice）
+ *   - hal_fm_detect/init/shutdown/write_reg() 86 板 OPNA FM（BGM，devdocs/123）
+ *   - hal_wallclock_ms()   毫秒时钟（MIDI 时序调度 / PCM 泵节流）
+ *
+ * 约束（详见 AGENTS.md §5.1）：
+ *   - core/engine/ 中的引擎代码只能通过此头文件访问硬件
+ *   - outb()/inb() 等端口 I/O 只能在 core/plat/ 中调用
+ *   - 不允许在引擎代码中直接解引用 MMIO 地址
+ *
+ * 键盘扫描码常量（KC_*）与鼠标按钮常量在此处定义，供 engine 层使用。
+ * 平台实现（keyboard.c/mouse.c）也使用同一套常量。
+ */
+#ifndef HAL_H
+#define HAL_H
+
+#include <stdint.h>
+
+/*
+ * 平台初始化
+ *
+ * 在引擎启动早期调用一次。PC-98 实现初始化 uPD8251 串口作为
+ * 调试输出通道。其他平台实现应在此完成必要的早期硬件设置。
+ *
+ * 在所有其他 HAL 函数之前调用。
+ */
+void hal_init(void);
+
+/*
+ * 调试字符串输出
+ *
+ * 在 DOS/4GW 保护模式下，标准 printf() 不可用（DOS 文本层被
+ * 图形模式覆盖），串口是唯一可靠的输出通道。
+ *
+ * @param s  以 NUL 结尾的字符串
+ */
+void hal_log(const char *s);
+
+/*
+ * 格式化调试输出
+ *
+ * printf 风格的便捷封装：内部格式化到栈缓冲后调用 hal_log()。
+ * 替代散落在引擎各处的手写 snprintf+hal_log 两段式，统一缓冲长度
+ * 与截断策略。
+ *
+ * @param fmt  printf 风格格式串
+ */
+void hal_logf(const char *fmt, ...);
+
+/*
+ * 设置调色板索引的 RGB 值
+ *
+ * 各分量使用 8-bit 精度（0-255）。PC-98 PEGC 模式下通过
+ * GDC 端口 0xA8-0xAE 写入。
+ *
+ * @param idx  调色板索引（0-255）
+ * @param r    红色分量
+ * @param g    绿色分量
+ * @param b    蓝色分量
+ */
+void hal_set_palette(int idx, uint8_t r, uint8_t g, uint8_t b);
+
+/*
+ * 读取调色板索引的 RGB 值
+ *
+ * 读取索引 idx 对应的 R/G/B 分量，通过输出参数返回。
+ *
+ * @param idx  调色板索引（0-255）
+ * @param r    输出红色分量
+ * @param g    输出绿色分量
+ * @param b    输出蓝色分量
+ */
+void hal_read_palette(int idx, uint8_t *r, uint8_t *g, uint8_t *b);
+
+/*
+ * 等待垂直回扫（VBLANK）
+ *
+ * 轮询 GDC 状态端口直到 VSYNC 开始。
+ * 为免撕裂的 VRAM 操作提供 ~16ms 安全窗口。
+ */
+void hal_vblank_wait(void);
+
+/*
+ * 非阻塞 VSYNC 采样（devdoc 131 方案 B）
+ *
+ * 返回 1 恰好表示观察到一个上升沿（VBLANK 开始），否则 0。供无法阻塞的
+ * 长 CPU 路径（MAG 解码内循环）调用，使其仍能检测「显示前进了一帧」——
+ * 虚拟时钟必须按显示帧率步进，而非按解码扫描次数，否则 BGM 会跑快。
+ * 每次调用仅一次端口读，足够廉价以在解码扫描中频繁调用。
+ */
+int hal_vblank_poll(void);
+
+/*
+ * devdoc 163 Phase 3 C1: GDC vsync IRQ delivery probe (compile-gated).
+ *
+ * Samples the master PIC IRR bit2 (IRQ2) for ~2 seconds after arming the
+ * GDC via a write to port 0x64, then logs "[IRQP] hits=... samples=...".
+ * Never touches the PIC mask or the INT 0Ah vector (see hal_pc98.c).
+ * Default build compiles this out entirely; enable with
+ *   make -C core EXTRA_DEFS=-DNAIZ_IRQ_PROBE=1
+ */
+#ifndef NAIZ_IRQ_PROBE
+#define NAIZ_IRQ_PROBE 0
+#endif
+#if NAIZ_IRQ_PROBE
+void hal_irq_probe_run(void);
+
+/*
+ * devdoc 164 phase 0: DPMI interrupt-capability probe (compile-gated).
+ *
+ * Read-only: queries the DPMI version (INT 31h AX=0400), whether it can read
+ * a protected-mode vector for the IRQ3 line (AX=0204), and whether the lock
+ * API answers (AX=0600).  NEVER sets a vector, never touches the PIC mask --
+ * this exists to decide, before writing an ISR, whether the Open Watcom +
+ * DOS/4GW toolchain can hook a hardware IRQ at all (G08 §2 flags the Watcom
+ * equivalent of `_go32_dpmi_*` as unmapped).  Logs "[DPMP] ver=.. bits32=..
+ * vec0B_ok=.. vec0A_ok=.. lock_ok=..".  Default build compiles it out.
+ */
+void hal_dpmi_probe_run(void);
+#endif
+
+/*
+ * 读取墙钟毫秒数（DOS 系统时钟 INT 21h AH=2Ch，10ms 粒度）
+ *
+ * 时间基动画步进。时钟源演变：NP2kai 下 8253 PIT（0x71/0x77）由模拟
+ * CPU 时钟驱动（非单调，不可用，0.2.130 探针实证）；vblank 帧计数因
+ * NP2kai pass 率仅 ~20.5Hz 而每真实秒只推 ~342ms（慢 3 倍）。DOS 时钟
+ * 由 DOS 维护，模拟器与真机一致、秒级正确；10ms 粒度够打字机/动画用。
+ * 午夜回绕由调用方处理。
+ */
+unsigned long hal_wallclock_ms(void);
+unsigned long hal_wallclock_last_advance_units(void);  /* stage 3/4: last emitted advance in units */
+
+/*
+ * 虚拟时钟毫秒数（平滑步进，devdoc 107 / 0.2.134，devdoc 129 订正）
+ *
+ * 供微秒级节拍消费方（打字机 reveal / 动画 / BGM MIDI 调度）使用的单一
+ * 事实源。hal_wallclock_ms() 的宏观累计值秒级正确，但 NP2kai 上单次调用
+ * delta 成块交付（冻结 3-6s 后一次 +1000..+6000ms 跳），直接吃 raw delta
+ * 的消费方会冻结-爆发。
+ *
+ * 平滑策略在 lib/vclock（0.3.028，devdoc 129 follow-up）：不再把每 pass 增
+ * 量钳制到固定上下限，而是让步进大小向 DOS 时钟实测出的速率平滑收敛
+ * （每 pass 最多挪 VCLOCK_SLEW_UNITS）。订正原因：帧泵把 advance 收敛为
+ * 「每 pass 一次」后，旧的 floor/ceiling 钳制会在洞内吐 40ms 步、在秒落地
+ * 的哪一拍吐 100ms 步，2.5:1 交替即为可闻的 BGM 颤动。首 pass 返回 0（基线）。
+ */
+
+/*
+ * Advance the virtual clock by exactly one frame (devdoc 129).
+ * Sole writer — called once per pass by engine_frame_pump().  Do NOT call
+ * this from arbitrary subsystems; they must use the read-only reader below.
+ */
+void hal_wallclock_smooth_advance(void);
+
+/*
+ * Fixed-step advance for the Timer-B ISR (devdoc 165).  Adds a known delta (in
+ * 1/16 ms units) to the virtual clock without any DOS call — int 21h is not
+ * reentrant from a hardware handler, so the ISR cannot use
+ * hal_wallclock_smooth_advance().  The hardware timer period is the time source.
+ */
+void hal_wallclock_fixed_advance(unsigned long delta_units);
+
+/*
+ * Read-only view of the virtual clock (devdoc 129).  No side effects: the
+ * elapsed time between two reads reflects only frame-pump advances, so the
+ * rate no longer depends on how many subsystems poll it.
+ */
+unsigned long hal_wallclock_smooth_ms(void);
+
+/*
+ * 音频（真实后端，devdoc 101）
+ *
+ * BGM = SMF 解析 + 时序调度，经 MPU-401 UART 直写 MIDI 字节流。
+ * sound/voice = .pcm(8bit mono) 直灌 86 板 YM3433B FIFO。
+ *
+ * hal_audio_detect():
+ *   探测 MPU-PC98（0xC0D0/0xC0D2）。发送 reset(0xFF)+UART(0x3F) 并等待
+ *   ACK 0xFE；失败返回 0（无卡/未使能时 NP2kai 状态口读回 0xFF）。检测
+ *   成功后即处于 UART 模式。实机无 MPU 卡时返回 0，引擎降级旧 stub 行为。
+ *
+ * hal_midi_out():
+ *   写前轮询状态口 bit6（MIDIOUT_BUSY=0x40）清 0，再写数据口一字节。
+ *   仅 detect 成功后调用。
+ *
+ * hal_pcm_*():
+ *   86 板 PCM。hal_pcm_play 配置速率/8bit mono 并启用输出；hal_pcm_advance_units
+ *   泵 FIFO（A466 bit7=full 时停泵）；loop=1 时数据耗尽自动回绕
+ *   pos 至 0（素材表语义决定调用方传入），否则耗尽自动停；hal_pcm_stop
+ *   停输出清缓冲。data 由调用方持有（HAL 借用至 play/stop），不自 free。
+ *   `elapsed_ms` = 距上次 tick 的真实毫秒数（Timer-B ISR 传固定周期，
+ *   协作路径传时钟差）：泵入量按采样率折算，不再「一次塞满 32KB FIFO」。
+ *   一次塞满会让 ISR 里出现数千次 outb（devdoc 167）。
+ *   hal_pcm_set_volume 写 A466 电子音量（0=最响~15=最轻，**倒序**且
+ *   15 仍非静音）；真静音需 A66E bit0，音量档位见 F02 §4.2。
+ */
+int  hal_audio_detect(void);
+void hal_midi_out(uint8_t b);
+void hal_pcm_play(const uint8_t *data, uint32_t len, int rate, int loop);
+void hal_pcm_advance_units(uint32_t units);  /* stage 4: unit-based, uint32_t (devdoc 169) */
+void hal_pcm_stop(void);
+int  hal_pcm_active(void);
+void hal_pcm_set_volume(int step);
+
+/* 86 板 OPNA FM（devdocs/123 M3）：
+ *   - hal_fm_detect()   通过能力 ID 回读（0xFF -> 1）探测 OPNA
+ *   - hal_fm_init()     确保 A460 bit0=1（选 OPNA + 不强制静音），
+ *                       否则扩展窗口 0x18C/0x18E 不路由；并把 FM 音量
+ *                       路径 VOL1/VOL2 初始化为满音量
+ *   - hal_fm_write_reg(bank,addr,val)  bank 0 -> 0x188/0x18A（普通组），
+ *                       bank 1 -> 0x18C/0x18E（扩展组，FM ch4-6）
+ *   - hal_fm_shutdown() 所有 FM 声道 KEYOFF + SSG 全静音
+ *   - hal_fm_set_volume(atten)  A466 VOL1（FM 直接）衰减，0（最响）~15 */
+int  hal_fm_detect(void);
+void hal_fm_init(void);
+void hal_fm_shutdown(void);
+void hal_fm_write_reg(int bank, uint8_t addr, uint8_t val);
+void hal_fm_set_volume(int atten);
+
+/*============================================================================
+ * Interrupt-driven audio pump (devdoc 164 phase 1, devdoc 174 scan)
+ *
+ * The BGM pump is co-operative: audio_tick() only runs from the frame pump, so
+ * a long CPU-bound pass starves it and the music stalls (the M1 time-debt of
+ * devdoc 163).  With NAIZ_BGM_IRQ the HAL also installs an OPNA Timer-B timer
+ * whose handler advances the virtual clock and pumps FMSeq/PCM, decoupling the
+ * beat from the main loop.
+ *
+ * The timer's IRQ line is strapped by the host's board DIP switch, so it cannot
+ * be known at compile time.  hal_bgm_irq_init() therefore only programs the
+ * timer; hal_bgm_irq_probe_step() (called once per frame) scans the candidates
+ * and hands the pump to the ISR only after a line actually ticks.  Until then
+ * -- and if no line ever ticks -- the co-operative pump runs unchanged, so
+ * enabling this macro can never silence the BGM.
+ *============================================================================ */
+#ifndef NAIZ_BGM_IRQ
+#define NAIZ_BGM_IRQ 1  /* ISR path enabled; 运行时可由 hal_bgm_irq_set_on() 切换到协作泵
+                            （devdoc 175 §十一：toggle 本身是诊断工具，用于实机 A/B） */
+#endif
+#if NAIZ_BGM_IRQ
+/* One Timer-B period in virtual-clock units (1/16 ms), devdoc 168/177.
+ * tB = 2304 * (256 - NB) / phiM at phiM = 7.9872 MHz, NB = 200 => 16.154 ms
+ * => 258 units (truncated: -0.18% against a real 86 board).  The engine's
+ * split drain also steps by this amount, so both sides share one definition. */
+#define BGM_TIMER_B_UNITS 258UL
+
+/*
+ * Program Timer-B and start the IRQ line scan (devdoc 174).
+ * Returns 1 if a candidate line was hooked, 0 if none had a protected-mode
+ * vector at all.  Either way the co-operative pump keeps running until a
+ * candidate actually ticks -- see hal_bgm_irq_probe_step().  Call once, after
+ * hal_fm_init().
+ */
+int  hal_bgm_irq_init(void);
+/* Advance the candidate scan.  Call once per frame from the main loop; promotes
+ * the hooked line to pump owner once it has ticked, otherwise detaches it and
+ * tries the next one.  No-op once a line is elected or the list is exhausted. */
+void hal_bgm_irq_probe_step(void);
+/* 1 once a candidate has ticked and the ISR owns the clock/audio pump.  The
+ * frame pump reads this to yield ownership and avoid double-pumping; while it
+ * is 0 (including during the scan) the co-operative pump must run. */
+int  hal_bgm_irq_active(void);
+/* ISR tick count (devdoc 165).  The handler must not log, so the frame path
+ * samples this to prove the Timer-B is actually firing.  Monotone while the
+ * ISR is active; frozen if it is not. */
+unsigned long hal_bgm_irq_ticks(void);
+/* Clock units the handler accumulated since the last drain; clears them. */
+unsigned long hal_bgm_irq_take_pending_units(void);
+/* 1 while the Timer-B ISR is running (devdoc 166).  The engine's audio
+ * critical section must become a no-op there: the handler already runs with
+ * IF cleared, and re-enabling interrupts inside it would let it re-enter
+ * itself. */
+int  hal_bgm_irq_in_isr(void);
+/* Runtime ownership toggle (devdoc 175 §十一).  ISR path 与协作泵在同一构建
+ * 下实时切换，用于实机 A/B 对比听感与根因定位。
+ *   hal_bgm_irq_set_on(1) → ISR（若 init+probe 已选举出线）；返回 -1 表示未 setup
+ *   hal_bgm_irq_set_on(0) → 协作泵；Timer-B 仍在后台 tick
+ *   hal_bgm_irq_is_on()    → 1 表示当前 ISR 持有所有权 */
+int  hal_bgm_irq_set_on(int on);
+int  hal_bgm_irq_is_on(void);
+/* Stop the timer and restore the previous vector (scene shutdown). */
+void hal_bgm_irq_shutdown(void);
+#else
+/* audio.c drains the ISR's unit counter unconditionally, so the gated build
+ * still needs this no-op stub.  Keep the prototype visible so the gated build
+ * does not fall back to an implicit int declaration (Watcom W131). */
+unsigned long hal_bgm_irq_take_pending_units(void);
+#endif
+
+/*============================================================================
+ * 键盘扫描码常量（PC-98 硬件标准）
+ *============================================================================
+ * 与 NP2kai keystat.tbl 定义的编码一致。
+ * engine 层代码通过这些常量调用 hal_kbd_*() 函数。
+ */
+#define HAL_KBD_WAIT_MAX_ITER  50000
+
+/* 字母数字键 —— 扫描码 0x00-0x0E */
+#define KC_ESC      0x00
+#define KC_1        0x01
+#define KC_2        0x02
+#define KC_3        0x03
+#define KC_4        0x04
+#define KC_5        0x05
+#define KC_6        0x06
+#define KC_7        0x07
+#define KC_8        0x08
+#define KC_9        0x09
+#define KC_0        0x0A
+#define KC_MINUS    0x0B
+#define KC_HAT      0x0C
+#define KC_YEN      0x0D
+#define KC_BS       0x0E
+#define KC_TAB      0x0F
+#define KC_Q        0x10
+#define KC_W        0x11
+#define KC_E        0x12
+#define KC_R        0x13
+#define KC_T        0x14
+#define KC_Y        0x15
+#define KC_U        0x16
+#define KC_I        0x17
+#define KC_O        0x18
+#define KC_P        0x19
+#define KC_AT       0x1A
+#define KC_LBRACKET 0x1B
+#define KC_RETURN   0x1C
+#define KC_ENTER    0x1C
+#define KC_A        0x1D
+#define KC_S        0x1E
+#define KC_D        0x1F
+#define KC_F        0x20
+#define KC_G        0x21
+#define KC_H        0x22
+#define KC_J        0x23
+#define KC_K        0x24
+#define KC_L        0x25
+#define KC_SEMI     0x26
+#define KC_COLON    0x27
+#define KC_RBRACKET 0x28
+#define KC_Z        0x29
+#define KC_X        0x2A
+#define KC_C        0x2B
+#define KC_V        0x2C
+#define KC_B        0x2D
+#define KC_N        0x2E
+#define KC_M        0x2F
+#define KC_COMMA    0x30
+#define KC_DOT      0x31
+#define KC_SLASH    0x32
+#define KC_UNDER    0x33
+#define KC_SPACE    0x34
+#define KC_XFER     0x35
+#define KC_RLUP     0x36
+#define KC_RLDN     0x37
+#define KC_INS      0x38
+#define KC_DEL      0x39
+#define KC_UP       0x3A
+#define KC_LEFT     0x3B
+#define KC_RIGHT    0x3C
+#define KC_DOWN     0x3D
+#define KC_HOME     0x3E
+#define KC_HELP     0x3F
+#define KC_NP_MINUS 0x40
+#define KC_NP_SLASH 0x41
+#define KC_NP_7     0x42
+#define KC_NP_8     0x43
+#define KC_NP_9     0x44
+#define KC_NP_STAR  0x45
+#define KC_NP_4     0x46
+#define KC_NP_5     0x47
+#define KC_NP_6     0x48
+#define KC_NP_PLUS  0x49
+#define KC_NP_1     0x4A
+#define KC_NP_2     0x4B
+#define KC_NP_3     0x4C
+#define KC_NP_EQU   0x4D
+#define KC_NP_0     0x4E
+#define KC_NP_COMMA 0x4F
+#define KC_NP_DOT   0x50
+#define KC_NFER     0x51
+#define KC_VF1      0x52
+#define KC_VF2      0x53
+#define KC_VF3      0x54
+#define KC_VF4      0x55
+#define KC_VF5      0x56
+#define KC_STOP     0x60
+#define KC_COPY     0x61
+#define KC_F1       0x62
+#define KC_F2       0x63
+#define KC_F3       0x64
+#define KC_F4       0x65
+#define KC_F5       0x66
+#define KC_F6       0x67
+#define KC_F7       0x68
+#define KC_F8       0x69
+#define KC_F9       0x6A
+#define KC_F10      0x6B
+/* 修饰键 */
+#define KC_SHIFT    0x70
+#define KC_CAPS     0x71
+#define KC_KANA     0x72
+#define KC_GRPH     0x73
+#define KC_ALT      0x73
+#define KC_CTRL     0x74
+
+/* 鼠标按钮常量 */
+#define HAL_MOUSE_LBUTTON  0
+#define HAL_MOUSE_RBUTTON  1
+
+/*============================================================================
+ * 键盘 HAL 接口
+ *============================================================================
+ * 函数签名与 keyboard.h 相同。
+ */
+void hal_kbd_init(void);
+void hal_kbd_update(void);
+int  hal_kbd_is_down(unsigned char scancode);
+void hal_kbd_flush(void);
+void hal_kbd_drain_advance(void);
+void hal_kbd_wait_any(void);
+void hal_kbd_set_ignore_frames(int n);
+
+/*============================================================================
+ * 鼠标 HAL 接口
+ *============================================================================
+ * 光标绘制函数在阶段二之后移至 engine 层 cursor.c。
+ */
+void hal_mouse_init(void);
+void hal_mouse_update(void);
+int  hal_mouse_get_x(void);
+int  hal_mouse_get_y(void);
+int  hal_mouse_was_clicked(int btn);
+void hal_mouse_set_pos(int x, int y);
+void hal_mouse_flush(void);
+void hal_mouse_drain(void);
+void hal_mouse_invalidate_cursor(void);
+void hal_mouse_erase_cursor(void);
+void hal_mouse_draw_cursor(void);
+void hal_mouse_draw_cursor_force(void);
+/* Report a VRAM write rectangle to the software cursor layer; the layer
+ * erases itself only when the region overlaps the cursor (no-op otherwise).
+ * Any VRAM writer whose region may overlap the cursor must call this (or
+ * hal_mouse_invalidate_cursor) BEFORE writing (devdoc 108 layer contract). */
+void hal_mouse_touch_cursor(int x, int y, int w, int h);
+/* Opaque variant: the caller's write pixel-for-pixel overwrites the WHOLE
+ * reported rect.  When the rect fully covers the cursor box the layer skips
+ * the up-front erase and the stale same-position redraw re-captures the
+ * background without a VBLANK gate (no full-frame arrow absence per reveal
+ * pass, devdoc 109).  Transparent/partial writers must use touch_cursor. */
+void hal_mouse_touch_cursor_opaque(int x, int y, int w, int h);
+void hal_mouse_recenter_if_idle(void);
+int  hal_mouse_available(void);
+int  hal_mouse_get_display_x(void);
+int  hal_mouse_get_display_y(void);
+
+/*============================================================================
+ * 视频 HAL 接口
+ *============================================================================
+ */
+void hal_video_init(void);
+void hal_video_exit(void);
+void hal_video_check_palette(void);
+
+/*============================================================================
+ * VRAM 访问接口
+ *
+ * PC-98 PEGC 256-color mode: VRAM is 640x400 bytes (256KB total), accessed
+ * through a 32KB bank window at 0xA8000. Bank selection via port 0xE0004.
+ *
+ * These functions abstract the banked VRAM access so engine rendering code
+ * does not directly reference hardware addresses (see AGENTS.md §5.1).
+ *============================================================================
+ */
+
+/* VRAM bank size in bytes (32KB = 32768). */
+#define VRAM_BANK_SZ       32768
+
+/* Select VRAM bank 0-7 for the window at 0xA8000. */
+void hal_vram_bank_select(int bank);
+
+/* Return pointer to the VRAM window base. */
+volatile uint8_t *hal_vram_get_window(void);
+
+#endif

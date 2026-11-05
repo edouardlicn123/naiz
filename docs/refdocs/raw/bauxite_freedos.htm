@@ -1,0 +1,258 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.0 Transitional//EN">
+<HTML LANG=ja>
+<HEAD>
+<META HTTP-EQUIV="Content-Type" content="text/html; charset=Shift_JIS">
+<TITLE>Garbage for FreeDOS</TITLE>
+</HEAD>
+<BODY>
+
+<H1>FreeDOS 方面</H1>
+<HR>
+
+適当な作業結果が捨てられたりします。<BR>
+内容については保証／保障いたしかねます。あしからず。<BR>
+
+<P>
+その他のテスト物は<!-- <A HREF="http://www2.atpages.jp/lpproj/dos/">分所</A>にて。<BR>
+うまく落とせないときは -->、<A HREF="https://onedrive.live.com/redir?resid=37E157F1D87E4BC4%21116">OneDrive のほう</A>からそれらしいのを適当にみつくろってきてください。
+<P>
+<H2 ID="fdkernel">FreeDOS and FreeDOS(98) unstable fdkernel (private snapshot)</H2>
+
+FreeDOS の<a href="https://github.com/FDOS/kernel">開発版カーネル</a>に tori 氏による <a href="http://www.retropc.net/tori/freedos/">FreeDOS(98)</a> の成果を<RUBY>悪魔合体<RP>（<RT>マージ<RP>）</RUBY>したものです。<BR>
+既存のものからの更新点は、おおむね以下のようになります。
+
+<P>
+PC-98, IBM PC (DOS/V)版共通：
+<SMALL>
+<UL>
+ <LI>DBCS（２バイト文字、つまり主に日本語）ファイル名サポート
+</UL>
+</SMALL>
+
+<P>
+PC-98 FreeDOS(98)固有：
+
+<SMALL>
+<UL>
+ <LI>3mode FDD(2DD/2HD/1.44M)対応
+ <LI>SCSI ハードディスク対応（MO起動は現状未対応）
+ <LI>その他（NEC版MS-DOSとの）互換性向上
+ <LI>若干の外部ドライバ、ユーティリティ追加
+</UL>
+</SMALL>
+
+<P>
+作業進捗 : <a href="https://github.com/lpproj/fdkernel/tree/nec98test">https://github.com/lpproj/fdkernel/</a><br>
+暫定リリース : <a href="https://github.com/lpproj/fdkernel/releases">https://github.com/lpproj/fdkernel/releases</a><br>
+<br>
+
+<P>
+コンパイル済カーネル(IBMPC,NEC98 FAT16,FAT32) : <a href="https://github.com/lpproj/fdkernel/releases/download/test-20220120-cherrypick/fdkernel_dbcs-20220120-bin.zip">fdkernel_dbcs-20220120-bin.zip</a>
+ <small><a href="fdkernel/fdkernel_dbcs-20220120-bin.zip">[mirror]</a></small>
+ 　 <small><a href="https://github.com/lpproj/fdkernel/archive/refs/tags/test-20220120-cherrypick.zip">[source.zip]</a></small>
+<br />
+<!--
+<small>
+※ PC-98用FAT32カーネルを使う場合は、FreeDOS(98)起動ディスクのKERNEL.SYSをnec98/kwc18632.sysで上書きしてください。（元のFAT16カーネルに戻すにはnec98/kwc8616.sysで上書き）
+<br />
+</small>
+-->
+
+<P>
+暫定資料：<br />
+<small>
+おおまかな更新履歴 <a href="https://gist.github.com/lpproj/2420a2acb1601866cb04746093c283ed">fdkernel_nec98_history.txt</a> <br />
+PC-98用MS-DOS固有部分のサポート状況 <a href="https://gist.github.com/lpproj/4ac479989a15214da52c6890a331e047">nec98int.txt</a> <br />
+FreeDOS(98)固有カーネル設定の説明と変更法 <a href="https://github.com/lpproj/fdkernel/blob/nec98test/docs/ja/sys_fd98.txt">sys_fd98.txt</a> <br />
+</small>
+
+<H2 ID="diskimage">FreeDOS(98) 起動ディスクイメージ</H2>
+
+FreeDOS(98)起動フロッピーディスクイメージ(2HD&amp;1.44M) : <a href="https://github.com/lpproj/fdkernel/releases/download/test-20220120-cherrypick/fd98_2hd144_20220123.zip">fd98_2hd144_20220123.zip</a>
+ <small><a href="fdkernel/fd98_2hd144_20220123.zip">[mirror]</a></small>
+<br>
+FreeDOS(98)各種PC-98エミュレータ用ハードディスクイメージ（HDI形式）: <a href="https://github.com/lpproj/fdkernel/releases/download/test-20220120-cherrypick/fd98_hd_250m_20220123.zip">fd98_hd_250m_20220123.zip</a>
+ <small><a href="fdkernel/fd98_hd_250m_20220123.zip">[mirror]</a></small>
+<br>
+<!--
+FreeDOS(98)起動フロッピーディスクイメージ(2HD&amp;1.44M) : <a href="https://github.com/lpproj/fdkernel/releases/download/test-20211027/fd98_2hd144_20211029.zip">fd98_2hd144_20211029.zip</a>
+ <small><a href="fdkernel/fd98_2hd144_20211029.zip">[mirror]</a></small>
+<br>
+FreeDOS(98)各種PC-98エミュレータ用ハードディスクイメージ（HDI形式）: <a href="https://github.com/lpproj/fdkernel/releases/download/test-20211027/fd98_hd_250m_20211029.zip">fd98_hd_250m_20211029.zip</a>
+ <small><a href="fdkernel/fd98_hd_250m_20211029.zip">[mirror]</a></small>
+<br>
+-->
+<br>
+<small>
+※ FAT32カーネルを使う場合は、ディスクイメージのルートディレクトリ上にあるKERNEL.SYSをKWC18632.SYSで上書きコピーしてください。（元のFAT16カーネルに戻すにはKWC8616.SYSで上書き）
+<br />
+</small>
+<small>過去のイメージは<a href="https://github.com/lpproj/fdkernel/releases">暫定リリースのとこ</a>からどうぞ</small><br />
+<br>
+<H2 ID="freecom_dbcs">FreeCOM DBCS Edition</H2>
+
+MS-DOSのCOMMAND.COMの代替品（機能的には上位互換）です。
+日本語文字列を正しく編集できるように修正し、suzu氏やakm氏の日本語メッセージを取り込んで日本語化しています。<br>
+FreeDOSでなくても（DOS 3.1以上であれば）動作しますので、ファイル名補完やヒストリ、ディレクトリスタックといった機能をMS-DOSでも使いたいときはCOMMAND.COMを入れ替えてみるのもいいかもしれません。
+（XMSドライバのインストールを強く推奨）
+
+<P>
+FreeCOM 0.85a DBCS edition (PC-98, IBM PC, DOS/V and generic DOS) : <a href="https://github.com/lpproj/freecom_dbcs2/releases/download/dbcswip-20220117/freecom_dbcswip-20220117-bin.zip">freecom_dbcswip-20220117-bin.zip</a>
+ 　 <small><a href="https://github.com/lpproj/freecom_dbcs2/archive/refs/tags/dbcswip-20220117.zip">[source.zip]</a></small><br />
+<SMALL>
+<br />
+<!--
+(old) FreeCOM 0.85a DBCS edition (PC-98, IBM PC, DOS/V and generic DOS) : <a href="https://github.com/lpproj/freecom_dbcs2/releases/download/dbcswip-20210929/freecom_dbcswip-20210929-bin.zip">freecom_dbcswip-20210929-bin.zip</a><br />
+(old) FreeCOM 0.84pre7 DBCS edition (PC-98, IBM PC, DOS/V and generic DOS) : <a href="https://github.com/lpproj/freecom_dbcs2/releases/download/dbcswip-20210302/freecom_dbcswip-20210303-bin.zip">freecom_dbcswip-20210303-bin.zip</a><br />
+(old) FreeCOM 0.84pre7 DBCS edition (PC-98, IBM PC, DOS/V and generic DOS) : <a href="https://github.com/lpproj/freecom_dbcs2/releases/download/dbcswip-20210120/freecom_dbcswip-20210124-bin.zip">freecom_dbcswip-20210124-bin.zip</a><br />
+(old) FreeCOM 0.84pre7 DBCS edition (PC-98, IBM PC, DOS/V and generic DOS) : <a href="https://github.com/lpproj/freecom_dbcs2/releases/download/dbcswip-20200704/freecom_dbcswip-20200704-bin.zip">freecom_dbcswip-20200704-bin.zip</a><br />
+(old) FreeCOM 0.84pre6 DBCS edition (PC-98, IBM PC, DOS/V and generic DOS) : <a href="https://github.com/lpproj/freecom_dbcs2/releases/download/dbcswip-20190612/freecom_dbcswip-20190707-bin.zip">freecom_dbcswip-20190707-bin.zip</a> <a href="https://github.com/lpproj/freecom_dbcs/releases/download/dbcswip-20181114/freecom_dbcswip-20181114-bin.zip">freecom_dbcswip-20181114-bin.zip</a><br />
+(old) FreeCOM 0.84pre4 DBCS edition (PC-98, IBM PC, DOS/V and generic DOS) : <a href="https://github.com/lpproj/freecom_dbcs/releases/download/dbcswip-20180629/freecom_dbcswip-20180629-bin.zip">freecom_dbcswip-20180629-bin.zip</a><br />
+(old) 0.84pre2 DBCS edition : <a href="https://github.com/lpproj/freecom_dbcs/releases/download/dbcswip-20170226/freecom_dbcswip-20170226-bin.zip">freecom_dbcswip-20170226-bin.zip</a><br />
+-->
+作業進捗 : <a href="https://github.com/lpproj/freecom_dbcs2/">https://github.com/lpproj/freecom_dbcs2/</a><br />
+暫定リリース : <a href="https://github.com/lpproj/freecom_dbcs/releases">https://github.com/lpproj/freecom_dbcs2/releases</a><br />
+</SMALL>
+
+
+<H2 ID="fd98_tools">Driver and Tools for FreeDOS(98)</H2>
+
+
+以下、主にFreeDOS(98)用ドライバ＆ツール<br>
+（NEC版DOS6.2でも一応使えます。DOS汎用版はPC-98以外のふつうのPCでも使えます）
+<p>
+
+フロッピーディスク初期化ツール : <a href="https://github.com/lpproj/fdformat/releases/download/fdformat-20211003/fdformat-20211003.zip">fdformat-20211003.zip</a> (<a href="https://github.com/lpproj/fdformat">source</a>) &nbsp;<!-- <small>(old) <a href="https://github.com/lpproj/fdformat/releases/download/fdformat-20210203/fdformat-20210203.zip">fdformat-20210203.zip</a> <a href="fdkernel/fdformat-20200709.zip">fdformat-20200709.zip</a><!-- <a href="fdkernel/fdformat-20160311.zip">fdformat-20160311.zip</a></small> --> <br>
+簡易ハードディスク初期化ツール : <a href="https://github.com/lpproj/btnpart/releases/download/v0.0.4/btnpart_20230825.zip">btnpart_20230825.zip</a> (<a href="https://github.com/lpproj/btnpart">source</a>) <!--<a href="tmp/btnpart_20230825.zip">btnpart_20230825.zip</a> --> <!-- &nbsp;<small>(old) <a href="https://github.com/lpproj/fdkernel/releases/download/test-20180419/btnpart_20180418.zip">btnpart_20180418.zip</a></small> -->
+<br />
+286対応XMSドライバ<small>（<a href="http://www.ludd.ltu.se/~ams/freedos/fdxms286/">PC/AT版fdxms286</a> の移植）</small>: <a href="fdkernel/f2xms003r1_nec98_20160724.zip">f2xms003r1_nec98_20160724.zip</a><br>
+386対応XMSドライバ<small>（<a href="http://ibiblio.org/pub/micro/pc-stuff/freedos/files/dos/himem/himemx/">PC/AT版HimemX</a> の移植）</small>: <a href="https://github.com/lpproj/himemx.nec/releases/download/v3.34-nec98-20160913/himemx334_nec98_20160913.zip">himemx334_nec98_20160913.zip</a> &nbsp; (<a href="https://github.com/lpproj/himemx.nec/">source</a>)<br />
+EMM386(98) v2.26 (試作): <a href="https://github.com/lpproj/emm386.nec/releases/download/EMM386_v2.26_nec98_20161111wip/emm386_nec98_20161111wip.zip">emm386_nec98_20161111wip.zip</a>  (<a href="https://github.com/lpproj/emm386.nec/blob/master/doc/emm386/NEC98.txt">README的なやつ</a>)<br />
+debug.com DOS汎用版: <a href="https://github.com/lpproj/debug.gen/releases/download/dos-generic-20170817/debug125_dosgeneric_20170817.zip">debug125_dosgeneric_20170817.zip</a>  (<a href="https://github.com/lpproj/debug.gen">source</a>)<br />
+MEM 1.11p1 PC98/IBMPC兼用版: <a href="https://github.com/lpproj/mem.nec/releases/download/mem1.11p1-20181113/mem11p1-20181113.zip">mem11p1-20181113.zip</a>  (<a href="https://github.com/lpproj/mem.nec/">source</a>)<br />
+EDLIN 2.17 SHIFTJIS版: <a href="tmp/edlin-2.17-nonls-shiftjis-20200112.zip" NAME="edlin">edlin-2.17-nonls-shiftjis-20200112.zip</a><br />
+
+<p>
+<small>
+[試作品] PC-98(21)/PCAT 兼用 IDE(ATAPI) CD-ROM ドライバ：<a href="https://github.com/lpproj/mydosuty/releases/download/patacd-wip-20160721/patacd-wip-20160721.zip">patacd-wip-20160721.zip</a> &nbsp; (<a href="https://github.com/lpproj/mydosuty/tree/master/patacd">source</a>)<br />
+※MSCDEX 相当ドライバが別途必要（<a href="http://www.ibiblio.org/pub/micro/pc-stuff/freedos/files/dos/shsucdx/">SHSUCDX</a> が使えます）<br />
+</small>
+<br />
+<small>
+[おまけ] フロッピーディスクを 1.2M (2HD) でフォーマットするツール（Windows用）：<a href="https://github.com/lpproj/mydosuty/releases/download/format2hd-wip-20230928/format2hd-wip-20230928-bin.zip">format2hd-wip-20230928-bin.zip</a> &nbsp; <a href="https://github.com/lpproj/mydosuty/blob/master/win/format2hd/READMEja.txt">README</a> &nbsp; (<a href="https://github.com/lpproj/mydosuty/tree/master/win/format2hd">source</a>)<br />
+</small>
+
+<P>
+<H2 ID="fdhelp">FreeDOS Help Viewer (IBMPC, DOS/V and NEC PC-98)</H2>
+
+FreeDOS のヘルプビューア（HELP.EXE）の改造版です。<br>
+とりあえず DOS/V 日本語モードでもヘルプの表示が行えるようになります。<br>
+<small>（それ以外の日本語化は特に行っていません。シフトJIS形式のテキストや html ファイルの簡易ビューアとして使うことは可能です）</small><BR>
+(2017-04-05) PC-98版同梱<BR>
+
+<P>
+テスト版： <a href="https://github.com/lpproj/fdhelp_modified/releases/download/fdhelp_5.3.3fix2a_20190707/fdhelp_5.3.3fix2a_20190707.zip">fdhelp_5.3.3fix2a_20190707.zip</a> (<a href="https://github.com/lpproj/fdhelp_modified">github</a>)
+
+<P>
+<H2 ID="unf">Steffen Kaiser's UNF library (with DBCS)</H2>
+
+ぶっちゃけ気味に言うと、freedos カーネルソース中の nls_hc.asm を作成するとき、この中にあるツールを使うと動作中の DOS から国別情報その他をぶっこ抜いて (grab_unf.exe) アセンブラ形式に変換 (unf2hc.exe) できる。
+
+<P>
+ライブラリとツールバイナリ作成時に FreeDOS カーネルのソースが必要。
+カーネルソースのヘッダが DBCS ベクタ領域を確保していない場合、DBCS ベクタの情報は取得できない。
+
+<P>
+<A HREF="ftp://ftp-fd.inf.fh-rhein-sieg.de/pub/freedos/local/">ここ</A>にあった <A HREF="ftp://ftp-fd.inf.fh-rhein-sieg.de/pub/freedos/local/unf_0.3_2000-07-01.zip">unf_0.3_2000-07-01.zip</A> を DBCS ベクタの内容とか取れるようにすこし直した。<BR>
+（今はもうない。実は私もオリジナルのアーカイブを保持していません。どなたか持っていないでしょうか？）<BR>
+コンパイルには Borland C++ 3.1 日本語版を使用。
+Turbo C++ 1.01 でもほぼコンパイルできる（が、一部のツールは作成できない）。
+
+
+<P>
+entire of sources and exectable (*.exe) : <tt>unf-0.3-dbcs.zip</tt> (→<a href="https://1drv.ms/u/s!AsRLftjxV-E3gnQ_7mKf7SAQ09I1">OneDrive</a>) <!-- <A HREF="http://www2.atpages.jp.nyud.net:8080/lpproj/dos/temp/unf-0.3-dbcs.zip">unf-0.3-dbcs.zip</A> -->
+
+<P>
+DBCS-awared nls.h (FreeDOS kernel): <tt>nls_dbcs.zip</tt> (→<a href="https://1drv.ms/u/s!AsRLftjxV-E3gnOJSK2JMqL3JyMr">OneDrive</a>) <!-- <A HREF="http://www2.atpages.jp.nyud.net:8080/lpproj/dos/temp/nls_dbcs.zip">nls_dbcs.zip</A> --><BR>
+(based on <A HREF="http://sourceforge.net/mailarchive/message.php?msg_id=9513014">Eduardo Casino's patch</A>)
+
+<P>
+以下、最近のカーネル向け nls_hc.asm 作成用。（コンパイル環境は OpenWatcom のみ想定）<br>
+<br>
+
+for previous stable kernel (KE2041) : <A HREF="unftools/unftools-ke2041-20141016.zip">unftools-ke2041-20141016.zip</A><BR>
+for latest stable (KE2042) and <a href="https://github.com/PerditionC/fdkernel">unstable kernel</a> : <A HREF="unftools/unftools-ke2042-20180529.zip">unftools-ke2042-20180529.zip</A><BR>
+
+
+<P>
+<H2 ID="fdedit">FreeDOS Editor Japanese (DOS/V) version (experimental)</H2>
+
+<A HREF="http://www.freedos.org/freedos/software/lsm.cgi?q=f&a=base/edit.lsm">FreeDOS EDIT (version 0.82)</A> の日本語化。<BR>
+DOS/V 日本語モードでそれなりに日本語とか表示可能。<BR>
+ただし、現時点では編集についてまったく考慮してない。
+
+<!--
+<P>
+some screen shots (on qemu) : <A HREF="http://www2.atpages.jp/lpproj/dos/temp/fdeditj_wip_07.png">*</A> <A HREF="http://www2.atpages.jp/lpproj/dos/temp/fdeditj_wip_08.png">*</A>
+-->
+<P>
+entire of sources and exectables (*.exe, *.hlp) : <tt>fdeditj_wip_20050502.zip</tt> (→<a href="https://1drv.ms/u/s!AsRLftjxV-E3gnH10cv_1hVIEeyk">OneDrive</a>) <!-- <A HREF="http://www2.atpages.jp/lpproj/dos/temp/fdeditj_wip_20050502.zip">fdeditj_wip_20050502.zip</A> -->
+
+
+<P>
+<H2 ID="jvim3">JVim (vim 3.0-j2.1b) djgpp-v2 (and OS/2 VIO)</H2>
+
+<A HREF="http://hp.vector.co.jp/authors/VA003457/vim/index.html">JVim</A> 3.0-j2.1b を djgpp v2 環境でコンパイルしてみました、的なもの。ついでに OS/2 のコンソールにもネイティブ対応（OS/2 版は emx の gcc 2.8.1 でビルド）。<BR>
+
+16bit の DOS 版と比べて以下のメリット／デメリットがあります。
+
+<UL>
+<LI>（Windows DOS 窓の LFN ファンクションをサポートしてる環境なら）長いファイル名が使える
+<LI>UTF-8 エンコードの日本語テキストが扱える
+<LI>Windows の DOS 窓や FreeDOS でも fepctrl が効く
+<LI>画面表示が（ふつうの DOS 版に比べて）遅い
+<LI>バイナリサイズがでかい（<A HREF="http://upx.sourceforge.net/">upx</A> 使用時で約 210k バイト。実際にはこの倍以上）
+</UL>
+
+djgpp 版のバイナリ作成時には、下においてある libc patch と <a href="https://1drv.ms/u/s!AsRLftjxV-E3gzjUgbGGlHgCyKXf">libdbcs</a> を使ってみました。
+
+<P>
+exectables (for DOS/V, PC-9801 and OS/2), documents and source : <tt>vim3j21b-m1-20080525.zip</tt> (→<a href="https://1drv.ms/u/s!AsRLftjxV-E3gnantbtHlcTMSqG-">OneDrive</a>)<!-- <A HREF="http://www2.atpages.jp/lpproj/dos/temp/vim3j21b-m1-20080525.zip">vim3j21b-m1-20080525.zip</A> --><BR>
+
+<!--
+<SMALL>
+old version : <A HREF="http://www2.atpages.jp/lpproj/dos/temp/vim3j21b-djv2-20050728.zip">vim3j21b-djv2-20050728.zip</A>
+</SMALL>
+-->
+
+<!--
+<P>
+※PC-98 で使う場合、DOS やメモリマネージャに付属する DPMI サーバを有効にするか、<a href="http://www2.atpages.jp/lpproj/dos/#cwsdpmi">こちら</a>にある修正版 cwsdpmi をご利用ください。
+-->
+
+
+<P>
+<H2 ID="dj98">djgpp v2.05/v2.03 libc patch for PC-AT/PC-9800</H2>
+
+最近のやつ（v2.05）向けの作業：
+<a href="https://github.com/lpproj/djgpp-cvs.nec">https://github.com/lpproj/djgpp-cvs.nec</a>の <a href="https://github.com/lpproj/djgpp-cvs.nec/releases">Releases</a> あたりからどうぞ
+
+<p />
+
+過去のv2.03向け：
+
+<A HREF="http://www.mfp.gr.jp/users/takas/prog/index.html">ここ</A>（あるいは<A HREF="http://www.vector.co.jp/soft/dos/prog/se210770.html">ここ</A>）にある修正が最近の v2.03 だと一部そのままで適用できないので、何ヶ所かつぎはぎしてみた。<BR>
+ついでに DOS の OEM 名に "FreeDOS" 追加。<br />
+
+patch and libc.a : <tt>dj20398a.zip</tt> (→<a href="https://1drv.ms/u/s!AsRLftjxV-E3gm8-bJlm43xR4w1_">OneDrive</a>)<!-- <A HREF="http://www2.atpages.jp/lpproj/dos/temp/dj20398a.zip">dj20398a.zip</A> -->
+
+
+
+
+
+
+</P>
+<BR>
+<a href="../index.htm">←software</a><br />
+<a href="../../">↑bauxite:top</a><br />
+</BODY>

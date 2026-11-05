@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="translated-from" content="202610300931">
+<!-- AI-NOTE: translated-from = the guildbook_cn doc-version this page was translated from. If the cn counterpart's doc-version is newer, re-translate this page from the Chinese source. -->
+
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Animation Mechanics — Naiz Guildbook</title>
+<link rel="stylesheet" href="../style.css">
+</head>
+<body>
+<nav class="sidebar" id="sidebar-nav"></nav>
+<script src="../sidebar-reference.js"></script>
+<main class="main">
+
+<h1>Animation Mechanics</h1>
+<blockquote><strong>Created</strong>: 2026-08-29<br><strong>Last updated</strong>: 2026-08-29</blockquote>
+<p>This page explains, from a <strong>creator's</strong> point of view, the Naiz engine's frame-sequence animation system (NAIZ_ANIM): how animations are made, packed into a <code>.ANI</code> container, and played in a scenario, displaying concurrently with the dialogue box without leaving ghosting artifacts.</p>
+<hr>
+
+<h2>1. Animation system overview</h2>
+<p>NAIZ_ANIM is the engine's unified entry point for frame-sequence animation, built on the in-house <code>.ANI</code> container (v1), which carries <strong>two tracks</strong>:</p>
+<ul>
+<li><strong>Pixel track</strong>: per-frame replacement of the full screen (or a fixed sub-region), drawn in sync with vblank, reusing the MAG frame codec.</li>
+<li><strong>Palette track</strong>: per-frame recoloring via <code>palette_set_all</code> (the container embeds the original palette table, bypassing the shared-palette invariant).</li>
+</ul>
+<p>The two tracks are independent; either can be used alone. Animation, the transition system, and the palette primitives share the pure data functions in <code>palette.c/h</code>.</p>
+
+<h2>2. The .ANI container and the per-frame tick table</h2>
+<p>The v1 container replaces a fixed fps with a <strong>per-frame tick table</strong>: each frame carries its own duration (in ticks), and playback timing is governed solely by the tick table as the single source of truth.</p>
+<table>
+<tr><th>Size policy (fixed by route S)</th><th>Region</th></tr>
+<tr><td>fullscreen</td><td>640×400 @(0,0)</td></tr>
+<tr><td>cine</td><td>640×280 @(0,0) (fixed to the whole strip above the dialogue box)</td></tr>
+</table>
+<p>There is no coordinate mechanism at all — the animation size is declared in the container header, and the playback command <strong>does not</strong> specify type/coordinates (type introspection). The <code>sec</code> modifier can override the total-duration window: the engine converts it into a tick budget with <code>ceil(sec×60)</code>; once stops on expiry, loop resets and continues.</p>
+
+<h2>3. Production workflow</h2>
+<p>Animations are described in dedicated <code>.na</code> scripts (strictly separated from the scenario's <code>.nb</code> files); the <code>anima.sh</code> toolchain produces standalone <code>.ANI</code> files:</p>
+<pre><code>anima.sh init &lt;项目&gt;          # creates animation/projects/&lt;项目&gt;/{config.toml,scripts/,db/}
+anima.sh register &lt;项目&gt;      # bare names → the name index db db/&lt;项目&gt;.db (indexes only)
+anima.sh check &lt;项目&gt;         # read-only reconciliation of unregistered/stale/pending entries (exit 1 on any diff)
+anima.sh build &lt;项目&gt;/&lt;脚本&gt;  # parses .na → produces .ANI (--sync syncs the index db first)</code></pre>
+<ul>
+<li>Scripts go in <code>scripts/&lt;名&gt;.na</code>; <strong>bare names</strong> (no path, no extension) are written inside the braces and mapped to concrete frame files by the name index db.</li>
+<li>Frame assets go in <code>assets/&lt;项目名&gt;/anim/</code>, and finished <code>.ANI</code> files are output globally to <code>animation/output/</code>.</li>
+<li>The script syntax supports the animaconf / frame / base / pal bare-bracket sections and V1–V8 validation; a multi-image <code>{f1,f2}</code> explicit interleave sequence shares one duration in seconds.</li>
+</ul>
+
+<h2>4. Playback commands</h2>
+<p>The playback-side handlers live in <code>core/engine/nb_anim.c</code>, registered in the NB command table:</p>
+<pre><code>playanima(){name}                 # defaults to once: stops automatically when finished
+playanima(once){name}            # explicit once (equivalent to the default)
+playanima(loop){name}            # loops (fire-and-forget ambient effects)
+playanima(once,sec){name}        # caps total duration at sec seconds (once stops on expiry)
+playanima(loop,sec){name}        # loop + a sec-second budget per pass (resets and continues on expiry)
+waitanima()                      # blocks until the current animation finishes; passes through if none is active
+stopanima()                      # stops and releases the current animation; passes through if none is active</code></pre>
+<ul>
+<li>The animation name goes in the curly-brace payload, mirroring the shape of a dialogue line's main payload; the command does not declare fullscreen/cine/track/fps (the container header is the single source of truth).</li>
+<li>Rejection rules (no silent failures): unknown keywords, a missing name, extra arguments, or <code>sec≤0</code> are all rejected with a log entry, and the script continues.</li>
+<li><code>waitanima</code> warns when applied to a loop animation (a loop never finishes — an author error); <code>waitanima</code>/<code>stopanima</code> warn and ignore any arguments they receive, then function as usual.</li>
+</ul>
+
+<h2>5. Dialogue-box concurrency and clip_h clipping</h2>
+<p>When an animation reaches into the dialogue-box region (y≥280), sprite blits must be kept from writing into the dialogue-box VRAM or leaving ghosting artifacts:</p>
+<ul>
+<li>The <code>clip_h</code> parameter of <code>vram_blit_sprite()</code> (limits the number of rows drawn when &gt;0) is an architecture-level constraint that forces drawing only the region above the dialogue box.</li>
+<li>If the dialogue-box region must be written for a full-body replacement, use <code>layer_sprite_replace()</code> and call <code>layer_dialog_refresh()</code> explicitly.</li>
+<li><code>layer_sprite_face()</code> must not write to the y≥280 region.</li>
+</ul>
+<p>This matches the dialogue-box snapshot/restore strategy in <a href="mc03-图层渲染与换装机制.html">mc03 — layer rendering and sprite swapping</a>.</p>
+
+<h2>6. Relation to mechanics / scenario</h2>
+<ul>
+<li>Animation-frame pixels/palettes ultimately go through the same MAG codec and palette path as <a href="mc04-MAG图片机制.html">mc04 MAG Image Mechanics</a>.</li>
+<li>Animation playback is a separate render pass, independent of background/character sprites, layered on top of the rendering order described in <a href="mc03-图层渲染与换装机制.html">mc03</a>.</li>
+<li>The authoritative specification for the production and playback commands is in the <code>playanima</code> / <code>waitanima</code> / <code>stopanima</code> entries of <code>docs/B92-NB脚本命令参考.md</code> and the <code>anima.sh</code> workflow.</li>
+<li>For the animation <strong>production side</strong> (<code>.na</code> script syntax, the <code>anima.sh</code> workflow, the name index db), see the <a href="../animation.html">Animation Design category page</a>.</li>
+</ul>
+
+</main>
+</body>
+</html>

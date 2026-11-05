@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="translated-from" content="202610300931">
+<!-- AI-NOTE: translated-from = the guildbook_cn doc-version this page was translated from. If the cn counterpart's doc-version is newer, re-translate this page from the Chinese source. -->
+
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>scene — Naiz Guildbook</title>
+<link rel="stylesheet" href="../style.css">
+</head>
+<body>
+<nav class="sidebar" id="sidebar-nav"></nav>
+<script src="../sidebar-scripts.js"></script>
+<main class="main">
+
+<h1>scene — Scene Transitions</h1>
+<hr>
+<blockquote><strong>Created</strong>: 2026-07-27<br><strong>Last updated</strong>: 2026-10-03</blockquote>
+<p><code>scene()</code> jumps to another scene. Both unconditional jumps and conditional chain jumps (which rely on the variable system) are supported.</p>
+
+<h2>1. Unconditional Jumps</h2>
+<pre><code>scene(target)</code></pre>
+<table>
+<tr><th>Parameter</th><th>Type</th><th>Description</th></tr>
+<tr><td><code>target</code></td><td>keyword / 3-digit</td><td>Scene name or number</td></tr>
+</table>
+<p>Values for target:</p>
+<table>
+<tr><th>Value</th><th>Description</th></tr>
+<tr><td><code>logo</code></td><td>Startup logo scene (<code>logo.nb</code>)</td></tr>
+<tr><td><code>op</code></td><td>Opening scene (<code>op.nb</code>)</td></tr>
+<tr><td><code>mainmenu</code></td><td>Main menu scene (<code>mainmenu.nb</code>)</td></tr>
+<tr><td><code>001</code>–<code>020</code></td><td>Story scenes <code>nbookXXX.nb</code></td></tr>
+<tr><td><code>end</code></td><td>End the game and return to the main menu</td></tr>
+</table>
+
+<h2>2. Conditional Chain Jumps</h2>
+<pre><code>scene(var1,op1,val1,...,target1;var2,op2,val2,...,target2[;default])</code></pre>
+<p>Each <code>;</code> segment consists of one or more <code>var,op,val</code> triples plus a final <code>target</code>. Multiple triples inside a segment are <strong>AND</strong> (all must match); segments are <strong>OR</strong> (the first matching segment wins).</p>
+<table>
+<tr><th>Field</th><th>Description</th></tr>
+<tr><td><code>var</code></td><td>Variable id (must be defined in variables.json)</td></tr>
+<tr><td><code>op</code></td><td>Comparison operator: <code>==</code> <code>!=</code> <code>&gt;</code> <code>&gt;=</code> <code>&lt;</code> <code>&lt;=</code></td></tr>
+<tr><td><code>val</code></td><td>Comparison value (integer)</td></tr>
+<tr><td><code>target</code></td><td>Jump target (3-digit, e.g. <code>002</code> → <code>nbook002.nb</code>)</td></tr>
+</table>
+<p>Each segment supports 1–8 triples (<code>SCENE_MAX_CONDS = 8</code>); the last field is always the target.</p>
+<p><strong>Default value convention</strong>: if the last segment contains no comma (e.g. <code>;001</code>), it is used as an explicit default jump target. If the last segment does contain a comma, all segments are conditional, and when nothing matches the engine falls back to the target of the <strong>first segment</strong>.</p>
+<p><strong>Commas inside fields</strong>: if a field itself contains a comma, write it exactly as in <code>question</code> — escape it as <code>\,</code> (<code>\\</code> is a literal backslash). Escaping is handled in one place, the engine's <code>nb_next_field()</code>, and the validator and the translation extractor share the same rule. See <a href="sc08-question.html">sc08 question — choice branches</a> §1.1.</p>
+
+<h2>3. Example</h2>
+<pre><code>scene(003)                                          ← unconditional jump to nbook003.nb
+scene(bond_fei,&gt;=,5,005;001)                        ← single condition: bond_fei≥5→005, otherwise→001
+scene(bond_ira,&gt;=,5,bond_neon,&gt;=,3,005;001)         ← AND: both affinity values reach the threshold→005, otherwise→001
+scene(bond_ira,&gt;=,5,005;bond_neon,&gt;=,3,005;001)         ← OR: either one reaches the threshold→005, otherwise→001
+scene(bond_ira,&gt;=,5,005;bond_neon,&gt;=,3,004)         ← no explicit default: each matching segment goes to its own target, otherwise fallback→005 (target of the first segment)</code></pre>
+
+<h2>4. sceneconf — Scene Configuration</h2>
+<p>The <code>sceneconf</code> command declares the current scene's <strong>configuration</strong>: chapter title + scene type. It does not control jumps.</p>
+<pre><code>sceneconf(){A normal day, normal}
+sceneconf(){, menu}   # menu-type scene: the title may be omitted</code></pre>
+<table>
+<tr><th>Field</th><th>Required</th><th>Description</th></tr>
+<tr><td><code>title</code></td><td>No</td><td>Chapter title. Stored with the save and shown on the save/load screens (falls back to the scene file name when unset)</td></tr>
+<tr><td><code>type</code></td><td>No (default <code>normal</code>)</td><td>Scene type, see the table below</td></tr>
+</table>
+<h3>4.1 Scene Types</h3>
+<table>
+<tr><th>Type</th><th>Description</th></tr>
+<tr><td><code>normal</code></td><td>Regular story scene (default)</td></tr>
+<tr><td><code>cg</code></td><td>CG showcase scene</td></tr>
+<tr><td><code>menu</code></td><td>Menu-type scene (main menu / save / load / logo etc.). In these scenes the <strong>F5 save / F6 load hotkeys are disabled</strong></td></tr>
+</table>
+<p>Convention: write <code>sceneconf</code> on the <strong>first line</strong> of the scene file. Menu-type scenes (mainmenu / loadscene / logo / op) must declare <code>type=menu</code>, otherwise the save hotkey stays wrongly active.</p>
+
+</main>
+</body>
+</html>

@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="translated-from" content="202610300931">
+<!-- AI-NOTE: translated-from = the guildbook_cn doc-version this page was translated from. If the cn counterpart's doc-version is newer, re-translate this page from the Chinese source. -->
+
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Animation Production Workflow (for non-programmers) — Naiz Guildbook</title>
+<link rel="stylesheet" href="../style.css">
+</head>
+<body>
+<nav class="sidebar" id="sidebar-nav"></nav>
+<script src="../sidebar-animation.js"></script>
+<main class="main">
+
+<h1>Animation Production Workflow</h1>
+<blockquote><strong>Created</strong>: 2026-08-29<br><strong>Last updated</strong>: 2026-08-29</blockquote>
+<p>This is an animation production guide for galgame makers who <strong>don't write code</strong>. Making a game animation really takes three steps: ① prepare the image assets; ② write the "storyboard script" (the <code>.na</code> file — see the <a href="anim-语法.html">Syntax Overview</a> for how); ③ use the animation tool to generate the final <code>.ANI</code> file. This page covers steps ① and ③.</p>
+<hr>
+
+<h2>1. Where animations live</h2>
+<p>Every animation belongs to an <strong>animation project</strong> (for example "protagonist blink" or "title-screen shimmer"). A project is just a folder, with two places inside:</p>
+<ul>
+<li><strong>The assets folder</strong>: holds your drawn images (and the palette-table files used by palette animations).</li>
+<li><strong>The scripts folder</strong>: holds the storyboard script, the <code>.na</code> file.</li>
+</ul>
+<p>The tools create these folders for you, so you never have to fiddle with paths by hand.</p>
+
+<h2>2. Generating animations with the animation tool (anima.sh)</h2>
+<p>Type the following commands in a terminal (replace the project name and script name with your own):</p>
+<table>
+<tr><th>What you want to do</th><th>What to type</th></tr>
+<tr><td>Create a new animation project (the folders are created automatically)</td><td><code>anima.sh init 项目名</code></td></tr>
+<tr><td>Register the assets into the nickname table</td><td><code>anima.sh register 项目名</code></td></tr>
+<tr><td>Check for assets that weren't registered</td><td><code>anima.sh check 项目名</code></td></tr>
+<tr><td>Build the animation file from a script</td><td><code>anima.sh build 项目名/脚本名</code></td></tr>
+<tr><td>Build every animation in the project in one go</td><td><code>anima.sh buildall</code></td></tr>
+<tr><td>See which animations a project has</td><td><code>anima.sh list</code></td></tr>
+</table>
+<p>Running <code>anima.sh</code> with no arguments pops up a menu that walks you through step by step — handy while you're not yet familiar with the commands.</p>
+<p><strong>Tip</strong>: run <code>register</code> once before generating (or simply append <code>--sync</code> to <code>build</code> — it registers automatically before building).</p>
+
+<h2>3. Giving assets nicknames (the asset nickname table)</h2>
+<p>When writing a script you <strong>don't use the image's real path and filename</strong> — you write a simple "nickname". For example, write <code>{微笑}</code> in the script and the tool looks for the image with that nickname.</p>
+<p>These nicknames are registered automatically by the <code>register</code> step — it scans your assets folder and records every image in the nickname table. So:</p>
+<ul>
+<li>run <code>register</code> first, then <code>build</code>;</li>
+<li>if a script uses a nickname that isn't registered (or the image was deleted), the tool raises an error instead of quietly producing a broken animation.</li>
+</ul>
+
+<h2>4. The output: .ANI files</h2>
+<p>Following your script, the tool packs the images into the final <code>.ANI</code> file — the animation that plays in the game.</p>
+<ul>
+<li><strong>Fullscreen animations</strong>: fill the entire screen, fixed at 640×400.</li>
+<li><strong>Cine-strip animations above the dialogue box</strong>: occupy only the strip above the dialogue box, fixed at 640×280.</li>
+</ul>
+
+<h2>5. See also</h2>
+<ul>
+<li><a href="anim-语法.html">Syntax Overview</a> — how to write the storyboard script (the <code>.na</code> file).</li>
+<li><a href="mc05-动画机制.html">Animation Mechanics</a> — how the animation plays in the game.</li>
+<li><a href="mc04-MAG图片机制.html">MAG Image Mechanics</a> — how the engine displays and recolors images.</li>
+</ul>
+
+</main>
+</body>
+</html>

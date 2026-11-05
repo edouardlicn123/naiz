@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="doc-version" content="202611051818">
+<!-- AI-NOTE: guildbook_cn is the authoritative Chinese source; guildbook_en holds the English translation. Version format: YYYYMMDDHHMM. Before translating, compare this doc-version with the en counterpart's translated-from meta; if cn is newer, re-translate this page from Chinese to English. Invisible during normal browsing. -->
+
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>makegame.sh 使用说明 — Naiz Guildbook</title>
+<link rel="stylesheet" href="../style.css">
+</head>
+<body>
+<nav class="sidebar" id="sidebar-nav"></nav>
+<script src="../sidebar-tools.js"></script>
+<main class="main">
+
+<h1>makegame.sh 使用说明</h1>
+<blockquote><strong>创建</strong>：2026-08-29<br><strong>最后更新</strong>：2026-11-05</blockquote>
+<p><code>makegame.sh</code> 是<strong>游戏数据构建</strong>脚本：把项目里的剧本、素材、配置打包成可在模拟器里运行的 HDI 镜像，并提供测试入口。引擎编译见 <code>start.sh</code> 的 Watcom 安装。<strong>日常最推荐直接运行、用数字菜单选择项目与操作</strong>；命令行子命令适合写进脚本或熟练后使用。</p>
+<hr>
+
+<h2>1. 交互式菜单（主要用法）</h2>
+<p>不带任何参数运行：</p>
+<pre><code>./makegame.sh</code></pre>
+<p>会进入两级菜单，<strong>每一步都输入数字并按回车</strong>：</p>
+<ul>
+<li><strong>第一步</strong>：列出所有项目（如 <code>1) demo-a2 …</code>），选一个数字进入该项目。</li>
+<li><strong>第二步</strong>：在该项目下选择操作，按数字选择：</li>
+</ul>
+<table>
+<tr><th>序号</th><th>操作</th></tr>
+<tr><td>1</td><td><code>makegame</code> — 编译项目数据 + 制作 HDI（<code>build</code> + <code>make</code>，推荐）</td></tr>
+<tr><td>2</td><td><code>build</code> — 只编译项目数据</td></tr>
+<tr><td>3</td><td><code>make</code> — 只制作 HDI 镜像</td></tr>
+<tr><td>4</td><td><code>test</code> — 启动 NP2kai 测试</td></tr>
+<tr><td>5</td><td><code>test --porttest</code> — 串口硬件测试</td></tr>
+<tr><td>6</td><td><code>audio</code> — 模拟器音频延迟设置（全局）</td></tr>
+<tr><td>7</td><td><code>pack</code> — 切换打包方式（cmpack / openpack）</td></tr>
+<tr><td>0</td><td>返回上一级</td></tr>
+</table>
+<p>菜单操作失败不会退出，会回到菜单让你重试。这种方式不用记命令和项目名，最适合日常使用。</p>
+<p><em>新手提示：想跑起来看看效果，进项目后选「测试」那一项即可启动模拟器。</em></p>
+
+<h2>2. 命令行用法（进阶 / 脚本化）</h2>
+<p>熟练或要写进自动化脚本时，可直接跟子命令，跳过菜单：</p>
+<pre><code>./makegame.sh &lt;子命令&gt; &lt;game&gt; [选项] [--pack cmpack|openpack]</code></pre>
+<table>
+<tr><th>子命令</th><th>作用</th></tr>
+<tr><td><code>makegame &lt;game&gt;</code></td><td><strong>推荐</strong>：编译项目数据 + 制作 HDI（<code>build</code> + <code>make</code> 一步到位）</td></tr>
+<tr><td><code>build &lt;game&gt;</code></td><td>只编译项目数据：PNG→MAG、引擎、场景、<code>IMAGE.DAT</code>、运行时，并重新生成 <code>nb_config.h</code></td></tr>
+<tr><td><code>make &lt;game&gt;</code></td><td>只制作 HDI 镜像：把 <code>games/&lt;game&gt;/</code> 注入 <code>disks/&lt;game&gt;.hdi</code></td></tr>
+<tr><td><code>test &lt;game&gt; [--serial] [--porttest] [--auto]</code></td><td>启动 NP2kai 测试</td></tr>
+<tr><td><code>i18n-gen &lt;game&gt; [--force]</code></td><td>生成/刷新国际化文本模板</td></tr>
+<tr><td><code>audio</code></td><td>模拟器音频延迟设置（全局，BGM 颤音/电流声）</td></tr>
+<tr><td><code>pack [cmpack|openpack]</code></td><td>查看/切换打包方式；带参数时写入 <code>.naiz_pack</code> 作为后续默认</td></tr>
+</table>
+<p><strong>两个防呆检查</strong>：</p>
+<ul>
+<li><code>make</code> 发现 <code>games/&lt;game&gt;/engine.exe</code> 落后于 <code>core/</code> 下的引擎时会报错，避免把旧引擎打进 HDI。</li>
+<li><code>test</code> 发现 <code>disks/&lt;game&gt;.hdi</code> 比 <code>games/&lt;game&gt;/engine.exe</code> 旧时会报错，避免模拟器静默运行旧引擎。</li>
+</ul>
+
+<h2>3. 选项说明</h2>
+<h3>3.1 全局打包选项</h3>
+<ul>
+<li><code>--pack cmpack</code>：商业链，<code>tools_commercial</code> + DOS/4GW（默认）。</li>
+<li><code>--pack openpack</code>：开源链，<code>tools_open</code> + DOS/32A，extender 绑定进 EXE。</li>
+<li>优先级：<code>--pack</code> &gt; 环境变量 <code>NAIZ_PACK</code> &gt; 项目根 <code>.naiz_pack</code> &gt; 自动探测（有 <code>tools_commercial</code> 用 cmpack，否则有 <code>tools_open</code> 用 openpack）。</li>
+<li><code>pack</code> 子命令可持久化选择：不带参数进入交互菜单，带参数则直接写入 <code>.naiz_pack</code>。</li>
+</ul>
+<h3>3.2 其它选项</h3>
+<ul>
+<li><code>&lt;game&gt;</code>：项目目录名，位于 <code>projects/&lt;game&gt;/</code>（如 <code>demo-a2</code>）。</li>
+<li><code>--serial</code>：测试时通过串口输出调试信息（最可靠的排错通道）。</li>
+<li><code>--porttest</code>：只检测模拟器串口端口是否可用，不启动游戏。</li>
+<li><code>--auto</code>：若 <code>games/&lt;game&gt;/engine_a.exe</code> 存在，将其替换为 <code>engine.exe</code> 并重新注入 HDI 后再测试。</li>
+<li><code>--force</code>（i18n-gen）：忽略增量判断，强制重新生成文本。</li>
+</ul>
+
+<h2>4. 常见用法示例</h2>
+<pre><code># 交互菜单里选项目 → 选 1) makegame（推荐）
+./makegame.sh
+# 等效的命令行写法（编译数据 + 注入 HDI）：
+./makegame.sh makegame demo-a2
+
+# 分步执行：先编译数据，再打包 HDI
+./makegame.sh build demo-a2
+./makegame.sh make demo-a2
+
+# 只重新打包 HDI（数据未变）
+./makegame.sh make demo-a2
+
+# 用串口模式在模拟器里跑起来看日志
+./makegame.sh test demo-a2 --serial
+
+# 切换到开源链并查看当前设置
+./makegame.sh pack openpack
+./makegame.sh pack</code></pre>
+
+<h2>5. 关联</h2>
+<ul>
+<li><a href="tool-start.html">start.sh</a> — 环境安装与审计入口。</li>
+<li><a href="tool-anima.html">anima.sh</a> — 动画制作工具（动画产物由本脚本一并打包进 HDI）。</li>
+<li><a href="../scripts.html">NB 剧本命令</a> — 剧本语法参考；构建时会校验 tag / jump / jumpscene 等命令。</li>
+</ul>
+
+</main>
+</body>
+</html>

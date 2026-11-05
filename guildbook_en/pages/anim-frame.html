@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="translated-from" content="202610300931">
+<!-- AI-NOTE: translated-from = the guildbook_cn doc-version this page was translated from. If the cn counterpart's doc-version is newer, re-translate this page from the Chinese source. -->
+
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>frame: Placing an Image — Naiz Guildbook</title>
+<link rel="stylesheet" href="../style.css">
+</head>
+<body>
+<nav class="sidebar" id="sidebar-nav"></nav>
+<script src="../sidebar-animation.js"></script>
+<main class="main">
+
+<h1>frame: Placing an Image</h1>
+<blockquote><strong>Created</strong>: 2026-08-29<br><strong>Last updated</strong>: 2026-08-29</blockquote>
+<p><code>frame</code> is for <strong>pixel animations</strong> (the kind whose header declaration picked <code>pixel</code>). Each <code>frame</code> line is one image of the animation and states how many seconds that image stays on screen. Write several lines in a row and you get a moving picture. Back to the <a href="anim-语法.html">Syntax Overview</a>.</p>
+<hr>
+
+<h2>1. How to write it</h2>
+<pre><code>frame(停留秒数){素材昵称}</code></pre>
+<ul>
+<li>The parentheses hold <strong>one number</strong> (seconds; decimals allowed — 0.5 means half a second).</li>
+<li>The braces hold the asset <strong>nickname</strong> used by this image (the name given at registration — no path needed).</li>
+<li>To have several images play in turn while sharing one duration, put them on one line separated by commas: <code>{图1,图2,图3}</code>.</li>
+</ul>
+
+<h2>2. A galgame example</h2>
+<pre><code># Character blink: eyes open half a second, closed half a second, toggling back and forth
+animaconf(fullscreen,pixel,主角)
+frame(0.5){睁眼}
+frame(0.5){闭眼}
+
+# Clouds drifting slowly: three images, each held 0.3 seconds, shown in turn
+frame(0.3){云1,云2,云3}</code></pre>
+<p>The tool converts your seconds into the animation's internal timing (60 ticks per second) automatically — just fill in seconds and don't worry about the details. If seconds×60 isn't a whole number, the tool only prints a notice; generation is unaffected.</p>
+
+<h2>3. Things to watch out for</h2>
+<ul>
+<li><strong>Only for pixel animations</strong> (the header declaration picked <code>pixel</code>). Writing <code>frame</code> in a palette animation is an error.</li>
+<li>A pixel animation needs <strong>at least one</strong> <code>frame</code> line, otherwise there is nothing to show.</li>
+<li>Nicknames in the braces must already be registered in the asset nickname table (go run <code>register</code>); otherwise the tool says it can't find the name.</li>
+<li>Every image in a fullscreen animation must be exactly 640×400.</li>
+</ul>
+
+<h2>4. Common mistakes</h2>
+<ul>
+<li>Using frame in a palette animation by mistake → use base + pal instead.</li>
+<li>It reports an unregistered name → the asset wasn't registered; run <code>register</code> first.</li>
+<li>It reports a wrong size → fullscreen animation images must be exactly 640×400.</li>
+</ul>
+<p>→ <a href="anim-语法.html">Back to the Syntax Overview</a></p>
+
+</main>
+</body>
+</html>

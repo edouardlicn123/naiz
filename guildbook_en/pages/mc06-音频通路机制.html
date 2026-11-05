@@ -1,0 +1,96 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="translated-from" content="202610300931">
+<!-- AI-NOTE: translated-from = the guildbook_cn doc-version this page was translated from. If the cn counterpart's doc-version is newer, re-translate this page from the Chinese source. -->
+
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Audio Path Mechanics — Naiz Guildbook</title>
+<link rel="stylesheet" href="../style.css">
+</head>
+<body>
+<nav class="sidebar" id="sidebar-nav"></nav>
+<script src="../sidebar-reference.js"></script>
+<main class="main">
+
+<h1>Audio Path Mechanics</h1>
+<blockquote><strong>Created</strong>: 2026-10-05<br><strong>Last updated</strong>: 2026-10-05</blockquote>
+<p>You want to make a BGM track for your game, and that means facing a practical reality: <strong>the PC-98 has three parts that can make sound</strong>. They are like three unrelated players, each with its own limits — one of them <strong>can play only one sound at a time</strong>, while the other two can sound simultaneously.</p>
+<p>Get these three limits straight, and you know <strong>what shape a music asset should take and which path it belongs on</strong>. This page covers mechanics only: how the hardware is split up, which music files can be stored, and which conversions are impossible in principle. <strong>For which platforms and software can actually produce these files, see <a href="mc07-音频平台与工具.html">mc07 Audio Platforms and Tools</a></strong>; for how to write audio commands in scripts, see <a href="sc10-audio.html">sc10 audio commands</a>; for how to register assets, see <a href="cf07-图片登记.html">cf07 Image Registration</a>.</p>
+<hr>
+
+<h2>1. The three sound-making parts</h2>
+<p>First, memorize the division of labor: <strong>BGM (background music) goes over FM; sound effects and voice go over PCM</strong>.</p>
+<table>
+<tr><th>Part</th><th><strong>What belongs there</strong></th><th>What it is</th><th>How many at once</th><th>Limits</th></tr>
+<tr><td><strong>FM sound source</strong></td><td><strong>BGM (background music)</strong>. The only path in this project that can <strong>play music while voice and sound effects also play</strong></td><td>YM2608, built into the motherboard</td><td>6 FM + 3 square wave / noise</td><td>Four blocks inside: 6-channel 4-operator FM (8 algorithms), 3-channel SSG (YM2149 square wave / noise source), <strong>a single-channel 4-bit ADPCM (2–55 kHz)</strong>, and a 6-channel rhythm section</td></tr>
+<tr><td><strong>PCM samples</strong></td><td><strong>Sound effects and voice</strong> (<code>sound</code> / <code>voice</code>). <strong>Not for BGM</strong> — it would fight sound effects and voice for that single channel</td><td>YM3433B on the 86 board</td><td><strong>only 1</strong></td><td>Sound effects and voice <strong>share this one FIFO</strong>; whatever plays later clobbers whatever played first</td></tr>
+<tr><td>MIDI sound source</td><td><strong>A dead end in this project</strong> — this machine does not have the card</td><td>MPU-401, an expansion card that must be <strong>installed separately</strong></td><td>16 channels</td><td><strong>Without the card, this path does not exist at all</strong> — it has nothing to do with the motherboard's built-in sound</td></tr>
+</table>
+<p>Two conclusions fall straight out of this table:</p>
+<ul>
+<li><strong>Background music goes over FM and can sound at the same time as voice and sound effects.</strong> They are simply not the same piece of hardware; each goes its own way. That is <strong>the fundamental reason background music belongs on FM</strong> — not for sound quality, but so that it <strong>never has to fight anyone for a channel</strong>.</li>
+<li><strong>Sound effects and voice cannot play back-to-back.</strong> There is only one channel: when two commands run back-to-back, the second pushes the first out within 1 millisecond, and the actual sound is too short to hear. <strong>Put a page of dialogue between them.</strong></li>
+</ul>
+<div class="note-box">
+<p><strong>Addendum (only for those who dig into the manuals):</strong> the two groups don't overlap on ports either — PCM uses <code>A4xx</code>, FM uses <code>0188h–018Fh</code> (DIP-selectable <code>0288h</code>). That is the hardware basis for the first conclusion above.</p>
+</div>
+
+<h2>2. What kinds of music files are there</h2>
+<div class="note-box">
+<p><strong>First, a common misconception to correct: "FM" is not a file format; it is a synthesis method.</strong> When people say "make the BGM with FM", they mean "the sound is synthesized by the YM2608 chip" — <strong>not</strong> some file extension. What can actually be saved to disk and passed between tools is what's in the table below — FM only appears in the "who renders the sound" column.</p>
+</div>
+<table>
+<tr><th>Kind</th><th>What it actually holds</th><th>Who will give it to you</th><th>What we have to do</th></tr>
+<tr><td>MIDI (<code>.mid</code>)</td><td>A <strong>list</strong>: which note to play when, with which instrument, adjusting which parameters. <strong>No sound inside</strong>, so it is independent of the specific hardware</td><td>Nearly all composition software, trackers, most AI platforms</td><td>Write one "MIDI → YM2608" translation layer: an instrument mapping table + how to split the channels + how to convert pitch ranges</td></tr>
+<tr><td>MML</td><td>A score <strong>written as text</strong> (notations like <code>@0</code>, <code>c4</code>, <code>l16</code>)</td><td>Hand-written, or generated by AI</td><td><strong>Not used in this project</strong> (demoted to a fallback by §3 option C): it has no velocity and no pitch bend, while the ready-made MIDI path from §1 can already read both</td></tr>
+<tr><td>S98</td><td>The <strong>machine code</strong> compiled from MML</td><td>Compilers like <code>mml2mdx</code></td><td>Write a virtual machine that can execute it</td></tr>
+<tr><td>VGM</td><td>A stream of "<strong>write this value to that chip knob</strong>" commands; can be reproduced exactly</td><td>Tracker exports, libOPNMIDI's dumper</td><td>Must handle its wait commands and pipelined delays; files are larger than MIDI</td></tr>
+<tr><td>WOPN</td><td>A YM2608 <strong>patch bank</strong> (a set of patch parameters)</td><td>Patch editors, community patch banks</td><td>It is only a "patch", <strong>not a "song"</strong>, and cannot be used as a BGM file</td></tr>
+<tr><td><code>.pcm</code></td><td>Raw samples — the recording itself</td><td>This repo's <code>wav_convert.py</code></td><td>The engine can read it directly, but it occupies PCM's single channel</td></tr>
+<tr><td>ADPCM: <code>PC8</code> / <code>P86</code> / <code>PPC</code></td><td><strong>Compressed</strong> samples</td><td>pc98sndpmdtools</td><td>Needs a decoder written</td></tr>
+<tr><td><code>2608_*.WAV</code></td><td>Sample assets needed by the rhythm and ADPCM modes — <strong>only the emulator needs them, real hardware does not</strong></td><td>Bundled with NP2kai; no need to look elsewhere</td><td><strong>Affects only NP2kai</strong>: without them the emulator's rhythm channel is silent while the FM channels still sound</td></tr>
+</table>
+<p>In one sentence: <strong>MIDI / MML / VGM can be "songs"</strong>; WOPN is only a patch asset, and <code>.pcm</code> and ADPCM are sample assets. For which tools produce each of these, see <a href="mc07-音频平台与工具.html">mc07</a>.</p>
+
+<h2>3. Which music the engine will take</h2>
+<p>Music can reach the engine by four routes, and <strong>the first (A) has been chosen</strong>. Two others (B exact playback, C text scores) are kept as fallbacks; the fourth (D) has been ruled out.</p>
+<table>
+<tr><th>Option</th><th>Rough approach</th><th>Effort</th><th>Fidelity</th><th>Notes</th></tr>
+<tr><td><strong>A. Teach the engine to read MIDI ✅ chosen</strong></td><td>The engine already reads MIDI files; add a translation layer on top: an FM instrument mapping table, how to allocate the 6 channels, and how to convert pitch ranges</td><td>Medium</td><td>High</td><td>The same route as the current BGM path; the whole MIDI ecosystem remains usable</td></tr>
+<tr><td>B. Play VGM directly</td><td>Build a VGM player into the engine that programs the chip instruction by instruction</td><td>Medium</td><td>Highest (exact, instruction-by-instruction reproduction)</td><td>Must handle its wait commands; useful for exact playback or reference debugging. For producing tools see <a href="mc07-音频平台与工具.html">mc07</a></td></tr>
+<tr><td>C. Teach the engine to read MML / S98<br><span style="font-size:0.85em;opacity:0.75">(fallback, not for now)</span></td><td>Write a converter or virtual machine that turns text scores into music</td><td>High</td><td>Medium</td><td>Upside: pure text, readable, easy to diff versions; <strong>but it has no velocity and no pitch bend</strong>, and the ready-made MIDI parser already has both, so not for now</td></tr>
+<tr><td>D. Render to WAV on desktop first, deliver via PCM</td><td>Use an FM renderer on a PC to export the song as WAV and pack it as <code>.pcm</code></td><td>Low</td><td>High (offline)</td><td>❌ <strong>Doesn't work</strong>: PCM has only one channel; background music would clobber voice and hog the only channel — exactly the problem §1 says to avoid</td></tr>
+</table>
+<p><strong>A is the chosen route</strong>, and it can be combined with B: A takes care of reading MIDI, B serves for exact playback and behavioral comparison. D is ruled out no matter how faithful the offline render is, because it fights for the channel.</p>
+<div class="note-box"><strong>Why MIDI</strong>: the ready-made MIDI reading path <strong>already carries velocity, pitch bend, and the sustain pedal</strong>; translating these into FM is nearly free (velocity maps directly onto the volume's decay). With a text score (MML) you would have to write a parser from scratch and throw away velocity and pitch bend entirely.<br><br><strong>One difference to know</strong>: the engine <strong>decides automatically</strong> — with a MIDI card installed it plays over MIDI; without one, over the FM sound source. So the same <code>bgm</code> command <strong>sounds different in timbre for players with the card and without</strong>. That is an inherent cost of this route, not a fault.</div>
+
+<h2>4. Can WAV be converted to MIDI?</h2>
+<p>This is the most frequently asked question: you have a WAV (or MP3) in hand — can it be converted straight to MIDI? <strong>Yes</strong>, and mature tools exist — this route works in principle. For tools, see <a href="mc07-音频平台与工具.html">mc07 §1.4</a>.</p>
+<p>But one boundary must be drawn clearly: <strong>you can convert to "notes", not to "FM patches"</strong>. The two are often conflated, and once they are, you end up with the wrong conclusion that "all AI audio is useless".</p>
+<div class="note-box">
+<table>
+<tr><th>What you want</th><th>Why</th><th>Verdict</th></tr>
+<tr><td>WAV / audio → <strong>MIDI</strong> (notes: pitch / duration / stem separation)</td><td>Pitch detection is a very mature signal-processing problem, and the answer is <strong>unique</strong></td><td>✅ <strong>Doable</strong> — this is called "automatic music transcription" (AMT; a well-posed problem in mathematical terms)</td></tr>
+<tr><td>WAV / audio → <strong>FM patch</strong></td><td>An FM patch is <strong>a set of parameters</strong>, while a sound is <strong>one waveform</strong>. The same waveform can be produced by infinitely many different parameter sets, so <strong>no unique answer can be derived backwards</strong></td><td>❌ <strong>Not doable</strong>. No reliable lossless back-derivation exists (an "underdetermined inverse problem" in mathematical terms)</td></tr>
+</table>
+<p><strong>Key distinction: notes are the "score"; a patch is the "instrument".</strong> Only the latter is that unsolvable problem. So the industry actually works <strong>the other way around</strong> — compose with an FM patch first, then <strong>export</strong> to MIDI or another format. For the full workflow, see <a href="mc07-音频平台与工具.html">mc07</a>.</p>
+<p>The one exception is academia's <a href="https://github.com/magenta/ddsp">DDSP</a> (Apache-2.0), but it works in <strong>the other direction</strong>: synthesizing sound from parameters, not back-deriving parameters from sound.</p>
+<p>So in practice: <strong>platforms that only let you download audio are not a dead end</strong> — their output can be transcribed into notes. For usable transcription tools, and the "split stems first, then transcribe" order, see <a href="mc07-音频平台与工具.html">mc07 §1.4</a>.</p>
+</div>
+
+<h2>5. Common pitfalls</h2>
+<ul>
+<li><strong>FM has only 6 channels (6-voice polyphony); MIDI has 16.</strong> Decide up front which part takes which channel, and which to sacrifice first when things don't fit — otherwise multi-part arrangements will drop notes outright.</li>
+<li><strong>The rhythm section's sounds are built into the chip — no assets to prepare.</strong> The 6-channel percussion reads ROM inside the YM2608 chip; <strong>on real hardware you need nothing at all</strong>. Only the <strong>NP2kai emulator</strong> needs the <code>2608_*.WAV</code> files (the emulator doesn't have that ROM), and NP2kai ships with them; if they're missing, only the rhythm channel goes silent — the FM channels still sound.<br><strong>The easier route is to synthesize drums yourself with FM + SSG</strong> — the SSG's 3 channels are themselves square-wave and noise sources, plenty for kick drum, hi-hat, and snare (§3 option A's first version takes exactly this route).</li>
+<li><strong>GM patches ≠ FM patches.</strong> General MIDI instrument numbers in MIDI are <strong>instrument names</strong> like "piano" or "violin", while the YM2608 has only 128 4-operator patches; the same patch with different algorithms and envelopes can sound nothing like the original instrument. Map them one-to-one by name and you get the classic "robot sound".</li>
+<li><strong>AI-generated MIDI cannot serve as BGM as-is.</strong> This is a direct consequence of the previous item: generic GM MIDI must be opened in a tracker to <strong>swap patches, rework the arrangement, and drop unusable parts</strong> to fit 6 channels. Treat it as a "melody draft", never as a "finished piece". For how to land it, see <a href="mc07-音频平台与工具.html">mc07</a>.</li>
+<li><strong>Don't let "WAV can't become an FM patch" spill over into "WAV can't become MIDI either".</strong> See §4: the former is unsolvable, the latter is solvable.</li>
+<li><strong>PCM has only one channel.</strong> If background music goes over PCM, it will fight sound effects and voice for the lane. This is the fundamental reason for choosing FM over PCM.</li>
+<li><strong>If an asset's volume never changes, a volume test can't measure anything.</strong> If the test samples are synthesized at constant amplitude, an inconclusive volume test <strong>cannot</strong> be taken to mean the path is faulty. Switch to definite criteria instead, such as whether the path passes sound at all, damping, and decay differences.</li>
+</ul>
+
+</main>
+</body>
+</html>

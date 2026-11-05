@@ -1,0 +1,22 @@
+# =============================================================
+# Naiz 动画工程配置 (TOML) — 支持 # 注释
+# Naiz animation project configuration (TOML), supports # comments
+#
+# [project] name 是本目录作为动画项目的判定依据，必须与目录名一致。
+# The [project] name identifies this directory as an animation project;
+# it must match the directory name exactly.
+# =============================================================
+
+[project]
+# 项目名（必须与本目录同名；脚本 animaconf 第三参数须与此一致）
+# Project name (must equal the directory name; scripts reference it as
+# the third animaconf argument)
+name = "animatest"
+
+# 版本号 X.Y.ZZZ（.ANI 为独立分发产物，当前仅作标识记录）
+# Version X.Y.ZZZ (.ANI files are standalone artifacts; informational)
+version = "0.1.000"
+
+# 描述（简短说明，仅用于项目内辨识）
+# Description (short note for identification within the project)
+description = ""

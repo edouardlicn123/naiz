@@ -1,0 +1,23 @@
+# ── 动画脚本(.na) 语法速查（与剧本脚本 .nb 分离，devdocs/79） ─
+# 动画脚本放 animation/projects/<项目名>/scripts/<名>.na；
+# 剧本脚本为 games/<game>/ 下 .nb，两者后缀/目录/工具链均分离。
+#
+# animaconf(<区域>,<轨道>,<项目名>)   # 头部，恰好一次且为首条命令，裸括号形式
+#                                     # <项目名> 选定 assets/<项目名>/ 素材域
+#                                     # 与 animation/projects/<项目名>/db/ 登记库；
+#                                     # 循环与否由播放器/引擎控制，不写入动画
+# frame(<秒数>){<名>[,<名>...]}       # pixel 轨帧（≥1），裸名字显式序列，
+#                                     # 各名共用括号内秒数；循环由播放器控制
+# base(){<名>}                        # palette 轨底图（恰好 1）
+# pal(<秒数>){<名>[,<名>...]}         # palette 轨差异表（≥1），与 base 搭配
+#
+# 名字解析: 裸名字（无路径/扩展名）查 animation/projects/<项目名>/db/<项目名>.db（assets 表，
+# frame/base→kind='png'，pal→kind='pal'），映射到 assets/<项目名>/anim/<文件>。
+# 登记素材: ./anima.sh register <项目名>（或 build --sync 自动同步）；
+# 只读对账: ./anima.sh check <项目名>（有差异退出码 1）。
+#
+# palette 轨范例:
+#   animaconf(cine,palette,<项目名>)
+#   base(){bg}
+animaconf(cine,pixel,animatest)
+frame(0.5){cine001,cine002}

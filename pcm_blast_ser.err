@@ -1,0 +1,3 @@
+/tmp/opencode/pcm_blast_ser.c(5): Warning! W131: No prototype found for function 'outp'
+/tmp/opencode/pcm_blast_ser.c(17): Warning! W131: No prototype found for function 'inp'
+/tmp/opencode/pcm_blast_ser.c(47): Warning! W138: No newline at end of file

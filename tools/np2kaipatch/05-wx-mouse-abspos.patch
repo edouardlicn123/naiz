@@ -1,0 +1,143 @@
+diff --git a/io/np2sysp.c b/io/np2sysp.c
+index cd70e5b..ee15eda 100644
+--- a/io/np2sysp.c
++++ b/io/np2sysp.c
+@@ -695,11 +695,7 @@ static void np2sysp_getmpos(const void *arg1, long arg2) {
+   UINT8 mode = (np2sysp.outval >> 24) & 0xff;
+ 
+   if (mode == 0 || mode == 1 || mode == 2 || mode == 3) {
+-#if defined(NP2_WIN)
+     if (mousemng_getabspos(&mouseX, &mouseY))
+-#else
+-    if (0)
+-#endif
+     {
+       if (mouseX < 0)
+         mouseX = 0;
+@@ -957,6 +953,29 @@ static void IOOUTCALL np2sysp_o0e9(UINT port, REG8 dat) {
+ 
+ static REG8 IOINPCALL np2sysp_i0e9(UINT port) { return ((UINT8)port); }
+ #endif
++/* Absolute mouse position via dedicated read-only I/O ports (P5 extension).
++ * Ports: 0x7E0=X low, 0x7E1=X high, 0x7E2=Y low, 0x7E3=Y high.
++ * Values: screen pixel coordinates (scale-independent, tracked from host). */
++static REG8 IOINPCALL np2sysp_i7e0(UINT port) {
++  int x, y;
++  mousemng_getabspos(&x, &y);
++  return (REG8)(x & 0xff);
++}
++static REG8 IOINPCALL np2sysp_i7e1(UINT port) {
++  int x, y;
++  mousemng_getabspos(&x, &y);
++  return (REG8)((x >> 8) & 0xff);
++}
++static REG8 IOINPCALL np2sysp_i7e2(UINT port) {
++  int x, y;
++  mousemng_getabspos(&x, &y);
++  return (REG8)(y & 0xff);
++}
++static REG8 IOINPCALL np2sysp_i7e3(UINT port) {
++  int x, y;
++  mousemng_getabspos(&x, &y);
++  return (REG8)((y >> 8) & 0xff);
++}
+ 
+ // ---- I/F
+ 
+@@ -973,6 +992,10 @@ void np2sysp_bind(void) {
+   iocore_attachout(0x07ef, np2sysp_o7ef);
+   iocore_attachinp(0x07ed, np2sysp_i7ed);
+   iocore_attachinp(0x07ef, np2sysp_i7ef);
++  iocore_attachinp(0x07e0, np2sysp_i7e0);
++  iocore_attachinp(0x07e1, np2sysp_i7e1);
++  iocore_attachinp(0x07e2, np2sysp_i7e2);
++  iocore_attachinp(0x07e3, np2sysp_i7e3);
+ 
+ #if defined(NP2APPDEV)
+   iocore_attachout(0x00e9, np2sysp_o0e9);
+diff --git a/wx/mousemng.cpp b/wx/mousemng.cpp
+index 0a3bc01..fab9a1c 100644
+--- a/wx/mousemng.cpp
++++ b/wx/mousemng.cpp
+@@ -7,11 +7,30 @@ MOUSEMNG mousemng;
+ 
+ static UINT enabled_procs = 0;
+ 
++/* absolute cursor position in panel coordinates (tracked for NP2 system port) */
++static int mouse_abs_x = 0;
++static int mouse_abs_y = 0;
++
+ void mousemng_initialize(void)
+ {
+ 	memset(&mousemng, 0, sizeof(mousemng));
+ 	mousemng.btn = uPD8255A_LEFTBIT | uPD8255A_RIGHTBIT;  /* active-low: both released */
+ 	mousemng.showcount = 1;
++	mouse_abs_x = 0;
++	mouse_abs_y = 0;
++}
++
++void mousemng_setabspos(int ax, int ay)
++{
++	mouse_abs_x = ax;
++	mouse_abs_y = ay;
++}
++
++UINT8 mousemng_getabspos(int *x, int *y)
++{
++	if (x) *x = mouse_abs_x;
++	if (y) *y = mouse_abs_y;
++	return 1;
+ }
+ 
+ BYTE mousemng_getstat(SINT16 *x, SINT16 *y, int clear)
+diff --git a/wx/mousemng.h b/wx/mousemng.h
+index 08a7b0b..4717cab 100644
+--- a/wx/mousemng.h
++++ b/wx/mousemng.h
+@@ -39,6 +39,10 @@ void mousemng_toggle(UINT proc);
+ void mousemng_hidecursor(void);
+ void mousemng_showcursor(void);
+ 
++/* absolute position tracking */
++void mousemng_setabspos(int ax, int ay);
++UINT8 mousemng_getabspos(int *x, int *y);
++
+ /* called from wxPanel event handlers */
+ void mousemng_onmove(int dx, int dy);
+ void mousemng_onleft(BOOL pressed);
+diff --git a/wx/np2panel.cpp b/wx/np2panel.cpp
+index bddbfd9..757d403 100644
+--- a/wx/np2panel.cpp
++++ b/wx/np2panel.cpp
+@@ -190,16 +190,26 @@ void Np2Panel::OnMouseMove(wxMouseEvent &evt)
+ 	if (!m_mouseCaptured) { evt.Skip(); return; }
+ 
+ 	wxPoint pos = evt.GetPosition();
+-	int cx = GetClientSize().x / 2;
+-	int cy = GetClientSize().y / 2;
+ 	int dx = pos.x - m_lastMousePos.x;
+ 	int dy = pos.y - m_lastMousePos.y;
+ 
+ 	if (dx || dy) {
+ 		mousemng_onmove(dx, dy);
+-		/* warp cursor back to center to allow unlimited movement */
+-		WarpPointer(cx, cy);
+-		m_lastMousePos = wxPoint(cx, cy);
++		m_lastMousePos = pos;
++
++		/* Absolute position scaled to the 640x400 emulated screen.
++		 * No WarpPointer: the host cursor tracks the emulated cursor 1:1,
++		 * so the window edge equals the emulated screen edge.  Compositors
++		 * that handle XWarpPointer non-atomically (e.g. KWin on Deepin)
++		 * re-deliver the warp as a burst of synthetic motion events with
++		 * non-zero deltas; those would be treated as real moves and drag
++		 * the cursor back toward the window center. */
++		wxSize sz = GetClientSize();
++		int sx = (sz.GetWidth()  > 0) ? pos.x * 640 / sz.GetWidth()  : pos.x;
++		int sy = (sz.GetHeight() > 0) ? pos.y * 400 / sz.GetHeight() : pos.y;
++		if (sx < 0) sx = 0; else if (sx > 639) sx = 639;
++		if (sy < 0) sy = 0; else if (sy > 399) sy = 399;
++		mousemng_setabspos(sx, sy);
+ 	}
+ }
+ 

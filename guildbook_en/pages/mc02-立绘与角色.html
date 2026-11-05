@@ -1,0 +1,266 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="translated-from" content="202610300931">
+<!-- AI-NOTE: translated-from = the guildbook_cn doc-version this page was translated from. If the cn counterpart's doc-version is newer, re-translate this page from the Chinese source. -->
+
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Sprites and Characters — Naiz Guildbook</title>
+<link rel="stylesheet" href="../style.css">
+</head>
+<body>
+<nav class="sidebar" id="sidebar-nav"></nav>
+<script src="../sidebar-reference.js"></script>
+<main class="main">
+<h1>Sprites and Characters</h1>
+<blockquote><strong>Created</strong>: 2026-06-10<br><strong>Last updated</strong>: 2026-07-27</blockquote>
+<p>This page describes the production guidelines for character-sprite and background assets.</p>
+<hr>
+
+<h2>1. Hard constraints</h2>
+
+<h3>1.1 Transparent-color conventions</h3>
+<p>The PC-98 has no alpha channel. Sprite transparency is achieved via <strong>color-key transparency</strong>.</p>
+<table>
+<thead>
+<tr><th>Convention</th><th>Meaning</th></tr>
+</thead>
+<tbody>
+<tr><td><strong>Transparent index</strong></td><td>Palette <strong>index 15</strong> (an engine convention — <code>vram_blit_sprite</code> skips this index)</td></tr>
+<tr><td><strong>Opaque indexes</strong></td><td>Indexes 0–14, 15 actual colors in total</td></tr>
+<tr><td><strong>Asset format</strong></td><td>RGBA PNG (transparent background); alpha&lt;128 → index 15</td></tr>
+</tbody>
+</table>
+<p><strong>White-background images are forbidden</strong>: if the character contains white (eye highlights, skin highlights), <code>--sprite-key</code> will misjudge it as transparent, leaving pixel holes in the character.</p>
+
+<h3>1.2 Sprite facing conventions</h3>
+<p>All sprite assets follow one uniform convention: <strong>right placement</strong> — the character stands on the right side of the screen, body facing left (toward the center). The engine implements left placement via horizontal mirroring:</p>
+<table>
+<thead>
+<tr><th>Placement</th><th>Horizontal mirror</th><th>Result</th></tr>
+</thead>
+<tbody>
+<tr><td>Right</td><td>Not needed</td><td>Original image; the character faces left (toward the center)</td></tr>
+<tr><td>Center</td><td>Not needed</td><td>Original image; the character faces left</td></tr>
+<tr><td>Left</td><td><strong>Needed</strong></td><td>Mirrored; the character faces right (toward the center, symmetric to the right side)</td></tr>
+</tbody>
+</table>
+<p>Mirroring is controlled implicitly by the <code>char</code> position argument (left <code>l</code> mirrors horizontally automatically); assets are not drawn as separate left/right versions.</p>
+
+<hr>
+
+<h2>2. Sprite asset guidelines</h2>
+
+<h3>2.1 Standard size</h3>
+<table>
+<thead>
+<tr><th>Width×Height</th><th>Canvas</th><th>Meaning</th></tr>
+</thead>
+<tbody>
+<tr><td><strong>200×400</strong></td><td>200×400</td><td>Full-height sprite; bottom touches the screen bottom, top aligned to y=0</td></tr>
+</tbody>
+</table>
+
+<h3>2.2 Asset requirements</h3>
+<ul>
+<li><strong>Format</strong>: RGBA PNG with an alpha transparency channel</li>
+<li><strong>Canvas</strong>: position the character appropriately within the canvas — the canvas is the sprite's bounding box</li>
+<li><strong>Transparent region</strong>: every pixel outside the character outline has alpha=0</li>
+<li><strong>Index constraint</strong>: a sprite uses at most 15 colors (indexes 0–14); the 16th color (index 15) is transparent</li>
+<li><strong>Drawing constraint</strong>: for sprites of the same character with different expressions, the region below the dialogue box [y=280, 400) must be pixel-identical</li>
+</ul>
+<p><img src="../imgs/canvas-diagram.png" alt=""></p>
+
+<h3>2.3 File naming conventions</h3>
+<table>
+<thead>
+<tr><th>File</th><th>Meaning</th></tr>
+</thead>
+<tbody>
+<tr><td><code>fei-normal.MAG</code></td><td>fei's default expression</td></tr>
+<tr><td><code>fei-happy.MAG</code></td><td>fei's happy expression</td></tr>
+<tr><td><code>fei-sad.MAG</code></td><td>fei's sad expression</td></tr>
+</tbody>
+</table>
+<p>PNG source files share the MAG's base name with a different extension: <code>fei-normal.png</code> → <code>fei-normal.MAG</code>.</p>
+<p>Expression names are recorded in the <code>char_expressions.expr_name</code> column; the engine does not parse expressions from file names — it indexes only via <code>asset_map.id</code>.</p>
+
+<h3>2.4 Cross-expression drawing constraints for the same character</h3>
+<p>The engine's "change the expression without redrawing the dialogue box" optimization relies on the following drawing rules:</p>
+<p><img src="../imgs/region-diagram.png" alt=""></p>
+<table>
+<thead>
+<tr><th>Region</th><th>Y range</th><th>Height</th><th>Requirement</th></tr>
+</thead>
+<tbody>
+<tr><td>Expression-variable region</td><td>0–279</td><td>280 px</td><td>May differ per expression</td></tr>
+<tr><td>Fixed region (hidden by the dialogue box)</td><td>280–395</td><td>116 px</td><td>Pixel-identical</td></tr>
+<tr><td>Fixed region (visible bottom)</td><td>396–399</td><td>4 px</td><td>Pixel-identical</td></tr>
+<tr><td><strong>Fixed region total</strong></td><td><strong>280–400</strong></td><td><strong>120 px</strong></td><td><strong>Must be identical for the same character</strong></td></tr>
+</tbody>
+</table>
+<blockquote><strong>Why?</strong> On an expression change the engine redraws only the <code>y&lt;280</code> region; the VRAM pixels at <code>y&gt;=280</code> are left as-is. If the lower bodies of the same character's different expressions differ, you get the visual glitch of "a new face with the old body misaligned".</blockquote>
+<p><strong>Drawing advice</strong>: crop the different expression versions from the same full-body base drawing, redrawing only the part with y&lt;280.</p>
+
+<h3>2.5 Conversion command</h3>
+<pre><code class="language-bash">python3 -m tools.naiz_conv.img2mag char_hime.png -o CHR_HIME.MAG --sprite --256</code></pre>
+<ul>
+<li>Detects the alpha channel automatically → transparent areas map to index 15</li>
+<li><strong>No resize</strong> (keeps the original 200×400 size)</li>
+<li>Writes the <code>"sprt\x1a"</code> user string</li>
+</ul>
+
+<hr>
+
+<h2>3. Background asset guidelines</h2>
+
+<h3>3.1 Specifications</h3>
+<table>
+<thead>
+<tr><th>Parameter</th><th>Value</th></tr>
+</thead>
+<tbody>
+<tr><td>Resolution</td><td><strong>640×400</strong></td></tr>
+<tr><td>Colors</td><td>256 colors (PEGC mode)</td></tr>
+<tr><td>Format</td><td>MAG (MAKI02, screen_mode 0x80)</td></tr>
+<tr><td>Input format</td><td>PNG or JPG (anything PIL supports)</td></tr>
+</tbody>
+</table>
+
+<h3>3.2 Palette protection</h3>
+<p>When a background MAG loads, the engine automatically skips these indexes:</p>
+<table>
+<thead>
+<tr><th>Index</th><th>Reserved color</th><th>Used for</th></tr>
+</thead>
+<tbody>
+<tr><td><strong>7</strong></td><td><code>#FFFFFF</code> white</td><td>Dialogue text, dialogue-box borders, hints</td></tr>
+<tr><td><strong>8</strong></td><td><code>#555555</code> gray</td><td>The Ctrl fast-forward hint</td></tr>
+</tbody>
+</table>
+<p>The engine handles the protection automatically; creators need not worry. If the background needs an exact white/gray, just substitute index 6, 14, or similar.</p>
+
+<h3>3.3 Conversion command</h3>
+<pre><code class="language-bash">python3 -m tools.naiz_conv.img2mag bg_photo.png -o BG001.MAG --dither --256
+python3 -m tools.naiz_conv.img2mag bg_flat_colors.png -o BG002.MAG --256</code></pre>
+<table>
+<thead>
+<tr><th>Flag</th><th>Effect</th></tr>
+</thead>
+<tbody>
+<tr><td><code>--dither</code></td><td>Floyd-Steinberg dithering (recommended for photos/gradients)</td></tr>
+<tr><td>No flag</td><td>Direct quantization (recommended for pixel art/flat colors)</td></tr>
+</tbody>
+</table>
+
+<h3>3.4 Workflow</h3>
+<pre><code>1. Draw a 640×400 background
+2. Export the PNG → img2mag bg.png -o BG001.MAG --dither
+3. BG001.MAG → IMAGE.DAT (packed by pack_images.py)
+4. Engine loads → image_set_palette + vram_blit</code></pre>
+
+<hr>
+
+<h2>4. Placement layout</h2>
+
+<h3>4.1 Placement mapping table</h3>
+<p>The <code>l</code>/<code>c</code>/<code>r</code> in the NB script's <code>char()</code> are mapped to pixel coordinates by the engine's <code>pos_to_x()</code>:</p>
+<table>
+<thead>
+<tr><th>pos</th><th>Meaning</th><th>x coordinate</th></tr>
+</thead>
+<tbody>
+<tr><td><code>l</code></td><td>Left</td><td><strong>27</strong></td></tr>
+<tr><td><code>c</code></td><td>Center</td><td><strong>220</strong></td></tr>
+<tr><td><code>r</code></td><td>Right</td><td><strong>413</strong></td></tr>
+</tbody>
+</table>
+<blockquote>The sprite's y is fixed at 0: top aligned with the screen top, the 400px bottom touching the screen bottom. The dialogue box [y=280,395] covers the sprite's bottom 116px.</blockquote>
+<p>Three-character layout (panorama):</p>
+<p><img src="../imgs/screen-panorama.png" alt="Screen panorama of the three-character placement"></p>
+
+<h3>4.2 Two-character layout</h3>
+<table>
+<thead>
+<tr><th>Position</th><th>x at 200×400</th></tr>
+</thead>
+<tbody>
+<tr><td>Left</td><td>90</td></tr>
+<tr><td>Right</td><td>350</td></tr>
+</tbody>
+</table>
+
+<h3>4.3 Single-character layout</h3>
+<table>
+<thead>
+<tr><th>Position</th><th>x at 200×400</th></tr>
+</thead>
+<tbody>
+<tr><td>Center</td><td>220</td></tr>
+</tbody>
+</table>
+
+<hr>
+
+<h2>5. Sprite operations and rendering</h2>
+
+<h3>5.1 Sprite operations</h3>
+<table>
+<thead>
+<tr><th>Operation</th><th>Method</th><th>Dialogue-box impact</th></tr>
+</thead>
+<tbody>
+<tr><td>Show sprite (first time)</td><td><code>char(pos, expr, body){key}</code></td><td>None</td></tr>
+<tr><td>Expression change</td><td><code>char(pos, expr, face){key}</code></td><td><strong>Dialogue box not redrawn</strong> ✅</td></tr>
+<tr><td>Costume change / reposition</td><td><code>char(pos, expr, body){key}</code> (when already shown)</td><td><strong>Dialogue box redrawn automatically</strong> ✅</td></tr>
+<tr><td>Hide all</td><td><code>char(hideall)</code></td><td>Clears the sprites; the dialogue-box area reverts to plain background</td></tr>
+</tbody>
+</table>
+
+<h3>5.2 Rendering order</h3>
+<pre><code>1. Background fullscreen → bg()
+2. Character sprites      → char()
+3. Dialogue box           → first dialogue command
+4. Text                   → key(){}</code></pre>
+<ul>
+<li><strong>Sprites sit below the dialogue box</strong>: the dialogue box is drawn after the second sprite pass, covering the part of a sprite that extends into the dialogue-box region.</li>
+<li><strong>Text is always topmost</strong>: written over the dialogue box's base color.</li>
+<li><strong>Semi-transparent dialogue box</strong>: the bottom of a sprite shows through faintly via the dot pattern — see <a href="cf03-对话框样式方案.html">cf03 Dialogue Box Style Scheme</a>.</li>
+</ul>
+<blockquote><strong>Note</strong>: all of the layers above write into the same graphics VRAM (the 256-color packed-pixel area formed by combining Graphics Plane A+B). The Text Plane is unused; text is drawn into the graphics VRAM as a bitmap. See <a href="fd01-引擎基本概念.html#1.4">fd01 §1.4</a> for details.</blockquote>
+<p>On an expression change (<code>face</code> type): only the y&lt;280 region is redrawn and the dialogue box is untouched. This requires the same character's different expressions to be pixel-identical in the y≥280 region (see §2.4).</p>
+
+<hr>
+
+<h2>6. Palette management</h2>
+<p>Backgrounds and sprites <strong>share the same 256-color palette</strong> — the engine sets the whole-scene palette when loading the background, and sprite loading does not change the palette.</p>
+<p><strong>Workflow</strong>:</p>
+<pre><code>1. Make the background → img2mag bg.png -o BG001.MAG --dither
+2. Set up the same palette in Aseprite/Krita
+3. Export the character RGBA PNGs, named `角色-表情.png`
+4. Register in ASSETS.DB:
+   asset_map        — one entry per MAG file
+   characters       — character definitions (charname → display name)
+   char_expressions — character → expression → asset_id mapping
+5. pack_images.py packs it all (automatically verifying cross-expression y≥280 consistency)
+6. IMAGE.DAT → engine rendering</code></pre>
+
+<hr>
+
+<h2>7. Relation to other documents</h2>
+<table>
+<thead>
+<tr><th>Document</th><th>Content</th></tr>
+</thead>
+<tbody>
+<tr><td><a href="fd01-引擎基本概念.html">fd01 Engine Fundamentals</a></td><td>Engine fundamentals (background/dialogue)</td></tr>
+<tr><td><a href="cf03-对话框样式方案.html">cf03 Dialogue Box Style Scheme</a></td><td>Dialogue-box preset styles</td></tr>
+<tr><td><a href="mc03-图层渲染与换装机制.html">mc03 Layer Rendering and Costume-Change Mechanics</a></td><td>Render pipeline, sprite operations, costume-change mechanics</td></tr>
+<tr><td><a href="sc01-NB剧本概述.html">sc01 NB Scenario Overview</a></td><td>Basic commands such as bg/host/key/scene</td></tr>
+</tbody>
+</table>
+
+</main>
+</body>
+</html>

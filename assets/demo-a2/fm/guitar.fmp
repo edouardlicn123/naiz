@@ -1,0 +1,7 @@
+# guitar — GM 24..31 (nylon/steel/elec guitars).  Tracked fuzz from feedback
+# on op4 (alg 0, fb 4); fast pluck attack, medium decay, short tail.
+alg=0 fb=4 pan=0xc0
+op=1 dt=0 mul=2  tl=44 ks=2 ar=28 am=0 d1r=7  d2r=6  sl=2 rr=5
+op=3 dt=0 mul=3  tl=46 ks=1 ar=26 am=0 d1r=7  d2r=5  sl=2 rr=5
+op=2 dt=1 mul=1  tl=40 ks=1 ar=28 am=0 d1r=8  d2r=6  sl=3 rr=5
+op=4 dt=0 mul=1  tl=30 ks=1 ar=28 am=1 d1r=6  d2r=5  sl=3 rr=6

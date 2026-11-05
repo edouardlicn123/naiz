@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="translated-from" content="202610300931">
+<!-- AI-NOTE: translated-from = the guildbook_cn doc-version this page was translated from. If the cn counterpart's doc-version is newer, re-translate this page from the Chinese source. -->
+
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Animation Script Syntax Overview (for non-programmers) — Naiz Guildbook</title>
+<link rel="stylesheet" href="../style.css">
+</head>
+<body>
+<nav class="sidebar" id="sidebar-nav"></nav>
+<script src="../sidebar-animation.js"></script>
+<main class="main">
+
+<h1>Animation Script Syntax Overview</h1>
+<blockquote><strong>Created</strong>: 2026-08-29<br><strong>Last updated</strong>: 2026-08-29</blockquote>
+<p>This page explains in plain language how to write the <strong>storyboard script</strong> (the <code>.na</code> file). Think of it as the animation's "shooting list": first the header declaration, then one line per image (or per recolor). For the detailed syntax of each command see: <a href="anim-animaconf.html">animaconf</a> / <a href="anim-frame.html">frame</a> / <a href="anim-base.html">base</a> / <a href="anim-pal.html">pal</a>. To generate the animation, see the <a href="anim-制作.html">Production Workflow</a>.</p>
+<hr>
+
+<h2>1. The script file must end in .na</h2>
+<p>Animation script filenames must end with <code>.na</code> (for example <code>眨眼.na</code>). This is what sets them apart from ordinary scenario files (<code>.nb</code>); with the wrong extension the tools refuse to process the file.</p>
+
+<h2>2. The four constructs (commands)</h2>
+<table>
+<tr><th>Construct</th><th>Used by</th><th>What it does</th></tr>
+<tr><td><code>animaconf(...)</code></td><td>Both types</td><td>Header declaration: is this animation fullscreen or a cine strip? A pixel animation or a palette animation? Which project does it belong to?</td></tr>
+<tr><td><code>frame(...){...}</code></td><td>Pixel animations</td><td>Places one (or several) images and states how many seconds each stays on screen</td></tr>
+<tr><td><code>base(){...}</code></td><td>Palette animations</td><td>Declares the first base image, before any recoloring</td></tr>
+<tr><td><code>pal(...){...}</code></td><td>Palette animations</td><td>Declares each recolor step and how long it lasts</td></tr>
+</table>
+<p>Numbers or options go in the parentheses; inside the braces <code>{ }</code> you write the assets' "nicknames" (the names you gave them at registration).</p>
+
+<h2>3. A few general rules</h2>
+<ul>
+<li><strong>The header declaration comes first</strong>: <code>animaconf</code> must be the script's very first line (blank lines or <code>#</code> comments may precede it).</li>
+<li><strong>Pixel animations</strong> use <code>frame</code>; <strong>palette animations</strong> use <code>base</code> + <code>pal</code>. Never mix the two.</li>
+<li><strong>In a palette animation, base must come before pal</strong> (base image first, then the changes).</li>
+<li>The braces may hold several nicknames separated by commas, e.g. <code>{云1,云2,云3}</code> — they play one after another in turn and share the same duration.</li>
+<li>A <code>#</code> at the end of a line starts a comment (e.g. <code>frame(0.3){云1} # drift by</code>); the tools ignore comments, so they don't affect the animation.</li>
+</ul>
+
+<h2>4. Common pitfalls when writing animations (troubleshooting cheat sheet)</h2>
+<p>When a tool reports an error it tells you the line number and what went wrong. Here are the common cases in plain words:</p>
+<table>
+<tr><th>Symptom</th><th>Usually this means…</th></tr>
+<tr><td>It says the script must have a .na extension</td><td>The filename doesn't end in <code>.na</code>; just rename the file</td></tr>
+<tr><td>It reports a problem with animaconf</td><td>The header declaration was omitted, written twice, or is not on the first line</td></tr>
+<tr><td>It reports a bad region/type/project name</td><td>An option in animaconf is misspelled, or the project folder doesn't exist</td></tr>
+<tr><td>It reports cross-track or a command used in the wrong place</td><td>base/pal leaked into a pixel animation, or frame appears in a palette animation (don't mix the two)</td></tr>
+<tr><td>It reports a missing frame / missing base image</td><td>A pixel animation needs at least 1 frame; a palette animation needs 1 base and at least 1 pal</td></tr>
+<tr><td>It reports an unregistered name</td><td>A nickname in the braces can't be found in the asset nickname table — go run <code>register</code> again</td></tr>
+<tr><td>It reports a wrong size</td><td>Fullscreen animation images must be 640×400; cine-strip images are at most 640 wide and 400 tall</td></tr>
+<tr><td>It reports a malformed .pal file</td><td>In the palette table, each line must be the four numbers index red green blue, with no repeated index</td></tr>
+<tr><td>It says pal must come after base</td><td>In a palette animation pal was written before base; just swap the order</td></tr>
+</table>
+
+<h2>5. The four constructs in detail</h2>
+<div class="index-section">
+  <div class="index-grid-2">
+    <div class="index-card">
+      <a href="anim-animaconf.html">
+        <span class="card-badge b-anim">an</span>
+        <h3>animaconf (header declaration)</h3>
+        <p>Fullscreen or cine strip? Pixel or palette? Which project?</p>
+      </a>
+    </div>
+    <div class="index-card">
+      <a href="anim-frame.html">
+        <span class="card-badge b-anim">an</span>
+        <h3>frame (place an image)</h3>
+        <p>Pixel animations: which image, how many seconds</p>
+      </a>
+    </div>
+    <div class="index-card">
+      <a href="anim-base.html">
+        <span class="card-badge b-anim">an</span>
+        <h3>base (recolor base image)</h3>
+        <p>Palette animations: the first image, before any changes</p>
+      </a>
+    </div>
+    <div class="index-card">
+      <a href="anim-pal.html">
+        <span class="card-badge b-anim">an</span>
+        <h3>pal (make the colors change)</h3>
+        <p>Palette animations: how colors change, how long each step lasts</p>
+      </a>
+    </div>
+  </div>
+</div>
+
+<h2>6. See also</h2>
+<ul>
+<li><a href="anim-制作.html">Production Workflow</a> — generating the .ANI with the tools.</li>
+<li><a href="mc05-动画机制.html">Animation Mechanics</a> — how animations play in the game.</li>
+<li><a href="mc04-MAG图片机制.html">MAG Image Mechanics</a> — how images and palettes work.</li>
+</ul>
+
+</main>
+</body>
+</html>

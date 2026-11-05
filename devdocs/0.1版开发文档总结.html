@@ -1,0 +1,914 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Naiz 引擎 0.1 版开发文档总结</title>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Noto Sans SC", "Microsoft YaHei", sans-serif; background: #f5f6f8; color: #1a1a2e; line-height: 1.75; }
+.container { max-width: 1000px; margin: 0 auto; padding: 40px 32px 96px; }
+
+header { background: linear-gradient(135deg, #1a1a2e 0%, #2d2d44 100%); color: #fff; border-radius: 12px; padding: 40px 44px; margin-bottom: 36px; }
+header h1 { font-size: 30px; margin-bottom: 10px; font-weight: 700; }
+header .subtitle { font-size: 15px; color: #c8c8d8; margin-bottom: 20px; }
+header .meta { display: flex; flex-wrap: wrap; gap: 10px; }
+header .badge { background: rgba(255,255,255,0.14); border: 1px solid rgba(255,255,255,0.22); padding: 4px 14px; border-radius: 999px; font-size: 13px; color: #e8e8f0; }
+
+.toc { background: #fff; border: 1px solid #e0e0e0; border-radius: 10px; padding: 28px 32px; margin-bottom: 40px; }
+.toc h2 { font-size: 18px; margin-bottom: 16px; color: #1a1a2e; }
+.toc a { display: block; padding: 6px 0; color: #1976d2; text-decoration: none; font-size: 14px; }
+.toc a:hover { text-decoration: underline; }
+.toc .toc-group { color: #555; font-weight: 700; font-size: 13px; letter-spacing: 1px; margin-top: 14px; padding: 6px 0 2px; text-transform: uppercase; }
+.toc .toc-group:first-child { margin-top: 0; }
+
+.group { margin-bottom: 44px; }
+.group-header { display: flex; align-items: baseline; gap: 12px; border-left: 5px solid #4fc3f7; padding-left: 14px; margin-bottom: 6px; }
+.group-header h2 { font-size: 22px; color: #1a1a2e; }
+.group-header .range { font-size: 13px; color: #888; }
+.group-desc { color: #666; font-size: 14px; margin: 0 0 22px 19px; }
+
+.doc { background: #fff; border: 1px solid #e0e0e0; border-radius: 10px; padding: 22px 26px; margin-bottom: 18px; }
+.doc-head { display: flex; align-items: center; gap: 12px; margin-bottom: 10px; flex-wrap: wrap; }
+.doc-num { background: #1a1a2e; color: #fff; font-size: 13px; font-weight: 700; padding: 3px 10px; border-radius: 5px; letter-spacing: 0.5px; }
+.doc-title { font-size: 18px; font-weight: 700; color: #1a1a2e; }
+.doc-status { margin-left: auto; font-size: 12px; color: #555; background: #f0f4f8; border: 1px solid #d8dee8; padding: 2px 10px; border-radius: 999px; white-space: nowrap; }
+
+.doc h4 { font-size: 13px; color: #666; margin: 12px 0 4px; text-transform: uppercase; letter-spacing: 1px; }
+.doc ul { margin: 0 0 6px 20px; }
+.doc li { margin: 3px 0; font-size: 14px; }
+.doc .landing { background: #f0f8f4; border-left: 3px solid #26a69a; padding: 8px 14px; border-radius: 0 6px 6px 0; font-size: 14px; color: #2b4a3a; margin: 8px 0; }
+.doc .rel { font-size: 13px; color: #777; background: #faf9f6; border-left: 3px solid #d8b56a; padding: 8px 14px; border-radius: 0 6px 6px 0; }
+
+footer { text-align: center; color: #999; font-size: 13px; margin-top: 56px; padding-top: 24px; border-top: 1px solid #e0e0e0; }
+
+@media (max-width: 720px) {
+  .container { padding: 20px 16px 60px; }
+  header { padding: 28px 24px; }
+  .doc-status { margin-left: 0; }
+}
+</style>
+</head>
+<body>
+<div class="container">
+
+<header>
+  <h1>Naiz 引擎 0.1 版开发文档总结</h1>
+  <div class="subtitle">devdocs/ 开发记录全量归档汇总 — 主要思路、最终落点与现状关联</div>
+  <div class="meta">
+    <span class="badge">覆盖 00–67 · 66 份文档</span>
+    <span class="badge">版本 0.1.069</span>
+    <span class="badge">生成于 2026-08</span>
+  </div>
+</header>
+
+<nav class="toc">
+  <h2>目录</h2>
+  <a href="#g1">一、重建与参考引擎分析（00–09）</a>
+  <a href="#g2">二、显示管线、256 色与字库（10–19）</a>
+  <a href="#g3">三、剧本系统、输入与菜单（20–35）</a>
+  <a href="#g4">四、封装重构、存档与文档（36–48）</a>
+  <a href="#g5">五、鼠标漂移系列（49–59）</a>
+  <a href="#g6">六、近期固化与版本演进（60–67）</a>
+</nav>
+
+<!-- ============================================================ -->
+<section class="group" id="g1">
+  <div class="group-header"><h2>一、重建与参考引擎分析</h2><span class="range">00 – 09</span></div>
+  <p class="group-desc">引擎重建纲领、图像/场景格式规范、参考引擎（love es××××）差异分析，以及显示路径的多轮探索（VRAM 直写 / GDC 端口 / GRCG / DPMI）。</p>
+
+  <div class="doc" id="doc-00">
+    <div class="doc-head"><span class="doc-num">00</span><span class="doc-title">新引擎重建计划</span><span class="doc-status">计划 · 多数阶段已实施</span></div>
+    <h4>核心思路</h4>
+    <ul>
+      <li>抛弃 gcc-ia16/DJGPP 双目标 + MHVN98 遗产，重建 Open Watcom → DOS/4GW → LE → VEM486 → NP2kai 完整链路，与参考游戏一致。</li>
+      <li>放弃厚重 HAL 抽象与 EGC/GRCG 残留，改为无 HAL、直接 port I/O、32-bit flat 指针、纯软渲染、标准 C 文件 I/O 的单目标构建。</li>
+      <li>启动从 CONFIG.SYS INSTALL= hack 改为 AUTOEXEC.BAT；内存管理用 VEM486（XMS/EMS/VCPI），SET DOS16M=1 启用 DOS/4GW PC-98 路径。</li>
+      <li>工具链全部 Python；FAT16 文件系统即容器，无需 ARCHIVE 格式；分 Phase 0–4 实施。</li>
+    </ul>
+    <div class="landing"><b>最终落点：</b>成为后续所有工作的总纲，直接催生 core/ 下 engine/plat/data 分层架构；键盘/VRAM 等阻塞点在后续文档继续推进。</div>
+    <div class="rel"><b>现状关联：</b>现引擎（core/ 目录、watcom 构建、render.h 软渲染管线）即本计划产物。</div>
+  </div>
+
+  <div class="doc" id="doc-01">
+    <div class="doc-head"><span class="doc-num">01</span><span class="doc-title">MAKI / MAG 图像格式规范</span><span class="doc-status">规范</span></div>
+    <h4>核心思路</h4>
+    <ul>
+      <li>MAKI/MAG 为 Woody Rinn 两代 PC-98 图像格式；核心压缩 = 有序抖动像素规律 + flag 帧标记 + 行间 XOR 去重。</li>
+      <li>MAKI（MAKI01A/B）：MSB-first、640×400、4bpp；Phase 1 建 mask buffer、Phase 2 光栅填充、Phase 3 行间 XOR。</li>
+      <li>MAG（MAKI02）：LSB-first、变长头（签名/型号/用户名 + 固定 32 字节 + 调色板）、4/8bpp；主循环每 2 字节处理，相对回拷表 15 位置。</li>
+      <li>调色板按型号代码复原（MSX 3 位、X68K 5 位、Mac 8 位等），MSX 需 YJK→RGB 转换。</li>
+    </ul>
+    <div class="landing"><b>最终落点：</b>成为 mag.c 解码器与 png2mag/img2mag 编码器的实现依据。</div>
+    <div class="rel"><b>现状关联：</b>MAG 现为引擎主图像格式（IMAGE.DAT、mag.c、docs/B11）。</div>
+  </div>
+
+  <div class="doc" id="doc-02">
+    <div class="doc-head"><span class="doc-num">02</span><span class="doc-title">场景字节码格式规范</span><span class="doc-status">规范</span></div>
+    <h4>核心思路</h4>
+    <ul>
+      <li>SCENE.DAT 格式：头 + 每场景 LZ4 独立压缩块（解压最大 4096 字节）。</li>
+      <li>VM 状态：Z/N 标志 + VMFLAG；统一 16 位地址空间五区（临时/全局/局部变量与标志）。</li>
+      <li>执行模型：while(VMFLAG_PROCESS) 逐帧 dispatch，阻塞靠清标志，nowait(0x0F) 为异步前缀。</li>
+      <li>指令集 0x00–0x3F 共 46 opcode；Naiz 扩展重定义 0x30–0x3F 并新增 0x40。</li>
+    </ul>
+    <div class="landing"><b>最终落点：</b>成为 scene.c 场景 VM 与 scene_asm.py 汇编器依据（现 NB 解释器的前身）。</div>
+    <div class="rel"><b>现状关联：</b>现引擎已演进为 NB 剧本解释器，但标志/阻塞/nowait 核心模型思想延续。</div>
+  </div>
+
+  <div class="doc" id="doc-03">
+    <div class="doc-head"><span class="doc-num">03</span><span class="doc-title">当前进度与等待反编译期间的行动指南</span><span class="doc-status">调查记录</span></div>
+    <h4>核心思路</h4>
+    <ul>
+      <li>记录 2026-06-08 时点进度：工具链、串口、GDC 初始化、LZ4、场景 VM、文本、FONT、MAG 均已就绪或待确认。</li>
+      <li>两套引擎格式对比（MHVN98 vs love es××××）：脚本 EQA、图像 ECG、容器 LOVE.EAR、文本格式高风险冲突，硬件层一致。</li>
+      <li>划分「可安全继续」与「必须暂停等反编译」的工作清单。</li>
+    </ul>
+    <div class="landing"><b>最终落点：</b>指导等待期工作分配；最终 Naiz 选择自研 NB 剧本 + MAG/256 色路线而非移植 EQA。</div>
+    <div class="rel"><b>现状关联：</b>历史背景。</div>
+  </div>
+
+  <div class="doc" id="doc-04">
+    <div class="doc-head"><span class="doc-num">04</span><span class="doc-title">参考引擎分析与修正计划</span><span class="doc-status">已实施</span></div>
+    <h4>核心思路</h4>
+    <ul>
+      <li>定位 VRAM 平面地址错误：参考引擎用 PC-9801 VM 4 平面紧密布局 0xA8000/0xA9000/0xAA000/0xAB000，当前引擎继承分散布局，疑为黑屏根因。</li>
+      <li>已验证路径：GRCG + 绝对地址 0xA8000 是唯一有效显示路径；TMW 写 0x0000 黑屏、应写 0xFFFF。</li>
+      <li>调色板端口 RGB 分别写 0xAA/0xAC/0xAE（原全写 0xAA，已改）；GDC 模式用极简序列；VSYNC 读 0xA0 bit0。</li>
+      <li>ECG 比 MAG 简单 10 倍，建议直接实现 ECG（后未采纳）。</li>
+    </ul>
+    <div class="landing"><b>最终落点：</b>pc98.h 平面地址修正与 gdc.c 调色板三端口已落地。</div>
+    <div class="rel"><b>现状关联：</b>现引擎调色板端口与 VRAM 平面即按此修正；ECG 主张最终被否决，GRCG 被 PEGC bank 方案取代。</div>
+  </div>
+
+  <div class="doc" id="doc-05">
+    <div class="doc-head"><span class="doc-num">05</span><span class="doc-title">方案 A 实施计划（DOS 文本层显示）</span><span class="doc-status">计划</span></div>
+    <h4>核心思路</h4>
+    <ul>
+      <li>放弃 32-bit CPU VRAM 直写，统一用 printf（DOS 文本层）作为全部显示通道，短周期内让 VM/文本引擎可观测。</li>
+      <li>无需 GDC 初始化、BIOS 模式切换、VRAM 访问。</li>
+    </ul>
+    <div class="landing"><b>最终落点：</b>作为临时显示方案执行，后被 13 起 PEGC bank 切换的像素级渲染取代。</div>
+    <div class="rel"><b>现状关联：</b>「显示不可用先走 printf」的思路仍在早期调试中沿用。</div>
+  </div>
+
+  <div class="doc" id="doc-06">
+    <div class="doc-head"><span class="doc-num">06</span><span class="doc-title">GDC 端口像素写入计划</span><span class="doc-status">计划 · 未成为主线</span></div>
+    <h4>核心思路</h4>
+    <ul>
+      <li>uPD7220 可通过 WDAT 命令直接写像素绕开 CPU 内存总线；设写光标 → WDAT(0x20) → 逐字节写 0xA0。</li>
+      <li>实验分四步：基础像素 → 白方块 → 字形 → 文本框系统。</li>
+    </ul>
+    <div class="landing"><b>最终落点：</b>WDAT 在 NP2kai 中 0x20 非标准命令，被 13 的 PEGC bank 方案取代。</div>
+    <div class="rel"><b>现状关联：</b>gdc_set_palette 端口序列仍沿用，WDAT 写入函数已删除。</div>
+  </div>
+
+  <div class="doc" id="doc-07">
+    <div class="doc-head"><span class="doc-num">07</span><span class="doc-title">GRCG 重试计划</span><span class="doc-status">计划 · 未成为最终方案</span></div>
+    <h4>核心思路</h4>
+    <ul>
+      <li>用参考引擎 vram.c 精确寄存器序列重建 GRCG 驱动，此前失败疑因模式寄存器/平面地址/CG-TMW 未对齐。</li>
+      <li>按参考序列设 GDC 模式 → 调色板 → 直接 CPU 写 VRAM → 不工作再加 GRCG CG mode。</li>
+    </ul>
+    <div class="landing"><b>最终落点：</b>09/10 揭示根因在 NP2kai 渲染管线而非 GRCG 本身；GRCG/EGC 代码已被引擎彻底移除。</div>
+    <div class="rel"><b>现状关联：</b>全部软渲染，显示走 PEGC packed-pixel。</div>
+  </div>
+
+  <div class="doc" id="doc-08">
+    <div class="doc-head"><span class="doc-num">08</span><span class="doc-title">VEM486 Raw DPMI 启动迁移计划</span><span class="doc-status">计划 · 备选运行时</span></div>
+    <h4>核心思路</h4>
+    <ul>
+      <li>放弃 DOS/4GW WATCOM stub，改用参考引擎 start16.asm 原始 DPMI 启动（INT 2Fh/1687h → INT 31h → C main）。</li>
+      <li>与 DOS/4GW 路径共享全部 C 源码，仅入口不同；Makefile 双目标。</li>
+    </ul>
+    <div class="landing"><b>最终落点：</b>VEM486 原生 DPMI 为备选运行时；实际主线仍走 DOS/4GW。</div>
+    <div class="rel"><b>现状关联：</b>DPMI INT 31h 映射在 09 被证实在 NP2kai 中不达显示；int386()（15）成为 BIOS 中断正确途径。</div>
+  </div>
+
+  <div class="doc" id="doc-09">
+    <div class="doc-head"><span class="doc-num">09</span><span class="doc-title">VRAM 调查完整记录</span><span class="doc-status">调查记录 · 12 小时</span></div>
+    <h4>核心思路</h4>
+    <ul>
+      <li>CPU 直写/DPMI 映射/GRCG 触发均不达显示，唯一有效通道为 CRT BIOS；后确认 CPU 写入实际可达 GDC，只是 NP2kai 内存表 text-RAM 交错页造成条纹。</li>
+      <li>memfn0 表 32KB 粒度（34 条目），entry 20 映射 memtram 且内部静默丢弃 0xA5000–0xA7FFF。</li>
+      <li>关键事实：0x6A 端口是触发 CRTC→MEMM_VRAM 更新的关键，参考引擎写 outp(0x6A,0x00)。</li>
+      <li>四轮修复 + NAIZ_DEBUG 三层诊断框架（DRAW trace / VRAM BMP / PIXBUF raw）。</li>
+    </ul>
+    <div class="landing"><b>最终落点：</b>NAIZ_DEBUG 诊断框架与 gdc.c 修复（移除文本层 STOP + outb(0x6A,0x00)）。</div>
+    <div class="rel"><b>现状关联：</b>现引擎显示管线已走 PEGC（13–15），不再依赖这些 NP2kai 补丁。</div>
+  </div>
+</section>
+
+<!-- ============================================================ -->
+<section class="group" id="g2">
+  <div class="group-header"><h2>二、显示管线、256 色与字库</h2><span class="range">10 – 19</span></div>
+  <p class="group-desc">显示路径根因定位与修复、对白刷新、MAG 管线、16→256 色迁移、VRAM 批量写入优化、CJK 字库与多语言文本。</p>
+
+  <div class="doc" id="doc-10">
+    <div class="doc-head"><span class="doc-num">10</span><span class="doc-title">参考引擎差异分析与显示修复方案</span><span class="doc-status">已实施</span></div>
+    <h4>核心思路</h4>
+    <ul>
+      <li>wxNP21kai 二进制本身无缺陷，黑屏根因是引擎操作序列踩中 NP2kai 渲染管线「对实机正确但对该构建有 bug」的路径。</li>
+      <li>前提 A：textdisp &amp; GDCSCRN_ENABLE=1；前提 B：写 outp(0x6A,0x00) 触发 CRTC→MEMM_VRAM 更新。</li>
+      <li>三层修复：短期绕开（gdc_init 加 0x6A + 注释文本层 STOP）、对齐参考引擎 4 条 outp + 64KB 硬编码地址、NP2kai 源码修复。</li>
+    </ul>
+    <div class="landing"><b>最终落点：</b>gdc.c 层次一改动落地（提交 6336729）；问题推进到 maketextgrph 内部。</div>
+    <div class="rel"><b>现状关联：</b>NP2kai 内部路径问题在 13–15 转由 256 色 PEGC 路线整体绕开。</div>
+  </div>
+
+  <div class="doc" id="doc-11">
+    <div class="doc-head"><span class="doc-num">11</span><span class="doc-title">对白刷新与字体替换方案</span><span class="doc-status">已实施</span></div>
+    <h4>核心思路</h4>
+    <ul>
+      <li>op_text 每翻页重复绘制整个对话框（每句 ~53000 次 VRAM 写）→ 拆分：黑底+白边+提示由 scene_draw_dialog() 画一次，op_text 只清文字区。</li>
+      <li>FONT.DAT 从 MHVN98 点阵字替换为 Uni1-VGA16 PSF1（IBM VGA 经典 8×16），新增 psf2font.py 转换。</li>
+    </ul>
+    <div class="landing"><b>最终落点：</b>scene_draw_dialog()、op_text 局部清除、psf2font.py 与新版 FONT.DAT。</div>
+    <div class="rel"><b>现状关联：</b>scene_draw_dialog() 演化为核心 layer_dialog_open/restore；FONT.DAT 格式沿用至今。</div>
+  </div>
+
+  <div class="doc" id="doc-12">
+    <div class="doc-head"><span class="doc-num">12</span><span class="doc-title">MAG 图片加载管线方案</span><span class="doc-status">已实施</span></div>
+    <h4>核心思路</h4>
+    <ul>
+      <li>打通「素材→IMAGE.DAT→引擎→屏幕」完整管线：pack_images.py 归档（count + TOC + 原始数据），O(1) 索引。</li>
+      <li>ASSETS.DB（SQLite）四表：asset_map / characters / char_expressions / scene_scripts。</li>
+      <li>引擎侧 image_init/image_load；render.c 新增 vram_blit；scene.c 实现 0x30 bgload。</li>
+    </ul>
+    <div class="landing"><b>最终落点：</b>IMAGE.DAT 归档、image_init/image_load、vram_blit、bgload 全部成为现引擎实现基础。</div>
+    <div class="rel"><b>现状关联：</b>与 docs/B11 及现 IMAGE.DAT/pack_images.py 一致；「保护调色板 7/8」思想延续至今。</div>
+  </div>
+
+  <div class="doc" id="doc-13">
+    <div class="doc-head"><span class="doc-num">13</span><span class="doc-title">256 色模式迁移方案</span><span class="doc-status">已实施</span></div>
+    <h4>核心思路</h4>
+    <ul>
+      <li>从 16 色（GDC/EGC 4 平面）迁移到 256 色 PEGC packed-pixel（INT 18h AH=30h，640×400 line-double）。</li>
+      <li>调色板端口不变，每通道 4-bit 右移改为 8-bit 直写；VRAM 访问改为 bank 切换（逻辑地址 Y*640+X，bank 寄存器 0xE0004）。</li>
+      <li>engine 改动：pc98.h PEGC 宏、video.c AH=30h、gdc.c 变空 init + 8-bit 调色板、render.c 完全重写、img2mag.py --256 标志。</li>
+    </ul>
+    <div class="landing"><b>最终落点：</b>256 色 PEGC 显示管线全面落地；IMAGE.DAT 从 108KB 增至 252KB（约 2.3×）。</div>
+    <div class="rel"><b>现状关联：</b>现引擎显示管线的直接基础（docs/B02）。</div>
+  </div>
+
+  <div class="doc" id="doc-14">
+    <div class="doc-head"><span class="doc-num">14</span><span class="doc-title">256 色模式迁移：阶段总结</span><span class="doc-status">已实施 + 调查</span></div>
+    <h4>核心思路</h4>
+    <ul>
+      <li>引擎侧全部完成，但 NP2kai 显示不更新——VRAM BMP 恒为 RGB(0,0,26)。</li>
+      <li>根因：NP2kai 256 色四个互锁缺陷——① AH=30h 未启用 bank 切换 ② 渲染函数漏查 gdc.analog&4 ③ 8bpp 需 GDCANALOG_256E ④ VGAWR8 设错 GDCSCRN 标志。</li>
+      <li>选项：A 深修 NP2kai / B 回退 16 色 / C 16 色+dithering。</li>
+    </ul>
+    <div class="landing"><b>最终落点：</b>缺陷 ①② 已修（bios18.c、pccore.c），诊断工具链（naiz_vram_*.bmp 等）建立。</div>
+    <div class="rel"><b>现状关联：</b>衔接 15 第二阶段；outb 0x6A 在 15 被证实无效，改为 int386()。</div>
+  </div>
+
+  <div class="doc" id="doc-15">
+    <div class="doc-head"><span class="doc-num">15</span><span class="doc-title">256 色模式移植：第二阶段</span><span class="doc-status">调查 + 修复</span></div>
+    <h4>核心思路</h4>
+    <ul>
+      <li>关键发现：outb(0x6A,...) 在 DOS/4GW 中无效（被 VEM486 DPMI host 吞掉），必须用 int386() DPMI 调用。</li>
+      <li>阶段 1 根因修复：scrndraw.c:317 的 naiz_composite_planar() 在 256 色被错误调用，改为 (gdc.analog &amp; 3)==0 才走 composite。</li>
+      <li>阶段 2 瓶颈：pex_g 只渲染 24 像素，np2_vram 数据已到位、调色板链路正常，剩余疑点 SURFACE_WIDTH/grphvad/dirty。</li>
+    </ul>
+    <div class="landing"><b>最终落点：</b>阶段 1 修复落地；阶段 2 的 pex_g 问题留待后续，诊断与修改清单完整交接。</div>
+    <div class="rel"><b>现状关联：</b>int386() 调用方式与 engine 侧 bank-switched 渲染路径成为现引擎标准。</div>
+  </div>
+
+  <div class="doc" id="doc-16">
+    <div class="doc-head"><span class="doc-num">16</span><span class="doc-title">CJK 字库与多语言文本系统开发计划</span><span class="doc-status">已实施</span></div>
+    <h4>核心思路</h4>
+    <ul>
+      <li>GNU Unifont 源 → 16×16 单色点阵 CJK.DAT；场景字符串按语言加载；UTF-8 感知 draw_text（ASCII 8px / CJK 16px 混排）。</li>
+      <li>Phase C0–C6：gen_cjk_font.py 生成 ~1.1MB、cjk.c 二分查找、draw_text_utf8 改造、多语言打包、运行时切换、性能优化。</li>
+      <li>明确不在范围：不改 ASCII 8×16、无矢量/缩放/RTL。</li>
+    </ul>
+    <div class="landing"><b>最终落点：</b>全部阶段已实施——cjk.c、gen_cjk_font.py、draw_text_utf8、多语言体系（docs/B14）。</div>
+    <div class="rel"><b>现状关联：</b>初始化顺序 font_init → cjk_init 即按此落地（AGENTS.md 十一节）。</div>
+  </div>
+
+  <div class="doc" id="doc-17">
+    <div class="doc-head"><span class="doc-num">17</span><span class="doc-title">VRAM 批量写入优化方案</span><span class="doc-status">已实施</span></div>
+    <h4>核心思路</h4>
+    <ul>
+      <li>消除每像素一次 bank_select，改为按 bank 边界切块写入，全屏 blit 从 256,000 次降到 ≤9 次。</li>
+      <li>vram_blit/fill_rect 用 while(addr&lt;end) 切块算法；透明/不连续场景用 prev_bank 缓存去重。</li>
+      <li>明确不做 EGC 加速、解码缓存、软件帧缓冲；函数签名全不变。</li>
+    </ul>
+    <div class="landing"><b>最终落点：</b>当前 render.c 采用 win[addr &amp; (VRAM_BANK_SZ-1)] 按 bank 切块写入。</div>
+    <div class="rel"><b>现状关联：</b>显示管线的性能基础。</div>
+  </div>
+
+  <div class="doc" id="doc-18">
+    <div class="doc-head"><span class="doc-num">18</span><span class="doc-title">场景动画系统实现方案</span><span class="doc-status">计划 · 未实施</span></div>
+    <h4>核心思路</h4>
+    <ul>
+      <li>为旧 scene.c VM 新增 dialog_show/dialog_hide/wait/text_style 四 opcode；对话框淡入用 5 档 dither 模拟 alpha。</li>
+      <li>打字机模式每帧推进一个 UTF-8 字符。</li>
+    </ul>
+    <div class="landing"><b>最终落点：</b>未按此实施——随后整体被 NB 解释器（21）取代。</div>
+    <div class="rel"><b>现状关联：</b>历史背景；现引擎为 NB + layer_dialog 体系。</div>
+  </div>
+
+  <div class="doc" id="doc-18b">
+    <div class="doc-head"><span class="doc-num">18</span><span class="doc-title">黑屏诊断计划</span><span class="doc-status">调查记录</span></div>
+    <h4>核心思路</h4>
+    <ul>
+      <li>假设 A：PEGC bank MMIO 0xE0004 被 DPMI 拦截；假设 B：VRAM 窗口 0xA8000 未正确映射。</li>
+      <li>列出 NP2kai memvga.c 参考实现与 flat 窗口基址 0xF00000。</li>
+    </ul>
+    <div class="landing"><b>最终落点：</b>根因由 19 收敛——INT 18h AH=30h 未设 GDCSCRN_ENABLE，经 video.c 修正 + P1/P2/P3 补丁解决。</div>
+    <div class="rel"><b>现状关联：</b>本计划为黑屏调查过程存档。</div>
+  </div>
+
+  <div class="doc" id="doc-19">
+    <div class="doc-head"><span class="doc-num">19</span><span class="doc-title">NP2kai 平台差异与调色板自检系统</span><span class="doc-status">已实施</span></div>
+    <h4>核心思路</h4>
+    <ul>
+      <li>本机 NP2kai 为完整 PC-9821 VX 模拟（SUPPORT_PC9821/CRT31KHZ/PEGC），与其他简化版存在行为差异。</li>
+      <li>4 类问题：黑屏（AH=30h 需追加 AH=40h）、调色板残留（gdc.anareg 未初始化）、白点（预留索引 7/15）、对话框颜色异常。</li>
+      <li>补丁 P1（memvga.c 强制重绘）、P2（gdc.c 去 EGC 门控）、P3（bios18.c AH=30h 加 gdc_analogext(TRUE)）。</li>
+      <li>自检 video_check_palette()：端口回读验证索引 1=Blue、7=White。</li>
+    </ul>
+    <div class="landing"><b>最终落点：</b>video.c AH=30h→40h 顺序、image_set_palette 全量上传、pack_images 重映射预留索引。</div>
+    <div class="rel"><b>现状关联：</b>video_check_palette() 仍存在于 video.c:136，「Pal chk OK」串口自检沿用至今。</div>
+  </div>
+</section>
+
+<!-- ============================================================ -->
+<section class="group" id="g3">
+  <div class="group-header"><h2>三、剧本系统、输入与菜单</h2><span class="range">20 – 35</span></div>
+  <p class="group-desc">NB 剧本解释器架构、调色板/菜单渲染修复、多语言翻译、键盘空格键修复、对话框惰性截图、圆角按钮菜单、鼠标输入与输入系统防御式重构。</p>
+
+  <div class="doc" id="doc-20">
+    <div class="doc-head"><span class="doc-num">20</span><span class="doc-title">剧本系统基础架构</span><span class="doc-status">占位</span></div>
+    <h4>核心思路</h4>
+    <ul>
+      <li>定义角色模型（system/story 两类）、脚本命名规则（nopbook.nb + nbook001-020.nb）、ASSETS.DB schema。</li>
+      <li>.sca 与 .nb 可共存互跳；本阶段不修改任何引擎代码。</li>
+    </ul>
+    <div class="landing"><b>最终落点：</b>作为 21 号 NB 解释器方案的设计占位基础。</div>
+    <div class="rel"><b>现状关联：</b>characters 表 type 列与 scene_scripts 映射在 export_asset_table.py 管线中沿用。</div>
+  </div>
+
+  <div class="doc" id="doc-21">
+    <div class="doc-head"><span class="doc-num">21</span><span class="doc-title">NB 剧本解释器实现方案</span><span class="doc-status">已实施</span></div>
+    <h4>核心思路</h4>
+    <ul>
+      <li>用 C 实现 NB 纯文本解释器替换 .sca→scene.c 字节码 VM；main.c 仅替换 init/process 调用。</li>
+      <li>命令分发表 cmd_table：加新命令只需一行；资源查找层集中（resolve_asset/char/expression/display_name）。</li>
+      <li>nb_asset_table.h 由 export_asset_table.py 从 ASSETS.DB 自动生成，nb.c 无硬编码表。</li>
+      <li>dialog_show 分页复用 draw_text 分页机制；settings.txt（dlgstyle/lang）先于解释器生效。</li>
+      <li>NB_DEBUG 宏逐行追踪；VMFLAG_SCENE_CHANGED/ERROR/FINALEND 新标志；menu_show + cmd_question。</li>
+    </ul>
+    <div class="landing"><b>最终落点：</b>nb.c/nb.h 建立，main.c 切换 nb_init/nb_process；后续拆分为 nb_menu/nb_dialog/nb_question/nb_scene 等。</div>
+    <div class="rel"><b>现状关联：</b>现引擎即 NB 解释器架构，scene.c VM 已删除；docs/B92 为命令参考源。</div>
+  </div>
+
+  <div class="doc" id="doc-22">
+    <div class="doc-head"><span class="doc-num">22</span><span class="doc-title">调色板与颜色修正开发记录</span><span class="doc-status">已修复</span></div>
+    <h4>核心思路</h4>
+    <ul>
+      <li>记录 25 个阶段问题：白色偏黄/只剩16色/蓝屏变土黄/sprite 透明色/近白杂色/切换闪烁等。</li>
+      <li>根因：8-bit BG MAG 用 index 25 但引擎只定义 7 个 palette entry；SPR 需跳过 idx 7/15 保留引擎白；PEGC I/O 写入比 MMIO 快致闪烁。</li>
+      <li>最终：image_set_palette 按 is_sprite 区分、palette 先于 vram_blit、master_palette[15]=白、BG 只做 filter_near_white。</li>
+    </ul>
+    <div class="landing"><b>最终落点：</b>image_set_palette、cmd_bg/menu 调色板函数、layer_redraw_sprites、pack_images.py。</div>
+    <div class="rel"><b>现状关联：</b>SPR 跳过 7/15、palette 先于像素的时序约定仍是当前 image.c/layer 行为。</div>
+  </div>
+
+  <div class="doc" id="doc-23">
+    <div class="doc-head"><span class="doc-num">23</span><span class="doc-title">菜单渲染修复记录</span><span class="doc-status">已修复</span></div>
+    <h4>核心思路</h4>
+    <ul>
+      <li>菜单闪烁：三轮失败后改先 highlight 新项再 unhighlight 旧项，消除「无选中项」中间态。</li>
+      <li>BG 颜色错乱：菜单改写 palette[3]/[7] 全局生效，改用专用保留条目 250/251（打开保存、关闭恢复）。</li>
+      <li>BG 红色杂色：pack_images.py 对所有非 sprite 图片 filter_near_white 后重映射 PROTECTED_IDX。</li>
+    </ul>
+    <div class="landing"><b>最终落点：</b>菜单用 MENU_PAL_WHITE(250)/YELLOW(251)；pack_images 对 BG 图片保护 PROTECTED_IDX。</div>
+    <div class="rel"><b>现状关联：</b>保留条目 248–255 约定与构建时保护延续；AGENTS.md §14 菜单两阶段绘制规则吸收其结论。</div>
+  </div>
+
+  <div class="doc" id="doc-24">
+    <div class="doc-head"><span class="doc-num">24</span><span class="doc-title">多语言翻译系统实现方案</span><span class="doc-status">已实施</span></div>
+    <h4>核心思路</h4>
+    <ul>
+      <li>键值翻译表（原文=译文）运行时切换，三文件分离 system/role/game，key 唯一共享空间。</li>
+      <li>i18n_gen.py 模板生成 + 增量合并：已有翻译保留、新文本追加、被删文本标 # ORPHANED:。</li>
+      <li>引擎侧 tr.c/tr.h：tr_init(lang) 读三文件入定长数组，tr(text) exact match 回退原文。</li>
+    </ul>
+    <div class="landing"><b>最终落点：</b>core/lib/tr.c/tr.h、tools/naiz_conv/i18n_gen.py、makegame.sh i18n-gen + i18n/ 部署。</div>
+    <div class="rel"><b>现状关联：</b>翻译系统为现引擎运行时可选项。</div>
+  </div>
+
+  <div class="doc" id="doc-28">
+    <div class="doc-head"><span class="doc-num">28</span><span class="doc-title">键盘空格键修复记录</span><span class="doc-status">已修复</span></div>
+    <h4>核心思路</h4>
+    <ul>
+      <li>主菜单空格可选中但长按卡死、对话空格无反应；5 次引擎侧尝试均失败。</li>
+      <li>真正根因（2026-06-21）：NP2kai wx 前端 kbtrans.cpp WXK_SPACE→0x35 映射错误（应为 0x34）。</li>
+      <li>三个推测（tight loop 饿死/空格无连发/flush 副作用）经反证均为红鲱鱼。</li>
+    </ul>
+    <div class="landing"><b>最终落点：</b>引擎保留 Enter 逃脱 + inb(0x00) 同步；根因修复走 29 号双修方案。</div>
+    <div class="rel"><b>现状关联：</b>根因定位为模拟器扫描码错位而非引擎缺陷。</div>
+  </div>
+
+  <div class="doc" id="doc-29">
+    <div class="doc-head"><span class="doc-num">29</span><span class="doc-title">键盘空格键推进修复方案</span><span class="doc-status">已实施</span></div>
+    <h4>核心思路</h4>
+    <ul>
+      <li>确认根因链：wxkey_to_pc98 查 wxkcnv[]（错：WXK_SPACE→0x35）→ keystat_keydown(0x35) → kbd_is_down(KC_SPACE=0x34) 永远 false。</li>
+      <li>方案 C 双修：引擎侧让 KC_XFER(0x35) 也作推进/确认键（6 处）；模拟器侧 P4 补丁两处映射 0x35→0x34。</li>
+      <li>外科手术边界：不触动 wait_release/flush 内部、SDL 前端、numpad 错映射。</li>
+    </ul>
+    <div class="landing"><b>最终落点：</b>tools/np2kaipatch/04-wx-kbtrans-space.patch + engine 确认键加 KC_XFER。</div>
+    <div class="rel"><b>现状关联：</b>P4 补丁机制延续（另有 05-wx-mouse-abspos）；XFER 写入 docs/B10 键盘表。</div>
+  </div>
+
+  <div class="doc" id="doc-30">
+    <div class="doc-head"><span class="doc-num">30</span><span class="doc-title">对话框伪透明回归修复方案</span><span class="doc-status">计划 · 被 32 替代</span></div>
+    <h4>核心思路</h4>
+    <ul>
+      <li>回归 commit 85f9951：新台词分支用 fill_rect(248) 实心清除致第二句起对话框变实心。</li>
+      <li>纠正 B16 错误前提：layer_dialog_refresh 从未包含 vram_read，B16 修了一个不存在的问题。</li>
+      <li>原方案 layer_dialog_rebuild()（bg_restore + 重绘精灵 + refresh）。</li>
+    </ul>
+    <div class="landing"><b>最终落点：</b>被 32 号替代——layer_dialog_rebuild() 未落地，改为 dialog_dirty 惰性截图。</div>
+    <div class="rel"><b>现状关联：</b>当前 layer_dialog.c 无 rebuild，dialog_dirty 机制生效。</div>
+  </div>
+
+  <div class="doc" id="doc-32">
+    <div class="doc-head"><span class="doc-num">32</span><span class="doc-title">对话框惰性截图方案与实现</span><span class="doc-status">已实施</span></div>
+    <h4>核心思路</h4>
+    <ul>
+      <li>30 号每句三步重建冗余；改为 dialog_dirty 惰性截图——截图延迟到实际变更发生时标记。</li>
+      <li>设 dirty：layer_sprite_replace/hide（覆盖 dialog 区域）；清 dirty：layer_capture_bg；消费：dialog_show 两分支。</li>
+      <li>补充 clean reset + bg_dialog_snapshot 处理 sprite 全局过渡 + char(hideall)。</li>
+    </ul>
+    <div class="landing"><b>最终落点：</b>layer_dialog.c 的 dialog_dirty + layer_dialog_snap 惰性截图即此实现。</div>
+    <div class="rel"><b>现状关联：</b>当前行为与本文档一致。</div>
+  </div>
+
+  <div class="doc" id="doc-33">
+    <div class="doc-head"><span class="doc-num">33</span><span class="doc-title">圆角按钮菜单系统设计与实现</span><span class="doc-status">已实施</span></div>
+    <h4>核心思路</h4>
+    <ul>
+      <li>主菜单改圆角按钮，由 render.c 实时绘制（非预制素材）；5 种 btnstyle 配色，palette 249 填充 + 边框恒白 + 选中文字黄。</li>
+      <li>圆角算法：硬编码 90° 弧度偏移表 ARC_R4/ARC_R3，两层 border_w 循环，4 角镜像复用。</li>
+      <li>新增 text_width() 与 draw_rounded_rect()；menu_* 函数签名改版。</li>
+    </ul>
+    <div class="landing"><b>最终落点：</b>render.c 新增 draw_rounded_rect/text_width；settings.txt 增 btnstyle=0–4。</div>
+    <div class="rel"><b>现状关联：</b>ui.c 的 draw_rounded_emboss 为后续演化；nb_menu/nb_saveload 均用其绘制按钮。</div>
+  </div>
+
+  <div class="doc" id="doc-34">
+    <div class="doc-head"><span class="doc-num">34</span><span class="doc-title">鼠标输入支持方案</span><span class="doc-status">已实施</span></div>
+    <h4>核心思路</h4>
+    <ul>
+      <li>PC-98 标准鼠标接口是 Microsoft Mouse Driver INT 33h（QMOUSE.COM TSR）；int386(0x33) 经 DPMI 转发。</li>
+      <li>三阶段：点击推进对话（已实现）、菜单点击选择、软件光标。</li>
+      <li>mouse.h API：init/update/get_x/get_y/is_down/was_clicked/flush/is_available；16 项环形 FIFO。</li>
+    </ul>
+    <div class="landing"><b>最终落点：</b>core/plat/mouse.c/mouse.h 实现（161 行）；main.c 主循环接入。</div>
+    <div class="rel"><b>现状关联：</b>软件光标 mouse_draw_cursor 路径存活（AGENTS.md §14 仍用）；35 号硬件光标未落地。</div>
+  </div>
+
+  <div class="doc" id="doc-35">
+    <div class="doc-head"><span class="doc-num">35</span><span class="doc-title">输入系统防御式重构方案</span><span class="doc-status">已实施</span></div>
+    <h4>核心思路</h4>
+    <ul>
+      <li>冻结 bug 双层根因：kbd_flush 后 auto-repeat 连发 + kbd_wait_release 无超时；加 50 次迭代超时。</li>
+      <li>Phase 1 物理状态机 kbd_held[256]（MAKE 置位/BREAK 清除），kbd_is_pressed 区分按住与残留。</li>
+      <li>Phase 2 kbd_drain_advance() 统一「等安静」入口；Phase 4 nb_load 末尾 flush→drain。</li>
+      <li>Phase 5 AGENTS.md 输入循环编码规则四条 + kbd_ignore_frames 弃帧防御。</li>
+    </ul>
+    <div class="landing"><b>最终落点：</b>keyboard.c 全量改造（kbd_held/drain_advance/wait_confirm/ignore_frames）；nb.c 三处输入点。</div>
+    <div class="rel"><b>现状关联：</b>AGENTS.md §14 输入循环规则即 Phase 5 产物。</div>
+  </div>
+
+  <div class="doc" id="doc-35b">
+    <div class="doc-head"><span class="doc-num">35</span><span class="doc-title">鼠标硬件光标方案</span><span class="doc-status">计划 · 未实施</span></div>
+    <h4>核心思路</h4>
+    <ul>
+      <li>软件光标四类问题（残影/场景切换消失/对话后消失/每帧 bank 切换），改用 INT 33h 硬件光标（AX=0001h/0002h/0009h）。</li>
+      <li>选纯 XOR 模式任意背景可见无残影；删除软件光标代码约 96 行。</li>
+      <li>DPMI 实模式内存问题（ES:DX &lt;1MB）——推荐先不设自定义形状用默认光标。</li>
+    </ul>
+    <div class="landing"><b>最终落点：</b>未实施——mouse.c 仍保留软件光标路径。</div>
+    <div class="rel"><b>现状关联：</b>后续 NP2kai 补丁 P5 解决绝对坐标，但光标仍走软件路径（见 43–58）。</div>
+  </div>
+</section>
+
+<!-- ============================================================ -->
+<section class="group" id="g4">
+  <div class="group-header"><h2>四、封装重构、存档与文档</h2><span class="range">36 – 48</span></div>
+  <p class="group-desc">系统性风险补修、管线质量提升、大规模封装重构、存档读档系统、文档结构重组、音频命令、鼠标直连。</p>
+
+  <div class="doc" id="doc-36">
+    <div class="doc-head"><span class="doc-num">36</span><span class="doc-title">引擎系统性风险模式分析与补修</span><span class="doc-status">调查 + 补修</span></div>
+    <h4>核心思路</h4>
+    <ul>
+      <li>归纳五种风险模式：A 状态无契约检查 / B 缓冲区边界靠约定 / C 数据管线静默通过 / D 无全局逃生门 / E 构建-部署反馈延迟。</li>
+      <li>8 项高性价比防御：noop 死循环防护、image_load NULL 日志、atoi 校验、缓冲截断日志、sprite 边界检查、delay_frames 上限、ESC 逃生门、args 边界。</li>
+    </ul>
+    <div class="landing"><b>最终落点：</b>8 项补修被 37 号列为「已落地措施」，大部分已实施。</div>
+    <div class="rel"><b>现状关联：</b>ESC 逃生门当前仍存在于 main.c 输入等待段。</div>
+  </div>
+
+  <div class="doc" id="doc-37">
+    <div class="doc-head"><span class="doc-num">37</span><span class="doc-title">管线质量提升计划</span><span class="doc-status">已实施（Phase 1–3）</span></div>
+    <h4>核心思路</h4>
+    <ul>
+      <li>对全管线静默失败点普查，列 39 项（A1/B1/C1–C39/D3/E1）按 P0–P3 分级。</li>
+      <li>四阶段：Phase 1 C 引擎防御 16 项 / Phase 2 Python 告警 14 项 / Phase 3 管线 hardening 10 项 / Phase 4 自动化测试。</li>
+      <li>每项三层验证（编译/自动运行/故障注入）。</li>
+    </ul>
+    <div class="landing"><b>最终落点：</b>Phase 1–3 全部完成（NAIZ_ERROR 宏、tr 语言 fallback、spr_asset_map 等）；Phase 4 未实施。</div>
+    <div class="rel"><b>现状关联：</b>AGENTS.md C1–C18/P1–P11/S1–S7 防复发清单与本文档 C 系列同源。</div>
+  </div>
+
+  <div class="doc" id="doc-38">
+    <div class="doc-head"><span class="doc-num">38</span><span class="doc-title">封装重构计划</span><span class="doc-status">部分已落地</span></div>
+    <h4>核心思路</h4>
+    <ul>
+      <li>全量封装审查发现 120+ 项机会，组织为 14 个独立可测阶段。</li>
+      <li>阶段 0 安全重构：魔法数→常量、static 修复、删死代码、修 Python bug。</li>
+      <li>阶段 1 循环依赖修复：LAYER_SCREEN_W/H 移 render.h、BTN_* 移出 vm.h。</li>
+      <li>阶段 2–4 C 去重：draw_glyph 四合一、vram_blit 包装器、nb.c 拆 nb_menu/nb_dialog。</li>
+      <li>阶段 5–6 Python/构建：PROJECT_ROOT 集中、FAT 去重、Makefile wildcard 自动 OBJS。</li>
+      <li>阶段 7–8 core/lib 与 image.c：text.h 访问器、file_read_all 共享、mag_decode 拆辅助。</li>
+      <li>阶段 11–14：跨语言常量集中、过期 docs 清理、Git 清理生成文件。</li>
+    </ul>
+    <div class="landing"><b>最终落点：</b>部分落地——core/lib（endian.h/mag_format.h/naiz_file.c）、core/plat（gdc.h/serial.h）、engine（nb_* 拆分）、tr_init 返回 int。</div>
+    <div class="rel"><b>现状关联：</b>66/67 号文档继续此路线；HAL 边界（§五）吸收其 pc98.h 清理结论。</div>
+  </div>
+
+  <div class="doc" id="doc-39">
+    <div class="doc-head"><span class="doc-num">39</span><span class="doc-title">存档读档系统设计方案</span><span class="doc-status">已实施</span></div>
+    <h4>核心思路</h4>
+    <ul>
+      <li>F5/F6 全局热键 + 主菜单 Load 进独立 NB 场景；退出时完整恢复进入前状态；10 Slot×3 页。</li>
+      <li>save_game_temp() 写 SAVETMP.SAV（~371KB 全量状态，原始写入不压缩）→ 菜单循环 → load_game_temp() 无缝恢复。</li>
+      <li>SaveData 结构体：magic/version/checksum + 变量 + NB 运行时 + 设置 + sprites + 3 VRAM 快照 + user_data。</li>
+      <li>slot_info() 只读头部 ~48B 元数据；SLOT SELECT→CONFIRM→EXECUTE 状态机；跨版本兼容。</li>
+    </ul>
+    <div class="landing"><b>最终落点：</b>save.c/save.h/save_io.c/save_sys.c 与 nb_saveload.c/nb_save_dialog.c；45–48 记录界面修复。</div>
+    <div class="rel"><b>现状关联：</b>Slot 菜单与 F5/F6 热键沿用。</div>
+  </div>
+
+  <div class="doc" id="doc-40">
+    <div class="doc-head"><span class="doc-num">40</span><span class="doc-title">文档更新计划</span><span class="doc-status">已实施</span></div>
+    <h4>核心思路</h4>
+    <ul>
+      <li>38 后 docs/ 约 16 个 .md 陈旧需修正；Phase 1 修正 A/B 系列，Phase 2 重组 C 系列。</li>
+      <li>技术内容归 B 系列，用户部分改为手写 HTML（naiz-guildbook/），删除 docs/C*.md（5 个）。</li>
+      <li>简化 build_docs.py 并更新 guildbook 约定。</li>
+    </ul>
+    <div class="landing"><b>最终落点：</b>docs/ 无 C*.md，naiz-guildbook/ 手写 HTML 替代。</div>
+    <div class="rel"><b>现状关联：</b>guildbook 更新约定为「手写 HTML」。</div>
+  </div>
+
+  <div class="doc" id="doc-41">
+    <div class="doc-head"><span class="doc-num">41</span><span class="doc-title">Audio 命令语法与 char_map 清理</span><span class="doc-status">已实施</span></div>
+    <h4>核心思路</h4>
+    <ul>
+      <li>删除 characters.yaml 的 scene(7)/menu(8) 死条目，char_map 只留 fei/ira/neon。</li>
+      <li>定义 bgm(key)/bgm(stop)/sound(key)/voice(key) 命令语法；hal.h 加 4 个 HAL 声明 + hal_pc98.c stub。</li>
+    </ul>
+    <div class="landing"><b>最终落点：</b>hal_bgm_play/stop、hal_sound_play、hal_voice_play 在 hal.h/hal_pc98.c 存在，nb_commands.c 注册命令。</div>
+    <div class="rel"><b>现状关联：</b>layer.c:156 也调用 hal_bgm_stop。</div>
+  </div>
+
+  <div class="doc" id="doc-42">
+    <div class="doc-head"><span class="doc-num">42</span><span class="doc-title">角色与表情数据 YAML→JSON 拆分</span><span class="doc-status">已实施</span></div>
+    <h4>核心思路</h4>
+    <ul>
+      <li>characters.yaml 拆成 characters.json + expressions.json，删除 type 字段，减少 pyyaml 依赖。</li>
+      <li>更新 4 个工具：export_asset_table / nb_validator / build_game / i18n_gen。</li>
+    </ul>
+    <div class="landing"><b>最终落点：</b>characters.json + expressions.json 落地，yaml 删除。</div>
+    <div class="rel"><b>现状关联：</b>projects/demo-a2/ 只存在 json 两件套。</div>
+  </div>
+
+  <div class="doc" id="doc-43">
+    <div class="doc-head"><span class="doc-num">43</span><span class="doc-title">鼠标调试记录</span><span class="doc-status">调查 · 已废弃路径</span></div>
+    <h4>核心思路</h4>
+    <ul>
+      <li>INT 33h + QMOUSE 调试：检测条件误修正致不可见；坐标不随鼠标移动（AX=07h/08h 范围疑不兼容）。</li>
+      <li>尝试 6 步修复后遗留待定。</li>
+    </ul>
+    <div class="landing"><b>最终落点：</b>INT 33h + int386() 路线因坐标不更新被放弃，44 转 8255 端口直连。</div>
+    <div class="rel"><b>现状关联：</b>当前 mouse.c 无 INT 33h 代码（54/57 又验证 DPMI 反射下不可用）。</div>
+  </div>
+
+  <div class="doc" id="doc-44">
+    <div class="doc-head"><span class="doc-num">44</span><span class="doc-title">鼠标硬件直连方案</span><span class="doc-status">已实施</span></div>
+    <h4>核心思路</h4>
+    <ul>
+      <li>判定 43 根因为 DPMI 实模式中断透传与 QMOUSE 不兼容，改为直接 I/O 轮询 PC-98 8255 PPI（0x7FD9/0x7FDD/0x7FDF）。</li>
+      <li>HC↑ 锁存后按序读 X/Y 高低 4 半字节合成有符号 8-bit 位移；按钮 active low。</li>
+      <li>从注入脚本删除 QMOUSE.COM 与 AUTOEXEC 加载行。</li>
+    </ul>
+    <div class="landing"><b>最终落点：</b>mouse.c 重写为 8255 端口 I/O（~344 行），QMOUSE 不再注入。</div>
+    <div class="rel"><b>现状关联：</b>8255 直读至今仍在（58 三路架构的优先级 3 回退路径）。</div>
+  </div>
+
+  <div class="doc" id="doc-45">
+    <div class="doc-head"><span class="doc-num">45</span><span class="doc-title">存档/读档界面修复 v1</span><span class="doc-status">已修复 · 被 v2 取代</span></div>
+    <h4>核心思路</h4>
+    <ul>
+      <li>修四个问题：Back 无鼠标命中、光标被每帧重绘覆盖、选中记录全黑（pal 251 未初始化）、槽位背景不一致。</li>
+    </ul>
+    <div class="landing"><b>最终落点：</b>v1 落地但引入新问题（弧槽方形区、闪烁、ghost），由 46 接管。</div>
+    <div class="rel"><b>现状关联：</b>修复方向经 46/47 演化成当前 nb_saveload.c。</div>
+  </div>
+
+  <div class="doc" id="doc-46">
+    <div class="doc-head"><span class="doc-num">46</span><span class="doc-title">存档/读档界面修复 v2</span><span class="doc-status">已修复 · 被 v3 取代</span></div>
+    <h4>核心思路</h4>
+    <ul>
+      <li>定位 v1 六个问题：draw_rounded_emboss 底弧弧心错误、键盘 fill_rect 清屏闪烁、invalidate 阻断 restore 致 ghost。</li>
+      <li>render.c 三个 loop 各拆顶弧+底弧；新增 mouse_restore_bg/mouse_draw_cursor_force 配对；focus_on_back 状态。</li>
+    </ul>
+    <div class="landing"><b>最终落点：</b>v2 落地但 ghost/闪烁仍残留，47 提 ez 方案继续。</div>
+    <div class="rel"><b>现状关联：</b>mouse_restore_bg/mouse_draw_cursor_force 设计沿用至今。</div>
+  </div>
+
+  <div class="doc" id="doc-47">
+    <div class="doc-head"><span class="doc-num">47</span><span class="doc-title">保存/读取菜单修复记录 v3</span><span class="doc-status">已修复 · ez 方案后否决</span></div>
+    <h4>核心思路</h4>
+    <ul>
+      <li>提出 mouse_draw_cursor_ez()（无 save/restore，帧末直接擦旧+画新）解决 ghost 与闪烁。</li>
+      <li>给出完整菜单循环结构；遗留闪烁疑 draw_rounded_emboss 单帧 &gt;16ms。</li>
+    </ul>
+    <div class="landing"><b>最终落点：</b>v3 落地后 48 转向两阶段绘制彻底解决；ez 函数被证明有擦痕问题。</div>
+    <div class="rel"><b>现状关联：</b>现代码无 ez，AGENTS.md §14 明确禁止。</div>
+  </div>
+
+  <div class="doc" id="doc-48">
+    <div class="doc-head"><span class="doc-num">48</span><span class="doc-title">保存/读取菜单重构计划</span><span class="doc-status">已实施</span></div>
+    <h4>核心思路</h4>
+    <ul>
+      <li>根因：每帧全量重绘单帧 &gt;16ms 致闪烁；Step 1 拆 save_load_draw(full=1/0) 两层绘制，仅增量改文字颜色。</li>
+      <li>光标回归 save/restore（restore_bg + draw_cursor_force）；Step 2 加 vblank_wait 防撕裂。</li>
+    </ul>
+    <div class="landing"><b>最终落点：</b>save_load_draw() 两阶段结构沿用至今；vblank_wait 进入 full 重绘入口。</div>
+    <div class="rel"><b>现状关联：</b>当前 nb_saveload.c 的 save_load_draw(is_load,...,full) 与 plan 一致。</div>
+  </div>
+</section>
+
+<!-- ============================================================ -->
+<section class="group" id="g5">
+  <div class="group-header"><h2>五、鼠标漂移系列</h2><span class="range">49 – 59</span></div>
+  <p class="group-desc">鼠标漂移问题从幅度域滤波 → 方向域滤波 → 数据源切换（INT33/8255/NP2kai 系统端口）→ 三路最终架构的完整演进，以及远程调试规程。</p>
+
+  <div class="doc" id="doc-49">
+    <div class="doc-head"><span class="doc-num">49</span><span class="doc-title">鼠标漂移调试记录（第一期）</span><span class="doc-status">调查 · 漂移系列起点</span></div>
+    <h4>核心思路</h4>
+    <ul>
+      <li>现象：菜单光标自动漂到边沿；8255 PPI 直连（无 QMOUSE），每帧累加相对位移。</li>
+      <li>根因：nb_process 的 HDI I/O 期间 deltas 泄漏到下一帧 + 宿主传感器抖动。</li>
+      <li>第 4 轮：mouse_drain() 帧尾清 I/O deltas + 启动 recenter。</li>
+    </ul>
+    <div class="landing"><b>最终落点：</b>帧尾 drain + set_pos/ignore_next_delta/recenter 机制成型。</div>
+    <div class="rel"><b>现状关联：</b>50→51→52→56→57→58→59 的起点。</div>
+  </div>
+
+  <div class="doc" id="doc-50">
+    <div class="doc-head"><span class="doc-num">50</span><span class="doc-title">鼠标漂移调试记录（第二期）</span><span class="doc-status">调查</span></div>
+    <h4>核心思路</h4>
+    <ul>
+      <li>7 轮快速迭代（Back 缩小/recenter 重写/死区/菜单 drain/中心阻尼/死区±8/dx/=2）均失败。</li>
+      <li>确认 NP2kai 紧循环期间不推进 pccore_exec，帧 drain 在菜单循环失效。</li>
+      <li>提出三种噪声模型（小 ±1–3 / 中 ±4–10 / 大 ≥±18），判断用户机属第三类。</li>
+    </ul>
+    <div class="landing"><b>最终落点：</b>滤波尝试未通过，输出噪声模型与未尝试方案表。</div>
+    <div class="rel"><b>现状关联：</b>噪声模型被 51 修订为积累放大模型。</div>
+  </div>
+
+  <div class="doc" id="doc-51">
+    <div class="doc-head"><span class="doc-num">51</span><span class="doc-title">鼠标漂移问题全记录与交接方案</span><span class="doc-status">调查 + 转折点</span></div>
+    <h4>核心思路</h4>
+    <ul>
+      <li>串口诊断：主循环静止 dx_raw=0，菜单循环 60fps 出现 2–3 帧爆发、值域 -128~127。</li>
+      <li>关键根因假设：vblank_wait 的 16ms 窗口是唯一「放大器」，把可过滤噪声放大到满 8-bit。</li>
+      <li>实测验证：移除菜单循环 vblank_wait 后 dx_raw 持续为 0、光标稳定。</li>
+      <li>推荐优先级 D（删 3 处 vblank_wait）→ F（双缓冲读）→ C（低阈值 recenter）。</li>
+    </ul>
+    <div class="landing"><b>最终落点：</b>方案 D 采纳并验证本机；但 52 显示用户机仍漂移。</div>
+    <div class="rel"><b>现状关联：</b>现代码 vblank_wait 只在保存菜单 full 重绘入口保留。</div>
+  </div>
+
+  <div class="doc" id="doc-52">
+    <div class="doc-head"><span class="doc-num">52</span><span class="doc-title">鼠标漂移问题第三期总结</span><span class="doc-status">调查</span></div>
+    <h4>核心思路</h4>
+    <ul>
+      <li>移除 vblank_wait 后本机 dx_raw=0，但用户机仍漂，证明 vblank_wait 非唯一放大器。</li>
+      <li>防弹跳 idle 衰减/无衰减两版均失败；排除根因表（vblank_wait/衰减/死区/敏感度）。</li>
+      <li>方向转为「换数据源」，53/54 分析 EQAP32 与 INT 33h 绝对坐标。</li>
+    </ul>
+    <div class="landing"><b>最终落点：</b>幅度域滤波路线穷尽，55 改方向域滤波。</div>
+    <div class="rel"><b>现状关联：</b>附带修复 install_env.py 串口 UTF-8 解码。</div>
+  </div>
+
+  <div class="doc" id="doc-53">
+    <div class="doc-head"><span class="doc-num">53</span><span class="doc-title">参考游戏 EQAP32 鼠标调用分析</span><span class="doc-status">调查 · 关键线索</span></div>
+    <h4>核心思路</h4>
+    <ul>
+      <li>参考游戏在相同环境鼠标正常，证明问题在我们的 INT 33h 调用方式而非 QMOUSE/NP2kai。</li>
+      <li>反汇编发现 8 处直接 INT 33h 指令；坐标范围用 0-631/0-384（比 640×400 小 9/16）。</li>
+      <li>假设：int386 返回值被库截断（最可能）/坐标范围边界/DOS16M 配置差异。</li>
+    </ul>
+    <div class="landing"><b>最终落点：</b>结论被 54 吸收——改用内联 _asm{int 33h} 并试 631/384 范围。</div>
+    <div class="rel"><b>现状关联：</b>58 三路架构与 53 直接相关。</div>
+  </div>
+
+  <div class="doc" id="doc-54">
+    <div class="doc-head"><span class="doc-num">54</span><span class="doc-title">鼠标 INT33 绝对坐标方案</span><span class="doc-status">已否决 · 回退 8255</span></div>
+    <h4>核心思路</h4>
+    <ul>
+      <li>判定漂移根因是增量累加架构本身；绝对坐标天然无漂移，设计 int33() 内联汇编包装。</li>
+      <li>§八 裁决（2026-06-30）：INT 33h 否决——AX=0Bh 始终返回 0，QMOUSE handler 经 DPMI 反射后无法读 8255 端口。</li>
+      <li>回到 8255 PPI 最简方案：4 步握手 + 死区±2/限幅±50/空闲计数。</li>
+    </ul>
+    <div class="landing"><b>最终落点：</b>INT 33h 否决，回 8255（~394 行）+ 简单滤波。</div>
+    <div class="rel"><b>现状关联：</b>58 记录该否决；当前 mouse.c 无 INT33 主路径。</div>
+  </div>
+
+  <div class="doc" id="doc-55">
+    <div class="doc-head"><span class="doc-num">55</span><span class="doc-title">鼠标方向一致性滤波方案</span><span class="doc-status">已实施</span></div>
+    <h4>核心思路</h4>
+    <ul>
+      <li>洞察：噪声方向每帧随机翻转，真实移动期内保持同一符号；之前全在幅度域滤波。</li>
+      <li>算法：pending 缓冲 + dir_conf 连续同向帧计数，sign 反转即清空 pending；连续 3 帧（CONFIRM_THRESHOLD=3）同向才提交；X/Y 轴独立。</li>
+      <li>死区±2 与帧限幅±50 保留在方向滤波之前；recenter 保留作安全网。</li>
+    </ul>
+    <div class="landing"><b>最终落点：</b>方向滤波实现于 mouse.c，作用于 game 坐标 mouse_x_game。</div>
+    <div class="rel"><b>现状关联：</b>mouse.c:290-318 完整保留 DIR_CONFIRM_THRESHOLD/pending/conf 逻辑。</div>
+  </div>
+
+  <div class="doc" id="doc-56">
+    <div class="doc-head"><span class="doc-num">56</span><span class="doc-title">鼠标漂移远程调试计划</span><span class="doc-status">计划 · 数据采集规程</span></div>
+    <h4>核心思路</h4>
+    <ul>
+      <li>在另一台机器收集噪声数据的规程：5 项测试（静止噪声/burst/方向滤波穿透/小移动响应/菜单操作）。</li>
+      <li>定义增强串口字段：g/d/dr/cx/cy/ls/pd/idle/flp。</li>
+    </ul>
+    <div class="landing"><b>最终落点：</b>作为远程协作数据采集规范交付。</div>
+    <div class="rel"><b>现状关联：</b>字段体系被 57 引用，方向滤波探针已实现。</div>
+  </div>
+
+  <div class="doc" id="doc-57">
+    <div class="doc-head"><span class="doc-num">57</span><span class="doc-title">INT33h 远程调试与 QMOUSE 方案验证</span><span class="doc-status">调查 · 结论：VM 下 INT33 不可靠</span></div>
+    <h4>核心思路</h4>
+    <ul>
+      <li>判定漂移根因是 VM 下宿主绝对→8255 相对转换累积误差；INT 33h 可作独立参考源。</li>
+      <li>加入 int386(0x33, AX=03h) 探针 + 恢复 QMOUSE.COM 加载。</li>
+      <li>VM 测试结果：INT 33h 数据不可靠（垃圾坐标、异常按钮），DPMI 反射损坏寄存器。</li>
+    </ul>
+    <div class="landing"><b>最终落点：</b>确认 VM 下 INT 33h 经 DPMI 反射不可用，为 58 的 NP2 系统端口方案提供必要性。</div>
+    <div class="rel"><b>现状关联：</b>58 正式化「DPMI 中断反射断裂」结论。</div>
+  </div>
+
+  <div class="doc" id="doc-58">
+    <div class="doc-head"><span class="doc-num">58</span><span class="doc-title">鼠标三路最终架构与漂移问题总览</span><span class="doc-status">已实施 · 最终架构</span></div>
+    <h4>核心思路</h4>
+    <ul>
+      <li>为 NP2kai 定制 P5 补丁（05-wx-mouse-abspos.patch），新增端口 0x7E0–0x7E3 暴露宿主绝对坐标。</li>
+      <li>三路架构：NP2 系统端口（优先级1，无漂移无需滤波）→ INT33（优先级2，实体 PC）→ 8255（优先级3 回退，完整滤波链）。</li>
+      <li>双坐标系：仅 8255 路径区分 mouse_x_now（显示）与 mouse_x_game（游戏/方向滤波）。</li>
+      <li>参数表：死区 2、帧限幅 50、方向确认 3、recenter 300 帧、INT33 激活 3。</li>
+    </ul>
+    <div class="landing"><b>最终落点：</b>三路架构在 mouse.c 落地（619 行）；P5 补丁 + QMOUSE 注入形成完整构建链。</div>
+    <div class="rel"><b>现状关联：</b>mouse_np2kai/mouse_np2_detect()（71-74 行）与 NP2 路径优先（205 行）与文档一致。</div>
+  </div>
+
+  <div class="doc" id="doc-59">
+    <div class="doc-head"><span class="doc-num">59</span><span class="doc-title">mouse_drain 方向过滤器修复方案</span><span class="doc-status">计划 · 未实施</span></div>
+    <h4>核心思路</h4>
+    <ul>
+      <li>问题：mouse_drain() 每帧同时复位方向滤波器状态与 INT33 计数，致方向过滤器永远达不到阈值、INT33 永久禁用、漂移校准拉回中心。</li>
+      <li>根因：硬件 drain 与软件状态复位混在一个函数；方案拆 mouse_drain_hw()（仅硬件）与 mouse_reset_filters()。</li>
+    </ul>
+    <div class="landing"><b>最终落点：</b>计划未执行；当前 mouse_drain() 仍每帧复位所有状态。</div>
+    <div class="rel"><b>现状关联：</b>58 已使 NP2kai 主路径绕过此问题。</div>
+  </div>
+</section>
+
+<!-- ============================================================ -->
+<section class="group" id="g6">
+  <div class="group-header"><h2>六、近期固化与版本演进</h2><span class="range">60 – 67</span></div>
+  <p class="group-desc">HAL 边界清理、全项目 Bug 修复、NB 变量系统、图像性能优化、过渡效果、黑花体、封装拆分与访问器收口——对应 AGENTS.md R1–R6 及版本 0.1.0xx。</p>
+
+  <div class="doc" id="doc-60">
+    <div class="doc-head"><span class="doc-num">60</span><span class="doc-title">HAL 边界清理与循环依赖解除计划</span><span class="doc-status">已实施</span></div>
+    <h4>核心思路</h4>
+    <ul>
+      <li>审计：6 个 engine 文件 12 处直接 include plat/*.h 违反 HAL 边界；plat/mouse.c 反向 include render.h 形成循环。</li>
+      <li>阶段一：hal.h 声明完整 API + hal_pc98.c 转发，engine 层改 hal_*() 调用。</li>
+      <li>阶段二：24×24 光标移入新 core/engine/cursor.c 解耦。</li>
+      <li>阶段三：Makefile 分层 -I + #error 守卫（部分未落地）。</li>
+    </ul>
+    <div class="landing"><b>最终落点：</b>HAL 提取落地（hal_kbd_init 等 + cursor.c）；编译隔离未完全落地（engine 仍带 -Iplat）。</div>
+    <div class="rel"><b>现状关联：</b>docs/B03 与 AGENTS.md §5.1 为对应约束。</div>
+  </div>
+
+  <div class="doc" id="doc-61">
+    <div class="doc-head"><span class="doc-num">61</span><span class="doc-title">修复计划（B19 全项目修复）</span><span class="doc-status">已修复</span></div>
+    <h4>核心思路</h4>
+    <ul>
+      <li>按 P1 致命 / P2 逻辑 / P3 封装 / P4 质量四级分 27 项。</li>
+      <li>P1：read_settings 末行截断死循环（补 !feof）、keyboard 溢出、pack_images TypeError 等。</li>
+      <li>P2：cmd_question 超时、时间戳 &lt;、mag 溢出、parse_line NUL 终止、TOC 边界。</li>
+      <li>P3：gdc.h/serial.h/pc98.h 补 #error 守卫；P4：去重复/魔数/死代码。</li>
+    </ul>
+    <div class="landing"><b>最终落点：</b>各修复项散落落地（settings.c feof、keyboard 溢出保护、export_asset_table db 预初始化等）。</div>
+    <div class="rel"><b>现状关联：</b>与 AGENTS.md R1–R6 六轮修复对应。</div>
+  </div>
+
+  <div class="doc" id="doc-62">
+    <div class="doc-head"><span class="doc-num">62</span><span class="doc-title">NB 变量系统与条件分支实现方案</span><span class="doc-status">已实施</span></div>
+    <h4>核心思路</h4>
+    <ul>
+      <li>引入 question / var / scene 三命令；`;` 作为 question/scene 顶级段分隔符（段内仍用 `,`）。</li>
+      <li>question(text;opt,var,delta;...)：最多 10 段、UI 显示前 4 项、超时 600 帧不修改变量。</li>
+      <li>var(id,op,value)：`=` set / `+`/`-` add，未知 id/op 打日志。</li>
+      <li>scene 条件链 scene(var,op,val,target;...;default)：六种比较符 eval_cond 判定；scene_jump() 统一目标解析。</li>
+    </ul>
+    <div class="landing"><b>最终落点：</b>完整落地并有演进——cmd_var、question 独立 nb_question.c（含每选项 op 字段）、scene 独立 nb_scene.c（scene_jump/eval_cond）。</div>
+    <div class="rel"><b>现状关联：</b>demo-a2 已用；docs/B92 为命令参考源。</div>
+  </div>
+
+  <div class="doc" id="doc-63">
+    <div class="doc-head"><span class="doc-num">63</span><span class="doc-title">图像加载性能优化分析计划</span><span class="doc-status">已实施（A/B/C）</span></div>
+    <h4>核心思路</h4>
+    <ul>
+      <li>定位三处热点：mag_decode 堆分配 + 位流、fill_rect 逐像素银行检查、vram_blit_sprite 逐像素透明检查。</li>
+      <li>方案 A：image.c 4 槽 LRU 缓存（MagImage 深拷贝，命中跳过 decode）。</li>
+      <li>方案 B：fill_rect 按银行分段 + memset（实测改用内联循环）。</li>
+      <li>方案 C：vram_blit_sprite 逐行分段 + run 扫描 + memcpy 块写。</li>
+      <li>D（单块分配）/E（场景预解码）明确暂缓。</li>
+    </ul>
+    <div class="landing"><b>最终落点：</b>A 落地（IMAGE_CACHE_SLOTS 4 + mag_copy）、B 落地（银行分段内联循环）、C 落地（run 扫描）。</div>
+    <div class="rel"><b>现状关联：</b>当前 render.c 的 fill_rect/vram_blit_sprite 即本方案 B/C 产物。</div>
+  </div>
+
+  <div class="doc" id="doc-64">
+    <div class="doc-head"><span class="doc-num">64</span><span class="doc-title">过渡效果系统设计与实现</span><span class="doc-status">已实施</span></div>
+    <h4>核心思路</h4>
+    <ul>
+      <li>SOLID（场景切换转纯色）与 BLEND（立绘隐藏转背景）两模式共享 transition_run() API。</li>
+      <li>五种类型：CUT / FADE（Bayer 8×8 有序抖动 64 级）/ VBLINDS / HBLINDS / DBLINDS / RDBLINDS。</li>
+      <li>条数对齐保证整除；OOM 回退 CUT 或跳过过渡并记日志。</li>
+    </ul>
+    <div class="landing"><b>最终落点：</b>完整落地于 transition.c + transition.h，layer.c scene_end() 调用（logo/op 跳过）。</div>
+    <div class="rel"><b>现状关联：</b>设置从 settings.txt 改为 config.toml→nb_config.h，比原计划演进。</div>
+  </div>
+
+  <div class="doc" id="doc-65">
+    <div class="doc-head"><span class="doc-num">65</span><span class="doc-title">黑花体字体配置方案</span><span class="doc-status">已实施</span></div>
+    <h4>核心思路</h4>
+    <ul>
+      <li>引入可配置黑花体（UnifrakturMaguntia，OFL 1.1），仅拉丁字符，仅非 CJK 语言启用。</li>
+      <li>两路呈现：加载页标题（宿主侧渲染 PNG→MAG）与正文（TTF 生成 16×16 BLACK.DAT）。</li>
+      <li>config.json 布尔开关 blackletter.title/dialog → settings.txt blacktitle/blackdialog。</li>
+      <li>新增 ttf2font.py 与 render_title.py；资源缺失或关闭时零风险回退。</li>
+    </ul>
+    <div class="landing"><b>最终落点：</b>font_load_alt/font_get_glyph_alt、text_set_blackletter、blacktitle/blackdialog、ttf2font.py/render_title.py 全部落地。</div>
+    <div class="rel"><b>现状关联：</b>正文开关经 66 号 A1 改为 text_set_blackletter() setter 注入。</div>
+  </div>
+
+  <div class="doc" id="doc-66">
+    <div class="doc-head"><span class="doc-num">66</span><span class="doc-title">封装与拆分重构计划</span><span class="doc-status">已实施</span></div>
+    <h4>核心思路</h4>
+    <ul>
+      <li>全项目封装/拆分审查：render 依赖 NB 内部头、settings 写 6 全局、scene_layers↔sprite 6 个可变 extern、存档校验和重复等。</li>
+      <li>阶段 A：A1 render_text setter 注入解耦、A2 settings.c/h 收 6 全局、A3 scene_layers+sprite 合并 layer.c、A5 save_file_read 统一、A6 删死代码、A7 nb_load 移 nb.h。</li>
+      <li>阶段 B：B3 六处重复实现消除、B4 MAG CLI 统一委托、B5 fat.py/env_build.py 拆分。</li>
+      <li>阶段 C：删 tools/__main__.py。</li>
+    </ul>
+    <div class="landing"><b>最终落点：</b>全部落地——settings.c/h、layer.c（后又被 67 再拆）、save_file_read、fat.py 拆分、env_toolchains/env_np2kai、png2mag 委托、test_engine_constants.py。</div>
+    <div class="rel"><b>现状关联：</b>当前代码结构即本方案产物。</div>
+  </div>
+
+  <div class="doc" id="doc-67">
+    <div class="doc-head"><span class="doc-num">67</span><span class="doc-title">封装改进：访问器收口与模块边界固化</span><span class="doc-status">已实施</span></div>
+    <h4>核心思路</h4>
+    <ul>
+      <li>三处跨模块可变全局：delay_frames/vm_flags 双向全局写（vm_flags 5 文件 20+ 处）、g_dialog_style 被 nb.c 越权直读、nb.filename/lang/chapter_title 被 main.c/save.c 直接访问。</li>
+      <li>机会 1：新增 vm.c/vm.h，10 个访问器，vm_flags 与 delay_frames 定义移入 vm.c，main.c 保留递减。</li>
+      <li>机会 2：dlg_get_style() getter；不补 btn_get_style（避免 C13 死代码）。</li>
+      <li>机会 3：nb_is_menu_scene()/nb_get_state()/nb_set_lang()，main.c/save.c 改走访问器。</li>
+    </ul>
+    <div class="landing"><b>最终落点：</b>全部落地——vm.c/vm.h、dlg_get_style（layer.c:82）、nb 状态访问器（nb.c:237/248/261）、main.c/save.c/nb_commands.c 改调用。</div>
+    <div class="rel"><b>现状关联：</b>当前 vm.c、dlg_get_style、nb 状态访问器即本方案产物；B90 函数索引已同步。</div>
+  </div>
+</section>
+
+<footer>
+  Naiz 引擎 0.1 版开发文档总结 · 由 devdocs/（00–67，66 份）精炼整理生成 · 版本 0.1.069
+</footer>
+
+</div>
+</body>
+</html>

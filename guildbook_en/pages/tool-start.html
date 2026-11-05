@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="translated-from" content="202610300931">
+<!-- AI-NOTE: translated-from = the guildbook_cn doc-version this page was translated from. If the cn counterpart's doc-version is newer, re-translate this page from the Chinese source. -->
+
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>start.sh Usage Guide — Naiz Guildbook</title>
+<link rel="stylesheet" href="../style.css">
+</head>
+<body>
+<nav class="sidebar" id="sidebar-nav"></nav>
+<script src="../sidebar-tools.js"></script>
+<main class="main">
+
+<h1>start.sh Usage Guide</h1>
+<blockquote><strong>Created</strong>: 2026-08-29<br><strong>Last updated</strong>: 2026-08-29</blockquote>
+<p><code>start.sh</code> is the repository's <strong>unified entry point script</strong>: it handles the environment setup check, installing the various dependencies/emulators, and code audits. <strong>For daily use, running it directly and working through the number menu is the recommended way</strong>; command-line subcommands suit scripts or experienced users.</p>
+<hr>
+
+<h2>1. Interactive menu (primary usage)</h2>
+<p>Run it with no arguments:</p>
+<pre><code>./start.sh</code></pre>
+<p>A menu appears; <strong>type a number and press Enter</strong> to run the corresponding function:</p>
+<table>
+<tr><th>Menu number</th><th>Function</th></tr>
+<tr><td><code>1</code></td><td>Run the environment check (check)</td></tr>
+<tr><td><code>2</code></td><td>Enter the "environment setup" submenu (install dependencies, emulators, compilers, etc. item by item — see below)</td></tr>
+<tr><td><code>3</code></td><td>Run the code audit (audit)</td></tr>
+<tr><td><code>4</code></td><td>Run the full audit (fullaudit, including a build)</td></tr>
+<tr><td><code>0</code></td><td>Exit</td></tr>
+</table>
+<p>After choosing <code>2</code> to enter the install submenu, the installable items are listed; select by number again — for example the Open Watcom compiler, the NP2kai emulator, system-level tools, and so on. A failed menu action does not exit; it returns to the menu so you can retry.</p>
+<p><em>Beginner tip: when setting up the environment for the first time, run <code>1</code> first to see what is missing, then use <code>2</code> to fill the gaps item by item.</em></p>
+<div class="note-box">
+<strong>Which items are "spare" and do not have to be installed?</strong>
+<p>A few items in the install submenu are <strong>optional / spare</strong> — normal development never needs them, so you can skip installing them:</p>
+<ul>
+<li><code>djgpp</code>: another compiler toolchain, only a fallback for when Open Watcom (the main one) is unavailable — normally not needed.</li>
+<li><code>retroarch</code>: backs up emulator configuration (backup-emu); only needed if you want to switch to RetroArch or another frontend — NP2kai is the default test emulator.</li>
+<li><code>mirror</code>: Git repository source (mirror) settings; only used when downloads are slow and you need to switch mirrors.</li>
+<li><code>commercial</code>: the commercial menu; only needed when commercial distribution is involved.</li>
+</ul>
+<p>The only <strong>must-install</strong> items are: <code>pip</code> (Python dependencies), <code>deps</code> (system tools), <code>watcom</code> (the engine's compiler), and <code>np2kai</code> (the test emulator) — install the rest only as needed.</p>
+</div>
+
+<h2>2. Command-line usage (advanced / scripting)</h2>
+<p>Once familiar, or when writing automation scripts, pass a subcommand directly and skip the menu:</p>
+<pre><code>./start.sh &lt;子命令&gt; [参数]</code></pre>
+<table>
+<tr><th>Subcommand</th><th>What it does</th></tr>
+<tr><td><code>check</code></td><td>Check whether the current environment (Python venv, dependencies, toolchain) is ready</td></tr>
+<tr><td><code>pip</code></td><td>Install Python dependencies (pip-install)</td></tr>
+<tr><td><code>deps</code></td><td>Install system-level tools (system-tools)</td></tr>
+<tr><td><code>np2kai</code></td><td>Install/prepare the NP2kai emulator</td></tr>
+<tr><td><code>retroarch</code></td><td>Back up emulator configuration (backup-emu)</td></tr>
+<tr><td><code>watcom</code></td><td>Install the Open Watcom compiler (for building the engine)</td></tr>
+<tr><td><code>djgpp</code></td><td>Install the DJGPP toolchain</td></tr>
+<tr><td><code>mirror</code></td><td>Enter the Git repository source (mirror) settings</td></tr>
+<tr><td><code>commercial</code></td><td>The commercial menu (commercial_menu)</td></tr>
+<tr><td><code>audit</code></td><td>Run the code audit (symbol-audit logs go to the terminal and logs/)</td></tr>
+<tr><td><code>fullaudit [--no-make]</code></td><td>The six-step pipeline audit; <code>--no-make</code> skips the make step</td></tr>
+</table>
+
+<h2>3. Common usage examples</h2>
+<pre><code># In the interactive menu, press 1 to see what the environment is missing (recommended)
+./start.sh
+# Equivalent command-line form:
+./start.sh check
+
+# Install the Watcom compiler needed to build the engine
+./start.sh watcom
+
+# Run the full audit (including a build) before committing
+./start.sh fullaudit
+# Audit only, without rebuilding
+./start.sh fullaudit --no-make</code></pre>
+
+<h2>4. Related</h2>
+<ul>
+<li><a href="tool-makegame.html">makegame.sh</a> — game-data build and HDI injection.</li>
+<li><a href="tool-anima.html">anima.sh</a> — the animation production tool.</li>
+</ul>
+
+</main>
+</body>
+</html>

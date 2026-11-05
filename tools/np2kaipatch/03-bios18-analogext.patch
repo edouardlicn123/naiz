@@ -1,0 +1,30 @@
+diff --git a/bios/bios18.c b/bios/bios18.c
+index 61a60dc..fa3f6d5 100644
+--- a/bios/bios18.c
++++ b/bios/bios18.c
+@@ -386,10 +386,14 @@ const CRTDATA	*p;
+ //				biosioemu_enq8(0x6a, 0x20); // ����͑ʖ�
+ //			}else
+ //#endif	
+-			{
++			if (rate & 0x0c) {
++				gdc_analogext(TRUE);
++				mem[MEMB_PRXDUPD] |= 0x80;
++			}
++			if (!(rate & 0x0c)) {
+ 				gdc_analogext(FALSE);
++				mem[MEMB_PRXDUPD] &= ~0x80;
+ 			}
+-			mem[MEMB_PRXDUPD] &= ~0x80;
+ 		}
+ #if defined(BIOS_IO_EMULATION) && defined(CPUCORE_IA32)
+ 		// XXX: Windows3.1 DOS�v�����v�g�p �������
+@@ -397,7 +401,7 @@ const CRTDATA	*p;
+ 			biosioemu_enq8(0x6a, 0x68);
+ 		}else
+ #endif	
+-		{
++		if (!(rate & 0x0c)) {
+ 			gdc.analog &= ~(1 << (GDCANALOG_256E));
+ 		}
+ #endif

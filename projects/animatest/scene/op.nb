@@ -1,0 +1,4 @@
+sceneconf(){, menu}
+playanima(once){testfull}
+waitanima{}
+scene(mainmenu)

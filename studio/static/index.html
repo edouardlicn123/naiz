@@ -1,0 +1,128 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Naiz Script Studio</title>
+<link rel="stylesheet" href="/static/vendor/codemirror.min.css">
+<link rel="stylesheet" href="/static/vendor/show-hint.min.css">
+<link rel="stylesheet" href="/static/style.css">
+</head>
+<body data-lang="en">
+  <!-- 顶部工具栏 -->
+  <header id="topbar">
+    <div id="brand-block">
+      <span id="brand">Naiz</span>
+      <span id="brand-sub">NB Script Studio</span>
+    </div>
+    <select id="project-select" title="Project"></select>
+    <button id="btn-guide" class="btn" data-i18n="btn_guide" data-i18n-title="tip_guide">Guidebook</button>
+    <div class="btn-join">
+      <button id="btn-lint"  class="btn" data-i18n="btn_lint" data-i18n-title="tip_lint">Validate</button>
+      <button id="btn-save" class="btn" data-i18n="btn_save" data-i18n-title="tip_save">Save</button>
+    </div>
+    <div class="btn-join">
+      <button id="btn-build" class="btn" data-i18n="btn_build" data-i18n-title="tip_build">Compile Data</button>
+      <button id="btn-pack"  class="btn" data-i18n="btn_pack" data-i18n-title="tip_pack">Build Image</button>
+    </div>
+    <button id="btn-launch" class="btn btn-cta" data-i18n="btn_launch" data-i18n-title="tip_launch">▶ Launch Test</button>
+    <select id="lang-select" title="Language">
+      <option value="en">English</option>
+      <option value="zh">中文</option>
+      <option value="ja">日本語</option>
+      <option value="ko">한국어</option>
+    </select>
+    <div class="lamps">
+      <span class="lamp" id="lamp-stale"  data-i18n="lamp_stale" data-i18n-title="tip_pack">Image Stale</span>
+      <span class="lamp" id="lamp-noeng"  data-i18n="lamp_noeng" data-i18n-title="tip_build">Engine Missing</span>
+      <span class="lamp" id="lamp-run"    data-i18n="lamp_run">Job Running</span>
+    </div>
+  </header>
+
+  <main id="layout">
+    <!-- 左：场景与配置 -->
+    <aside id="sidebar">
+      <div class="side-title" data-target="scene-list">
+        <span data-i18n="group_scenes">Scenes scene/*.nb</span><span class="count" id="scene-count"></span>
+      </div>
+      <ul id="scene-list" class="file-list"></ul>
+      <div class="side-title" data-target="cfg-list">
+        <span data-i18n="group_cfg">Project Config</span><span class="count" id="cfg-count"></span>
+      </div>
+      <ul id="cfg-list" class="file-list"></ul>
+      <div class="side-title" data-target="img-list">
+        <span data-i18n="group_imgs">Images</span><span class="count" id="img-count"></span>
+      </div>
+      <ul id="img-list" class="file-list"></ul>
+      <div class="side-title" data-target="audio-list">
+        <span data-i18n="group_audio">Audio</span><span class="count" id="audio-count"></span>
+      </div>
+      <ul id="audio-list" class="file-list"></ul>
+      <div class="side-title" data-target="anim-list">
+        <span data-i18n="group_anims">Animations</span><span class="count" id="anim-count"></span>
+      </div>
+      <ul id="anim-list" class="file-list"></ul>
+    </aside>
+
+    <!-- 中：编辑器 -->
+    <section id="editor-pane">
+      <div id="editor-head">
+        <span id="current-file">—</span>
+        <span id="dirty-mark" class="hidden">● unsaved</span>
+      </div>
+      <textarea id="editor-fallback" class="hidden"></textarea>
+      <div id="editor-host"></div>
+    </section>
+
+    <!-- 右：输出面板 -->
+    <section id="panel">
+      <nav id="panel-tabs">
+        <button class="tab active" data-tab="lint" data-i18n="tab_lint">Lint</button>
+        <button class="tab" data-tab="jobs" data-i18n="tab_jobs">Build Output</button>
+        <button class="tab" data-tab="serial" data-i18n="tab_serial">Serial Log</button>
+        <button class="tab" data-tab="media" data-i18n="tab_media">Assets</button>
+      </nav>
+      <div class="tab-body active" id="tab-lint"><pre id="lint-out" class="log-box" data-i18n="ph_lint">(no lint run yet)</pre></div>
+      <div class="tab-body" id="tab-jobs"><pre id="job-out" class="log-box" data-i18n="ph_jobs">(no jobs)</pre></div>
+      <div class="tab-body" id="tab-serial"><pre id="serial-out" class="log-box" data-i18n="ph_serial">(no test started)</pre></div>
+      <div class="tab-body" id="tab-media">
+        <div id="media-box">
+          <div id="media-cap" data-i18n="media_none">(pick an asset on the left)</div>
+          <img id="media-img" class="hidden" alt="asset preview">
+          <div id="media-mag-wrap" class="hidden">
+            <span class="mag-label" data-i18n="mag_label">MAG converted output (as shown in the emulator)</span>
+            <img id="media-mag" alt="MAG output">
+          </div>
+          <audio id="media-audio" controls class="hidden"></audio>
+          <canvas id="media-canvas" class="hidden"></canvas>
+          <div id="anim-ctrl" class="hidden">
+            <button id="anim-play">▶</button>
+            <input id="anim-seek" type="range" min="0" max="0" value="0">
+            <span id="anim-frame"></span>
+          </div>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <!-- 底部状态栏 -->
+  <footer id="statusbar">
+    <span id="sb-job" data-i18n="sb_ready">Ready</span>
+    <span class="sb-flex"></span>
+    <span id="save-hint"></span>
+    <span id="sb-cursor">Ln 1, Col 1</span>
+    <span class="sb-kbd"><kbd>Ctrl</kbd>+<kbd>S</kbd></span>
+    <span class="sb-kbd"><kbd>Ctrl</kbd>+<kbd>Space</kbd></span>
+  </footer>
+
+  <div id="toast" class="hidden"></div>
+
+  <script src="/static/vendor/codemirror.min.js"></script>
+  <script src="/static/vendor/active-line.min.js"></script>
+  <script src="/static/vendor/matchbrackets.min.js"></script>
+  <script src="/static/vendor/show-hint.min.js"></script>
+  <script src="/static/i18n.js"></script>
+  <script src="/static/nb_mode.js"></script>
+  <script src="/static/app.js"></script>
+</body>
+</html>

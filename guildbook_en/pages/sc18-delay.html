@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="translated-from" content="202610300931">
+<!-- AI-NOTE: translated-from = the guildbook_cn doc-version this page was translated from. If the cn counterpart's doc-version is newer, re-translate this page from the Chinese source. -->
+
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>delay — Naiz Guildbook</title>
+<link rel="stylesheet" href="../style.css">
+</head>
+<body>
+<nav class="sidebar" id="sidebar-nav"></nav>
+<script src="../sidebar-scripts.js"></script>
+<main class="main">
+
+<h1>delay — Scenario Delay</h1>
+<hr>
+<blockquote><strong>Created</strong>: 2026-08-29</blockquote>
+<p><code>delay(seconds)</code> pauses scenario progression for the given number of seconds.</p>
+
+<h2>1. Syntax</h2>
+<pre><code>delay(seconds)</code></pre>
+<table>
+<tr><th>Parameter</th><th>Type</th><th>Description</th></tr>
+<tr><td><code>seconds</code></td><td>number</td><td>Seconds to pause; based on the 60Hz frame counter, 60 seconds maximum</td></tr>
+</table>
+
+<h2>2. Example</h2>
+<pre><code>delay(2)</code></pre>
+
+<div class="note-box"><p>Implemented on the 60Hz frame counter; anything above 60 seconds is treated as 60 seconds. If you need to wait for an animation instead of a fixed duration, use <code>waitanima{}</code> (see <code>sc16-waitanima.html</code>).</p></div>
+
+</main>
+</body>
+</html>

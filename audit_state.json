@@ -1,0 +1,1721 @@
+{
+  "version": 2,
+  "git_head": "2c54cf3",
+  "checked_at": "2026-11-05T18:22:12",
+  "files": {
+    "core/build.sh": {
+      "sha256": "0e6bb3f41cae8f6c5a014a49767f93990ddd3e2c461a85ec991c01b40b66b11e",
+      "violations": 0,
+      "candidates": 0,
+      "findings": []
+    },
+    "core/detect_watcom.sh": {
+      "sha256": "018dfa6097deda2beb2114edc89b578e0782fdcfd56a314b0b999ff72ad04fff",
+      "violations": 0,
+      "candidates": 1,
+      "findings": [
+        {
+          "line": 1,
+          "rule": "S8",
+          "level": "HEUR"
+        }
+      ]
+    },
+    "core/engine/audio.c": {
+      "sha256": "4a39918f06c5914edebaa0ef41ec747f1ce67c12d290bd9ebbd322a724554266",
+      "violations": 0,
+      "candidates": 2,
+      "findings": [
+        {
+          "line": 656,
+          "rule": "C1",
+          "level": "HEUR"
+        },
+        {
+          "line": 269,
+          "rule": "C9",
+          "level": "HEUR"
+        }
+      ]
+    },
+    "core/engine/audio.h": {
+      "sha256": "e4932c961b38ee214db195add1a0c48009ec8b677d2e7bebcd95f1ee0289852d",
+      "violations": 0,
+      "candidates": 0,
+      "findings": []
+    },
+    "core/engine/bootmenu.c": {
+      "sha256": "8cf65874a523f17beb8a4356a6a8b906329dd8ef2469475bd6bb1591865d43f5",
+      "violations": 0,
+      "candidates": 1,
+      "findings": [
+        {
+          "line": 116,
+          "rule": "C35",
+          "level": "HEUR"
+        }
+      ]
+    },
+    "core/engine/bootmenu.h": {
+      "sha256": "b6bd87c5b30ad8d1ac4accaafa4d842d7728ba58433b1777ea8496d6d900446f",
+      "violations": 0,
+      "candidates": 0,
+      "findings": []
+    },
+    "core/engine/cursor.c": {
+      "sha256": "1c856ed860595d21c2242d6e8e34e470f6898a241583fbb3858f207abff1009a",
+      "violations": 0,
+      "candidates": 1,
+      "findings": [
+        {
+          "line": 26,
+          "rule": "C35",
+          "level": "HEUR"
+        }
+      ]
+    },
+    "core/engine/cursor.h": {
+      "sha256": "be01f24e3d86827662366102e9266f923f2e452828dcd25d6d4e98e972a2bc3f",
+      "violations": 0,
+      "candidates": 0,
+      "findings": []
+    },
+    "core/engine/debug.h": {
+      "sha256": "b26e0369fc19be3e2f41abae1e234cdeb818c4269b97fad3804c7285455e7647",
+      "violations": 0,
+      "candidates": 0,
+      "findings": []
+    },
+    "core/engine/frame.c": {
+      "sha256": "c831f72b3b26169484e75ecbe00784cc4c8910d2018926e42378037ea6cf6479",
+      "violations": 0,
+      "candidates": 0,
+      "findings": []
+    },
+    "core/engine/frame.h": {
+      "sha256": "6112e283dea66abf7be46de6371dc850d248b8064d878e428b25d8e890d6748c",
+      "violations": 0,
+      "candidates": 0,
+      "findings": []
+    },
+    "core/engine/image.c": {
+      "sha256": "b0c6b0e1ac39fd5e7c96a114466e95a9ee404d78e7afecd39febf352d33c6ac7",
+      "violations": 0,
+      "candidates": 3,
+      "findings": [
+        {
+          "line": 121,
+          "rule": "C9",
+          "level": "HEUR"
+        },
+        {
+          "line": 122,
+          "rule": "C9",
+          "level": "HEUR"
+        },
+        {
+          "line": 123,
+          "rule": "C9",
+          "level": "HEUR"
+        }
+      ]
+    },
+    "core/engine/image.h": {
+      "sha256": "ac8b0dee463a47d8508f3f4d2f1bdcbec24a42d8f6447723b05c33a2dfb49dc9",
+      "violations": 0,
+      "candidates": 0,
+      "findings": []
+    },
+    "core/engine/image_cache.c": {
+      "sha256": "6b7167d3a96da3f99e224e34b52c305328bf02942240f7f2fdbd6834493864f7",
+      "violations": 0,
+      "candidates": 0,
+      "findings": []
+    },
+    "core/engine/image_internal.h": {
+      "sha256": "6933000efb3c079f77ef4f009c57c74fe7edb9d5413e0932736abdee69444a5d",
+      "violations": 0,
+      "candidates": 0,
+      "findings": []
+    },
+    "core/engine/input_boundary.c": {
+      "sha256": "d98b077225775eb2145eea47c46adbcced3316a259977c759f5146e5f11e0da4",
+      "violations": 0,
+      "candidates": 0,
+      "findings": []
+    },
+    "core/engine/input_boundary.h": {
+      "sha256": "0625275f39e0b38e97c91e0746991d16364a6b0c5de924a6d2bf2cee923072a7",
+      "violations": 0,
+      "candidates": 0,
+      "findings": []
+    },
+    "core/engine/layer.c": {
+      "sha256": "20a6008f6aa0af8ecff945c4c2e2989dd2c009f8e97e9ac32661a1aecaf7cee4",
+      "violations": 0,
+      "candidates": 0,
+      "findings": []
+    },
+    "core/engine/layer_bg.c": {
+      "sha256": "783dfb07ed20cf872ebef6deaec5f51b23d65284d2ca1eca827d87f3191d1686",
+      "violations": 0,
+      "candidates": 0,
+      "findings": []
+    },
+    "core/engine/layer_debug.c": {
+      "sha256": "3b1236d248c535f1ec2a278ed3482322e5ded8b0e257332c507617b8b6585156",
+      "violations": 0,
+      "candidates": 2,
+      "findings": [
+        {
+          "line": 33,
+          "rule": "C3",
+          "level": "HEUR"
+        },
+        {
+          "line": 68,
+          "rule": "C35",
+          "level": "HEUR"
+        }
+      ]
+    },
+    "core/engine/layer_debug.h": {
+      "sha256": "b011867168b4d0a3a7178242c65f02a0122d3269b423b4c303fd69939bf5af2e",
+      "violations": 0,
+      "candidates": 0,
+      "findings": []
+    },
+    "core/engine/layer_dialog.c": {
+      "sha256": "af68ed2e60dd06633a575f676130a273a7908dc3e977b0d738efc7fe2e99f2e9",
+      "violations": 0,
+      "candidates": 6,
+      "findings": [
+        {
+          "line": 219,
+          "rule": "C35",
+          "level": "HEUR"
+        },
+        {
+          "line": 219,
+          "rule": "C9",
+          "level": "HEUR"
+        },
+        {
+          "line": 230,
+          "rule": "C9",
+          "level": "HEUR"
+        },
+        {
+          "line": 236,
+          "rule": "C9",
+          "level": "HEUR"
+        },
+        {
+          "line": 266,
+          "rule": "C9",
+          "level": "HEUR"
+        },
+        {
+          "line": 306,
+          "rule": "C9",
+          "level": "HEUR"
+        }
+      ]
+    },
+    "core/engine/layer_internal.h": {
+      "sha256": "f1bb486345b6b3163499fcffbf5bbb6b22b40103f9b56d289f874fbb7ec693ea",
+      "violations": 0,
+      "candidates": 0,
+      "findings": []
+    },
+    "core/engine/layer_sprite.c": {
+      "sha256": "fae3493b6114b8750fd9b3355856d29d89d52d08113c9b705c11c12c8a834f1e",
+      "violations": 0,
+      "candidates": 1,
+      "findings": [
+        {
+          "line": 85,
+          "rule": "C35",
+          "level": "HEUR"
+        }
+      ]
+    },
+    "core/engine/main.c": {
+      "sha256": "ebe1a8585ce069da159c535820a8b406772236f62de26f3451ea03af94d76c96",
+      "violations": 0,
+      "candidates": 0,
+      "findings": []
+    },
+    "core/engine/menu_layer.c": {
+      "sha256": "442ff93d8fedc7ae9deb75170bbe77e04d40b9542bb3dcaa68de306f09eb58a9",
+      "violations": 0,
+      "candidates": 1,
+      "findings": [
+        {
+          "line": 72,
+          "rule": "C9",
+          "level": "HEUR"
+        }
+      ]
+    },
+    "core/engine/menu_layer.h": {
+      "sha256": "73267a686764f6a9d9594010743761cc3626cbdf0273aee5f68a1f087d359df9",
+      "violations": 0,
+      "candidates": 0,
+      "findings": []
+    },
+    "core/engine/nb.c": {
+      "sha256": "e875b693364a7b7119e5e2e73f23734e89c52491a922227ca89abcef8f9f3c53",
+      "violations": 0,
+      "candidates": 0,
+      "findings": []
+    },
+    "core/engine/nb.h": {
+      "sha256": "c498c47425bfe312b095b6909bb04406ac2e513a27c75b8ac0b4e32bc8543aed",
+      "violations": 0,
+      "candidates": 0,
+      "findings": []
+    },
+    "core/engine/nb_anim.c": {
+      "sha256": "9e1e3b8a6b16227a1dafd585ee3a5a1487a143ed8ecd5c08a61ef38a2cff7564",
+      "violations": 0,
+      "candidates": 1,
+      "findings": [
+        {
+          "line": 460,
+          "rule": "C1",
+          "level": "HEUR"
+        }
+      ]
+    },
+    "core/engine/nb_anim.h": {
+      "sha256": "51f3f6c7dcd7bcc635b705801b85dbba7c645e6b6ae8f818e7c9935da339eb88",
+      "violations": 0,
+      "candidates": 0,
+      "findings": []
+    },
+    "core/engine/nb_asset_table.h": {
+      "sha256": "0526bbba71cc527359f3ac951418301718cda31fea57c9ca70db779e6ecc9454",
+      "violations": 0,
+      "candidates": 0,
+      "findings": []
+    },
+    "core/engine/nb_audio.c": {
+      "sha256": "d648e4bcf163ba550c63ebc8afc92240a7fba8cd1e135814ea1a3785d8bedd1f",
+      "violations": 0,
+      "candidates": 0,
+      "findings": []
+    },
+    "core/engine/nb_cg.c": {
+      "sha256": "0d75bd129ee5997a8e883a2ab744dda315084bdb4dcf71d5ec3e54d7ea9b54c4",
+      "violations": 0,
+      "candidates": 0,
+      "findings": []
+    },
+    "core/engine/nb_cggallery.c": {
+      "sha256": "f555cb0fc2db55d0134e9376d52875d0e9bb0521e6c67c0924395db22c5434ab",
+      "violations": 0,
+      "candidates": 0,
+      "findings": []
+    },
+    "core/engine/nb_commands.c": {
+      "sha256": "38f2a41b9ab1a2872f20967b5ce89f8fc1b2706aa51c3901d61139048bb1f91b",
+      "violations": 0,
+      "candidates": 1,
+      "findings": [
+        {
+          "line": 417,
+          "rule": "C8",
+          "level": "HEUR"
+        }
+      ]
+    },
+    "core/engine/nb_commands.h": {
+      "sha256": "dd25898ef5eedbefc5843e7d195029bef3225f6902b31eaf03adb6ff8808232b",
+      "violations": 0,
+      "candidates": 0,
+      "findings": []
+    },
+    "core/engine/nb_config.h": {
+      "sha256": "292915234bb915e3a274fd96ca75e979fa81d730a0d87dc5c29a86bae0078dca",
+      "violations": 0,
+      "candidates": 0,
+      "findings": []
+    },
+    "core/engine/nb_dialog.c": {
+      "sha256": "28b0e1e815d0868846e37201526ce9b6bb1e68cc676ae3b8758f4723b17f4afd",
+      "violations": 0,
+      "candidates": 0,
+      "findings": []
+    },
+    "core/engine/nb_dialog.h": {
+      "sha256": "436ff58d27285ed3807abe0b30848011be5e7a635513298b906a00ad7322061e",
+      "violations": 0,
+      "candidates": 0,
+      "findings": []
+    },
+    "core/engine/nb_interact.c": {
+      "sha256": "127741b05c1de834e3e90f1f954351e2a8451400f9989fb1f50ab5499eda1559",
+      "violations": 0,
+      "candidates": 0,
+      "findings": []
+    },
+    "core/engine/nb_internal.h": {
+      "sha256": "a44c10ffb6de558d7ece097eac08e0bf9256c92c8037249e835a503d68d2e6d1",
+      "violations": 0,
+      "candidates": 0,
+      "findings": []
+    },
+    "core/engine/nb_mainmenu.c": {
+      "sha256": "9d400026d8a97e6613e468bd007ebfd11acad91ed0a99ace3045da08ce5a4df2",
+      "violations": 0,
+      "candidates": 0,
+      "findings": []
+    },
+    "core/engine/nb_menu.c": {
+      "sha256": "27c9af5c445a5615af63da8bd1875f31355b0aa07e737bba83187f7438a3fe08",
+      "violations": 0,
+      "candidates": 0,
+      "findings": []
+    },
+    "core/engine/nb_parser.c": {
+      "sha256": "29d33dead32f64b3d39f3ed2b0c181d055b7fb85c320cffe551d321c17b90c11",
+      "violations": 0,
+      "candidates": 0,
+      "findings": []
+    },
+    "core/engine/nb_question.c": {
+      "sha256": "b82851dfb029b62e88e955cc81ac53561da93e218ffe7f431d5e0b828bbbb2d1",
+      "violations": 0,
+      "candidates": 0,
+      "findings": []
+    },
+    "core/engine/nb_save_dialog.c": {
+      "sha256": "95c8e41dcc18d627af2354534d806682beb2b972d351fd5b4a3e2c50fa34b5f8",
+      "violations": 0,
+      "candidates": 0,
+      "findings": []
+    },
+    "core/engine/nb_saveload.c": {
+      "sha256": "860e0d61fdd7058e5f0656cf2b46665b85feb502318ebd4b8d11312e454a5c43",
+      "violations": 0,
+      "candidates": 1,
+      "findings": [
+        {
+          "line": 440,
+          "rule": "C10",
+          "level": "HEUR"
+        }
+      ]
+    },
+    "core/engine/nb_saveload.h": {
+      "sha256": "1d7ca63afdc665838b9ff9dd8963bb700ae2cb1f419e3abde2a14f4325f3644f",
+      "violations": 0,
+      "candidates": 0,
+      "findings": []
+    },
+    "core/engine/nb_scene.c": {
+      "sha256": "5258bf92fa964af5b130d3d042d5a9979d95864418c8d891933f99bdb71f570a",
+      "violations": 0,
+      "candidates": 0,
+      "findings": []
+    },
+    "core/engine/nb_setting.c": {
+      "sha256": "047c66d1ee6162aaa83eb7f9bfa4c91124ef838c152fec8e77c4b559dc91a6c7",
+      "violations": 0,
+      "candidates": 0,
+      "findings": []
+    },
+    "core/engine/nb_special.c": {
+      "sha256": "73522e8605614f5a8a84318dbcede61f655defdec0081ffa7483054c92ac0e8b",
+      "violations": 0,
+      "candidates": 1,
+      "findings": [
+        {
+          "line": 77,
+          "rule": "C35",
+          "level": "HEUR"
+        }
+      ]
+    },
+    "core/engine/nb_var_defs.h": {
+      "sha256": "498f84610a7e2369b3edd22cb2fd1ac3860d24ca88e32fa411a6e804d5582e73",
+      "violations": 0,
+      "candidates": 0,
+      "findings": []
+    },
+    "core/engine/nb_var_table.h": {
+      "sha256": "8c82146a06f5cc100f38160befa5f58b937f859bb250f52ac7a76cbfeebc9a91",
+      "violations": 0,
+      "candidates": 0,
+      "findings": []
+    },
+    "core/engine/nb_vars.c": {
+      "sha256": "fd0da3675b9eaa2d02eef5ec90f377d20153d68a95510d0487714e22b8a4a073",
+      "violations": 0,
+      "candidates": 0,
+      "findings": []
+    },
+    "core/engine/nb_vars.h": {
+      "sha256": "dbcbdbd87db3ae097fa9addb303cea9717c4b5e3e2bb9794e6951ef4fbc0986e",
+      "violations": 0,
+      "candidates": 0,
+      "findings": []
+    },
+    "core/engine/palette.c": {
+      "sha256": "39364a8e4833294e1f18005c970ac51379071f0c639a53937b333d45d07fa8fd",
+      "violations": 0,
+      "candidates": 0,
+      "findings": []
+    },
+    "core/engine/palette.h": {
+      "sha256": "4990e4e53b048587125d6529f4069b445b033a30ccf407818c0afff343055df6",
+      "violations": 0,
+      "candidates": 0,
+      "findings": []
+    },
+    "core/engine/prefs.c": {
+      "sha256": "c9e47bf9cc5c966c67979bb43de4d37950be665c7e68568a9500311fe59b5393",
+      "violations": 0,
+      "candidates": 1,
+      "findings": [
+        {
+          "line": 195,
+          "rule": "C2",
+          "level": "HEUR"
+        }
+      ]
+    },
+    "core/engine/prefs.h": {
+      "sha256": "2088ce6c54500eacfc696c702a2d3c8695b3749a7fca61b7644abe704dd37879",
+      "violations": 0,
+      "candidates": 0,
+      "findings": []
+    },
+    "core/engine/preload_queue.c": {
+      "sha256": "9f7e014b09b00adfad88b994ccfd4e309c6a264b086746e9a2cd68f94cecba5d",
+      "violations": 0,
+      "candidates": 0,
+      "findings": []
+    },
+    "core/engine/preload_queue.h": {
+      "sha256": "f1d01f86c79592622ffb4ff7e95bff3b0f3aa0447ccdcf910934e204c1c9b71e",
+      "violations": 0,
+      "candidates": 0,
+      "findings": []
+    },
+    "core/engine/render.c": {
+      "sha256": "9ad8999a91cf93038b7b4e0aa9c1a9cefc1940d22f86e361b2afdf03afd79ed6",
+      "violations": 0,
+      "candidates": 1,
+      "findings": [
+        {
+          "line": 72,
+          "rule": "C35",
+          "level": "HEUR"
+        }
+      ]
+    },
+    "core/engine/render.h": {
+      "sha256": "fea23544691236fc023ebaa158a325e17140cff6c61e2fb37f727fa487915065",
+      "violations": 0,
+      "candidates": 0,
+      "findings": []
+    },
+    "core/engine/render_blit.c": {
+      "sha256": "c0f7c96193644cf01d3b30ca898e2241fedf185d5477b0bbb536877e2369bb0f",
+      "violations": 0,
+      "candidates": 0,
+      "findings": []
+    },
+    "core/engine/render_internal.h": {
+      "sha256": "86cd2ebc2af0be21357c9c2331a7c65bfa3b3fe6b0cd5878f2b2184d7df5b06c",
+      "violations": 0,
+      "candidates": 0,
+      "findings": []
+    },
+    "core/engine/render_text.c": {
+      "sha256": "353bdf281fe5c1bdc5d91093202bf6378f3769ad57162134ee670c9e545f9fe4",
+      "violations": 0,
+      "candidates": 1,
+      "findings": [
+        {
+          "line": 96,
+          "rule": "C35",
+          "level": "HEUR"
+        }
+      ]
+    },
+    "core/engine/render_vram.c": {
+      "sha256": "61386edb822e2a0ebb80884efef7e3e75c11add903ef236ce5c3442f3ae03fb2",
+      "violations": 0,
+      "candidates": 1,
+      "findings": [
+        {
+          "line": 57,
+          "rule": "C35",
+          "level": "HEUR"
+        }
+      ]
+    },
+    "core/engine/save.c": {
+      "sha256": "024a67905c84d56dec6d1d590a8c526882b3a19416f5a809d841582b71c248ce",
+      "violations": 0,
+      "candidates": 0,
+      "findings": []
+    },
+    "core/engine/save.h": {
+      "sha256": "186fd9d28306252c3b11f2348c625c33271192350a1affb7a3091c0d677656fe",
+      "violations": 0,
+      "candidates": 0,
+      "findings": []
+    },
+    "core/engine/save_io.c": {
+      "sha256": "176439f255c7917b845b847a3519a7ee17a16e4f4a2542f7a3517c2724ec3a2f",
+      "violations": 0,
+      "candidates": 0,
+      "findings": []
+    },
+    "core/engine/save_sys.c": {
+      "sha256": "005e2b54dcdef8f01f054ec3dc7b2d2ef0c6b9a12a802d7c4c7fc6f029e0a3b7",
+      "violations": 0,
+      "candidates": 0,
+      "findings": []
+    },
+    "core/engine/scene_display.c": {
+      "sha256": "0a478945fd9c9e9634c6f26c23c9be94b4b8f4a45d61da7304e3b7d961d4f96b",
+      "violations": 0,
+      "candidates": 0,
+      "findings": []
+    },
+    "core/engine/scene_display.h": {
+      "sha256": "4c451956fc6cc376052101066d1b7687ff42f28c5dbf92ca954dd84bc98a802a",
+      "violations": 0,
+      "candidates": 0,
+      "findings": []
+    },
+    "core/engine/scene_layers.h": {
+      "sha256": "2dd0d2cf025a9ec65401c276b17fe10d0358a88a827debef5a2d0c4846c192af",
+      "violations": 0,
+      "candidates": 0,
+      "findings": []
+    },
+    "core/engine/transition.c": {
+      "sha256": "c4f96c01d4120de199b246e84ab54eac0a50163d8657950285524b840dd76b2a",
+      "violations": 0,
+      "candidates": 0,
+      "findings": []
+    },
+    "core/engine/transition.h": {
+      "sha256": "ea15438c55614aea7c53e2835f68264316f20d71bde9801c5c18f253cf0e6e27",
+      "violations": 0,
+      "candidates": 0,
+      "findings": []
+    },
+    "core/engine/transition_blinds.c": {
+      "sha256": "66e63094f3e6300d8410ec681e8fe991da7a8903910ec85420bfee2e5b34a6c4",
+      "violations": 0,
+      "candidates": 0,
+      "findings": []
+    },
+    "core/engine/transition_checker.c": {
+      "sha256": "4649b474c01310df7a08048e1cb874847c2a1ab06d9e025eef813c1408f933dd",
+      "violations": 0,
+      "candidates": 0,
+      "findings": []
+    },
+    "core/engine/transition_internal.h": {
+      "sha256": "8b9861ebebea573acbacdd34a2516437a341fb05dd26183aff5c4c08ab78cd8b",
+      "violations": 0,
+      "candidates": 0,
+      "findings": []
+    },
+    "core/engine/transition_pfade.c": {
+      "sha256": "170cd6a1e3c28b33b351167e82388fddef02fa5cbbb77771a274e1027ff11045",
+      "violations": 0,
+      "candidates": 0,
+      "findings": []
+    },
+    "core/engine/ui.c": {
+      "sha256": "4b1adf64b35d59aaf9f5d4adb7fd630d8e91a959e11157f0d7a12dce21a39142",
+      "violations": 0,
+      "candidates": 0,
+      "findings": []
+    },
+    "core/engine/ui.h": {
+      "sha256": "fdf85040fa3da4c60a6ba5eea80f7fe9d0f1b86044dce620c33b29508ec4fc54",
+      "violations": 0,
+      "candidates": 0,
+      "findings": []
+    },
+    "core/engine/vm.c": {
+      "sha256": "1a2f3b141ae1ef3dea112f20047f0938ca877f3e2287614bf5fc331169ac9485",
+      "violations": 0,
+      "candidates": 0,
+      "findings": []
+    },
+    "core/engine/vm.h": {
+      "sha256": "3bade2dc4cd6d59d63842f310ff80c289f1b1267b94d5c4002885310f87d310d",
+      "violations": 0,
+      "candidates": 0,
+      "findings": []
+    },
+    "core/lib/cjk.c": {
+      "sha256": "e2da2bb3d0b4abac6b3052cae17edcbcf323f7af7032d81a45140866adb5063a",
+      "violations": 0,
+      "candidates": 0,
+      "findings": []
+    },
+    "core/lib/cjk.h": {
+      "sha256": "eed18c828c72a1cd32f05fbc4bd3c5127383cab1861407e691a50d227bd575a0",
+      "violations": 0,
+      "candidates": 0,
+      "findings": []
+    },
+    "core/lib/endian.h": {
+      "sha256": "2a95d39b04d8a00375b7ed377f7416372327762de81992c5acc1e9a434bb7a4d",
+      "violations": 0,
+      "candidates": 0,
+      "findings": []
+    },
+    "core/lib/farchive.c": {
+      "sha256": "7f5bd196f085baaf29143859d1ec6d8759ca031c6176f99580cb63e51a533ba9",
+      "violations": 0,
+      "candidates": 2,
+      "findings": [
+        {
+          "line": 86,
+          "rule": "C1",
+          "level": "HEUR"
+        },
+        {
+          "line": 61,
+          "rule": "C2",
+          "level": "HEUR"
+        }
+      ]
+    },
+    "core/lib/farchive.h": {
+      "sha256": "a827c8865779425c7ed54e2bf46247af5e1d4fd6fa03a32ad76e9a4f57d7eff4",
+      "violations": 0,
+      "candidates": 0,
+      "findings": []
+    },
+    "core/lib/fmopn.c": {
+      "sha256": "f059d4977d5e91de5546c821eeb1a9124dbd6845908c463d53153288562df998",
+      "violations": 0,
+      "candidates": 0,
+      "findings": []
+    },
+    "core/lib/fmopn.h": {
+      "sha256": "d0b807eebf31d85a8a7ff720c64cd1d50f86a1e35b5ac29000916a0980e928e0",
+      "violations": 0,
+      "candidates": 0,
+      "findings": []
+    },
+    "core/lib/fmseq.c": {
+      "sha256": "5078fa963b67de5c800304e2566ee5092c6647e6b8413c07c6e78e705f20a17f",
+      "violations": 0,
+      "candidates": 0,
+      "findings": []
+    },
+    "core/lib/fmseq.h": {
+      "sha256": "c6662f08aee303343b4f3f96ac88abf85d40816e9125a82ad0caa627f9b89245",
+      "violations": 0,
+      "candidates": 0,
+      "findings": []
+    },
+    "core/lib/font.c": {
+      "sha256": "89824ac699ab2488a50c006264cd9c3723866558f19b6b3fc9fdf2a6c8b908fd",
+      "violations": 0,
+      "candidates": 0,
+      "findings": []
+    },
+    "core/lib/font.h": {
+      "sha256": "d3a32ef5ef2072ce27915d7ba6fb1aecb2a1a5a4273449014245c84bf10c08e1",
+      "violations": 0,
+      "candidates": 0,
+      "findings": []
+    },
+    "core/lib/mag.c": {
+      "sha256": "1247b0403dae2bd2324d20838f9d376f41c7cbb235bc5b16c3175903fa8d0964",
+      "violations": 0,
+      "candidates": 3,
+      "findings": [
+        {
+          "line": 419,
+          "rule": "C9",
+          "level": "HEUR"
+        },
+        {
+          "line": 420,
+          "rule": "C9",
+          "level": "HEUR"
+        },
+        {
+          "line": 421,
+          "rule": "C9",
+          "level": "HEUR"
+        }
+      ]
+    },
+    "core/lib/mag.h": {
+      "sha256": "d1795190cf020e7373d22e8cf87b2d75ef8b68630796c5ff5ea01780a4956403",
+      "violations": 0,
+      "candidates": 0,
+      "findings": []
+    },
+    "core/lib/mag_format.h": {
+      "sha256": "6dcf27bea5e15e4ab3328f0dbfc35fbb41bd6ec9e4f402c806fdf8451bb20719",
+      "violations": 0,
+      "candidates": 0,
+      "findings": []
+    },
+    "core/lib/midi.c": {
+      "sha256": "4dde4fd1b3d7624849cf6539bbfdd2526712010b311d40c4204c036121be5bb0",
+      "violations": 0,
+      "candidates": 0,
+      "findings": []
+    },
+    "core/lib/midi.h": {
+      "sha256": "940cc2d2829268efdb4b0327575b079543ceb2035339e0ecb0d4a963544f395f",
+      "violations": 0,
+      "candidates": 0,
+      "findings": []
+    },
+    "core/lib/naiz_file.c": {
+      "sha256": "5bc6439f09ff8a855d46950018de89e6e7df4c84ebedd16edaa798cb0f73a268",
+      "violations": 0,
+      "candidates": 0,
+      "findings": []
+    },
+    "core/lib/naiz_file.h": {
+      "sha256": "9b6f7b40514bb7da39f11892fd07c5522d921c6ab9a911ddf5081cc20b514715",
+      "violations": 0,
+      "candidates": 0,
+      "findings": []
+    },
+    "core/lib/strutil.c": {
+      "sha256": "ee2a4b3e3b60a2bf86bbec79a1dbf87fb714d197396ef2e00b5883209aa528c9",
+      "violations": 0,
+      "candidates": 0,
+      "findings": []
+    },
+    "core/lib/strutil.h": {
+      "sha256": "af819d6261d3fa83b5e1437ad12ef9f337c4158a69d43c14aa616fb28d4b8ee1",
+      "violations": 0,
+      "candidates": 0,
+      "findings": []
+    },
+    "core/lib/tr.c": {
+      "sha256": "d0c8787ab27d2cd8ad9f4b89670d8a8db2a98b54fe80fad4fe68c63a9eef718c",
+      "violations": 0,
+      "candidates": 1,
+      "findings": [
+        {
+          "line": 99,
+          "rule": "C9",
+          "level": "HEUR"
+        }
+      ]
+    },
+    "core/lib/tr.h": {
+      "sha256": "0eac4ce3fe6c0e949202523703d9756d9d29ab71832e03b61dce4d806d14a468",
+      "violations": 0,
+      "candidates": 0,
+      "findings": []
+    },
+    "core/lib/vclock.c": {
+      "sha256": "bf04d61f87d967cfdddee8c292514770a8a52cda12670df899e34ac4da3ee67b",
+      "violations": 0,
+      "candidates": 0,
+      "findings": []
+    },
+    "core/lib/vclock.h": {
+      "sha256": "21d4d199b1bea76ee4c1651a2587d3f6375800e73f01829487832a09ba6c6136",
+      "violations": 0,
+      "candidates": 0,
+      "findings": []
+    },
+    "core/plat/gdc.c": {
+      "sha256": "5ad3bf78f5e8dc5a9fe3ec3690d52b0e88a6c3df304b6c2d48194c439f381479",
+      "violations": 0,
+      "candidates": 0,
+      "findings": []
+    },
+    "core/plat/gdc.h": {
+      "sha256": "44b3cb10ca95f1e9185bc148bc005b21fcd1af2e85cd66a0227203f5fbbaccc7",
+      "violations": 0,
+      "candidates": 0,
+      "findings": []
+    },
+    "core/plat/hal.h": {
+      "sha256": "90af73e354826912c8d484c0a24a5719dc4c484f07dff712ce52ed8fd62ed71a",
+      "violations": 0,
+      "candidates": 0,
+      "findings": []
+    },
+    "core/plat/hal_audio.c": {
+      "sha256": "4cfe395a2fcbc02bc3a7a3a2f67e16f323c13ebfb1ae6bb926106fc84cb7f029",
+      "violations": 0,
+      "candidates": 0,
+      "findings": []
+    },
+    "core/plat/hal_clock.c": {
+      "sha256": "b9929e1a3c637a3359a4f4d93cfcea77426dfb92af8338fa44194fd5a6381687",
+      "violations": 0,
+      "candidates": 0,
+      "findings": []
+    },
+    "core/plat/hal_internal.h": {
+      "sha256": "cfd4dbebc3fa3b524cfae7fac978bc8da343f4d881db4aa26605c89cab9e2845",
+      "violations": 0,
+      "candidates": 0,
+      "findings": []
+    },
+    "core/plat/hal_irq.c": {
+      "sha256": "83a6a433f025bac0d5a4bff3853f656454beeb2bedc0691c2c62ef6ab4b0c52b",
+      "violations": 0,
+      "candidates": 0,
+      "findings": []
+    },
+    "core/plat/hal_log.c": {
+      "sha256": "c8a275f0d2f56e334fa4cfdc5584d79384ce55e429b30666dbf9db0c1198a3cb",
+      "violations": 0,
+      "candidates": 0,
+      "findings": []
+    },
+    "core/plat/hal_pc98.c": {
+      "sha256": "a78bdc97dc663c8f2f94cefd7791eb4b56418709e05161135213d28580a30c0c",
+      "violations": 0,
+      "candidates": 0,
+      "findings": []
+    },
+    "core/plat/hal_probe.c": {
+      "sha256": "d14271a1bf9e22f000927eb03446461abce3227d023023069e1db355b4fcfc88",
+      "violations": 0,
+      "candidates": 0,
+      "findings": []
+    },
+    "core/plat/keyboard.c": {
+      "sha256": "dbe14774df87e20283a59e74f51a6b9c0c122b3e389e7cc9bd6206f14efa38c8",
+      "violations": 0,
+      "candidates": 1,
+      "findings": [
+        {
+          "line": 55,
+          "rule": "C35",
+          "level": "HEUR"
+        }
+      ]
+    },
+    "core/plat/mouse.c": {
+      "sha256": "1cdeae06bbdd99f13ded5395997cc6af8901ace40e5df581c4bcc453a71b95b7",
+      "violations": 0,
+      "candidates": 0,
+      "findings": []
+    },
+    "core/plat/pc98.h": {
+      "sha256": "bb98e8873270f1a0f45318fd09c3b1b05363e136f18583520522914c29e94648",
+      "violations": 0,
+      "candidates": 0,
+      "findings": []
+    },
+    "core/plat/serial.c": {
+      "sha256": "58802c9270105811850603f7fb0397855f1ac4ae7fc63f307df61268a0feb936",
+      "violations": 0,
+      "candidates": 0,
+      "findings": []
+    },
+    "core/plat/serial.h": {
+      "sha256": "18f343e2e201e4d40f2a5712e1fdea1554e74aa9a2eb94b62a1cc6d1ed29d5be",
+      "violations": 0,
+      "candidates": 0,
+      "findings": []
+    },
+    "core/plat/video.c": {
+      "sha256": "a8a5e6dcd8923ebf7c416c64b4e5906cc6c55d295b6f6a668be52ef3c785b1d0",
+      "violations": 0,
+      "candidates": 0,
+      "findings": []
+    },
+    "makegame.sh": {
+      "sha256": "012e0ce6afd26c844bfa4ed770009a277dee7dadd9d6a717113a54545e2c066f",
+      "violations": 0,
+      "candidates": 5,
+      "findings": [
+        {
+          "line": 340,
+          "rule": "S1",
+          "level": "HEUR"
+        },
+        {
+          "line": 47,
+          "rule": "S5",
+          "level": "HEUR"
+        },
+        {
+          "line": 51,
+          "rule": "S5",
+          "level": "HEUR"
+        },
+        {
+          "line": 55,
+          "rule": "S5",
+          "level": "HEUR"
+        },
+        {
+          "line": 145,
+          "rule": "S5",
+          "level": "HEUR"
+        }
+      ]
+    },
+    "start.sh": {
+      "sha256": "d0a8161dc33a57afd066a0aff4783964d21cea34ac18fd11ff6381f27755b3d5",
+      "violations": 0,
+      "candidates": 3,
+      "findings": [
+        {
+          "line": 173,
+          "rule": "S1",
+          "level": "HEUR"
+        },
+        {
+          "line": 187,
+          "rule": "S1",
+          "level": "HEUR"
+        },
+        {
+          "line": 229,
+          "rule": "S5",
+          "level": "HEUR"
+        }
+      ]
+    },
+    "tools/diag/__init__.py": {
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "violations": 0,
+      "candidates": 0,
+      "findings": []
+    },
+    "tools/diag/batch_edit.py": {
+      "sha256": "00c7e76941f5b30306f63d3f25dc616843aa1dba525f4f211d12b159559cde0c",
+      "violations": 0,
+      "candidates": 0,
+      "findings": []
+    },
+    "tools/diag/batch_read.py": {
+      "sha256": "82fcbba7902188d27010d78b57aa7ac2bb6e50b42569ac8040a4b74a6d65bf41",
+      "violations": 0,
+      "candidates": 0,
+      "findings": []
+    },
+    "tools/diag/bgm_compare.py": {
+      "sha256": "29e14315170dba6264aec17d402567fd4b4c70218bb2ec054e6be392ab0421e8",
+      "violations": 0,
+      "candidates": 1,
+      "findings": [
+        {
+          "line": 100,
+          "rule": "P8",
+          "level": "HEUR"
+        }
+      ]
+    },
+    "tools/diag/code_map.py": {
+      "sha256": "57955739519b44a8540214b224e4a5711d86a2d7b6a9a7ec1948d49371bc8651",
+      "violations": 0,
+      "candidates": 0,
+      "findings": []
+    },
+    "tools/diag/gen_com.py": {
+      "sha256": "642a100231ce48f9e41d8fcf7160a02359f4af81e2e3bfdf4fd493eb756ff6ea",
+      "violations": 0,
+      "candidates": 0,
+      "findings": []
+    },
+    "tools/diag/hdi_patch_autoexec.py": {
+      "sha256": "c89139b51bb56033d1f4662770aae6598874a0327078af1e2e54dc019cf9972b",
+      "violations": 0,
+      "candidates": 0,
+      "findings": []
+    },
+    "tools/diag/np2kai_ab.py": {
+      "sha256": "0f9c910e58e9ae96ae187ecff5e20a00470a81d09fab4b2c17998e00c1da6ac3",
+      "violations": 0,
+      "candidates": 0,
+      "findings": []
+    },
+    "tools/diag/np2kai_audio.py": {
+      "sha256": "bf5ffba46338059957721e9f3d73527b0b5f195429fc3ad8393eebe02fe3faa5",
+      "violations": 0,
+      "candidates": 1,
+      "findings": [
+        {
+          "line": 62,
+          "rule": "P8",
+          "level": "HEUR"
+        }
+      ]
+    },
+    "tools/diag/np2kai_serial.py": {
+      "sha256": "999e8b3e5bfc81edb71f8bfefb2430233f50095dda395a1506411c4d95ce0374",
+      "violations": 0,
+      "candidates": 1,
+      "findings": [
+        {
+          "line": 37,
+          "rule": "P8",
+          "level": "HEUR"
+        }
+      ]
+    },
+    "tools/diag/preflight.py": {
+      "sha256": "47cbe86d626e98c8b2a2508ff74ce5140b9853c7dd811ac62a261b33f7c26410",
+      "violations": 0,
+      "candidates": 1,
+      "findings": [
+        {
+          "line": 102,
+          "rule": "P8",
+          "level": "HEUR"
+        }
+      ]
+    },
+    "tools/diag/read_fat16.py": {
+      "sha256": "2008f0f7830faa6729bada68f6d9011b69a345892eca3cf45dc50e0e515da24d",
+      "violations": 0,
+      "candidates": 0,
+      "findings": []
+    },
+    "tools/diag/read_slice.py": {
+      "sha256": "4241ebdeee7ab4693e78a0746fecad9d3ff1844fce04e360d161c29212cd4641",
+      "violations": 0,
+      "candidates": 0,
+      "findings": []
+    },
+    "tools/diag/symbol_audit.py": {
+      "sha256": "4238e9dc43f3a94d867f35c4826d6c1d62b25716926d5afdc0e8b9f95d4fe5ea",
+      "violations": 0,
+      "candidates": 0,
+      "findings": []
+    },
+    "tools/diag/token_budget.py": {
+      "sha256": "53cd7f1b86b3c4be904f9f99751a1f06274df686f391898d8ef52f3bc8506a0f",
+      "violations": 0,
+      "candidates": 0,
+      "findings": []
+    },
+    "tools/env_setup/__init__.py": {
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "violations": 0,
+      "candidates": 0,
+      "findings": []
+    },
+    "tools/env_setup/env_build.py": {
+      "sha256": "7f938f1e01da3806d4f6931f56c0d10b929df5865d9c924b41c2b2ba30886369",
+      "violations": 0,
+      "candidates": 0,
+      "findings": []
+    },
+    "tools/env_setup/env_np2kai.py": {
+      "sha256": "0935c43116d5b5705ecd8f32db65f5fc2e95bab81f8e43179348fa232b20fe79",
+      "violations": 0,
+      "candidates": 0,
+      "findings": []
+    },
+    "tools/env_setup/env_test.py": {
+      "sha256": "ed964a663634bf7f264453b3a12c4e2f301810b6c2a020c7a9a7fd8597901efa",
+      "violations": 0,
+      "candidates": 1,
+      "findings": [
+        {
+          "line": 299,
+          "rule": "P8",
+          "level": "HEUR"
+        }
+      ]
+    },
+    "tools/env_setup/env_toolchains.py": {
+      "sha256": "57a7df6779df07e35fc100a3a3731e374cee4f5edae626026667542a1edee7fd",
+      "violations": 0,
+      "candidates": 0,
+      "findings": []
+    },
+    "tools/env_setup/env_utils.py": {
+      "sha256": "a39cac5d9fc50177119cbfee74f5c3973f91649f34003e369f11e200de69ddc3",
+      "violations": 0,
+      "candidates": 1,
+      "findings": [
+        {
+          "line": 121,
+          "rule": "P8",
+          "level": "HEUR"
+        }
+      ]
+    },
+    "tools/env_setup/install_env.py": {
+      "sha256": "c54229a3323d01d4f85769c3b6980856e64a3c51c99c44b0e2f7419e6e494848",
+      "violations": 0,
+      "candidates": 0,
+      "findings": []
+    },
+    "tools/naiz_audio/fm_patch.py": {
+      "sha256": "0eb0f773338ee9ef725a96326013ad7660e10adf227add5363d8c215275220cf",
+      "violations": 0,
+      "candidates": 0,
+      "findings": []
+    },
+    "tools/naiz_audio/fm_render.py": {
+      "sha256": "4a236e58583008c30091a81da84e0fac79394dc5fd79fc1ace557ddfa5db4746",
+      "violations": 0,
+      "candidates": 0,
+      "findings": []
+    },
+    "tools/naiz_audio/fmp_export.py": {
+      "sha256": "ced785712c646b9cf5c2da350bc992ab18fe88b5a1c165194d05eb28c2678ecd",
+      "violations": 0,
+      "candidates": 1,
+      "findings": [
+        {
+          "line": 97,
+          "rule": "P2",
+          "level": "HEUR"
+        }
+      ]
+    },
+    "tools/naiz_audio/gen_test_midi.py": {
+      "sha256": "b0ecb8df32f672afe168e0e6ae6a892bcb28c9a9ca13d9404dbd32bc7fe8308e",
+      "violations": 0,
+      "candidates": 0,
+      "findings": []
+    },
+    "tools/naiz_audio/gm_families.py": {
+      "sha256": "0f373087e9170df23aec0b9f532b175a05bc2afb2193eacbe973246b3869975b",
+      "violations": 0,
+      "candidates": 0,
+      "findings": []
+    },
+    "tools/naiz_audio/gm_render.py": {
+      "sha256": "1162192dac8708dac4e89b5c3f31cf624ef541f5e71bde3aa4292acbe2f197f4",
+      "violations": 0,
+      "candidates": 0,
+      "findings": []
+    },
+    "tools/naiz_audio/midi_ref.py": {
+      "sha256": "0ff36068ddb1a263807e0402130fcf169b4f93809e227863886e268c8d957b5f",
+      "violations": 0,
+      "candidates": 1,
+      "findings": [
+        {
+          "line": 119,
+          "rule": "P8",
+          "level": "HEUR"
+        }
+      ]
+    },
+    "tools/naiz_audio/pack_audio.py": {
+      "sha256": "aceecf79d9274cb948f990e5430310a8502615b984d2756fd1e8214cefa2167b",
+      "violations": 0,
+      "candidates": 0,
+      "findings": []
+    },
+    "tools/naiz_audio/s98_dump.py": {
+      "sha256": "6cc7a9eca432178fd55db23de0c4e339f1ef447f31b0910ad503fe72e5dfe99b",
+      "violations": 0,
+      "candidates": 4,
+      "findings": [
+        {
+          "line": 269,
+          "rule": "P2",
+          "level": "HEUR"
+        },
+        {
+          "line": 320,
+          "rule": "P2",
+          "level": "HEUR"
+        },
+        {
+          "line": 140,
+          "rule": "P2",
+          "level": "HEUR"
+        },
+        {
+          "line": 321,
+          "rule": "P2",
+          "level": "HEUR"
+        }
+      ]
+    },
+    "tools/naiz_audio/spectrum_report.py": {
+      "sha256": "a161701b437530bdb0bf8b2311ed46e564bdaa5d890b3725fc38c50eac14f93a",
+      "violations": 0,
+      "candidates": 1,
+      "findings": [
+        {
+          "line": 43,
+          "rule": "P8",
+          "level": "HEUR"
+        }
+      ]
+    },
+    "tools/naiz_audio/wav_convert.py": {
+      "sha256": "2c1ee8bf5446d19dddf48a88dca1324e33f1f0663e200a8a81719b82a0fd68b4",
+      "violations": 0,
+      "candidates": 0,
+      "findings": []
+    },
+    "tools/naiz_build/__init__.py": {
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "violations": 0,
+      "candidates": 0,
+      "findings": []
+    },
+    "tools/naiz_build/anim_import.py": {
+      "sha256": "ddec01d461fc5de3ffe4ae200e36f4f637e33c8d025eb075ad3dc677b156fd9a",
+      "violations": 0,
+      "candidates": 1,
+      "findings": [
+        {
+          "line": 89,
+          "rule": "P8",
+          "level": "HEUR"
+        }
+      ]
+    },
+    "tools/naiz_build/anim_project.py": {
+      "sha256": "9c1fbb7633211f13c4baf75c906966712f771ed8e90464656e62c87a1c6db4e1",
+      "violations": 0,
+      "candidates": 0,
+      "findings": []
+    },
+    "tools/naiz_build/anim_register.py": {
+      "sha256": "89ddc77fcb41c72c0d6a9016761dc92dc1b9199be1bcaf1b8ede6a066d4d26a3",
+      "violations": 0,
+      "candidates": 0,
+      "findings": []
+    },
+    "tools/naiz_build/anim_script.py": {
+      "sha256": "b14999f8fd9fe1cff7eb1e1fe89134da4a7da7e74a9e53daafe4520bcc69b2e4",
+      "violations": 0,
+      "candidates": 0,
+      "findings": []
+    },
+    "tools/naiz_build/build_game.py": {
+      "sha256": "ed1ee24c331907a45f84069bf1a287f6843ce887328ef63d383766c767fd2fd6",
+      "violations": 0,
+      "candidates": 1,
+      "findings": [
+        {
+          "line": 145,
+          "rule": "P8",
+          "level": "HEUR"
+        }
+      ]
+    },
+    "tools/naiz_build/bump_version.py": {
+      "sha256": "ef36e92bf20611370df926bfda4bfafbd40b3451d2a20b53d0087911c640976c",
+      "violations": 0,
+      "candidates": 0,
+      "findings": []
+    },
+    "tools/naiz_build/c_header.py": {
+      "sha256": "f0e16baad3d1a14a12c1783880a8098d136f7373ece55e239b4a982262d66ff3",
+      "violations": 0,
+      "candidates": 0,
+      "findings": []
+    },
+    "tools/naiz_build/cg_thumb.py": {
+      "sha256": "f2613f6219a159571437287e818ae347de9a75f512dc5b6dae7f3cccccc70fa7",
+      "violations": 0,
+      "candidates": 1,
+      "findings": [
+        {
+          "line": 142,
+          "rule": "P8",
+          "level": "HEUR"
+        }
+      ]
+    },
+    "tools/naiz_build/export_asset_table.py": {
+      "sha256": "f5b017c9c2e106a3762453d85d571831d064fe026c560e9ce43b0e6b64a6ad14",
+      "violations": 0,
+      "candidates": 0,
+      "findings": []
+    },
+    "tools/naiz_build/export_config.py": {
+      "sha256": "e92921f8ba4372cc464781ff4371b3143cedb3519d0ae73d9e761688aa788b0c",
+      "violations": 0,
+      "candidates": 0,
+      "findings": []
+    },
+    "tools/naiz_build/export_vars.py": {
+      "sha256": "689a5fd8aaefd2eeac2d283591245ea72350a6f599ba6adf1a4e704fce9ef177",
+      "violations": 0,
+      "candidates": 0,
+      "findings": []
+    },
+    "tools/naiz_build/mp4_to_ani.py": {
+      "sha256": "fca388e480e6716cb78c6c63d566e6e1c217d0bac5ba7d7b2a9fcd303a85cf2e",
+      "violations": 0,
+      "candidates": 1,
+      "findings": [
+        {
+          "line": 122,
+          "rule": "P8",
+          "level": "HEUR"
+        }
+      ]
+    },
+    "tools/naiz_build/nb_validator.py": {
+      "sha256": "e410a0494044dfeb88e187469ee33aa85c6368b86a02e6c50d30dba0bc162981",
+      "violations": 0,
+      "candidates": 0,
+      "findings": []
+    },
+    "tools/naiz_build/pack_images.py": {
+      "sha256": "78f9de80b69ad2daa090d53ef1f2b2af577e4a74f45250ecb518241d5b2ca285",
+      "violations": 0,
+      "candidates": 1,
+      "findings": [
+        {
+          "line": 42,
+          "rule": "P8",
+          "level": "HEUR"
+        }
+      ]
+    },
+    "tools/naiz_build/project_config.py": {
+      "sha256": "03ae25f16a1116e546f90d2ab8fa760dd72d6f0631d4ae79f5b54dc1ba289339",
+      "violations": 0,
+      "candidates": 0,
+      "findings": []
+    },
+    "tools/naiz_conv/__init__.py": {
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "violations": 0,
+      "candidates": 0,
+      "findings": []
+    },
+    "tools/naiz_conv/i18n_gen.py": {
+      "sha256": "f7ba1f19cd956f24e1890cd431186a5fe226b12797ec9dbb58963aeaeb9ffc18",
+      "violations": 0,
+      "candidates": 0,
+      "findings": []
+    },
+    "tools/naiz_conv/mag_convert.py": {
+      "sha256": "052ebf9f6a0f92241471a0f1f61556519fd6ad5bc3f5fc84020ae95d5031fa71",
+      "violations": 0,
+      "candidates": 1,
+      "findings": [
+        {
+          "line": 64,
+          "rule": "P8",
+          "level": "HEUR"
+        }
+      ]
+    },
+    "tools/naiz_conv/psf2font.py": {
+      "sha256": "367ebe8294508655392e1837a6ee1fc47244001d6efc67267c7f3be6f0acb58c",
+      "violations": 0,
+      "candidates": 0,
+      "findings": []
+    },
+    "tools/naiz_conv/render_title.py": {
+      "sha256": "61cde59640b500eee366e166b2bed2f724da5699ce9029285391ea9e46fd7193",
+      "violations": 0,
+      "candidates": 0,
+      "findings": []
+    },
+    "tools/naiz_conv/ttf2font.py": {
+      "sha256": "6554e0a3ee8bc148fa6c2f4b329cdccec59e4cf6e0061d18ffa2b9234113788b",
+      "violations": 0,
+      "candidates": 0,
+      "findings": []
+    },
+    "tools/naiz_docs/__init__.py": {
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "violations": 0,
+      "candidates": 0,
+      "findings": []
+    },
+    "tools/naiz_docs/build_docs.py": {
+      "sha256": "ab65d7b325ac4ee5729e886a5553072b9dedba825f24c047ff487667cf7b10b9",
+      "violations": 0,
+      "candidates": 0,
+      "findings": []
+    },
+    "tools/naiz_docs/gen_canvas_image.py": {
+      "sha256": "0f771b244b11d4f2e4cda04ae1de607be8055f97e8b16b8500c9b1ecaffdbd4a",
+      "violations": 0,
+      "candidates": 0,
+      "findings": []
+    },
+    "tools/naiz_docs/sync_line_refs.py": {
+      "sha256": "97ae4557d897f416e344114045acfc0fb45c72b82362b6f7f79c0c8bfb11eb87",
+      "violations": 0,
+      "candidates": 0,
+      "findings": []
+    },
+    "tools/naiz_font/__init__.py": {
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "violations": 0,
+      "candidates": 0,
+      "findings": []
+    },
+    "tools/naiz_font/gen_cjk_font.py": {
+      "sha256": "c952f20984155c93664146f8e5b74aa35c0c28ade4a2a7ee88ffbcbd556f801d",
+      "violations": 0,
+      "candidates": 0,
+      "findings": []
+    },
+    "tools/naiz_img/__init__.py": {
+      "sha256": "6493228fab7855853df3ed2c6f6923f3e52dfb7d20982cd2ebe6e4fa29a59410",
+      "violations": 0,
+      "candidates": 1,
+      "findings": [
+        {
+          "line": 47,
+          "rule": "P8",
+          "level": "HEUR"
+        }
+      ]
+    },
+    "tools/naiz_img/base.py": {
+      "sha256": "67c51661d243b3be4f4b33f339f0031c1caa1533c77c744ee2cdfe885302c912",
+      "violations": 0,
+      "candidates": 0,
+      "findings": []
+    },
+    "tools/naiz_img/d88.py": {
+      "sha256": "da5b19f3e3a7a65445248ca096744dce4e6db589c49c660cf71de3336ab0ab0b",
+      "violations": 0,
+      "candidates": 0,
+      "findings": []
+    },
+    "tools/naiz_img/fat.py": {
+      "sha256": "7444dffd02e933c7f56c82e0fe9acb09a3d610d785cb0eed8981793a5bb1aed8",
+      "violations": 0,
+      "candidates": 0,
+      "findings": []
+    },
+    "tools/naiz_img/fat_entries.py": {
+      "sha256": "21165eb25a40300eb398e37093d89cb676538a975be3dc7fcf3fe8763444402c",
+      "violations": 0,
+      "candidates": 1,
+      "findings": [
+        {
+          "line": 77,
+          "rule": "P8",
+          "level": "HEUR"
+        }
+      ]
+    },
+    "tools/naiz_img/fat_fs.py": {
+      "sha256": "e2d776b6a03d34dc9acba147887ece04ff1265910439ea0608d44ec2de6e21f8",
+      "violations": 0,
+      "candidates": 0,
+      "findings": []
+    },
+    "tools/naiz_img/fat_table.py": {
+      "sha256": "580aead47831ca907cc5f17a49fc04b85c62baff62a0856a3eb8a1c2b32bb0ea",
+      "violations": 0,
+      "candidates": 0,
+      "findings": []
+    },
+    "tools/naiz_img/hdi.py": {
+      "sha256": "b1c9d047bc27ffbe1d851cc2c3e47949cbe5303037a7583143cc2ceb2494a12d",
+      "violations": 0,
+      "candidates": 0,
+      "findings": []
+    },
+    "tools/naiz_img/inject.py": {
+      "sha256": "fd763ca7571995fd527de7b203c02436a35267faefe8ca3ef176c4e16431d623",
+      "violations": 0,
+      "candidates": 0,
+      "findings": []
+    },
+    "tools/naiz_img/inject_common.py": {
+      "sha256": "aae420fbe6c923090b3859590b601774e8b9dbb3199768582395b053c0d271a3",
+      "violations": 0,
+      "candidates": 0,
+      "findings": []
+    },
+    "tools/naiz_img/nhd.py": {
+      "sha256": "da27d7d62e05389d71a38afe4e63270d0d3cd512ab0cf94a47f7919e181aea45",
+      "violations": 0,
+      "candidates": 0,
+      "findings": []
+    },
+    "tools/naiz_img/partition.py": {
+      "sha256": "9374e43e16a17096da1ed9c7cba94e9af8f5c2cdae20823df235aafe8ee09499",
+      "violations": 0,
+      "candidates": 0,
+      "findings": []
+    },
+    "tools/naiz_img/raw.py": {
+      "sha256": "2e5b1c48d0573352bad1bbc015469267ef013615773976f22f3c10bf4830036d",
+      "violations": 0,
+      "candidates": 0,
+      "findings": []
+    },
+    "tools/naiz_lib/__init__.py": {
+      "sha256": "78b20b306a62cf877edda7a82763c21f80599733b1719dbf72866555ffde135e",
+      "violations": 0,
+      "candidates": 0,
+      "findings": []
+    },
+    "tools/naiz_lib/anim_container.py": {
+      "sha256": "14dd29985014cf0b1e9bb23285ab8b07c3b9ee69b90735705f64312761adda81",
+      "violations": 0,
+      "candidates": 0,
+      "findings": []
+    },
+    "tools/naiz_lib/font_dat.py": {
+      "sha256": "7a8c94dddb7aeadd0aa953452bec71edbb4be98f7b4a05c0595e4e5fddbd50b1",
+      "violations": 0,
+      "candidates": 0,
+      "findings": []
+    },
+    "tools/naiz_lib/image_dat.py": {
+      "sha256": "ad59a81f0ab92b7c688f802210176c020cc3d3806f17a3c8d722bef862147a82",
+      "violations": 0,
+      "candidates": 1,
+      "findings": [
+        {
+          "line": 36,
+          "rule": "P8",
+          "level": "HEUR"
+        }
+      ]
+    },
+    "tools/naiz_lib/langdefs.py": {
+      "sha256": "848b5293f2541ae2a647364825c3cd8857a1dc18dbb30f9f433c7427472fb652",
+      "violations": 0,
+      "candidates": 0,
+      "findings": []
+    },
+    "tools/naiz_lib/mag_codec.py": {
+      "sha256": "d8d5b422c9bdbd73fceee5cc0fbf1b57b9b173244a93fe0014fe3bb5a0f8c22f",
+      "violations": 0,
+      "candidates": 1,
+      "findings": [
+        {
+          "line": 161,
+          "rule": "P8",
+          "level": "HEUR"
+        }
+      ]
+    },
+    "tools/naiz_lib/mag_constants.py": {
+      "sha256": "db936a96d1101ab85685a61d72bb91ec4359e2cb1e545982fcd078ee14f4fc06",
+      "violations": 0,
+      "candidates": 0,
+      "findings": []
+    },
+    "tools/naiz_lib/nb_line.py": {
+      "sha256": "c749fd4f9408cad4ce5b0c5ca1e17fc021af6fcd83c7e9e18f3471eb971acf4d",
+      "violations": 0,
+      "candidates": 0,
+      "findings": []
+    },
+    "tools/naiz_lib/np2kai_capture.py": {
+      "sha256": "df5d63cbf465353e8e4e82b38cae319177b311fd7466fa1564966cc27d99905e",
+      "violations": 0,
+      "candidates": 0,
+      "findings": []
+    },
+    "tools/naiz_lib/palette_utils.py": {
+      "sha256": "8e44799998fb2d309660d08f907871f96acb0e0074b7e19d94fb0875907dd000",
+      "violations": 0,
+      "candidates": 0,
+      "findings": []
+    },
+    "tools/naiz_lib/toc_archive.py": {
+      "sha256": "4f31d67e8bb1e0febc0e2a18daac47f84c8c45e9723b45783ab6546a8fbc89fc",
+      "violations": 0,
+      "candidates": 0,
+      "findings": []
+    },
+    "tools/naiz_market/market.py": {
+      "sha256": "63e1f7ff296ffc222ed02ccd469b4dd21fa0e99f87b3f88f3f142ca8c209bc82",
+      "violations": 0,
+      "candidates": 1,
+      "findings": [
+        {
+          "line": 502,
+          "rule": "P8",
+          "level": "HEUR"
+        }
+      ]
+    },
+    "tools/naiz_screendig/__init__.py": {
+      "sha256": "79161cda41137f9e2f7af10dcf8c1aa0b10d05b9a26d95a1516013a519b7c942",
+      "violations": 0,
+      "candidates": 1,
+      "findings": [
+        {
+          "line": 15,
+          "rule": "P8",
+          "level": "HEUR"
+        }
+      ]
+    },
+    "tools/naiz_screendig/__main__.py": {
+      "sha256": "d22b35b70efb7207170c7e6cdbb7d36a5380e229665467fa6749007c7aaffcb9",
+      "violations": 0,
+      "candidates": 1,
+      "findings": [
+        {
+          "line": 177,
+          "rule": "P8",
+          "level": "HEUR"
+        }
+      ]
+    },
+    "tools/naiz_screendig/analyze.py": {
+      "sha256": "c3c1f4b40a4f9cfe17deded541228ca9a995ebd2fe0074988657f5e3f3d0c568",
+      "violations": 0,
+      "candidates": 0,
+      "findings": []
+    },
+    "tools/naiz_screendig/capture.py": {
+      "sha256": "3966d9b8758d4b4e74e8086138bbbdd47d9eed0524af57bce23d9d6133c58201",
+      "violations": 0,
+      "candidates": 0,
+      "findings": []
+    },
+    "tools/naiz_screendig/report.py": {
+      "sha256": "875d9b023016600f3b1a7c096649dd401cc660eb80456eec70e4407b78909bf1",
+      "violations": 0,
+      "candidates": 0,
+      "findings": []
+    },
+    "tools/naiz_screendig/screendig.py": {
+      "sha256": "fbb765afda054b0fc330b61ddbcb5375f0df8e41490e146ca2e381dd530c6074",
+      "violations": 0,
+      "candidates": 1,
+      "findings": [
+        {
+          "line": 115,
+          "rule": "P8",
+          "level": "HEUR"
+        }
+      ]
+    }
+  },
+  "summary": {
+    "files": 219,
+    "changed": 0,
+    "skipped": 219,
+    "out_of_scope": 0,
+    "violations": 0,
+    "candidates": 68,
+    "fresh_violations": 0,
+    "fresh_candidates": 0,
+    "verified": 20,
+    "stale": 0,
+    "open": 48
+  }
+}

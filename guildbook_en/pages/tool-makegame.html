@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="translated-from" content="202611051818">
+<!-- AI-NOTE: translated-from = the guildbook_cn doc-version this page was translated from. If the cn counterpart's doc-version is newer, re-translate this page from the Chinese source. -->
+
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>makegame.sh Usage Guide — Naiz Guildbook</title>
+<link rel="stylesheet" href="../style.css">
+</head>
+<body>
+<nav class="sidebar" id="sidebar-nav"></nav>
+<script src="../sidebar-tools.js"></script>
+<main class="main">
+
+<h1>makegame.sh Usage Guide</h1>
+<blockquote><strong>Created</strong>: 2026-08-29<br><strong>Last updated</strong>: 2026-11-05</blockquote>
+<p><code>makegame.sh</code> is the <strong>game-data build</strong> script: it packs a project's scenario, assets, and configuration into an HDI image that runs in the emulator, and provides the test entry point. For building the engine, see the Watcom installation in <code>start.sh</code>. <strong>For daily use, running it directly and picking the project and action from the number menu is the recommended way</strong>; command-line subcommands suit scripts or experienced users.</p>
+<hr>
+
+<h2>1. Interactive menu (primary usage)</h2>
+<p>Run it with no arguments:</p>
+<pre><code>./makegame.sh</code></pre>
+<p>You get a two-level menu; <strong>at every step, type a number and press Enter</strong>:</p>
+<ul>
+<li><strong>Step 1</strong>: all projects are listed (e.g. <code>1) demo-a2 …</code>); pick a number to enter that project.</li>
+<li><strong>Step 2</strong>: within the project, choose an action by number:</li>
+</ul>
+<table>
+<tr><th>No.</th><th>Action</th></tr>
+<tr><td>1</td><td><code>makegame</code> — build project data + produce the HDI (<code>build</code> + <code>make</code>, recommended)</td></tr>
+<tr><td>2</td><td><code>build</code> — build project data only</td></tr>
+<tr><td>3</td><td><code>make</code> — produce the HDI image only</td></tr>
+<tr><td>4</td><td><code>test</code> — launch the NP2kai test</td></tr>
+<tr><td>5</td><td><code>test --porttest</code> — serial hardware test</td></tr>
+<tr><td>6</td><td><code>audio</code> — emulator audio latency settings (global)</td></tr>
+<tr><td>7</td><td><code>pack</code> — switch pack mode (cmpack / openpack)</td></tr>
+<tr><td>0</td><td>Return to the previous level</td></tr>
+</table>
+<p>A failed menu action does not exit; it returns to the menu so you can retry. This way you never need to remember commands or project names, which makes it the best fit for daily use.</p>
+<p><em>Beginner tip: to see it running, enter a project and pick the "test" item — that launches the emulator.</em></p>
+
+<h2>2. Command-line usage (advanced / scripting)</h2>
+<p>Once familiar, or when writing automation scripts, pass a subcommand directly and skip the menu:</p>
+<pre><code>./makegame.sh &lt;subcommand&gt; &lt;game&gt; [options] [--pack cmpack|openpack]</code></pre>
+<table>
+<tr><th>Subcommand</th><th>What it does</th></tr>
+<tr><td><code>makegame &lt;game&gt;</code></td><td><strong>Recommended</strong>: build project data + produce the HDI (<code>build</code> + <code>make</code> in one step)</td></tr>
+<tr><td><code>build &lt;game&gt;</code></td><td>Build project data only: PNG→MAG, engine, scenes, <code>IMAGE.DAT</code>, runtime, and regenerate <code>nb_config.h</code></td></tr>
+<tr><td><code>make &lt;game&gt;</code></td><td>Produce the HDI image only: inject <code>games/&lt;game&gt;/</code> into <code>disks/&lt;game&gt;.hdi</code></td></tr>
+<tr><td><code>test &lt;game&gt; [--serial] [--porttest] [--auto]</code></td><td>Launch the NP2kai test</td></tr>
+<tr><td><code>i18n-gen &lt;game&gt; [--force]</code></td><td>Generate/refresh the internationalized text template</td></tr>
+<tr><td><code>audio</code></td><td>Emulator audio latency settings (global; BGM warble / electrical noise)</td></tr>
+<tr><td><code>pack [cmpack|openpack]</code></td><td>View/switch the pack mode; with an argument, writes <code>.naiz_pack</code> as the new default</td></tr>
+</table>
+<p><strong>Two safety checks</strong>:</p>
+<ul>
+<li><code>make</code> errors out if <code>games/&lt;game&gt;/engine.exe</code> is older than the engine under <code>core/</code>, preventing a stale engine from being packed into the HDI.</li>
+<li><code>test</code> errors out if <code>disks/&lt;game&gt;.hdi</code> is older than <code>games/&lt;game&gt;/engine.exe</code>, preventing the emulator from silently running an old engine.</li>
+</ul>
+
+<h2>3. Option reference</h2>
+<h3>3.1 Global pack options</h3>
+<ul>
+<li><code>--pack cmpack</code>: commercial chain, <code>tools_commercial</code> + DOS/4GW (default).</li>
+<li><code>--pack openpack</code>: open-source chain, <code>tools_open</code> + DOS/32A, with the extender bound into the EXE.</li>
+<li>Precedence: <code>--pack</code> &gt; <code>NAIZ_PACK</code> environment variable &gt; project-root <code>.naiz_pack</code> &gt; auto-detection (<code>tools_commercial</code> → cmpack, otherwise <code>tools_open</code> → openpack).</li>
+<li>The <code>pack</code> subcommand persists the choice: without an argument it opens an interactive menu; with an argument it writes <code>.naiz_pack</code> directly.</li>
+</ul>
+<h3>3.2 Other options</h3>
+<ul>
+<li><code>&lt;game&gt;</code>: the project directory name, located at <code>projects/&lt;game&gt;/</code> (e.g. <code>demo-a2</code>).</li>
+<li><code>--serial</code>: emit debug output over the serial port during tests (the most reliable debugging channel).</li>
+<li><code>--porttest</code>: only check whether the emulator's serial port is usable; does not launch the game.</li>
+<li><code>--auto</code>: if <code>games/&lt;game&gt;/engine_a.exe</code> exists, copy it over <code>engine.exe</code>, re-inject the HDI, then test.</li>
+<li><code>--force</code> (i18n-gen): ignore the incremental check and force regeneration of the text.</li>
+</ul>
+
+<h2>4. Common usage examples</h2>
+<pre><code># In the interactive menu, pick a project → pick 1) makegame (recommended)
+./makegame.sh
+# Equivalent command-line form (build data + inject HDI):
+./makegame.sh makegame demo-a2
+
+# Step by step: build data, then pack the HDI
+./makegame.sh build demo-a2
+./makegame.sh make demo-a2
+
+# Repack the HDI only (data unchanged)
+./makegame.sh make demo-a2
+
+# Run in the emulator over serial and watch the log
+./makegame.sh test demo-a2 --serial
+
+# Switch to the open-source chain and view the current setting
+./makegame.sh pack openpack
+./makegame.sh pack</code></pre>
+
+<h2>5. Related</h2>
+<ul>
+<li><a href="tool-start.html">start.sh</a> — environment setup and audit entry point.</li>
+<li><a href="tool-anima.html">anima.sh</a> — the animation production tool (its output is packed into the HDI by this script too).</li>
+<li><a href="../scripts.html">NB scenario commands</a> — script syntax reference; the build validates commands such as tag / jump / jumpscene.</li>
+</ul>
+
+</main>
+</body>
+</html>

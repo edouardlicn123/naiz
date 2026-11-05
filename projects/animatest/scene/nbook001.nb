@@ -1,0 +1,14 @@
+sceneconf(){Animation Test, normal}
+
+host(){Welcome to the animatest project.This scenario exercises the test of cine animation.}
+playanima(loop,5){testcine}
+waitanima{}
+host(){Could you see the 5 sec animation?That is great.}
+host(){Now let's try playing animation while advancing the story.}
+playanima(once,8){testfull}
+host(){This is the first line while animation plays.}
+host(){The animation runs in the background.}
+host(){You can see both animation and dialog together.}
+host(){The dialog area is protected from being overwritten.}
+host(){Let's continue with the story after this.}
+scene(end)

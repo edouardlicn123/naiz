@@ -1,0 +1,172 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="translated-from" content="202610300931">
+<!-- AI-NOTE: translated-from = the guildbook_cn doc-version this page was translated from. If the cn counterpart's doc-version is newer, re-translate this page from the Chinese source. -->
+
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Audio Platforms &amp; Tools — Naiz Guildbook</title>
+<link rel="stylesheet" href="../style.css">
+</head>
+<body>
+<nav class="sidebar" id="sidebar-nav"></nav>
+<script src="../sidebar-reference.js"></script>
+<main class="main">
+
+<h1>Audio Platforms &amp; Tools</h1>
+<blockquote><strong>Created</strong>: 2026-10-05<br><strong>Last updated</strong>: 2026-10-05</blockquote>
+<p>The previous page covered the mechanics — <strong>what shape the music should take</strong>. This page covers reality: <strong>which platforms and which software can actually produce something in that shape</strong>. Everything listed here has been checked against its actual terms and licenses, including prices and pitfalls.</p>
+<p>For hardware and principles, see <a href="mc06-音频通路机制.html">mc06 Audio Path Mechanics</a>; for how audio commands are written in scripts, see <a href="sc10-audio.html">sc10 Audio Commands</a>; for how assets are registered, see <a href="cf07-图片登记.html">cf07 Image Registration</a>.</p>
+<hr>
+
+<h2>1. AI Composition Platforms</h2>
+<p>When picking a platform, only one thing matters: <strong>can it give you a MIDI file or a written-out score</strong>. Only those can plug into the FM path; the ones that can't — no matter how good the music sounds — can't get in.</p>
+<table>
+<tr><th>Platform</th><th>How to use it</th><th>Notes</th></tr>
+<tr><td><a href="https://www.mureka.ai/">Mureka</a></td><td>Commercial service, <strong>runs in the cloud, zero load on your machine</strong></td><td><strong>The official pages explicitly state that MIDI export is exclusive to Premier members</strong>; there is also a <strong>pay-per-use API route</strong> — <strong>$0.2 per track</strong> gets you <code>wav + midi</code>, no subscription needed — see §1.1 for details</td></tr>
+<tr><td><a href="https://github.com/magenta/magenta-studio">Magenta Studio</a></td><td>Open source (Apache-2.0), runs locally</td><td>5 models, each operating on <strong>MIDI clips you already have</strong>, and the output is still MIDI. Requires <strong>Ableton Live 10.1 or later</strong>, or its standalone version</td></tr>
+<tr><td><a href="https://github.com/ElectricAlexis/NotaGen">NotaGen</a></td><td>Open source (MIT), runs locally</td><td>Generates <strong>scores</strong>, which can then be exported to MIDI</td></tr>
+<tr><td><a href="https://github.com/slSeanWU/MIDI-LLM">MIDI-LLM</a></td><td>Open source, but <strong>the license needs checking yourself</strong> (no standard declaration)</td><td>A model that learns MIDI as text: what goes in is what comes out, and it can continue a melody from where you leave off</td></tr>
+</table>
+<p>The following <strong>cannot directly generate MIDI</strong> — they only output audio waveforms, no MIDI and no score: Suno, Udio, MusicGen, ACE-Step, YuE, Stable Audio, DiffRhythm, <strong>and also <a href="https://magenta.withgoogle.com/magenta-realtime-2">Magenta RealTime 2</a></strong> (<strong>frequently mislisted</strong>: its official model card labels it <strong><code>text-to-audio</code></strong>, i.e. "text to audio". MIDI is its <strong>input</strong> — it encodes MIDI into a 128-dimensional numeric vector and feeds that in — not its output. The model file is about 15.6 GB. The project that actually produces MIDI locally is a different one, Magenta Studio, in the table above).</p>
+<p><strong>But "cannot use directly" does not mean "completely useless"</strong>: these tools' <strong>audio</strong> can be taken and <strong>transcribed into notes</strong> (see §1.4), and you can even <strong>split it into stems first, then transcribe</strong>, avoiding the problem of parts masking each other in a mix.</p>
+
+<h3>1.1 Mureka: two routes to getting MIDI</h3>
+<p><a href="https://www.mureka.ai/">Mureka</a> is currently <strong>the only commercial platform whose official pages state in writing that "MIDI export" actually exists</strong>. Its MIDI is <strong>not in the free tier</strong>, but there are two routes with very different price tags.</p>
+<h4>Route A: Premier membership (web)</h4>
+<p>Quoted from the official subscription page: "With exclusive access to Mureka Studio and <strong>MIDI/WAV export</strong>, Premier provides the ultimate control and high-fidelity production capabilities required for professional music workflows." From this, the capability boundaries of the three tiers can be confirmed:</p>
+<table>
+<tr><th>Tier</th><th>MIDI / WAV export?</th><th>What else</th></tr>
+<tr><td>Free tier</td><td>❌ <strong>No</strong></td><td>0 coins</td></tr>
+<tr><td>Pro</td><td>❌ <strong>No</strong></td><td>Higher-tier models (V9.5 / V9 / V8 / O2) + commercial rights + track extension and editing</td></tr>
+<tr><td><strong>Premier</strong></td><td>✅ <strong>Yes</strong> (MIDI + WAV)</td><td>12-stem separation, mixing in any style, any voice as an AI singer</td></tr>
+</table>
+<p><strong>⚠️ What Premier actually costs cannot be found on this page</strong> — the prices on the official page are drawn dynamically by page scripts; what you can scrape is only the capability table, no numbers. Rumored figures (e.g. $27 per month) <strong>are not officially confirmed; don't treat them as fact</strong>. Before paying, open the official subscription page yourself and confirm.</p>
+<h4>Route B: pay-as-you-go API (recommended if you "just want a few drafts")</h4>
+<p>The official <code>platform.mureka.ai</code> <strong>Export Stem Audio</strong> capability (exporting separated stems) turns MIDI into a <strong>per-track priced commodity</strong>, <strong>no subscription required</strong>:</p>
+<table>
+<tr><th>Model</th><th>What you get</th><th>Unit price</th><th>Stems</th></tr>
+<tr><td>V1</td><td><code>wav</code></td><td>$0.06 / track</td><td>5</td></tr>
+<tr><td><strong>V3</strong></td><td><strong><code>wav, midi</code></strong></td><td><strong>$0.2 / track</strong></td><td>2 (vocals + accompaniment)</td></tr>
+<tr><td><strong>V2</strong></td><td><strong><code>wav, midi</code></strong></td><td><strong>$0.7 / track</strong></td><td>12 (vocals / bass / drums / guitar / piano / flute / sound effects / strings / synthesizer / keyboard / brass and woodwinds / other)</td></tr>
+</table>
+<p>The official FAQ also confirms: <strong>downloading the track itself is free</strong>; only <strong>stem separation costs extra</strong>.</p>
+<div class="note-box">
+<p><strong>⚠️ Three things to know before using the API</strong> (all from the official FAQ): ① <strong>the API and website membership are two completely separate accounts with no interchange</strong> — credits must be purchased separately; ② <strong>credits you top up are valid for 12 months from the day of your most recent top-up; anything unspent expires and is forfeited</strong>; ③ <strong>no refunds, period</strong> — official wording: "all API services are deemed consumed once purchased".</p>
+<p><strong>How to choose</strong>: just trying out a few BGM drafts → <strong>Route B</strong> (10 tracks for only $2, no monthly fee, no expiry pressure); doing this long-term and regularly needing 12-stem separation → only then consider Premier.</p>
+<p><strong>Understand one thing before using it: its MIDI is essentially "split the stems first, then transcribe", not really writing a score</strong> — so its quality ceiling is <strong>exactly as high as the transcription tools in §1.4</strong>, no better. But V2/V3 <strong>hand you the accompaniment as a separate stem</strong>, which precisely satisfies the "one instrument at a time" prerequisite. See §1.4 for details.</p>
+</div>
+<h3>1.2 Why the free tiers don't help</h3>
+<p>This is a slightly counter-intuitive but crucial point: Suno and Udio both have $0 free tiers with generous generation quotas, yet <strong>the free tiers get you no MIDI</strong> — whether you can get it depends on which tier you subscribe to: <strong>Suno only with Premier's Studio</strong>, while <strong>Udio offers it on no tier at all</strong>. The blocking mechanisms are completely different, so they must be looked at separately.</p>
+<table>
+<tr><th>Platform</th><th>Free tier (official pricing page)</th><th>Can you get files?</th><th>For this project</th></tr>
+<tr><td><a href="https://suno.com/pricing">Suno</a></td><td><strong>$0</strong>, 50 credits per day (about 10 tracks), only the <strong>v4.5-all</strong> model, <strong>no commercial rights</strong></td><td>Free tier: audio downloads allowed (with separate download limits), <strong>no MIDI</strong></td><td>⚠️ <strong>depends on the tier</strong>: <strong>Premier's Studio can export MIDI</strong> (see below), <strong>the free tier cannot</strong></td></tr>
+<tr><td><a href="https://udio.com/pricing">Udio</a></td><td><strong>$0</strong>, 10 credits per day and 100 per month, full length (2 min 10 s), but <strong>only 3 tracks per day</strong></td><td>❌ <strong>downloads have been shut off entirely</strong> (see below)</td><td>❌ <strong>no files on any tier</strong>, and therefore no MIDI either</td></tr>
+</table>
+<div class="note-box">
+<p><strong>Udio downloads are <strong>prohibited by the terms of service</strong>, not just a disabled feature.</strong> Downloads of audio / video / stems were turned off starting 2025-10-29 (the same day as the settlement with Universal Music Group); the terms state plainly that "<em>You may not download copies of any Output</em>", and <strong>paid tiers are no exception</strong>. A tool that won't give you the files is worth zero for asset production.</p>
+</div>
+<p>So when choosing this kind of tool, <strong>"can it give you MIDI" matters far more than "is it cheap"</strong> — Suno's MIDI is locked behind Premier, Udio simply has none, and in both cases the free tier's appeal is irrelevant. Suno's Premier itself illustrates the point: <strong>the move was not a price cut but a new tier</strong>. Conversely, when the free tier gives no MIDI, the §1.4 transcription route still exists — so "audio only" means <strong>no direct connection</strong>, not <strong>no value</strong>.</p>
+<div class="note-box">
+<p><strong>Suno Studio can export MIDI (now officially confirmed)</strong> — this previously read "unverified"; it is now confirmed. The <a href="https://help.suno.com/en/articles/8128193">official Suno help center</a> describes the export method:</p>
+<ul>
+<li><strong>First use the Stems panel to split the track into up to 12 independent tracks</strong>, then <strong>right-click one of them → <em>Get MIDI</em>, costing 10 credits each time</strong>; Studio analyzes that track and generates a <code>.mid</code>. The official docs also list uses: re-playing a melody with a different instrument, analyzing chord progressions, re-arranging generated results, and making sample packs together with the audio.</li>
+<li>The official product page (<a href="https://suno.com/landing/audio-editor">suno.com/landing/audio-editor</a>) likewise states that stem-level WAV and MIDI can be exported.</li>
+<li>It is also <strong>bidirectional</strong>: Studio 2.0 (2026-08-13) added <strong>MIDI import, recording, and a piano roll</strong>, and MIDI clips can be used <strong>as prompts for generation</strong> — i.e. besides "exporting", you can also "feed it in and let it continue writing".</li>
+</ul>
+<div class="note-box">
+<p><strong>But note its nature: Get MIDI is "inferring notes back from audio", not handing you the AI's actual internal composition data.</strong> So it belongs to <strong>the same class</strong> as basic-pitch and Mureka's stem export — <strong>the quality ceiling is limited by transcription accuracy</strong> (principles in <a href="mc06-音频通路机制.html">mc06 §4</a>). Single-note melodies and clean bass transcribe accurately; complex chords and vocals will have wrong notes and phantom chords, requiring manual fixes.</p>
+<p><strong>Its order of operations naturally fits the workflow</strong>: you must <strong>split stems first, then Get MIDI one by one</strong>, which exactly satisfies the "one instrument at a time" prerequisite (see §1.4).</p>
+</div>
+<p><strong>One unverified lead remains</strong> (<strong>not confirmed by any official page; don't treat it as a verified option</strong>; before using it, check the official terms and export formats yourself): <strong>Veena</strong> is described by third-party comparison articles as including MIDI even on the free tier. That claim <strong>comes from a competitor's own marketing page</strong>; whether it's credible is yours to verify.</p>
+<p>How to verify: go directly to each vendor's <strong>official primary domain</strong> for pricing pages and export format details; don't trust comparison articles. One practical lesson: searching for "platform + pricing" turns up a pile of <strong>clone sites</strong> — lookalike domains reporting mutually contradictory prices, capability tables with checkmarks in empty columns, even invented model names. <strong>Example</strong>: during this check, a <strong>typosquatted site whose domain had one extra "n"</strong> claimed "Premier is about $24–30 / month" and listed Studio 2.0 details, looking extremely credible — <strong>that price is unverified and is therefore not included in this document</strong>. <strong>Trust only official primary domains</strong>; distrust everything else.</p>
+</div>
+<h3>1.3 Open-source models: what it takes to run them</h3>
+<p>Both NotaGen and MIDI-LLM must <strong>run on your own computer</strong>, and their GPU VRAM requirements are well above those of an ordinary desktop. Check these three items before running; missing any one makes it all pointless:</p>
+<table>
+<tr><th>Project</th><th>VRAM needed</th><th>Python</th><th>What else to install</th></tr>
+<tr><td><a href="https://github.com/slSeanWU/MIDI-LLM">MIDI-LLM</a><br> (an ISMIR 2026 result, based on Llama 3.2 1B)</td><td><strong>16 GB or more</strong>, requires CUDA 12.x</td><td>3.11 (conda environment)</td><td><code>vllm</code>, <code>anticipation</code>, and the FluidR3 GM soundfont; <strong>fast CPU inference also needs AVX512 support</strong></td></tr>
+<tr><td><a href="https://github.com/ElectricAlexis/NotaGen"><br>NotaGen</a><br> (Central Conservatory of Music)</td><td>NotaGen-X <strong>8 GB</strong>; NotaGen-large <strong>24 GB</strong></td><td>3.10 (conda environment)</td><td><code>torch==2.3.0</code> / cuda 11.8, <code>accelerate</code>, <code>optimum</code></td></tr>
+</table>
+<p><strong>4 GB-class cards (GTX 1650 territory) can't run either one</strong> — NotaGen-X needs twice the VRAM, large six times, MIDI-LLM four times. This isn't "a bit slower"; it's <strong>a hard failure: the VRAM simply doesn't fit</strong>.</p>
+<p>One more warning: NotaGen outputs <strong>classical scores written in ABC notation</strong> (not MIDI), leaning toward "generating score assets" — not the same path as the FM BGM route. MIDI-LLM's example prompts explicitly ask for common ensembles like electric guitar, church organ, and saxophone, while the YM2608 has only 6 channels and 128 4-operator tones; converted across, it usually comes out as "robot music" (see <a href="mc06-音频通路机制.html">mc06 "GM tones ≠ FM tones"</a>).</p>
+<div class="note-box">
+<p><strong>If you really must run them:</strong> ① first confirm <strong>10–20 GB</strong> of free disk space (environment plus model files — <strong>the disk often becomes the bottleneck before the GPU does</strong>); ② use something like Google Colab's free tier to <strong>rent a 16 GB GPU by the hour</strong>, leaving only the tracker step on your own machine; ③ when disk runs short, use external storage or clean package caches to make room — <strong>do not</strong> delete this repo's assets to free space (<code>assets/</code> and <code>disks/</code> must especially not be touched).</p>
+</div>
+<h3>1.4 The transcription route: audio → MIDI</h3>
+<p>The platforms above are "<strong>creation from nothing</strong>"; this route is "<strong>recovering notes from audio you already have</strong>". It has an advantage none of the others have: <strong>no platform dependency, no account, no subscription</strong>, and <strong>any audio can be fed in</strong>. For why WAV→MIDI works in principle while "reverse-engineering FM tones from sound" does not, see <a href="mc06-音频通路机制.html">mc06 §4</a>.</p>
+<table>
+<tr><th>Tool</th><th>License</th><th>How to use / what to watch for</th></tr>
+<tr><td><a href="https://github.com/spotify/basic-pitch">basic-pitch</a><br> (Spotify's audio intelligence lab)</td><td><strong>Dual-licensed Apache-2.0 or GPL-3.0</strong>; just take the Apache-2.0 one</td><td>Install with <code>pip install basic-pitch</code>; CLI usage is <code>basic-pitch &lt;output-dir&gt; &lt;input-audio&gt;</code>. ICASSP 2022 model; supports multiple notes sounding at once, and also pitch bend. <strong>TensorFlow is not installed by default</strong> — it instead picks a lighter inference library for your system (TensorFlowLite on Linux, ONNX on Windows, CoreML on macOS); if you truly need full TensorFlow, install <code>basic-pitch[tf]</code></td></tr>
+<tr><td><a href="https://basicpitch.spotify.com/">basic-pitch online demo</a></td><td>Same as above (free)</td><td><strong>Runs in the browser</strong> — drag audio in and MIDI comes out; <strong>nothing to install, no disk space used</strong></td></tr>
+</table>
+<div class="note-box">
+<p><strong>The most important thing in this section is order: split stems first, then transcribe — don't feed a full mix straight in.</strong></p>
+<p>basic-pitch has a hard limitation, in the official words: "<strong>works best with one instrument at a time</strong>" — in a full orchestral mix several parts mask each other and the transcription comes out a mess. Meanwhile §1.1's Mureka <strong>Export Stem Audio V3 / V2 hands you exactly the pre-split stems</strong> (V3 = vocals + accompaniment, V2 = 12 stems), and <strong>splitting out the accompaniment</strong> before per-stem transcription satisfies this prerequisite precisely. So for the most common situation — "all you have is a multi-instrument mix" — the correct order is:</p>
+<p><strong>generate (any tool) → stem split → per-track transcription → MIDI → tracker</strong></p>
+<p>This is not an "optional optimization"; it is a <strong>prerequisite that decides success or failure</strong>. Conversely, <strong>humming a single-note melody yourself is still the cleanest approach</strong> — the demo page itself says "press record and hum a tune into the microphone". Once the melody is clear in your head, humming it once and converting to MIDI is faster and more accurate than any generative tool.</p>
+</div>
+
+<h2>2. Software Tools</h2>
+<p>Every license below has been checked one by one against the repo's LICENSE or the official site. For which format each one produces, see <a href="mc06-音频通路机制.html">mc06 §2</a>.</p>
+<table>
+<tr><th>Tool</th><th>License</th><th>What it's for / what to watch for</th></tr>
+<tr><td><a href="https://github.com/BambooTracker/BambooTracker">BambooTracker</a></td><td>GPL-2.0-or-later</td><td>Composition software <strong>built specifically for the PC-88/98's YM2608 (OPNA)</strong> (Win / macOS / Linux builds available), and still under active development. The first choice for making PC-98 music</td></tr>
+<tr><td><a href="https://github.com/tildearrow/furnace">Furnace Tracker</a></td><td>GPL-2.0 / GPL-3.0 dual license</td><td>Explicitly supports the YM2608 (OPNA); <strong>can import MIDI</strong> (via RtMidi); can export VGM</td></tr>
+<tr><td><a href="https://github.com/Wohlstand/libOPNMIDI">libOPNMIDI</a></td><td>LGPL-3.0</td><td>A library that renders MIDI as OPN2 / OPNA sound, <strong>with a built-in "MIDI to VGM commands" exporter</strong> — this is the "real MIDI → FM" route</td></tr>
+<tr><td>OPNplug</td><td>Ships with libOPNMIDI</td><td>The VST / LV2 plugin form of libOPNMIDI, for auditioning in software</td></tr>
+<tr><td><a href="https://github.com/nobuyukinyuu/bambooCopy">bambooCopy</a></td><td>MIT</td><td>Converts YM2151 (OPM) tones into a form the YM2608 can use; not updated since 2019</td></tr>
+<tr><td><a href="https://github.com/vampirefrog/mdxtools">mdxtools</a></td><td>GPL-3.0</td><td>The <code>mml2mdx</code> compiler, used by the X68000 MDX scene; takes the MML / S98 route</td></tr>
+<tr><td><a href="https://github.com/gameblabla/pc98sndpmdtools">pc98sndpmdtools</a></td><td>Non-standard declaration; read the LICENSE yourself</td><td>Converts WAV into ADPCM formats like <code>PC8</code> / <code>P86</code> / <code>PPC</code> for use with PMD; the old-school way to make voice assets</td></tr>
+<tr><td><a href="https://mml-guide.readthedocs.io">MML Syntax Reference</a></td><td>Documentation</td><td>The syntax definition of the MML notation</td></tr>
+</table>
+<h3>2.1 Two easy pitfalls</h3>
+<div class="note-box">
+<p><strong>FamiTracker is the wrong tool for this job.</strong> Its own site describes it as "a free <em>windows</em> tracker for producing music for the <em>NES/Famicom</em>-systems" (a free Windows tracker for making music for Nintendo's Famicom). The last release is <strong>0.4.6 (2015-02-04)</strong>, GPL. Two facts are especially easy to mix up:</p>
+<ul>
+<li>The site does still say "MIDI input devices are supported" — but that means <strong>playing live from a connected MIDI keyboard</strong>, <strong>not</strong> importing <code>.mid</code> files;</li>
+<li><strong>MIDI import was removed back in 0.4.3 (2014-06-07)</strong> (changelog wording: "Removed MIDI import"), and it <strong>has no MIDI export at all</strong> — the only exports are NSF / WAV / text formats.</li>
+</ul>
+<p>In other words, if you wanted to use FamiTracker for the "AI-generated MIDI → FM" route, it <strong>falls short on both ends</strong>: MIDI can't get in, and MIDI can't come out.</p>
+</div>
+<div class="note-box">
+<p><strong>FamiStudio doesn't support the YM2612 either.</strong> It is often mistaken for "a tracker supporting many sound sources". It only covers the Nintendo side: 2A03, VRC6 / VRC7, FDS, N163, MMC5, 5E01, etc. — <strong>no YM2612 / YM2608</strong>.</p>
+</div>
+
+<h2>3. Recommended Workflow</h2>
+<pre><code>① Mureka Premier / Suno Studio / Magenta Studio ──▶ MIDI  ┐
+② any tool ──▶ stem split ──▶ per-track transcription ──▶ MIDI   ┤
+③ hum it yourself ──▶ per-track transcription ──▶ MIDI          ┘
+                                            │
+                                            ▼
+tracker (BambooTracker / Furnace)           │
+├─────▶ libOPNMIDI dumper ──▶ VGM ──▶ OPNplug audition (audition loop)
+                                            ▼
+└─────▶ engine (YM2608 backend)</code></pre>
+<pre><code>Side branch (sound effects / voice):
+any WAV ──wav_convert.py──▶ .pcm ──▶ engine (takes the single PCM channel)</code></pre>
+<ul>
+<li><strong>MIDI is the exchange format; FM is only responsible for producing the sound.</strong> This is the sole prerequisite for all the AI tools above to plug in — <strong>don't expect AI to hand you FM tones directly; it has no such ability</strong> (reasons in <a href="mc06-音频通路机制.html">mc06 §4</a>).</li>
+<li>Tones can start from WOPN or community tone banks, but <strong>verify each license one by one</strong> (see §4).</li>
+<li>A tracker's GPL covers only the software itself; <strong>music data made with it is not infected</strong> (see §4).</li>
+<li>When sound effects and voice take the PCM side branch, <strong>there must be one page of dialogue between them</strong> (because PCM has only one channel; see <a href="mc06-音频通路机制.html">mc06 §1</a>).</li>
+</ul>
+<div class="note-box">
+<p><strong>Where AI fits: it saves the effort of "thinking up a melody", not the effort of "producing a finished track".</strong> What AI gives you is <strong>generic GM MIDI</strong>, while the YM2608 has only 6 channels and 128 4-operator tones; converted directly, it usually comes out as "robot music" (see <a href="mc06-音频通路机制.html">mc06 "GM tones ≠ FM tones"</a>).</p>
+<p>So the AI's MIDI must be <strong>redone</strong> in a tracker: swap in FM tones, adjust the arrangement, and <strong>delete the parts you can't use</strong> to fit 6 channels. Treat it as a "melody draft", not a "finished piece". If you'd rather skip AI entirely and compose directly in a tracker, that costs nothing and depends on nothing, and the result is often higher quality — <strong>AI is not a necessity</strong>.</p>
+<p><strong>The three entry points, ranked by how much they cost</strong> (assuming a local 4 GB GPU without AVX512): <strong>③ zero cost, zero dependencies</strong> — once the melody is clear, just hum it; <strong>② nearly zero cost</strong> — Mureka API's V3 at $0.2 per track; <strong>① the most expensive or the most hassle</strong> — Premier needs a monthly fee, Magenta Studio needs Ableton. <strong>Try ③ first; don't subscribe right away.</strong></p>
+<p>Also, keep two things distinct: composition AI is "<strong>creation from nothing</strong>", giving you a melody that never existed before; transcription is "<strong>recovering notes from existing audio</strong>" — <strong>it doesn't save the "thinking up a melody" effort, only the "typing the melody into a tracker" effort</strong> (see §1.4).</p>
+</div>
+
+<h2>4. License Notes</h2>
+<ul>
+<li><strong>GPL's "contagion" applies to code, not to the data produced with it.</strong> FamiTracker, BambooTracker, Furnace, and mdxtools are all GPL, but <strong>music made with them can be shipped in any engine without open-sourcing your engine</strong>.</li>
+<li><strong>"Referencing its code" is a different matter.</strong> <code>libOPNMIDI</code> is mainly LGPL-3.0, but it embeds license-incompatible third-party cores (MAME's YM2612 / OPN core, Genesis Plus GX). To reference or port its code, you must <strong>check the SPDX license header of every file</strong>, not just the top-level LICENSE of the repo.</li>
+<li>When taking tone parameters from community tone banks, <strong>if the bank itself states no license, treat it as "unknown origin"</strong> and only use it after verifying.</li>
+<li>This project's rules are in <code>AGENTS.md</code> §10: GPL v2 code must not be copied directly; copied code must carry the source project + GitHub URL + license comment.</li>
+</ul>
+
+</main>
+</body>
+</html>

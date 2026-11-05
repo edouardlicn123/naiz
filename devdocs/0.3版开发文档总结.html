@@ -1,0 +1,928 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Naiz 引擎 116-176 开发文档总结</title>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Noto Sans SC", "Microsoft YaHei", sans-serif; background: #f5f6f8; color: #1a1a2e; line-height: 1.75; }
+.container { max-width: 1000px; margin: 0 auto; padding: 40px 32px 96px; }
+
+header { background: linear-gradient(135deg, #1a1a2e 0%, #2d2d44 100%); color: #fff; border-radius: 12px; padding: 40px 44px; margin-bottom: 36px; }
+header h1 { font-size: 30px; margin-bottom: 10px; font-weight: 700; }
+header .subtitle { font-size: 15px; color: #c8c8d8; margin-bottom: 20px; }
+header .meta { display: flex; flex-wrap: wrap; gap: 10px; }
+header .badge { background: rgba(255,255,255,0.14); border: 1px solid rgba(255,255,255,0.22); padding: 4px 14px; border-radius: 999px; font-size: 13px; color: #e8e8f0; }
+
+.toc { background: #fff; border: 1px solid #e0e0e0; border-radius: 10px; padding: 28px 32px; margin-bottom: 40px; }
+.toc h2 { font-size: 18px; margin-bottom: 16px; color: #1a1a2e; }
+.toc a { display: block; padding: 6px 0; color: #1976d2; text-decoration: none; font-size: 14px; }
+.toc a:hover { text-decoration: underline; }
+.toc .toc-group { color: #555; font-weight: 700; font-size: 13px; letter-spacing: 1px; margin-top: 14px; padding: 6px 0 2px; text-transform: uppercase; }
+.toc .toc-group:first-child { margin-top: 0; }
+
+.group { margin-bottom: 44px; }
+.group-header { display: flex; align-items: baseline; gap: 12px; border-left: 5px solid #4fc3f7; padding-left: 14px; margin-bottom: 6px; }
+.group-header h2 { font-size: 22px; color: #1a1a2e; }
+.group-header .range { font-size: 13px; color: #888; }
+.group-desc { color: #666; font-size: 14px; margin: 0 0 22px 19px; }
+
+.doc { background: #fff; border: 1px solid #e0e0e0; border-radius: 10px; padding: 22px 26px; margin-bottom: 18px; }
+.doc-head { display: flex; align-items: center; gap: 12px; margin-bottom: 10px; flex-wrap: wrap; }
+.doc-num { background: #1a1a2e; color: #fff; font-size: 13px; font-weight: 700; padding: 3px 10px; border-radius: 5px; letter-spacing: 0.5px; }
+.doc-title { font-size: 18px; font-weight: 700; color: #1a1a2e; }
+.doc-status { margin-left: auto; font-size: 12px; color: #555; background: #f0f4f8; border: 1px solid #d8dee8; padding: 2px 10px; border-radius: 999px; white-space: nowrap; }
+
+.doc h4 { font-size: 13px; color: #666; margin: 12px 0 4px; text-transform: uppercase; letter-spacing: 1px; }
+.doc ul { margin: 0 0 6px 20px; }
+.doc li { margin: 3px 0; font-size: 14px; }
+.doc .landing { background: #f0f8f4; border-left: 3px solid #26a69a; padding: 8px 14px; border-radius: 0 6px 6px 0; font-size: 14px; color: #2b4a3a; margin: 8px 0; }
+.doc .rel { font-size: 13px; color: #777; background: #faf9f6; border-left: 3px solid #d8b56a; padding: 8px 14px; border-radius: 0 6px 6px 0; }
+
+footer { text-align: center; color: #999; font-size: 13px; margin-top: 56px; padding-top: 24px; border-top: 1px solid #e0e0e0; }
+
+@media (max-width: 720px) {
+  .container { padding: 20px 16px 60px; }
+  header { padding: 28px 24px; }
+  .doc-status { margin-left: 0; }
+}
+</style>
+</head>
+<body>
+<div class="container">
+
+<header>
+  <h1>Naiz 引擎 0.3 版开发文档总结</h1>
+  <div class="subtitle">devdocs/ 开发记录全量归档汇总 — BGM 修复期、音频架构重构与 Naiz Queue 规划</div>
+  <div class="meta">
+    <span class="badge">覆盖 116–176 · 58 份文档</span>
+    <span class="badge">版本 0.3.062 → 0.4.001</span>
+    <span class="badge">归档于 2026-10</span>
+  </div>
+</header>
+
+<nav class="toc">
+  <h2>目录</h2>
+  <a href="#g1">一、输入边界、偏好、翻译收口（116–121）</a>
+  <a href="#g2">二、FM 地址修复与 MIDI→FM 通路（122–127）</a>
+  <a href="#g3">三、BGM 颤动系列诊断（128–133）</a>
+  <a href="#g4">四、参考引擎调研与音频架构选型（134–139）</a>
+  <a href="#g5">五、BGM buzz 消除与 FM 音色迭代（140–155）</a>
+  <a href="#g6">六、ISR 中断驱动音泵系列（157–171）</a>
+  <a href="#g7">七、ISR 路径修复与虚拟时钟收口（172–176）</a>
+</nav>
+
+<!-- ============================================================ -->
+<section class="group" id="g1">
+  <div class="group-header"><h2>一、输入边界、偏好、翻译收口</h2><span class="range">116 – 121</span></div>
+  <p class="group-desc">CG 后首句对白自动翻页根修启动的 116/117 输入边界收口，118/119/120 玩家偏好分家与单一配置源，121 翻译与脚本长度上限收口。</p>
+  <div class="doc" id="doc-116">
+    <div class="doc-head"><span class="doc-num">116</span><span class="doc-title">输入边界收口与阻塞语义陷阱修正</span><span class="doc-status">修复/验证</span></div>
+    <h4>核心思路</h4>
+    <ul>
+      <li>`core/engine/main.c:150`</li>
+      <li>`core/engine/layer.c:44-45`（两行合一）</li>
+      <li>`core/engine/nb_save_dialog.c:123`</li>
+      <li>`core/engine/nb_saveload.c:260`</li>
+      <li>`core/engine/nb_setting.c:252`</li>
+    </ul>
+    <div class="landing"><b>最终落点：</b>&gt; - **被推翻的结论**：点击 FIFO 在 `cmd_cg` 整屏 blit 期间堆积，故无输入自动翻页。</div>
+    <div class="rel"><b>现状关联：</b>&gt; **关联版本**：`0.3.008`（前序 `0.3.007` 为 CG 画廊 chrome 槽修复）</div>
+  </div>
+
+  <div class="doc" id="doc-117">
+    <div class="doc-head"><span class="doc-num">117</span><span class="doc-title">单页对白重复arm打字机根修与输入边界收口订正</span><span class="doc-status">修复/验证</span></div>
+    <h4>核心思路</h4>
+    <ul>
+      <li>单页行不再 arm 打字机，整句一次显示，**首击即翻页**；</li>
+      <li>**多页行所有页（含末页）保持打字机**，效果统一不变；</li>
+      <li>条件提取为 `single_page` 局部标志（C89 要求块首声明），使 arming 分支能同时报告页型。</li>
+      <li>`make -C core`：0 errors / 0 warnings</li>
+      <li>`pytest tools/tests/`：**510 passed**；`test_single_page_line_is_not_re_vealed` 已**双向确认**（回退则失败、修复则通过）</li>
+    </ul>
+    <div class="landing"><b>最终落点：</b>| **只认鼠标采样标记** | 键盘轮次明明成功，却被报 `INPUT_NOT_SAMPLED` | 采样标记须按通道取：键盘 `[INPUT] Key confirmed`、鼠标 `b=1` |</div>
+    <div class="rel"><b>现状关联：</b>&gt; **关联版本**：`0.3.009`（前序 `0.3.008` 为输入边界收口 + anim 幽灵唤醒门控）</div>
+  </div>
+
+  <div class="doc" id="doc-118">
+    <div class="doc-head"><span class="doc-num">118</span><span class="doc-title">玩家偏好分家与音频开关音量设置场景</span><span class="doc-status">已落地</span></div>
+    <h4>核心思路</h4>
+    <ul>
+      <li>**项目配置**（`dlgstyle` `btnstyle` `version` `blacktitle` `blackdialog`）——由 `projects/&lt;game&gt;/scene/settings.txt` 手工维护、`build` 时注入 `config.toml` 派生的三键；</li>
+      <li>**玩家偏好**（`lang` `text_speed`）——由 `settings_save()` 在运行期回写。</li>
+      <li>**状态归属**：`audio.c` 内 static + `audio_set_bgm_enabled/snd_enabled/vc_enabled` 与 getter；`settings.c` 只负责持久化（读写时调 audio 的 getter/setter）。方向与既有先例一致——`settings.c:144-145` 本就调 `dlg_set_s</li>
+      <li>**门控位置**：`audio_bgm_start:67`、`audio_snd_play:185`、`audio_vc_play:186` 三入口开头判开关。已核实 `nb_audio.c:29,40,51` 全经此三处，**覆盖完整、无旁路**。</li>
+      <li>**BGM 关**：额外调 `audio_bgm_stop()`（`audio.c:112`，16 通道 all-notes-off，通道独立、干净）。</li>
+    </ul>
+    <div class="landing"><b>最终落点：</b>&gt; **状态**：完结（代码已实施并通过全量验证；实机音频听感仍待用户确认，见 §十）</div>
+    <div class="rel"><b>现状关联：</b>&gt; 4. **§一/§三/§六/§八 的行号已因实现位移失效**（共 20 处）。本文档写于代码改动之前，§六/§七 描述的是**改动后**状态却保留了**改动前**的行号。正确的真值表见接替文档 `devdocs/119-用户偏好分家实装订正与设计门控与规格双源守恒.md` §二。</div>
+  </div>
+
+  <div class="doc" id="doc-119">
+    <div class="doc-head"><span class="doc-num">119</span><span class="doc-title">用户偏好分家实装订正与设计门控与规格双源守恒</span><span class="doc-status">修复/验证</span></div>
+    <h4>核心思路</h4>
+    <ul>
+      <li>`fre` `On`/`Off`：`Activé`/`Désactivé` → **`Actif`/`Inactif`**（只改 `Off` 会让 `Activé`/`Inactif` 配对失称，故成对改）</li>
+      <li>`fre` `Instant`：`Instantané` → `Immédiat`</li>
+      <li>`spa` `Off`：`Desactivado` → `Inactivo`（与既有 `Activado` 配对，只改一个）</li>
+      <li>`spa` `Instant`：`Instantáneo` → `Inmediato`</li>
+      <li>`por` `Instant`：`Instantâneo` → `Imediato`</li>
+    </ul>
+    <div class="landing"><b>最终落点：</b>&gt; **起因**：审查 devdoc 118 与实现的一致性时发现，118 标注「完结」但正文含**未做的声称**、**夸大的守卫强度**、**不存在的产物**与**大面积失效行号**。</div>
+    <div class="rel"><b>现状关联：</b>&gt; **起因**：审查 devdoc 118 与实现的一致性时发现，118 标注「完结」但正文含**未做的声称**、**夸大的守卫强度**、**不存在的产物**与**大面积失效行号**。按 AGENTS.md §十「任何地方还留着一个已知错误的结论，就是未完成」，118 不能算完结。</div>
+  </div>
+
+  <div class="doc" id="doc-120">
+    <div class="doc-head"><span class="doc-num">120</span><span class="doc-title">settings.txt废止与config.toml单一配置源与启动菜单语言根修</span><span class="doc-status">修复/验证</span></div>
+    <h4>核心思路</h4>
+    <ul>
+      <li>界面全部英文；</li>
+      <li>串口日志 `settings_menu: selected lang=cht (Chinese (TC))` **正常打印**——选择确实被接收了；</li>
+      <li>重启后再进开机菜单，Language 行**又显示回 English**；</li>
+      <li>游戏内 `startsetting` 改语言后界面不变。</li>
+      <li>`main.c:94` `settings_save()` 把 `lang=cht` **正确写进** USER.CFG —— 但没有任何代码读它；</li>
+    </ul>
+    <div class="landing"><b>最终落点：</b>|---|---|</div>
+    <div class="rel"><b>现状关联：</b>&gt; **接替/订正**：`devdocs/118-玩家偏好分家与音频开关音量设置场景.md`（§6.1 归属表 + §三 键集失效，追加 ERRATA）、`devdocs/119-用户偏好分家实装订正与设计门控与规格双源守恒.md`（§二 行号真值表因本次改名整体失效，追加 ERRATA）</div>
+  </div>
+
+  <div class="doc" id="doc-121">
+    <div class="doc-head"><span class="doc-num">121</span><span class="doc-title">翻译与脚本文本长度上限收口与五对话框容量守卫</span><span class="doc-status">方案/规划</span></div>
+    <h4>核心思路</h4>
+    <ul>
+      <li>`TR_INIT_CAP 64`（`:19`）注释随之更新：初块 64 × 2304 B ≈ 144 KB。</li>
+      <li>`TR_MAX_ENTRIES 1024`（`:18`）**不改**，但纳入守卫（§六）与运行期告警（§五）。</li>
+      <li>余量说明：值 1280 相对理论最坏 1260 仅 20 B（+NUL 后可用 1279）。**可选**给值留余量改 1536（≈6 框），代价是条目内存增至 2560 B。默认取 1280。</li>
+      <li>key 命中 `TR_KEY_LEN`（clamp 前判定 `klen &gt;= TR_KEY_LEN`）；</li>
+      <li>value 命中 `TR_VAL_LEN`（clamp 前判定 `vlen &gt;= TR_VAL_LEN`）；</li>
+    </ul>
+    <div class="landing"><b>最终落点：</b>&gt; **状态**：完结（2026-10-04 实现落地）</div>
+    <div class="rel"><b>现状关联：</b>&gt; **关联版本**：`0.3.018`（已 bump）</div>
+  </div>
+
+</section>
+
+<!-- ============================================================ -->
+<section class="group" id="g2">
+  <div class="group-header"><h2>二、FM 地址修复与 MIDI→FM 通路</h2><span class="range">122 – 127</span></div>
+  <p class="group-desc">BGM 本地静音根因、MIDI 转 FM 通路实现计划与 GM 映射数据、FM 寄存器地址公式根修（125 主 + 验证结果）、以及修复后仍&quot;无音乐&quot;的二次排查。</p>
+  <div class="doc" id="doc-122">
+    <div class="doc-head"><span class="doc-num">122</span><span class="doc-title">BGM本地静音根因与音频通路取舍</span><span class="doc-status">已落地</span></div>
+    <h4>核心思路</h4>
+    <ul>
+      <li>端口：`MPU_DATA_PORT 0xC0D0` / `MPU_STATUS_PORT 0xC0D2`（`hal_audio.c:29-30`）</li>
+      <li>`mpu_read_byte()`（`hal_audio.c:41-49`）轮询 status bit7（`0x80`，RX_PENDING）为 0 才读数据，最多 `MPU_PROBE_ITER 20000` 次（`hal_audio.c:38`），超时返回 -1</li>
+      <li>`hal_audio_detect()`（`hal_audio.c:51-60`）：reset(`0xFF`) 期待 ACK `0xFE`，再 UART(`0x3F`) 期待 ACK；任一步失败即返回 0</li>
+      <li>**FM 合成是参数化模型**：一首歌 = N 通道 ×（音色包络参数 + 音符序列），全部信息可能只有几千个数字。</li>
+      <li>**WAV 是任意波形采样**，信息量 = 采样率 × 时长。</li>
+    </ul>
+    <div class="landing"><b>最终落点：</b>&gt; **状态**：完结（2026-10-04 实现落地；§六 BGM 制作管线的 FM 作曲方法明确留作下一步研究）</div>
+    <div class="rel"><b>现状关联：</b>&gt; **状态**：完结（2026-10-04 实现落地；§六 BGM 制作管线的 FM 作曲方法明确留作下一步研究）</div>
+  </div>
+
+  <div class="doc" id="doc-123">
+    <div class="doc-head"><span class="doc-num">123</span><span class="doc-title">MIDI转FM通路实现计划</span><span class="doc-status">已落地</span></div>
+    <h4>核心思路</h4>
+    <ul>
+      <li>**SSG 通道数错**：§5.2 称「2608 = 2612 的 6FM + **6SSG** + ADPCM」。两个芯片都不是 6——**YM2608(OPNA) 是 3 通道 SSG**（`F03` §2），**YM2612 是 9 通道**（3 颗 YM2149）。且该式**漏了 RHYTHM**（2608 独有，6 通道）。</li>
+      <li>**`:213` 待研究项已收敛**：原文列的「FM 乐谱格式选型（MML/PMD `.MML` 采样 vs 直接驱动 YM2608 端口序列 vs MIDI+音源映射）」由本文 §1.2 决策闭合。注意原文把 **MML 称作「采样」**——MML 是纯文本记谱法，不是采样数据，术语亦误。</li>
+      <li>不引入 PMD 作为运行时依赖（实模式互操作撞 AGENTS §四 禁止表，且独占 OPNA）</li>
+      <li>不做 WAV → FM 音色（欠定逆问题，无解；`mc06` §4）</li>
+      <li>不改 NB 脚本语法（`bgm(){key}` / `bgm(stop)` 保持不变）</li>
+    </ul>
+    <div class="landing"><b>最终落点：</b>&gt; **状态**：**实现在完成中**（S0–S5 代码已落地，S7 实机/NP2kai 验证待做；详见下方实现记录）</div>
+    <div class="rel"><b>现状关联：</b>&gt; **关联版本**：`0.3.022`（S0–S5 落地轮）</div>
+  </div>
+
+  <div class="doc" id="doc-124">
+    <div class="doc-head"><span class="doc-num">124</span><span class="doc-title">MIDI转FM通路S6默认音色内容与GM映射数据</span><span class="doc-status">方案/规划</span></div>
+    <h4>核心思路</h4>
+    <ul>
+      <li>**音质试听与微调归 S7**。本轮交付「结构合理、范围合法、C 校验通过、许可干净」的**默认值起点**，不是最终混音成品；</li>
+      <li>**项目级 gm_map 覆盖**（devdoc 123 §6.2「项目可覆盖」）不做——当前严格约束「FMP 行序必须是 `gm_families.FAMILIES` 序」，序不一致构建即 `RuntimeError`（宁错勿错映射）。覆盖机制留待真正需要时另开。</li>
+      <li>**谐波骨架**（`mul`/`dt`）决定音色结构的「和声性 vs 打击性」——钢琴/钟/打击用高次倍频或非谐，弦/风琴/口琴用低次谐波；</li>
+      <li>**反馈**（`fb`）把并联堆推向「铜管/法兹」的过载边缘（brass 5、sfx 7）；</li>
+      <li>**包络形状**：`ar`（起音速率）区分拨弦类（26–31，瞬起）与持续类（14–20，慢起）;`d1r/d2r/sl` 决定「衰减到持续」的快慢与电平（风琴 d1r=d2r=0、sl=15 恒持）；`rr` 决定收尾（钟 8–9 长、打击 4 短）；</li>
+    </ul>
+    <div class="landing"><b>最终落点：</b>&gt; **关联版本**：`0.</div>
+    <div class="rel"><b>现状关联：</b>&gt; **状态**：**已实现**（devdoc 123 的 S6 内容轮；音质试听归 S7）</div>
+  </div>
+
+  <div class="doc" id="doc-125">
+    <div class="doc-head"><span class="doc-num">125</span><span class="doc-title">FM寄存器地址修复与Post-fix音频抓取时机解决-验证结果</span><span class="doc-status">调研分析</span></div>
+    <h4>核心思路</h4>
+    <ul>
+      <li>**根因 1（地址公式）**：`fm_op_addr` 修正为 `base + 4*r`（ymfm/OPN 布局 `{0,4,8,12}`），测试 `test_fm_seq.py + test_fmopn.py` **26 passed**，编译干净、HDI 更新。</li>
+      <li>**时机解决（抓取稳定性）**：采用“**parec 提前后台启动（monitor 源），检测到 `BGM start &#x27;melody_town&#x27; (310 events) (FM)` 后立即开始 5s 录制**”。首次稳定产出非空波形 `precise.raw`（7.8M 字节）。</li>
+      <li>**波形分析（post-fix）**：</li>
+      <li>首音符瞬态（1.29s 附近，极短脉冲窗口）：`max=2048, rms≈1970–1980, ~ -24.4 dBFS`（峰值接近满幅一半，短时能量较高）</li>
+      <li>紧随衰减后（~1.30–1.32s 短窗）：`rms~635 (~-34.2 dBFS)`、迅速跌至 `rms~0`（休止/衰减特性）</li>
+    </ul>
+    <div class="landing"><b>最终落点：</b>- 重新核查 `assets/demo-a2/fm/*.</div>
+    <div class="rel"><b>现状关联：</b>&gt; 相关：devdoc 123、122、F03</div>
+  </div>
+
+  <div class="doc" id="doc-125_b">
+    <div class="doc-head"><span class="doc-num">125</span><span class="doc-title">FM寄存器地址修复与Post-fix音频抓取时机解决</span><span class="doc-status">修复/验证</span></div>
+    <h4>核心思路</h4>
+    <ul>
+      <li>**根因 1（代码 bug）**：`core/lib/fmseq.c::fm_op_addr` 使用错误的地址公式 `base + 3*(r&amp;1) + 8*(r&gt;&gt;1)`，导致算子寄存器写入到 `{0,3,8,11}`，偏离 OPN/OPNA 的正确布局 `{0,4,8,12}`（operator 由寄存器地址 bit2–3 选定、channel 由 bit</li>
+      <li>**根因 2（内容）**：15 个 FMP 音色族全部 `SL=14`（≈-45 dB 持续底），即使寄存器写到正确算子也会使长音符停留在较低的 Sustain 电平。</li>
+      <li>**卡点（验证）**：要量化 post-fix 效果，必须稳定抓取 NP2kai 主机回放的波形。此前多轮用“检测到 `BGM start` 标记后再启动 `parec`”均导致 `fix*.raw` 为空或首音丢失，主要是 `parec` fork+PulseAudio/ALSA 初始化的启动延迟（30–80 ms）与时序竞争。</li>
+      <li>注释：`base + 4*r`（operator=bits2–3, channel=bits0–1）</li>
+      <li>预期 TL 写入：`(0,0x40,40)`、`(0,0x44,42)`、`(0,0x48,44)`、`(0,0x4C,46)`（原先为 `0x43/0x4B`）</li>
+    </ul>
+    <div class="landing"><b>最终落点：</b>（说明：`fmopn_op_tl` 等 accessor 以“芯片寄存器槽 r” 接受参数，并通过 `fmopn_file_slot` 将其反查到 FMP 文件槽 `{0,2,1,3}`。</div>
+    <div class="rel"><b>现状关联：</b>&gt; 相关：devdoc 123（MIDI→FM）、122（BGM 本地静音）、F03（OPNA FM 寄存器参考）</div>
+  </div>
+
+  <div class="doc" id="doc-125c">
+    <div class="doc-head"><span class="doc-num">125c</span><span class="doc-title">Post-fix 音频抓取分析（实听结论）</span><span class="doc-status">修复/验证</span></div>
+    <h4>核心思路</h4>
+    <ul>
+      <li>抓取时机方案有效：提前后台启动 parec（monitor 源）+ 标记后立即录制，稳定抓到非空波形（7.8M 字节）。</li>
+      <li>双声道分离：信号主要出现在<b>右声道（R）</b>，左声道整体 RMS 约 -54.6 dBFS、右声道约 -32.9 dBFS。</li>
+      <li>瞬态改善（根因 1 生效）：首音附近出现短促脉冲，窗口 RMS 可达 ~-24 dBFS（峰值 2048），相比 pre-fix max_abs≈59（≈-54 dBFS）有显著提升——寄存器写入位置已纠正到正确算子槽。</li>
+      <li>持续电平：右声道活动段 rms ~600–1100，约 42.5s 处出现更响片段（峰值 ~18934、rms ~12000，≈-8.7 dBFS），证明 FM 通路本身有动态范围。</li>
+      <li>"没听到音乐" vs "录到信号"：波形上确实有 FM 输出信号，主观没听到可能因信号集中单声道且整体电平偏中等、瞬态很短、播放设备音量平衡影响。</li>
+    </ul>
+    <div class="landing"><b>最终落点：</b>地址修复（根因 1）已生效，抓取时机解决方案完全有效。整体电平偏低更可能是音色参数（TL/算法平衡）或输出声道平衡/增益导致主观感受偏弱。建议确认声道输出、微调载波算子 TL（-4~-8）而非改 SL。</div>
+    <div class="rel"><b>现状关联：</b>承接 devdoc 125（根因分析与修复），后续 devdoc 125d（音色微调实验）。</div>
+  </div>
+
+  <div class="doc" id="doc-125d">
+    <div class="doc-head"><span class="doc-num">125d</span><span class="doc-title">FM 音色微调实验记录（flute 族 TL 调节）</span><span class="doc-status">实验记录</span></div>
+    <h4>核心思路</h4>
+    <ul>
+      <li>实验目的：验证 melody_town GM 程序 73（flute 族）小幅 TL 调节是否提升主观可听度。</li>
+      <li>第一次 TL -6（op0=26, op3=49）：L/R 整体 RMS 均 -56.6 dBFS（声道更平衡），但整体可听度提升有限。</li>
+      <li>第二次 TL 再 -4（共 -10 → op0=22, op3=45）：L/R RMS -90.5 dBFS，过度衰减，整体电平大幅下降。</li>
+      <li>恢复 -6：op0=26, op3=49，RMS -59.8 dBFS，较过度调节有所回升。</li>
+    </ul>
+    <div class="landing"><b>最终落点：</b>小幅降低载波 TL（-6）改善声道平衡但对整体可听度提升有限，过度降低（-10）不可取。地址修复（base+4*r）是解决核心 bug，已通过波形证实生效。已恢复 flute.fmp 原始 TL 值（op0=32, op3=55）。</div>
+    <div class="rel"><b>现状关联：</b>承接 devdoc 125c（实听结论）。</div>
+  </div>
+
+  <div class="doc" id="doc-126">
+    <div class="doc-head"><span class="doc-num">126</span><span class="doc-title">完整总结：FM地址修复后仍“无音乐”排查与下一步方向</span><span class="doc-status">方案/规划</span></div>
+    <h4>核心思路</h4>
+    <ul>
+      <li>`BGM start &#x27;melody_town&#x27; (310 events) (FM)` 正常触发（串口日志）</li>
+      <li>首音瞬态：从 pre-fix ~ -54 dBFS 提升至 ~ -24 dBFS（峰值 2048）——**地址修复已生效（寄存器写到正确算子）**</li>
+      <li>持续段：双声道有能量（R 声道更明显），活动段落 rms ~ 600–1100（约 -29 dBFS），整体 RMS 仍偏低</li>
+      <li>FMP SL 分布 2–9（并非此前推断的 14）。flute 族 TL 微调（-6）改善声道平衡但主观改善有限，已恢复原值</li>
+      <li>**A. 主机音量/平衡**：信号主要在 R 声道。模拟器音量、系统音量、PulseAudio 平衡、扬声器/耳机单侧都可能导致“听不到”。</li>
+    </ul>
+    <div class="landing"><b>最终落点：</b>结论：**波形上有 FM 信号输出，但主观听感偏弱甚至“没听到音乐”。</div>
+    <div class="rel"><b>现状关联：</b>&gt; 相关：devdoc 125–125d、123（MIDI→FM）、F03（OPNA FM 寄存器参考）、122（BGM 本地静音根因与音频通路取舍）</div>
+  </div>
+
+  <div class="doc" id="doc-127">
+    <div class="doc-head"><span class="doc-num">127</span><span class="doc-title">hal_audio.c临时诊断态还原后验证</span><span class="doc-status">调研分析</span></div>
+    <h4>核心思路</h4>
+    <ul>
+      <li>`FM_TRACE_ENABLED`：`1` → `0`</li>
+      <li>`hal_fm_init()`：去除诊断性写入 `0x0F/0x2F`，改为 `outb(PCM_STATUS_PORT, (uint8_t)(FM_VOL_PATH_VOL1 | 0x00))`（VOL1 路径，满音量）</li>
+      <li>新增 `#define FM_VOL_PATH_VOL1 0x00`</li>
+      <li>`hal_fm_set_volume()`：由固定写 `0x0F` 恢复为 `outb(PCM_STATUS_PORT, (uint8_t)(FM_VOL_PATH_VOL1 | (atten &amp; 0x0F)))`</li>
+      <li>首音瞬态：`~1.686s`，`max=2048, rms≈352, ~ -39.4 dBFS`（双声道平衡）</li>
+    </ul>
+    <div class="landing"><b>最终落点：</b>**临时诊断态还原是正确的修复方向。</div>
+    <div class="rel"><b>现状关联：</b>&gt; 相关：devdoc 126（排查方向）、125c（波形分析）</div>
+  </div>
+
+</section>
+
+<!-- ============================================================ -->
+<section class="group" id="g3">
+  <div class="group-header"><h2>三、BGM 颤动系列诊断</h2><span class="range">128 – 133</span></div>
+  <p class="group-desc">FM_finished 过早、菜单立绘加载期间卡顿、虚拟时钟平滑→步进变基准、剩余颤动与立绘拖慢 ABD 方案、二轮根修与量化预取。</p>
+  <div class="doc" id="doc-128">
+    <div class="doc-head"><span class="doc-num">128</span><span class="doc-title">排查FM_finished过早导致BGM只播首音后静音</span><span class="doc-status">方案/规划</span></div>
+    <h4>核心思路</h4>
+    <ul>
+      <li>`BGM start &#x27;melody_town&#x27; (310 events) (FM)` 正常触发（串口日志）</li>
+      <li>波形证实有 FM 信号输出，首音瞬态从 pre-fix ~ -54 dBFS 提升至 ~ -24 dBFS（地址修复生效）</li>
+      <li>双声道有能量（活动段落 rms ~ 600–1100，约 -29 dBFS），但绝大部分录音时段几乎静音</li>
+      <li>hal_audio.c 临时诊断态已还原（FM_TRACE_ENABLED=0，VOL1 路径正确）</li>
+      <li>FM 相关测试 `test_fm_seq.py + test_fmopn.py + test_audio*.py` 共 **66 passed**</li>
+    </ul>
+    <div class="landing"><b>最终落点：</b>- `BGM start &#x27;melody_town&#x27; (310 events) (FM)` 正常触发（串口日志）</div>
+    <div class="rel"><b>现状关联：</b>&gt; 相关：devdoc 126–127、123（MIDI→FM）、F03（OPNA 寄存器参考）</div>
+  </div>
+
+  <div class="doc" id="doc-129">
+    <div class="doc-head"><span class="doc-num">129</span><span class="doc-title">BGM在菜单询问立绘加载期间卡顿与中断根修</span><span class="doc-status">修复/验证</span></div>
+    <h4>核心思路</h4>
+    <ul>
+      <li>`audio.c`（BGM 调度，`audio_tick()` 内）</li>
+      <li>`nb_dialog.c:257`（打字机 reveal）</li>
+      <li>`nb_anim.c:568`（动画，仅 `a-&gt;active` 时）</li>
+      <li>阻塞一段 ⇒ 无调用 ⇒ 钟滞后 ⇒ 音乐整体后移；</li>
+      <li>打字机/动画同时轮询 ⇒ 每 pass 调用 2–3 次 ⇒ 钟加速 ⇒ 音乐变快。</li>
+    </ul>
+    <div class="landing"><b>最终落点：</b>- Phase 1/2/3 代码已落地并经 `bd2093e` 提交，`make -C core` 0 err/0 warn，`.</div>
+    <div class="rel"><b>现状关联：</b>&gt; 状态：`冻结已修，颤动见 devdoc 130`</div>
+  </div>
+
+  <div class="doc" id="doc-130">
+    <div class="doc-head"><span class="doc-num">130</span><span class="doc-title">BGM颤动根修虚拟时钟改平滑变步进</span><span class="doc-status">修复/验证</span></div>
+    <h4>核心思路</h4>
+    <ul>
+      <li>秒未落地的各 pass：`delta == 0` → 步进 **40ms**</li>
+      <li>秒落地的那一拍：`delta == 1000` → 钳到 **100ms**</li>
+      <li>`step` 以 1/16 ms 为单位，向「平台实测速率」**平滑收敛**，每 pass 最多挪 `VCLOCK_SLEW_UNITS`（8 单位 = 0.5ms）；</li>
+      <li>一个「窗口」= 两次平台时钟移动之间的所有 pass。窗口闭合时用 `delta / passes` 反推真实每 pass 速率；</li>
+      <li>平台不动（时钟洞）→ 吐固定 idle 步，**不停**（守住 devdoc 129 的修复）；</li>
+    </ul>
+    <div class="landing"><b>最终落点：</b>- 秒未落地的各 pass：`delta == 0` → 步进 **40ms**</div>
+    <div class="rel"><b>现状关联：</b>&gt; 相关：devdoc 129（帧泵，`bd2093e`）、107（smooth 时钟由来）、B19 §3.1（时钟契约）、F03 §4.2</div>
+  </div>
+
+  <div class="doc" id="doc-131">
+    <div class="doc-head"><span class="doc-num">131</span><span class="doc-title">剩余颤动与立绘加载拖慢分析unlove对照与建议</span><span class="doc-status">未实施</span></div>
+    <h4>核心思路</h4>
+    <ul>
+      <li>两个残留症状（BGM 颤动、立绘加载拖慢）有**同一个结构性根因**：把「音乐泵」挂在</li>
+      <li>**原版游戏 `EQAP32.EXE` 没有这个问题**：它把音乐交给 **PMD 常驻驱动 + YM2608 Timer-B</li>
+      <li>**unlove 的重实现也没有解决它**（`M86_Play()` 同步忙等）——这反证「不颤」靠的不是</li>
+      <li>网络调研给出四条可落地路径：**分片让步**、**中断驱动音泵（复刻 PMD）**、</li>
+      <li>本项目 B19 已排除「PIT 读回」「VSYNC 计帧」两条时钟源（NP2kai 下不可用），</li>
+    </ul>
+    <div class="landing"><b>最终落点：</b>- 网络调研给出四条可落地路径：**分片让步**、**中断驱动音泵（复刻 PMD）**、</div>
+    <div class="rel"><b>现状关联：</b>&gt; 相关：devdoc 129（帧泵：修冻结/打断）、devdoc 130（vclock 平滑变步进：修颤动）、</div>
+  </div>
+
+  <div class="doc" id="doc-132">
+    <div class="doc-head"><span class="doc-num">132</span><span class="doc-title">剩余颤动与立绘拖慢根修方案ABD落地</span><span class="doc-status">方案/规划</span></div>
+    <h4>核心思路</h4>
+    <ul>
+      <li>**§2.2 时钟链**：`hal_wallclock_smooth_advance()` 是虚拟时钟唯一写者，帧泵每 pass 调一次；消费方（BGM/打字机/动画）只读。</li>
+      <li>**§2.3 解码路径**：`mag_decode()` 的进度钩子（`mag.c` 四处调用点）此前直接挂 `audio_tick()`，**只读**时钟，不推进它。</li>
+      <li>**§2.4 为什么还颤**：解码期间推进停摆 → 事件表积压 → 解码结束后一次性排空（爆发），即听感上的抖。</li>
+      <li>**§2.5 为什么还拖**：解码是纯 CPU 密集，期间不让出，GDC 刷新被饿。</li>
+      <li>**目的**：长 CPU 路径（解码钩子）会远高于显示刷新率地调用 `audio_tick()`，每 16 次阻塞等一次 VBLANK，既让出 CPU 又顺带与显示重新同步。</li>
+    </ul>
+    <div class="landing"><b>最终落点：</b>&gt; 前序：devdoc 131 判定「剩下的是节拍颤动 + 立绘加载拖慢」并给出 A–E 五方案；本轮落地 A/B/D，C 经用户拍板**单独立项**，E 仍不做。</div>
+    <div class="rel"><b>现状关联：</b>&gt; 相关：devdoc 131（分析与建议，本轮的规格来源）、129（帧泵）、130（vclock 平滑步进）、B19 §2（时钟源决策）、B91 §3（32-bit 保护模式）</div>
+  </div>
+
+  <div class="doc" id="doc-133">
+    <div class="doc-head"><span class="doc-num">133</span><span class="doc-title">BGM颤动与立绘拖慢二轮根修虚拟时钟量化与预取修活</span><span class="doc-status">方案/规划</span></div>
+    <h4>核心思路</h4>
+    <ul>
+      <li>**`[VC]` 标记**：`hal_wallclock_smooth_advance()` 内每 64 pass 打一行 `[VC] v= step= tgt= cal=`（串口、节流、编译期 `VCLOCK_TRACE_ENABLED` 可关），供 §八 五禁要求的确定性判别（禁靠点击计数/听感）。</li>
+      <li>新建本 doc；CHANGELOG `c62`/`0.3.031`；AGENTS 头部同步；`bump_version`；`test_devdoc_refs`/`test_frame_pump`/`test_vclock` 复核。</li>
+      <li>**加载期 tempo 塌陷**：Phase 1 治「稳态颤」与「起播快」，但**主循环 pass 率被长操作绑架**导致窗口内音乐时间不足，属结构性，只有中断驱动音泵（方案 C，devdoc 134）能根治。若本轮后 `[VC]` 显示 steady 但加载瞬时仍慢，即转 C。</li>
+      <li>症状 3 的「拖」由 Phase 2 预取 + Phase 3 去 hitch 共同缓解；根治仍是 C 之外的独立课题。</li>
+    </ul>
+    <div class="landing"><b>最终落点：</b>&gt; 相关：devdoc 131（分析/建议，规格来源）、132（一轮 A/B/D 落地）、129（帧泵）、130（vclock 平滑步进）、B19 §1/§2（时钟源决策与 pass 率）、B91 §3（32-bit 保护模式）</div>
+    <div class="rel"><b>现状关联：</b>&gt; 相关：devdoc 131（分析/建议，规格来源）、132（一轮 A/B/D 落地）、129（帧泵）、130（vclock 平滑步进）、B19 §1/§2（时钟源决策与 pass 率）、B91 §3（32-bit 保护模式）</div>
+  </div>
+
+</section>
+
+<!-- ============================================================ -->
+<section class="group" id="g4">
+  <div class="group-header"><h2>四、参考引擎调研与音频架构选型</h2><span class="range">134 – 139</span></div>
+  <p class="group-desc">OPNA 定时器中断驱动音泵立项（方案 C）、S7 音色试听与 LFO、FM 音色实验室长远方案、实机 flute buzz 反馈、FM 音高低八度根修、虚拟时钟尖峰钳制。</p>
+  <div class="doc" id="doc-134">
+    <div class="doc-head"><span class="doc-num">134</span><span class="doc-title">方案C-OPNA定时器中断驱动音泵立项</span><span class="doc-status">未实施</span></div>
+    <h4>核心思路</h4>
+    <ul>
+      <li>**Timer-B**：`tB = 1152 · (256 − NB) / φM`，精度基准 144µs/步（`F04` §2）。两级门控：`$27`（Timer 控制）/`$29`（SCH + IRQ ENABLE，D1=EN_TB）。IRQ 经 PC-98 板载路由到 **IRQ3**（QEMU `pc98-opna` 事实，`F04` §6；`hal_</li>
+      <li>**DOS/4GW 挂中断**：`_go32_dpmi_*` / `__dpmi_*` + iret wrapper + **锁内存**（handler 必须常驻、不可被换页），bi-modal handler（`G08`）。</li>
+      <li>**级联 IRQ ACK**：PC-98 双 8259 级联，EOI 次序与 in-service 位需按手册；鼠标 IRQ13 优先级高于 FM IRQ12；写 0x64 → vsync IRQ2（`G09` §3 有 DOSBox-X #342 的完整清单，作为方案 C 前置检查）。</li>
+      <li>**未确认项（动手前硬阻塞）**：NP2kai 是否/以何频率投递 OPNA Timer IRQ（`F04:141`）、DOS/4GW 下默认 IRQ 号与向量映射（`G08:80`）、`$29` 默认位行为（`F04:173`，devdoc 131 与手册不一致）。</li>
+      <li>最小 handler：只**计数** + 清芯片标志（`$110` IRQ RESET / `$27` RESET 位，`F04` §5）+ **级联 EOI** + 串口打印计数。</li>
+    </ul>
+    <div class="landing"><b>最终落点：</b>- 通过条件：探针计数 ≈ 预期频率（vsync ≈ 显示帧率；Timer-B ≈ `1/tB`）且抖动可接受。</div>
+    <div class="rel"><b>现状关联：</b>&gt; 相关：devdoc 131 §4/§6/§9.1（方案 C 定义与依赖）、133（本轮 Phase 1–4，症状 1+2 的时基修复）、129（帧泵）、130（vclock）、B19 §2（时钟源决策）</div>
+  </div>
+
+  <div class="doc" id="doc-135">
+    <div class="doc-head"><span class="doc-num">135</span><span class="doc-title">MIDI转FM通路S7音色试听与OPNA-LFO接入</span><span class="doc-status">方案/规划</span></div>
+    <h4>核心思路</h4>
+    <ul>
+      <li>**`$22`**：`bit3 = LFO 使能`，`bits2-0 = 速率 LFRQ`。`fmgen_opna.cpp` 的 `SetReg`：`lfodcount = reg22 &amp; 8 ? lfotable[reg22 &amp; 7] : 0`。</li>
+      <li>**`$B4`**：`bits7-6 = pan L/R`（`(data&gt;&gt;6)&amp;3`），`bits5-4 = AMS`（`(ms&gt;&gt;4)&amp;3`），`bits2-0 = PMS`（`ms&amp;7`），`bit3 = 保留`。F03 §3.3 原掩码记法自相矛盾，本轮已订正。</li>
+      <li>**联动（关键）**：`FMMix()` 中 `if (!(reg22 &amp; 0x08)) act &amp;= 0x555;`——**全局 LFO 关闭时强制走无 LFO 合成路径，PMS 颤音同样失效**（不只是 AMS）。故 `$22` 是 PM/AM 的共同前置。</li>
+      <li>**逐算子 AM 使能**：`$60` bit7（patch 的 `am` 字段）。AMS&gt;0 但无任一算子 `am=1` 时 AM 不产生效果；PMS 不受此限制。</li>
+      <li>**旧 patch 兼容性**：现有 15 族 `pan=0xc0`、AMS=PMS=0 ⇒ `(ms &amp; 0x37)==0` ⇒ 走无 LFO 路径，加全局 LFO 后**听感零变化**。</li>
+    </ul>
+    <div class="landing"><b>最终落点：</b>**结论**：程序号、族映射、patch 装载全部正确落在 flute 族。</div>
+    <div class="rel"><b>现状关联：</b>&gt; 相关：devdoc 123（MIDI→FM 通路总体计划，S0–S6）、124（S6 默认音色内容与 GM 映射数据）、125c/125d（flute 族历代调节史）、docs/refdocs/F03（OPNA 寄存器参考，本轮据 NP2kai fmgen 订正 `$22`/`$B4` 位域）、F04/F05（Timer/PMD 架构）</div>
+  </div>
+
+  <div class="doc" id="doc-136">
+    <div class="doc-head"><span class="doc-num">136</span><span class="doc-title">BGM音质长远方案FM音色实验室与FM原生作曲</span><span class="doc-status">方案/规划</span></div>
+    <h4>核心思路</h4>
+    <ul>
+      <li>`--raw-note`：跳过 velocity→TL 衰减（纯音色），默认复刻 `fmseq` 的 velocity 缩放、bend 应用、KEYON/KEYOFF 时序、`$B4` 组合回写——以保证与实机 **apples-to-apples**。</li>
+      <li>`tools/naiz_audio/spectrum_report.py`：把 `/tmp/opencode/flute_spectrum.py` 正式化（该脚本已用合成信号自测通过）。</li>
+      <li>`assets/demo-a2/fm/targets.toml`：每族验收带（初值来自研究，落地时由 P1c 标定修正）。</li>
+      <li>`test_fm_patch_shape.py`（静态字节不变量）、`test_fm_timbre.py`（oracle 谱回归）。</li>
+      <li>（可选）`test_fm_oracle_alignment.py`：若仓库存在 NP2kai 采样，校验「对齐系数」未漂移。</li>
+    </ul>
+    <div class="landing"><b>最终落点：</b>&gt; **前置结论**：135 §2 已定性「像电子琴」= **patch 设计问题**（持续八度 + 硬起音），非映射/构建错误；123 §6.</div>
+    <div class="rel"><b>现状关联：</b>&gt; **关联**：devdoc 122（BGM 本地静音根因与音频通路取舍）、123（MIDI→FM 通路实现计划 S0–S7）、124（S6 默认音色内容与 GM 映射数据）、125c/125d（flute 族历代调节史）、134（方案 C-OPNA 定时器中断驱动音泵立项，**独立线**）、135（S7 OPNA LFO 接入 + 15 族重做）</div>
+  </div>
+
+  <div class="doc" id="doc-137">
+    <div class="doc-head"><span class="doc-num">137</span><span class="doc-title">修复用户实机反馈：flute及其他族感知音调偏低与buzz问题</span><span class="doc-status">调研分析</span></div>
+    <h4>核心思路</h4>
+    <ul>
+      <li>「音调似乎过低而且有不正常的类似喇叭振动的电流声」</li>
+      <li>补充：「部分音乐似乎严重偏低；整个播放期间都有；新出现，与先前的电子琴音似乎关系不是很大」</li>
+      <li>**修复前（错映射）**：`tools/naiz_audio/fm_patch.py` 的 `OP_FILE` 用 `[0,2,1,3]`（把算法算子写到错误寄存器槽）。这种错配产生了一种较干净的「电子琴音」（掩盖了边带）。</li>
+      <li>**修复后（正映射）**：改为恒等 `[0,1,2,3]`，并且引擎侧 `fmopn_op_slot = {0,2,1,3}` 与 NP2kai fmgen `slottable = {0,2,1,3}` 一致。现在**调制器↔载波的角色真正对应到硬件**。所以音色更接近设计的「近正弦笛子」，但也暴露出：在**正确映射**下，目前的 voicing 会产生较</li>
+      <li>**修复后算子映射是对的**。devdoc 136 §十三 已交叉验证（ymfm + NP2kai fmgen），不应回退 `OP_FILE`。</li>
+    </ul>
+    <div class="landing"><b>最终落点：</b>用户实机验证 P1b（`op=` 语义修复、fmbench/oracle 对齐、P1b 三件套落地）后反馈：</div>
+    <div class="rel"><b>现状关联：</b>- **修复后算子映射是对的**。devdoc 136 §十三 已交叉验证（ymfm + NP2kai fmgen），不应回退 `OP_FILE`。</div>
+  </div>
+
+  <div class="doc" id="doc-137b">
+    <div class="doc-head"><span class="doc-num">137b</span><span class="doc-title">实机反馈续：flute buzz 持久且方案 1 无效（需降低调制强度）</span><span class="doc-status">实施中</span></div>
+    <h4>核心思路</h4>
+    <ul>
+      <li>用户反馈：flute.fmp pms 2→1（方案 1）修改后<b>毫无改善</b>，重新编译测试验证。</li>
+      <li>方案 1 失效根因：只调 pms 不影响稳态调制；若 buzz 是整个播放期间都有（连续性），降低颤动深度自然没作用。</li>
+      <li>调制强度偏高：op 映射现为恒等 [0,1,2,3]，与 NP2kai fmgen 一致（正确，必须保留）。在正确映射下，op=1（调制器，tl=52）对 op=2（载波，tl=2）的调制指数可能偏强，持续产生边带。</li>
+      <li>感知偏低也由此导致：边带过多改变频谱重心，易让人感知音高中心偏低。</li>
+      <li>方案 2a（首选）：提高调制器衰减 op1 tl 52→54；方案 2b 递进 54→56；备选 tl=60 或调 op2。</li>
+    </ul>
+    <div class="landing"><b>最终落点：</b>方案 2a 改 flute.fmp 第 17 行 op1 tl 52→54（最保守，优先调调制器而非载波，保留笛子气声质感）。不回退 fm_patch.py::OP_FILE=[0,1,2,3]。当前状态：pms=1（方案 1 已生效）、tl=52（待改 54）。</div>
+    <div class="rel"><b>现状关联：</b>承接 devdoc 137（用户实机反馈：方案 1 实施后反馈"毫无改善"）。devdoc 136 §十三 已交叉验证 op 映射正确，不应回退。</div>
+  </div>
+
+  <div class="doc" id="doc-138">
+    <div class="doc-head"><span class="doc-num">138</span><span class="doc-title">FM音高整体低八度根因修复</span><span class="doc-status">方案/规划</span></div>
+    <h4>核心思路</h4>
+    <ul>
+      <li>实机：BGM（FM 通路，NP2kai）听感**音调偏低**，不止 flute，全部音符系统性低一个八度。</li>
+      <li>离线：oracle（fmbench/ymfm）渲染纯音参考 patch，C4→130.6（目标 261.6）、A4→220.2（目标 440）、C5→261.7（目标 523.3），比率恒 **0.5**。</li>
+      <li>devdoc 136 §十五 曾把这个 0.5 判为「**ymfm 低八度**」，并给 fmbench 打了一个 `FNUM ×2` 的补丁（`write_patch_and_keyon()`）。**该判定方向错了**（§四）。</li>
+      <li>`fmgen_opna.cpp:525` `OPNABase::SetRate()` 内 **`c /= 2`**（注释「従来版との互換性を重視したけりゃコメントアウトしよう」）⇒ NP2kai `opna.c:123` 传入的 `OPNA_CLOCK*2 = 7987200` 在 fmgen 内部变成 **3993600**。</li>
+      <li>`fmgen_opna.cpp:122` `SetPrescaler(0)`：`fmclock = clock / 6 / 12 = 3993600/72 = 55466.7 Hz`。</li>
+    </ul>
+    <div class="landing"><b>最终落点：</b>结论：**真实芯片（fmgen）对 block4/fnum520 输出的就是 220Hz**，对 block5/fnum520 输出 440Hz。</div>
+    <div class="rel"><b>现状关联：</b>&gt; **关联**：136（BGM 音质长远方案，**本文订正其 §十五 的低八度判定**）、123（MIDI→FM 通路 S0–S5）、135（S7 OPNA LFO 接入）、134（方案 C 定时器，独立线）</div>
+  </div>
+
+  <div class="doc" id="doc-139">
+    <div class="doc-head"><span class="doc-num">139</span><span class="doc-title">虚拟时钟单窗速率尖峰钳制</span><span class="doc-status">方案/规划</span></div>
+    <h4>核心思路</h4>
+    <ul>
+      <li>实机：FM BGM 播放中，**偶发一段明显偏快**（数秒），随后回正；静置对白页也可能出现。</li>
+      <li>触发与「DOS 秒成簇交付」相关（B19 §2.3）：NP2kai 平台时钟经 INT 21h AH=2Ch 读回的「秒」是**量化 + 成簇**的，一段时间内读数不变，然后一次跳好几秒。</li>
+      <li>每 **1000ms** 累积窗闭合时，按 `want = accum * 16 / passes`（`vclock.c:105`，`VCLOCK_UNITS_PER_MS=16`）计算「每 pass 应走多少虚拟单位」；`step` 以 **0.5ms/pass**（`VCLOCK_SLEW_UNITS=8`）向 `target` 逼近；`target` </li>
+      <li>**一次错误测量的代价**：`target` 移动 1/4，而 `step` 追上 `target` 需要多个 pass ⇒ 一次污染要 **~1–5 秒**才恢复。</li>
+      <li>`MIN_WINDOW_PASSES=2` 只拒绝「**单个 pass 吞掉整秒**」的硬停顿窗（`test_a_stalled_window_does_not_move_the_rate` 覆盖此形）。</li>
+    </ul>
+    <div class="landing"><b>最终落点：</b>- `tools/tests/test_vclock.</div>
+    <div class="rel"><b>现状关联：</b>&gt; **关联**：130（虚拟时钟改平滑变步进）、133（二轮根修：首窗直采 + 测量平滑）、134（方案 C 定时器中断驱动，独立线）、107（裸墙钟追帧音爆）、B19（NP2kai 时钟全谱）</div>
+  </div>
+
+</section>
+
+<!-- ============================================================ -->
+<section class="group" id="g5">
+  <div class="group-header"><h2>五、BGM buzz 消除与 FM 音色迭代</h2><span class="range">140 – 155</span></div>
+  <p class="group-desc">从全链路 buzz 总览（140）到诊断取证（141-143）、开源 PC98-BGM 调研（144-145）、改造建议与计划（146-150），再到 bell 八度修复、残余电流声、flute-pms 颤音、实机闭环、长笛水泡 legato-tie 根修（151-155）。</p>
+  <div class="doc" id="doc-140">
+    <div class="doc-head"><span class="doc-num">140</span><span class="doc-title">音频问题修复总览FM通路音高音色节拍三线状态汇总</span><span class="doc-status">方案/规划</span></div>
+    <h4>核心思路</h4>
+    <ul>
+      <li>**123（S0–S5）**：后端自动检测；FM 泵复用 `hal_wallclock_smooth_ms()`（避免裸墙钟追帧音爆）；loop 走 `fmseq_finished()` 回绕。</li>
+      <li>**124（S6）**：15 族 FMP patch（`assets/demo-a2/fm/*.fmp`）+ `fmp_gm_map[128]`（GM 0–127 全覆盖，无空档），终结历史终态「`gm_map=NULL` 全回落 family 0」。</li>
+      <li>**125/125c/125d**：FM 寄存器地址修复 + post-fix 抓取时机 + flute 族 TL 实验记录（历史）。</li>
+      <li>**126/127/128**：地址修复后仍「无音乐」的排查记录；128（`FM_finished` 过早）标为**规划中、先不动代码**，其现象被后续 135（S7 LFO 接线 + 试听基线）一并收敛。</li>
+      <li>**135（S7）**：接入 OPNA LFO（`$22` 使能+速率、`$B4` = pan/AMS/PMS）；`pan=0xc0` + AMS/PMS=0 的旧族行为零变化。状态：**待实机试听验证**。</li>
+    </ul>
+    <div class="landing"><b>最终落点：</b>&gt; **目的**：把散落在 123–139 的音频结论**按「问题」而非「轮次」重组**，给出每条线的根因 / 修复点 / 验证状态 / 遗留，供实机验证与后续排期。</div>
+    <div class="rel"><b>现状关联：</b>&gt; **关联**：123（MIDI→FM S0–S5）、124（S6 默认音色）、130/133/139（虚拟时钟节拍）、134（方案 C 定时器中断，独立线）、135（S7 LFO + 15 族试听）、136（FM 音色长远方案 / 音色实验室）、137/137b（用户实机反馈：感知偏低 + buzz）、138（低八度根因）、141（BGM 全程 buzz 诊断）</div>
+  </div>
+
+  <div class="doc" id="doc-141">
+    <div class="doc-head"><span class="doc-num">141</span><span class="doc-title">BGM全程buzz诊断-FM仿真正确性与bell过亮及系统性假设</span><span class="doc-status">修复/验证</span></div>
+    <h4>核心思路</h4>
+    <ul>
+      <li>引擎侧：`core/lib/fmopn.c:12-14`</li>
+      <li>fmgen 侧：`/home/edo/NP2kai/sound/fmgen/fmgen_opna.cpp:53` 的 `slottable[4] = {0,2,1,3}`。</li>
+      <li>ymfm 侧：`operator_map` / `operator_offset` 同序（见 `136` §十三）。</li>
+      <li>`core/lib/fmseq.c:186-195`：逐音写 `$B0`=`fb_alg`、`$B4`=`pan|ams&lt;&lt;4|pms`、`$A4`/`$A0`=`block/fnum`。</li>
+      <li>`core/lib/fmopn.c:193-205`：`pan`=bits7-6、`ams`=bits5-4、`pms`=bits2-0，与 OPNA 手册一致。</li>
+    </ul>
+    <div class="landing"><b>最终落点：</b>**本节的结论：buzz 不是 FM 仿真的寄存器语义错误。</div>
+    <div class="rel"><b>现状关联：</b>&gt; **前序**：`devdocs/123`（FM 通路 S0–S5）、`124`（S6 音色）、`135`（S7 LFO+15 族）、`136` §十五（ymfm 八度误判）、`137`/`137b`（flute buzz 的两轮最小改动，均未收敛）、`138`（低八度根因修复）、`139`（节拍尖峰钳制）、`140`（三线状态汇总）</div>
+  </div>
+
+  <div class="doc" id="doc-142">
+    <div class="doc-head"><span class="doc-num">142</span><span class="doc-title">BGM全程buzz实机录音对比（001-004）与诊断结论</span><span class="doc-status">修复/验证</span></div>
+    <h4>核心思路</h4>
+    <ul>
+      <li>引擎侧：`core/lib/fmopn.c:12-14`</li>
+      <li>fmgen 侧：`/home/edo/NP2kai/sound/fmgen/fmgen_opna.cpp:53` 的 `slottable[4] = {0,2,1,3}`。</li>
+      <li>ymfm 侧：`operator_map` / `operator_offset` 同序（见 `136` §十三）。</li>
+      <li>`core/lib/fmseq.c:186-195`：逐音写 `$B0`=`fb_alg`、`$B4`=`pan|ams&lt;&lt;4|pms`、`$A4`/`$A0`=`block/fnum`。</li>
+      <li>`core/lib/fmopn.c:193-205`：`pan`=bits7-6、`ams`=bits5-4、`pms`=bits2-0，与 OPNA 手册一致。</li>
+    </ul>
+    <div class="landing"><b>最终落点：</b>**本节的结论：buzz 不是 FM 仿真的寄存器语义错误。</div>
+    <div class="rel"><b>现状关联：</b>&gt; **前序**：`devdocs/123`（FM 通路 S0–S5）、`124`（S6 音色）、`135`（S7 LFO+15 族）、`136` §十五（ymfm 八度误判）、`137`/`137b`（flute buzz 的两轮最小改动，均未收敛）、`138`（低八度根因修复）、`139`（节拍尖峰钳制）、`140`（三线状态汇总）</div>
+  </div>
+
+  <div class="doc" id="doc-143">
+    <div class="doc-head"><span class="doc-num">143</span><span class="doc-title">BGM问题定位总结-症状根因现状与下一步</span><span class="doc-status">调研分析</span></div>
+    <h4>核心思路</h4>
+    <ul>
+      <li>**「偏低」= 已解决**：`138` 定位到引擎 `FMOPN_FNUM_SCALE_N` 隐含 `2^block`、漏 `2^(block-1)` 折半，使每个音符编低一个 block（芯片只给半频）。修复后用户实机确认「音调已回正」。详见 §三。</li>
+      <li>**「buzz」= 未收敛**：`137`/`137b` 的「提高 flute 调制器 `tl`」最小改动**未能消除**，故另立本轮诊断（`141`/`142`）。</li>
+      <li>修复：`N 18432→36864`（A4→block5/fnum520、C4→block4/fnum618），新增 `fmopn_ratio_freq()` 作编码逆（bend / SSG 打击恢复复用），`fmbench.cpp` 镜像同步并**撤销** `×2`。</li>
+      <li>实机确认：**BGM 音高已回正**（用户回传）。</li>
+      <li>另注：`136 §十五` 曾错误地判「引擎正确、ymfm 错」并给 oracle 打 `×2`，**恰好掩盖了引擎 bug**；`138` 已就地订正（`136` 头部留 ERRATA 指 `138`）。</li>
+    </ul>
+    <div class="landing"><b>最终落点：</b>&gt; **类型**：非实现轮 —— 汇总 `138`/`139`/`140`/`141`/`142` 的结论，回答「现在 BGM 到底哪儿出了问题」，并**订正 `142` 对 `targets.</div>
+  </div>
+
+  <div class="doc" id="doc-144">
+    <div class="doc-head"><span class="doc-num">144</span><span class="doc-title">开源PC98游戏与BGM实现调研</span><span class="doc-status">方案/规划</span></div>
+    <h4>核心思路</h4>
+    <ul>
+      <li>**检索日期**：2026-10-17；方式 = Web 搜索 6 组关键词（英文/日文各半）+ 2 次页面抓取（ReC98 README、S.W. 主页）+ 仓内 `docs/refdocs/F03/F05` 对照。</li>
+      <li>**核实级别**（全文标注）：</li>
+      <li>**【核实】** = 直接抓取页面或仓内 refdoc 读到的原文；</li>
+      <li>**【转述】** = 搜索结果摘要中读到、未再打开原页复核；</li>
+      <li>**【未确认】** = 仅线索，未打开/未验证，**不得当结论引用**。</li>
+    </ul>
+    <div class="landing"><b>最终落点：</b>&gt; **类型**：非实现轮 —— 回答「有没有开源的 PC-98 游戏，可以分析他们怎么做 BGM」，并把检索结论沉淀为可复用的分析路径</div>
+    <div class="rel"><b>现状关联：</b>&gt; **前序**：`docs/refdocs/F03`（BGM 四条通路选型）、`F04`（Timer A/B 硬件规格）、`F05`（PMD 常驻驱动与 Timer-B 节拍模型）、`F06`（PMD MML 手册英译）、`devdocs/131`/`134`（方案 C 立项）、`140`（三线状态汇总）、`143`（BGM 问题定位总结）</div>
+  </div>
+
+  <div class="doc" id="doc-145">
+    <div class="doc-head"><span class="doc-num">145</span><span class="doc-title">开源PC98-BGM实现逐读记录</span><span class="doc-status">方案/规划</span></div>
+    <h4>核心思路</h4>
+    <ul>
+      <li>**读取日期**：2026-10-18。</li>
+      <li>**本地仓库**（用户克隆，非本轮下载）：</li>
+      <li>`/media/edo/data/pc98` = `yarufu/pc98`（ADV98），HEAD `77db438`，MIT；</li>
+      <li>`/media/edo/data/98fmplayer` = `myon98/98fmplayer`，HEAD `4fa914e`，BSD-2-Clause。</li>
+      <li>**在线原文**（webfetch，2026-10-18 抓取成功）：`https://rec98.nmlgc.net/blog/2021-05-12`、`.../2023-11-30`。</li>
+    </ul>
+    <div class="landing"><b>最终落点：</b>- **在线原文**（webfetch，2026-10-18 抓取成功）：`https://rec98.</div>
+    <div class="rel"><b>现状关联：</b>&gt; **状态**：`调研存档（执行 devdoc 144 §八 分析路径；只读外部仓库，零代码改动）`</div>
+  </div>
+
+  <div class="doc" id="doc-146">
+    <div class="doc-head"><span class="doc-num">146</span><span class="doc-title">BGM现状代码分析与改造建议</span><span class="doc-status">方案/规划</span></div>
+    <h4>核心思路</h4>
+    <ul>
+      <li>需从零建：OPNA Timer-B 编程（`$24-$27` 写入、`$29` 使能 IRQ）、DOS/4GW DPMI 中断挂钩（`_go32_dpmi_set_protected_mode_interrupt_vector` + `_go32_dpmi_lock_code/data`）、PIC 级联 EOI、链到原 ISR；ISR 内推进 `fmseq`</li>
+      <li>**现状**：`core/plat/` **无任何 DPMI ISR / `cli` / `sti` / EOI 基础设施**（`pc98.h:191-207` 只定义了 `PIC_EOI` / `IRQ_*` 常量，零使用）。</li>
+      <li>**风险**：本环境（NP2kai）无法验证中断投递与级联 ACK，写错 = 静默死机（AGENTS §八）。故须 **build flag 门控 + 失败回落现有帧泵**，并按 `134` §3 先做「中断投递探针」判定可行性。</li>
+      <li>**前置未确认项**：NP2kai 是否/以何频率投递 OPNA Timer IRQ（`134` / `F04`）、DOS/4GW 下默认 IRQ 号与向量映射（`G08`）、`$29` 默认位行为（`F04:173`）。</li>
+      <li>**BGM 活跃期不写 `cli`**（当前无，保持）。</li>
+    </ul>
+    <div class="landing"><b>最终落点：</b>- 当前代码：`core/lib/midi.</div>
+    <div class="rel"><b>现状关联：</b>在此之上还叠着**四个确定的 BGM 正确性缺陷**（循环接缝早断、回卷丢相位、事件突发齐发、pump 覆盖依赖约定），它们不依赖中断即可修复、可在主机单测。</div>
+  </div>
+
+  <div class="doc" id="doc-147">
+    <div class="doc-head"><span class="doc-num">147</span><span class="doc-title">BGM-P0改造实施计划</span><span class="doc-status">方案/规划</span></div>
+    <h4>核心思路</h4>
+    <ul>
+      <li>`midi_parse` 的 EOT(0x2F) 只用于中断解析，**不记录曲长**：`midi.c:198-201`。</li>
+      <li>BGM 状态结构 `BgmState` 无曲长字段：`audio.c:43-50`。</li>
+      <li>FM 完成判据 `fmseq_finished()` = `cursor &gt;= count`：`fmseq.c:547-550`。</li>
+      <li>回卷用当帧 `now`（丢相位）：FM 路径 `audio.c:536`；MPU 路径 `audio.c:568`。</li>
+      <li>事件派发为无界 `while (tick_ms &lt;= cur)`：MPU 路径 `audio.c:552-563`；FM 路径 `fmseq.c:505-509`。</li>
+    </ul>
+    <div class="landing"><b>最终落点：</b>&gt; **状态**：`完结（0.</div>
+    <div class="rel"><b>现状关联：</b>- `devdocs/146` **不得修改**（分析存档）；本 `147` 实施后标 `完结`。</div>
+  </div>
+
+  <div class="doc" id="doc-148">
+    <div class="doc-head"><span class="doc-num">148</span><span class="doc-title">BGM时基-为何不直接用参考项目机制-机制vs实现与四道墙</span><span class="doc-status">方案/规划</span></div>
+    <h4>核心思路</h4>
+    <ul>
+      <li>**机制层（时序模型：YM2608 Timer-B 硬件溢出 → IRQ → 推进一拍，与主循环解耦）**：**该用，而且早在计划里**——`devdoc 134` 方案 C 就是复刻它。</li>
+      <li>**实现层（`PMD86.COM` 这类挂在 INT 60h 的**实模式 TSR**）**：**搬不进来**，有四道硬墙（§三）。</li>
+      <li>PMD 吃 **MML / `.M` 编译谱**；naiz 的输入已定为 **MIDI**（`F03 §1.2` 选型表，`devdoc 123`）。</li>
+      <li>转换路径不可依赖：`ConvFMML` 已停止维护、且只转序列（`c52`）；`libopenpmd` 自述 **WIP、只做文件解析、完全不管芯片输出**（`F03 §1.3`）。</li>
+      <li>音色也随之变成 PMD 自己那套，与本仓 `assets/&lt;项目&gt;/fm/*.fmp` 的 32 字节自研格式脱钩。</li>
+    </ul>
+    <div class="landing"><b>最终落点：</b>&gt; **类型**：非实现轮 —— 回答用户提问「为何不直接用参考项目的机制」，并把 `142`/`143`/`145`/`146` 的散结论收敛为一份「BGM 时基」规格</div>
+    <div class="rel"><b>现状关联：</b>&gt; **来源**：`docs/refdocs/F03`（§1.2/§1.3 BGM 通路选型与 PMD 理由）、`F04`（Timer A/B 硬件规格）、`F05`（PMD 常驻驱动与 Timer-B 节拍模型）、`F06`（PMD MML 手册）、`G08`（DOS/4GW 中断与 PIT）、`G09`（时基与音频工程）；`devdocs/144`/`145`（外部开源项目逐读）；当前代码 `</div>
+  </div>
+
+  <div class="doc" id="doc-149">
+    <div class="doc-head"><span class="doc-num">149</span><span class="doc-title">BGM颤音消除执行计划-bellvoicing与时基取证探针</span><span class="doc-status">已落地</span></div>
+    <h4>核心思路</h4>
+    <ul>
+      <li>**B 与 C 不合并**：B 单独先做（只影响 003/004，干净归因）；**轴 C 的一次性 A/B 折进 A1 会话**（改一行 `$22` 重编一次即可判定），不单独开一轮。</li>
+      <li>**A2 走 `134` 步骤 1 探针**（只读、默认关、门控、失败回落），它是「P1 是否可行」的**唯一门控**；**替补** = 协作式 Timer-B 轮询（无 DPMI/PIC，见 §五.5）。</li>
+      <li>`op=2 mul=8 → 1`（载波回基频）</li>
+      <li>`op=1 mul=2 → 8`（把「8」移到调制器 ⇒ 8f 只作边带）</li>
+      <li>视测量收紧 `op=1 tl`（提高以收敛边带）。</li>
+    </ul>
+    <div class="landing"><b>最终落点：</b>&gt; **版本**：`0.</div>
+    <div class="rel"><b>现状关联：</b>- 结论写回 `devdoc 148 §六`（判别法执行结果，坐实哪条轴）。</div>
+  </div>
+
+  <div class="doc" id="doc-150">
+    <div class="doc-head"><span class="doc-num">150</span><span class="doc-title">BGM录制对比工具链与三轴归因协议</span><span class="doc-status">已落地</span></div>
+    <h4>核心思路</h4>
+    <ul>
+      <li>ctypes 编译 `core/lib/midi.c`（宿主机 gcc，仿 `test_fm_seq.py`）→ `parse(path) -&gt; (events, len_ms)`；`note_ons()` 抽 `0x9x vel&gt;0`。</li>
+      <li>**单一事实源**：时间线由引擎自己的解析器产生，`midi_tick_to_ms` 与运行时逐字节一致。</li>
+      <li>已证：`midi.c` 单独可编译（`gcc -I core/lib midi.c`），Melody Town 310 ev/108151ms、Icy Garden 1527 ev/128994ms。</li>
+      <li>ctypes 加载 `/usr/lib/x86_64-linux-gnu/libfluidsynth.so.2`（**已装**，无需 sudo/无新 pip 依赖），`fluid_synth_sfload`(`TimGM6mb.sf2`) + `fluid_player_add/play` + `fluid_synth_write_s16` 循环 → WAV</li>
+      <li>用途：① 人工听&quot;原版&quot;；② 作 onset 检测器的**对照输入**（干净音频上验证检测器）。</li>
+    </ul>
+    <div class="landing"><b>最终落点：</b>&gt; **状态**：`部分完成`（工具链已落地并执行；§六「实测」已回填。</div>
+    <div class="rel"><b>现状关联：</b>- ctypes 加载 `/usr/lib/x86_64-linux-gnu/libfluidsynth.so.2`（**已装**，无需 sudo/无新 pip 依赖），`fluid_synth_sfload`(`TimGM6mb.sf2`) + `fluid_player_add/play` + `fluid_synth_write_s16` 循环 → WAV。</div>
+  </div>
+
+  <div class="doc" id="doc-151">
+    <div class="doc-head"><span class="doc-num">151</span><span class="doc-title">bell载波八度修复-BGM电流声B轴根因</span><span class="doc-status">已落地</span></div>
+    <h4>核心思路</h4>
+    <ul>
+      <li>**`tools/tests/test_devdoc_refs.py`**：`audio.c` 引脚（`g_snd_on`/`g_vc_on`/`g_bgm_on`/`audio_bgm_stop`）与 `bootmenu.c`（`prefs_set_lang`）、`main.c`（`prefs_save`/`LANG] boot`/`cjk_load_fo</li>
+      <li>**`tools/tests/test_frame_pump.py`**：`PUMP_CALLERS` 的 `main.c` 由 3 → 4（新增 `BGM_BENCH` 循环也必须泵帧，否则虚拟时钟不前进）。</li>
+      <li>**`targets.toml [bell]`**：改带后仍 `calibrated=false`（P2 流程再翻 true）；带值不再与错误音色自洽。</li>
+    </ul>
+    <div class="landing"><b>最终落点：</b>1.</div>
+  </div>
+
+  <div class="doc" id="doc-152">
+    <div class="doc-head"><span class="doc-num">152</span><span class="doc-title">BGM残余电流声判别取证-真实循环时基与LFO与抢音</span><span class="doc-status">已落地</span></div>
+    <h4>核心思路</h4>
+    <ul>
+      <li>**H1**：临时 `hal_fm_init()` 写 `$22=0`（LFO 全局关）与 `FM_LFO_RATE` 变体各录一次 001/002；杂音消失/变化即坐实。</li>
+      <li>**H3**：`fmseq.c` 分配器加 `force-steal` 计数 trace，统计命中率与时刻；对照录音包络尖峰。</li>
+      <li>真实循环 `[VC]` 稳态 **`step=574` 单位 = 35.9 ms/pass ≈ 27.9 Hz**（起始瞬态 823→1448）；`BGM_BENCH` 紧循环 **`step=55` = 3.4 ms/pass ≈ 291 Hz**。故 idle 比 bench 慢约 **10×**，但 idle 仍远高于「用户静置对白页」应有的卡顿。</li>
+      <li>`[BGMT]` vs MIDI 拟合：`engine_t = 0.9977·midi_t + 1210.7` ⇒ **tempo ratio 0.998（正确）**；残差 **std 21.4 ms / p95 35.0 ms**（bench 为 6.5–8.2 ms ⇒ ~3×）。**H2 部分成立**（真实循环派发抖动确实比 bench 大），但**幅</li>
+      <li>**GM 参考**（`TimGM6mb` 渲染 `melody_town`）：包络峰只有 **1.2–2.4 Hz**（音符率），无高频调制。</li>
+    </ul>
+    <div class="landing"><b>最终落点：</b>&gt; **状态**：`已完结`（`0.</div>
+    <div class="rel"><b>现状关联：</b>| 003/004（icy_garden/bell） | 电流声**减弱，仍有** | **记录为「待后续优化」，本轮不改** |</div>
+  </div>
+
+  <div class="doc" id="doc-153">
+    <div class="doc-head"><span class="doc-num">153</span><span class="doc-title">BGM颤音为flute-pms音高颤音-ymfm复现与去LFO试听</span><span class="doc-status">已落地</span></div>
+    <h4>核心思路</h4>
+    <ul>
+      <li>将 `flute.fmp` 中 `pms=1` 改为 `pms=0`，打包注入到 `disks/demo-a2.hdi` 后，用户在 **NP2kai wxnp21kai** 试听 `001/002` 仍听到「颤音」。</li>
+      <li>核验：新 patch blob（byte25 `$B4` 含 `pms=0 ams=0 pan=3`）已落在 `games/demo-a2/AUDIO.DAT@21655` 与 `disks/demo-a2.hdi`，旧 `pms=1` blob 已不存在；引擎 `fmseq.c:189` 照常按 patch 的 `pms/ams/pan` 写入 `$B4`</li>
+      <li>**结论**：**颤音并非 `pms` 音高颤音**，排除假设 V。残余听感与 `152` 所量化的 **~13.5 Hz 幅度包络** 属同一类现象（NP2kai 输出通路）。</li>
+      <li>**静音无该峰**：`sil.raw` 的高分辨包络谱在 2–40 Hz 内**不显著** 13.5 Hz。</li>
+      <li>**仅 NP2kai 录音中出现**：`cap44.raw` / `idle_nbook001.raw` 包络谱主峰在 **13.38–13.48 Hz**（峰值/中位比 ~10–20）。</li>
+    </ul>
+    <div class="landing"><b>最终落点：</b>&gt; **状态**：`已完结`（`0.</div>
+  </div>
+
+  <div class="doc" id="doc-154">
+    <div class="doc-head"><span class="doc-num">154</span><span class="doc-title">BGM颤音实机闭环-NP2kai-Latencys消除</span><span class="doc-status">已落地</span></div>
+    <h4>核心思路</h4>
+    <ul>
+      <li>GUI 等价入口：`Preference… → Sound → Sample Rate` / `Buffer delay`（`Short 47 / Normal 93 / Long 186 / Max 372`）。</li>
+      <li>**代价**：`Latencys` 越大，音效/语音延迟越明显（372 档下 `sound(){ding}` 等可感到滞后）；以听感在 186 与 372 间取舍。</li>
+      <li>运行时修改需先完全退出 wxnp21kai，否则退出时会把内存值回写覆盖。</li>
+      <li>用户实机：`Latencys=372` / `SampleHz=44100`，`001/002` 静置对白页**颤音消失**。</li>
+      <li>A/B：`pms=1`（保留轻颤音）与 `pms=0`（无颤音）两份 HDI 供对比，用户选定 **`pms=1`**。</li>
+    </ul>
+    <div class="landing"><b>最终落点：</b>&gt; **类型**：实机验证 + 玩家侧配置结论（承 `152` 的四连判别、`153` 的 A/B/C 离线取证）</div>
+  </div>
+
+  <div class="doc" id="doc-155">
+    <div class="doc-head"><span class="doc-num">155</span><span class="doc-title">BGM长笛水泡爆开根修-noteoff-noteon复用声部触发OPNA相位重置与legato-tie</span><span class="doc-status">已落地</span></div>
+    <h4>核心思路</h4>
+    <ul>
+      <li>`core/lib/fmseq.h`：</li>
+      <li>`#define FMSEQ_LEGATO_MS 40`（tie 窗口；0 ms 边界被完全覆盖，且远低于任何有意休止）；</li>
+      <li>`FmseqVoice` 新增 `uint8_t tied;`（该声部的 note-off 被挂起、等待 retune）。</li>
+      <li>`core/lib/fmseq.c`：</li>
+      <li>`fm_tie_follows()`（`:151`，新纯函数）：从 `cursor + 1` 起扫事件表，`tick_ms &gt; now_ms + FMSEQ_LEGATO_MS` 即停；先遇到**同 MIDI 频道**的 note-on → 返回 1（tie），遇到同频道 note-off/vel-0 → 返回 0。</li>
+    </ul>
+    <div class="landing"><b>最终落点：</b>&gt; **结论反驳**：本条推翻「`001/002` BGM 残余杂音全部属 NP2kai 输出通路（`152`/`154`）」的过宽表述——`152`/`154` 处理的是**周期 AM 颤音**；本条处理的是**音符交界处的宽频 click**，二者不同源、可叠加。</div>
+    <div class="rel"><b>现状关联：</b>**策略：前瞻式 tie**（不用 wall-clock 窗口，避免依赖 `audio_tick()` 60 Hz 心跳的调用节奏）。</div>
+  </div>
+
+</section>
+
+<!-- ============================================================ -->
+<section class="group" id="g6">
+  <div class="group-header"><h2>六、ISR 中断驱动音泵系列</h2><span class="range">157 – 171</span></div>
+  <p class="group-desc">音色分配器改动（157）、不可打断性取证（163）、方案 A TimerB-IRQ3 立项→实机落地→密集期停顿根因→TimerB 实际周期定论→架构收口与单位化泵→ISR/协作泵双失修复（164-171）。158-162 位于 模仿升级计划/ 子目录，不在本次汇总范围。</p>
+  <div class="doc" id="doc-157">
+    <div class="doc-head"><span class="doc-num">157</span><span class="doc-title">BGM音色与分配器改动-6声道启用SCH0x80+最冷空闲分配+撤销legato-tie</span><span class="doc-status">已落地</span></div>
+    <h4>核心思路</h4>
+    <ul>
+      <li>移除 `FMSEQ_LEGATO_MS 40`。</li>
+      <li>`FmseqVoice` 移除 `uint8_t tied;`。</li>
+      <li>注释更新：steal 顺序改为「coldest free voice, then pedal-pending, then oldest」；新增 `devdoc 156` 的 click-free 原理（不重击刚释放的声部）。</li>
+      <li>`fm_release()`：不清 `tied`（已删字段）。保留 keyoff + `active=0` + `sustain_pending=0`。</li>
+      <li>**删** `fm_tie_follows()` 全部实现（纯前瞻，曾用于 0-ms 边界 tie）。</li>
+    </ul>
+    <div class="landing"><b>最终落点：</b>「最冷空闲」分配是业界常见的 click 缓解：不重击刚释放的声部，靠选取已走 release 尾的声部做新 keyon 来隐蔽相位突变。</div>
+    <div class="rel"><b>现状关联：</b>&gt; **依赖证据**：`devdocs/138` 低八度根因、`tools/tests/test_fm_voice_enable.py`（$29 + bgm_start stop 守卫）、`tools/tests/test_fm_seq.py`（分配器 + stop 复位守卫）、离线 `seqdump2+chplay`（fmgen 核，双场景同芯片实例）复核</div>
+  </div>
+
+  <div class="doc" id="doc-163">
+    <div class="doc-head"><span class="doc-num">163</span><span class="doc-title">BGM不可打断性-阻塞段取证与音泵解耦</span><span class="doc-status">已落地</span></div>
+    <h4>核心思路</h4>
+    <ul>
+      <li>音泵 = 协作式轮询：`fmseq_pump` 仅由 `audio_tick()`（`core/engine/audio.c:572` 起，FM 分支 `:618`/`fmseq_pump` 在 `:621`）驱动；`audio_tick` 仅在 `engine_frame_pump()`（`core/engine/frame.c:12`）与 `frame_</li>
+      <li>虚拟时钟 `vclock_advance()`（`core/lib/vclock.c:70`）**每次调用只发 `step`（`vclock.c:150-163`，与本次 `delta` 无关）**；真实流逝只用于窗口测速（`accum/passes`，`vclock.c:96-98`），**相位差从不补偿**——`vclock.h:35-40` 明文「on</li>
+      <li>后果：一次慢 pass（如对白整页重绘的 VRAM 密集写、NP2kai 模拟器放大）墙钟走了 300 ms，虚拟钟只走 `step`≈36 ms ⇒ 差额 = **音乐时间债**，此后只有被 5/4 窗口比率钳制的瞬态速率追赶（`vclock.c:123-136`）、**无相位偿还** ⇒ 听感 = 操作期停住、操作后原地续播（位置落后墙钟）。与用户症状精</li>
+      <li>既有 `[VC]` 串口行（`core/plat/hal_pc98.c:136`）只打 `v/step/tgt/cal`，**无法直接读债**——Phase 1 补 `w=`（墙钟）。</li>
+      <li>`pcm_play()` 的 `farchive_read_alloc()`（`core/engine/audio.c:393`，PCM 读取段）是阻塞读，期间无任何泵。文件小（SE/voice ≈6–9 KB），量级待 Phase 1 实测。</li>
+    </ul>
+    <div class="landing"><b>最终落点：</b>`134` 蓝本不重复；本文件落地其**第一步：vsync IRQ 探针**。</div>
+    <div class="rel"><b>现状关联：</b>&gt; **前序**：`devdocs/129`（vclock 诞生）/ `130`（vclock 重构）/ `131`（帧泵 + 解码泵 + 方案 A–E）/ `133`（首窗直采 + 测量平滑）/ `134`（方案 C：中断驱动音泵**立项**）/ `139`（窗口比率钳制）/ `148`（vclock 诊断记录）；`B19 §2`（时钟源谱系）；`G08`（DOS/4GW 中断 API）/ `G</div>
+  </div>
+
+  <div class="doc" id="doc-164">
+    <div class="doc-head"><span class="doc-num">164</span><span class="doc-title">方案A中断驱动音泵-TimerB-IRQ3</span><span class="doc-status">已落地</span></div>
+    <h4>核心思路</h4>
+    <ul>
+      <li>`0204` 对 IRQ 向量返回成功且 `bits32=1` ⇒ 阶段 1 的 `0205` 挂接**理论可行**（本 oracle 实为 IRQ12，§4.4）；</li>
+      <li>`0204` 失败 / `bits32=0` ⇒ 方案 A 在本工具链下**不可行**，应转到**方案 B（vclock 有界相位追赶，`devdocs/163 §4 B3`）**。</li>
+      <li>~~修正探针 `bits32` 读位并重跑~~ → **已完成，见 §4.3**（`flags=1` 证实 32-bit host）；</li>
+      <li>`[IRQP]` 已证 IRQ2 可靠；IRQ3 是否被 Timer-B 抬升**仍须实机验证**（探针只查向量、未让 Timer-B 起振）；</li>
+      <li>装 ISR（`NAIZ_BGM_IRQ=1`）后是否静默卡死**仍须实机验证**——但风险已由「DPMI 不可靠」大幅下调为「挂在 IRQ3 上的既有 stub 链是否可安全覆盖/链尾」。</li>
+    </ul>
+    <div class="landing"><b>最终落点：</b>&gt; **状态**：`实施中`（阶段 0 实机取证经 §4.</div>
+    <div class="rel"><b>现状关联：</b>&gt; **相关**：`devdocs/163`（BGM 不可打断性三阶段总纲，C2 定义）／`devdocs/134`（方案 C 立项蓝本）／`devdocs/133`（vclock 首窗直采 + 测量平滑）／`devdocs/131`（帧泵 + 解码泵 + 方案 A–E）／`devdocs/129`（帧泵所有权）／`B19 §2`（时钟源谱系）</div>
+  </div>
+
+  <div class="doc" id="doc-165">
+    <div class="doc-head"><span class="doc-num">165</span><span class="doc-title">方案A中断驱动音泵实机落地-ISR安全审计与定点时基</span><span class="doc-status">方案/规划</span></div>
+    <h4>核心思路</h4>
+    <ul>
+      <li>`HIT opna_settimer cData=0xa` ⇒ 我们的 `$27=0x0A` 写入**到达**模拟器；</li>
+      <li>`HIT fmport_b` ×12 ⇒ Timer-B 事件**确实在跑并溢出**；</li>
+      <li>`HIT pic_setirq irq=0xc`（IRQ12）×2 ⇒ **Timer-B 确实抬升过 IRQ12**；</li>
+      <li>`NEVENT_RESET FMTIMERB(6)` **持续数百次**，全部来自 `nevent_set`（即 `fmport_b` 的 `set_fmtimerbevent` 正常重排）——**Timer-B 事件本身一直在跑**。</li>
+      <li>修复前：`isr_count=1`（并永不增长）；</li>
+    </ul>
+    <div class="landing"><b>最终落点：</b>&gt; **§四「定点硬件时基」的周期取值与随后的「相位精确」验证结论在 NP2kai 上是错的**，正文以下按存档规则原样保留（其中 §四 B1 段的 `129 units` 推导与 §六 实机验证表的「相位精确」两行已被本块推翻）。</div>
+    <div class="rel"><b>现状关联：</b>&gt; **承接**：`devdocs/164`（方案 A 立项 + 阶段 0 探针 + 阶段 1 ISR 骨架）</div>
+  </div>
+
+  <div class="doc" id="doc-167">
+    <div class="doc-head"><span class="doc-num">167</span><span class="doc-title">方案A中断驱动音泵-密集期停顿根因收束与修复尝试总结</span><span class="doc-status">方案/规划</span></div>
+    <h4>核心思路</h4>
+    <ul>
+      <li>ISR 构建的实机抓取是 `logs/serial_demo-a2.log`（2026-10-22 17:43），内含 `BGM IRQ: Timer-B installed` 与 `[ISR] ticks`；</li>
+      <li>而当前工作树里的引擎是**默认构建**——`core/engine.exe` 与 `games/demo-a2/engine.exe` 均为 2026-10-22 18:44 重编，`strings` 命中 `BGM IRQ` = 0，与 §四 的「恢复默认构建」一致。</li>
+      <li>2048 字节在 22.05 kHz 下 ≈ 93 ms 音频，量级确实不小；</li>
+      <li>但原实现每字节前先 `inb` 查 FIFO 满位，FIFO 满时循环自然停住，实际不会一口气写满 2KB；</li>
+      <li>⇒ 它**不是致顿主因**，真实代价更接近「单次 ISR 端口 I/O 偏多」。评级由「关键」下调为「次要」，主因见第 4 条。</li>
+    </ul>
+    <div class="landing"><b>最终落点：</b>&gt; **关联**: `devdocs/164`（方案A立项）、`devdocs/165`（ISR安全化与定点时基，**其时基结论已被订正，见 `devdocs/168`**）、`devdocs/168`（Timer-B 实际周期定论与虚拟时钟速率修正）</div>
+    <div class="rel"><b>现状关联：</b>&gt; **关联**: `devdocs/164`（方案A立项）、`devdocs/165`（ISR安全化与定点时基，**其时基结论已被订正，见 `devdocs/168`**）、`devdocs/168`（Timer-B 实际周期定论与虚拟时钟速率修正）</div>
+  </div>
+
+  <div class="doc" id="doc-168">
+    <div class="doc-head"><span class="doc-num">168</span><span class="doc-title">TimerB实际周期定论与虚拟时钟速率修正</span><span class="doc-status">方案/规划</span></div>
+    <h4>核心思路</h4>
+    <ul>
+      <li>实测 16.188 ms vs NP2kai 模型 16.128 ms ⇒ 差 **+0.37%**；vs 真机模型 16.154 ms ⇒ 差 **+0.21%**。墙钟 `w` 只有 1 秒粒度（`w % 1000` 恒为 0），全窗口误差界约 ±0.9% ⇒ **三者相符**。</li>
+      <li>反向校验：若周期真是 8.06 ms，6795 tick 只需 54.8 s，而墙钟走了 110 s——**观测本身就把「8 ms」排除掉了一倍**（初稿把这个矛盾读成了模拟器故障）。</li>
+      <li>协作式路径的虚拟钟是自测量时钟，速率被钳制在 `target×4/5 … target×5/4`（`core/lib/vclock.h:115-116`），实测 `logs/probe_run.out` 尾段 Δv/Δw ≈ 4646/5000 = 93%；</li>
+      <li>⇒ SE/voice 的播放速度与音高随虚拟钟漂移。此前实现是「一直推到 FIFO 满」⇒ 硬件速率精确。</li>
+      <li>258 对两个宿主的偏差都在 0.2% 以内（约 3 音分，听不出）；259 反而更差。「取更接近真机的 258.46」需要小数累加器，收益不抵复杂度（BGM 是 tick 调度、误差只影响速度不累积漂移）。</li>
+    </ul>
+    <div class="landing"><b>最终落点：</b>&gt; **状态**：实施中（根因已定论；**2026-10-24 结论订正**；2026-10-25 补充外部取证，仍为纯文档）</div>
+    <div class="rel"><b>现状关联：</b>&gt; **承接**：`devdocs/165`（定点硬件时基，**其周期取值已被本文件订正**）、`devdocs/167`（伪阻塞撤回与真根因定位）</div>
+  </div>
+
+  <div class="doc" id="doc-169">
+    <div class="doc-head"><span class="doc-num">169</span><span class="doc-title">音频架构收口与下一步实施计划</span><span class="doc-status">已落地</span></div>
+    <h4>核心思路</h4>
+    <ul>
+      <li>**A 是 bug**，不是架构问题。</li>
+      <li>**B 已经解过一轮**（`devdocs/129` / `131` / `163`），残留是（A）导致的时间基错误在放大它。</li>
+      <li>**C 改不了**：YM3433B 只有一路 PCM 输出，任何软件架构都无法让两路采样同时发声。能做的是**策略**（谁优先、最小播放时长），不是架构。</li>
+      <li>**D 已经做对**：`bgm_irq_lock` 是深度计数、可重入、ISR 内自动 no-op（`audio.c:56-72`）。重写不会更好。</li>
+      <li>ISR 路径：`hal_irq.c` 直接传 `BGM_TIMER_B_UNITS`（258），**不再读虚拟时间戳**；</li>
+    </ul>
+    <div class="landing"><b>最终落点：</b>&gt; **结论一句话**：**不重写音频架构**。</div>
+    <div class="rel"><b>现状关联：</b>&gt; **承接**：`devdocs/168`（Timer-B 实际周期定论，**本文件是其唯一的实施计划出口**）、`devdocs/167`（伪阻塞撤回）、`devdocs/165`（ISR 安全化与定点时基）、`devdocs/164`（方案 A 立项）、`devdocs/163`（时间债）</div>
+  </div>
+
+  <div class="doc" id="doc-170">
+    <div class="doc-head"><span class="doc-num">170</span><span class="doc-title">阶段3-6音频架构收口单位化泵与方案A就绪</span><span class="doc-status">已落地</span></div>
+    <h4>核心思路</h4>
+    <ul>
+      <li>定义行 `audio_tick_isr(unsigned long delta_units)`（`audio.c:665`）；</li>
+      <li>删除 `static unsigned long last_pcm_ms;`（`audio.c:672` 原位置已删除）；</li>
+      <li>删除 `now = hal_wallclock_smooth_ms();` + `pcm_dt = now - last_pcm_ms;`（虚拟时钟差计算已移除）；</li>
+      <li>`pcm_units = delta_units;` + `if (pcm_units == 0) pcm_units = 258UL;`（`audio.c:676-678`）；</li>
+      <li>`hal_pcm_advance_units(pcm_units);` 替代 `hal_pcm_tick()`（`audio.c:682`）；</li>
+    </ul>
+    <div class="landing"><b>最终落点：</b>&gt; **状态**：**阶段 3–6 已完成、阶段 5 探针就绪、方案 A 落地准备就绪** — 阶段 0（基线 842/2/0）、阶段 1（守卫 8 绿）、阶段 2（常量 258 + 注释同步）、阶段 3（`audio_tick_isr()` 参数化 + PCM 单位化 + 测试同步 8 绿）、阶段 4（3 红修复 → 848/2/2）、阶段 5（探针脚本 `np2kai_ab.</div>
+    <div class="rel"><b>现状关联：</b>&gt; **承接**：`devdocs/169`（音频架构收口计划，本文件是其唯一实施出口）；`devdocs/168`（Timer-B 实际周期定论）；`devdocs/165`（ISR 安全化与定点时基）；`devdocs/164`（方案 A 立项）；`devdocs/163`（时间债）；`devdocs/117`（实机验证六禁与探针纪律）。</div>
+  </div>
+
+  <div class="doc" id="doc-171">
+    <div class="doc-head"><span class="doc-num">171</span><span class="doc-title">BGM无法播放ISR未触发与协作泵双失修复</span><span class="doc-status">已落地</span></div>
+    <h4>核心思路</h4>
+    <ul>
+      <li>**串口测试**：`./makegame.sh test demo-a2 --serial --auto` 完成（超时退出，不是引擎崩溃）；完整日志 `logs/serial_demo-a2.log`（1218 行，含 `BGM start` ×3、`PCM start`、`FM` 事件、`Init OK`）。</li>
+      <li>**构建验证**：`make -C core` PASS，`.err` 空。</li>
+      <li>**版本同步**：`0.3.057`（`animatest` + `demo-a2`）。</li>
+      <li>**测试守卫**：`pytest` 未安装（环境缺失），但构建验证与串口验证已覆盖核心路径。</li>
+      <li>**确认修复版本已运行**：检查实际运行的 `engine.exe` 是否为修复后构建（`ls --full-time games/demo-a2/engine.exe` 应与 `core/build/audio.o` 时间接近，14:12）。</li>
+    </ul>
+    <div class="landing"><b>最终落点：</b>&gt; **状态**：`执行完毕，验证通过`（修复已落地，串口全验证通过，构建 `.</div>
+    <div class="rel"><b>现状关联：</b>&gt; **ERRATA（2026-10-27，由 devdocs/174 §九 订正）**：本文「ISR 已安装」的判据是</div>
+  </div>
+
+</section>
+
+<!-- ============================================================ -->
+<section class="group" id="g7">
+  <div class="group-header"><h2>七、ISR 路径修复与虚拟时钟收口</h2><span class="range">172 – 176</span></div>
+  <p class="group-desc">修复验证通过（172）、虚拟时钟停顿保护与追赶爆发（173）、TimerB 中断线候选扫描与看门狗选举（174）、ISR 路径回退与根因待解（175）、最终根因定位：DOS/4GW 中断栈段 SS≠DS 致栈局部指针写入失效（176）。</p>
+  <div class="doc" id="doc-172">
+    <div class="doc-head"><span class="doc-num">172</span><span class="doc-title">修复执行完毕引擎修复验证通过FM追踪已执行</span><span class="doc-status">修复/验证</span></div>
+    <h4>核心思路</h4>
+    <ul>
+      <li>`audio.c:681-683`：`audio_tick_isr()` 增加溢出守卫 `pcm_units &gt; 258UL * 4` → `pcm_units = 258UL`（防止 `delta_units` 异常导致泵不推进）</li>
+      <li>`hal_audio.c:215`：`#define FM_TRACE_ENABLED 1`（已执行，后恢复 `0` 以避免 ISR 写串口高开销导致卡死）</li>
+      <li>构建：`make -C core` PASS（`audio.o` 重编译 14:46 → 15:28，含修复），`core/*.err` 全为空</li>
+      <li>`Init OK`（`FONT.DAT` 正常加载，修复前 `FONT.DAT not found` 已解决）</li>
+      <li>`AUD OPNA OK` + `FM: 15 patch families ready`（FM 补丁正常加载）</li>
+    </ul>
+    <div class="landing"><b>最终落点：</b>- `BGM IRQ: installed; co-operative pump disabled (ISR active)`（ISR 安装成功，Timer-B 编程正常）</div>
+    <div class="rel"><b>现状关联：</b>&gt; **ERRATA（2026-10-27，由 devdocs/174 §九 订正）**：本文引的</div>
+  </div>
+
+  <div class="doc" id="doc-173">
+    <div class="doc-head"><span class="doc-num">173</span><span class="doc-title">虚拟时钟停顿保护与追赶爆发根因收束</span><span class="doc-status">已落地</span></div>
+    <h4>核心思路</h4>
+    <ul>
+      <li>**下界 `VCLOCK_MAX_ADVANCE_MS`（100 ms）**：低于它的抖动本来就被窗口钳制吸收，不构成本质污染；把 50 ms 也判为 stall 会把正常的 20 Hz 帧节奏打成永久暂停。</li>
+      <li>**上界 500 ms**：NP2kai 的 DOS 时钟（INT 21h AH=2Ch）是**秒级量化**的，第 20 次调用会给出 `delta = 1000 ms`。若把它当 stall 处理，虚拟时钟每过一秒就冻结 1 秒，比原问题更糟。真实 blit/解码在 NP2kai ~20 Hz 下被帧预算限制在 50–200 ms，不会接近 500 ms。</li>
+      <li>用户实测：「速度正常了」→ 追赶爆发消失。</li>
+      <li>**残余**：「还有轻微的拖延和过快」。这与 stall 无关——`audio_tick()` 只在帧泵调用点运行，NP2kai 下实际 pass 率约 20 Hz（50 ms 网格），音符起音被量化到最近的帧。±25 ms 的抖动正好是可闻的「轻微拖延/过快」。</li>
+      <li>该残余只能靠把音泵粒度从 50 ms 降到 Timer-B 的 ~16 ms 解决，即 devdoc 174 的候选线扫描。</li>
+    </ul>
+    <div class="landing"><b>最终落点：</b>&gt; **状态**：`已实施并实机验证`（`core/lib/vclock.</div>
+    <div class="rel"><b>现状关联：</b>&gt; **状态**：`已实施并实机验证`（`core/lib/vclock.c` stall protection 落地；用户实测「速度正常了」，残余「轻微拖延/过快」归因于 20Hz 帧粒度，见 devdoc 174）</div>
+  </div>
+
+  <div class="doc" id="doc-174">
+    <div class="doc-head"><span class="doc-num">174</span><span class="doc-title">TimerB中断线候选扫描与看门狗选举</span><span class="doc-status">已落地</span></div>
+    <h4>核心思路</h4>
+    <ul>
+      <li>记录 `g_probe_base_ticks = g_isr_ticks`，窗口 `BGM_IRQ_PROBE_FRAMES = 8` 帧。</li>
+      <li>若窗口内 `delta &gt;= BGM_IRQ_PROBE_MIN_TICKS = 6` → **该线真的在 tick**，`g_irq_active = 1`，ISR 接管时钟与音泵。</li>
+      <li>否则 `bgm_irq_probe_advance()` 调 `bgm_irq_detach()`（**恢复 IMR 与原向量**，不永久屏蔽别人的线）并试下一条。</li>
+      <li>全部候选耗尽 → 掉 `no candidate ticks; co-operative pump stays active`，Timer-B 停掉（`$27` RESET B），协作泵保持。**这同时经验性地回答了「Timer-B 到底可不可用」**。</li>
+      <li>bit1 未置 → 不是我们的 tick：立刻两次 EOI 返回，**不碰时钟、不碰音频**；</li>
+    </ul>
+    <div class="landing"><b>最终落点：</b>此前若干轮把该结论当成既定事实，据此关闭了 ISR 路径。</div>
+    <div class="rel"><b>现状关联：</b>&gt; **承接**：`devdocs/171`、`devdocs/172`、`devdocs/173`</div>
+  </div>
+
+  <div class="doc" id="doc-175">
+    <div class="doc-head"><span class="doc-num">175</span><span class="doc-title">ISR路径回退与根因待解</span><span class="doc-status">方案/规划</span></div>
+    <h4>核心思路</h4>
+    <ul>
+      <li>`BGM_TIMER_B_UNITS` 是编译期常量（Timer-B 理论步长，16.154 ms 对应 258 个 1/16 ms units）。</li>
+      <li>`hal_wallclock_last_advance_units()` 是 vclock 校准后最近一次发出的 advance 大小 —— 在 NP2kai 的 20 Hz 帧节奏下，它**绝不是 258**，而是 `~1000 ms ÷ 20 Hz = ~50 ms = 800 units` 左右。</li>
+      <li>devdoc 174 候选扫描的 `g_bgm.rewound = 1` 标志在 ISR 内置位、帧路径清位 + 打日志 —— 这条本身在结构上就是「ISR 置标志、帧路径收尾」的设计（devdoc 165 §四 B3：handler 不能 hal_logf），不是缺陷。</li>
+      <li>构建：`make -C core` → `engine.exe` + `engine_a.exe` 重建，`core/*.err` **不存在**。</li>
+      <li>pytest：**850 passed / 2 skipped / 1 failed**（唯一失败 `test_naiz_market.py::test_clear_screen_emits_ansi_on_tty` 在 HEAD 上同样失败）。</li>
+    </ul>
+    <div class="landing"><b>最终落点：</b>&gt; §十一 提出的「运行时 toggle」方案已在 0.</div>
+    <div class="rel"><b>现状关联：</b>&gt; **承接**：`devdocs/173`（虚拟时钟 stall 保护）、`devdocs/174`（候选扫描设计）</div>
+  </div>
+
+  <div class="doc" id="doc-176">
+    <div class="doc-head"><span class="doc-num">176</span><span class="doc-title">ISR路径FM静音根因-DOS4GW中断栈段与栈局部指针写入</span><span class="doc-status">已落地</span></div>
+    <h4>核心思路</h4>
+    <ul>
+      <li>14 s ISR 逐秒剖面（修复后最终构建）：**每一秒都有信号**（RMS 3561–9504，peak 6588–21771；对白推进处为 PCM 叠加），不再出现连续静音秒。</li>
+      <li>`[ISR] ticks` 持续递增，`v` 与 `w` 同步（`v/w ≈ 1.03–1.05`，属已知的时钟速率独立项，不在本文范围）。</li>
+      <li>`make -C core` 返回 0，`core/*.err` 无内容。</li>
+      <li>`bgm_irq_handler()` 函数体内不得出现 `audio_tick_isr(`、`fmseq`、`hal_log`；</li>
+      <li>`core/plat/hal_irq.c` 不得 `#include &quot;audio.h&quot;`（plat 不反向依赖 engine）；</li>
+    </ul>
+    <div class="landing"><b>最终落点：</b>&gt; **状态**：**已完结**（0.</div>
+    <div class="rel"><b>现状关联：</b>&gt; **承接**：`devdocs/175`（ISR 路径回退与根因待解；本文订正其 §四 的推断）、`devdocs/168`（Timer-B 步长定论）、`devdocs/165`（ISR 安全约束）</div>
+  </div>
+
+</section>
+
+<footer>
+  Naiz 引擎 116-176 开发文档总结 · 由 devdocs/（116–176，55 份）精炼整理生成 · 版本 0.3.000
+</footer>
+
+</div>
+</body>
+</html>

@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="translated-from" content="202610300931">
+<!-- AI-NOTE: translated-from = the guildbook_cn doc-version this page was translated from. If the cn counterpart's doc-version is newer, re-translate this page from the Chinese source. -->
+
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>market.sh Usage Guide — Naiz Guildbook</title>
+<link rel="stylesheet" href="../style.css">
+</head>
+<body>
+<nav class="sidebar" id="sidebar-nav"></nav>
+<script src="../sidebar-tools.js"></script>
+<main class="main">
+
+<h1>market.sh Usage Guide</h1>
+<blockquote><strong>Created</strong>: 2026-09-27<br><strong>Last updated</strong>: 2026-09-27</blockquote>
+<p><code>market.sh</code> is the <strong>asset-market download tool</strong>: it downloads resources (e.g. scene backgrounds) whole-package on demand from the public GitHub market repo to your local machine, without adding to this repository's size. Downloads are read-only HTTPS (GitHub API + raw) and need no write access. For registering images into a project, see <a href="cf07-图片登记.html">cf07 Image Registration</a>.</p>
+<hr>
+
+<h2>1. Basic concept: packages</h2>
+<ul>
+<li>A top-level directory in the market repo <strong>= one resource package</strong>; downloads are always whole-package — there is no file-level selection.</li>
+<li>Display-name rule: the directory name is split on <code>_</code>, the first segment is wrapped in <code>()</code>, and the remaining segments are joined with spaces (e.g. <code>images_sample_scenebg</code> → <code>(images)sample scenebg</code>); on the command line, both the raw directory name and the suffix kind name are accepted.</li>
+<li>The default download destination is <code>assets_samples/</code> (already gitignored); if a file with the same name already exists at the target path it is <strong>skipped</strong> by default (printing <code>SKIP (exists)</code>), and is overwritten only with <code>--force</code>.</li>
+</ul>
+
+<h2>2. Configuration (market.toml)</h2>
+<p>The repository root's <code>market.toml</code>:</p>
+<pre><code>[market]
+repo = "edouardlicn123/naiz_assets"  # market repo owner/repo
+ref = "main"                          # branch/ref
+dest = "assets_samples"               # local destination</code></pre>
+
+<h2>3. Subcommands</h2>
+<table>
+<tr><th>Subcommand</th><th>What it does</th></tr>
+<tr><td><code>list</code></td><td>List all packages (display name / file count / total size)</td></tr>
+<tr><td><code>cats</code></td><td>Package display names + file counts only</td></tr>
+<tr><td><code>menu</code> (default)</td><td>Pick packages interactively by number (supports <code>1 2</code> and <code>1-3</code>; pressing Enter downloads the whole package); the screen is cleared once at startup, later redraws do not clear it, and the download log stays above the menu</td></tr>
+<tr><td><code>get &lt;包&gt;...</code></td><td>Whole-package download from the command line (raw directory name or suffix kind name)</td></tr>
+<tr><td><code>get-all</code></td><td>Download all packages</td></tr>
+</table>
+<p>Common options (placed after the subcommand): <code>--repo</code> / <code>--ref</code> / <code>--dest</code> / <code>--config</code> / <code>--dry-run</code> (plan only, write nothing to disk) / <code>--force</code> (overwrite existing files).</p>
+<p>Screen clearing applies only to <code>menu</code>, and only when the output is a terminal (when redirected to a file or piped, plain text is written with no escape sequences).</p>
+
+<h2>4. Common usage examples</h2>
+<pre><code># Interactive menu (recommended)
+./market.sh
+# Equivalent form
+./market.sh menu
+
+# See what packages exist
+./market.sh list
+
+# Download a specific package (both forms are equivalent)
+./market.sh get images_sample_scenebg
+./market.sh get scenebg
+
+# Refresh already-downloaded files
+./market.sh get scenebg --force</code></pre>
+<p>The downloaded files under <code>assets_samples/</code> are raw assets; to use them in the game, copy them to <code>assets/&lt;game&gt;/png/</code> and register them following the three steps in <a href="cf07-图片登记.html">cf07 Image Registration</a>.</p>
+
+</main>
+</body>
+</html>
