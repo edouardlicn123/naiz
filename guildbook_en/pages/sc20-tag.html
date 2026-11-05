@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="translated-from" content="202611051818">
+<!-- AI-NOTE: translated-from = the guildbook_cn doc-version this page was translated from. If the cn counterpart's doc-version is newer, re-translate this page from the Chinese source. -->
+
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>tag — Naiz Guildbook</title>
+<link rel="stylesheet" href="../style.css">
+</head>
+<body>
+<nav class="sidebar" id="sidebar-nav"></nav>
+<script src="../sidebar-scripts.js"></script>
+<main class="main">
+
+<h1>tag — Scene Anchors</h1>
+<hr>
+<blockquote><strong>Created</strong>: 2026-11-05 <strong>Last updated</strong>: 2026-11-05</blockquote>
+<p><code>tag()</code> declares a <strong>jump anchor</strong> inside the current script for <a href="sc21-jump.html">jump — in-scene jump</a> and <a href="sc22-jumpscene.html">jumpscene — cross-scene jump</a>. It has no runtime effect of its own: normal sequential execution simply passes over the tag line.</p>
+
+<h2>1. Syntax</h2>
+<pre><code>tag(name)</code></pre>
+<table>
+<tr><th>Field</th><th>Description</th></tr>
+<tr><td><code>name</code></td><td>Anchor name. ASCII letters, digits and underscores only (<code>[A-Za-z0-9_]+</code>), case-sensitive</td></tr>
+</table>
+<pre><code>tag(m1)             ← valid
+tag(badge_01)       ← valid (underscore)
+tag(第一章)          ← invalid (non-ASCII identifier)</code></pre>
+
+<h2>2. Writing Rules</h2>
+<ul>
+<li><strong>Must occupy its own line</strong>: no space between the command name and <code>(</code>. <code>tag(m1)</code> works; <code>tag (m1)</code> does not.</li>
+<li>A trailing <code>#</code> comment is allowed, e.g. <code>tag(m1)  # forest branch</code>.</li>
+<li>Duplicate names in the same scene are allowed: <strong>the first match wins</strong> (top-down scan).</li>
+<li>A tag is <strong>scoped to its scene file</strong>; same-named tags in different scenes are independent.</li>
+<li>Tags do not need pairing, and there is no implicit “return to anchor” behavior — a backward jump is just a <code>jump</code> whose target lies above the current position.</li>
+<li>The build-time validator only collects <code>tag(name)</code> written <strong>on its own line, inside parentheses</strong>. The same text inside dialogue, comments or other command arguments is not an anchor.</li>
+</ul>
+
+<h2>3. Landing Position</h2>
+<p>When <code>jump</code> / <code>jumpscene</code> hits a tag, execution resumes at <strong>the line after the tag</strong>; the tag line itself is not executed (and would be a no-op anyway).</p>
+<pre><code>tag(branch_a)
+host(){Entering branch A}   ← execution starts here after the jump</code></pre>
+<p>Tags are therefore usually placed at the “entrance” of a story block. Note that <strong>lines before the tag are not replayed</strong>: if the target block needs a specific background, sprite or BGM, put those commands after the tag rather than relying on settings that “should have run” before it. The same applies to cross-scene landings (see <a href="sc22-jumpscene.html">sc22 §3</a>).</p>
+
+<h2>4. Build-Time Validation</h2>
+<ul>
+<li>A tag referenced by <code>jump</code> must exist in the <strong>current scene</strong>, otherwise the validator reports an error before runtime.</li>
+<li>A tag given as the third field of <code>jumpscene</code> must exist in the <strong>target scene</strong>, and that scene file must exist.</li>
+<li>Runtime fallback: if a tag is missing anyway (e.g. a hot-edited script), the engine logs a WARN, does not jump, and continues with the line after the jump command; <code>jumpscene</code> instead plays the target scene from the top.</li>
+</ul>
+
+<h2>5. Example</h2>
+<pre><code># nbook001.nb
+tag(m_start)
+host(){Morning forest}
+
+jump(Where to?;Forest,m_forest;Town,m_town)
+
+tag(m_forest)
+bg(normal){forest}
+host(){You walk into the forest}
+
+tag(m_town)
+bg(normal){town}
+host(){You arrive in town}</code></pre>
+
+<h2>6. See Also</h2>
+<ul>
+<li><a href="sc21-jump.html">sc21 — jump: in-scene jump</a>: choice-driven jump to a tag in this scene</li>
+<li><a href="sc22-jumpscene.html">sc22 — jumpscene: cross-scene jump</a>: choice-driven scene switch, optionally landing on a tag</li>
+<li><a href="sc08-question.html">sc08 — question: choice branches</a>: choices that change variables</li>
+<li><a href="sc04-scene.html">sc04 — scene: scene jump</a>: unconditional / conditional scene switching</li>
+</ul>
+
+</main>
+</body>
+</html>

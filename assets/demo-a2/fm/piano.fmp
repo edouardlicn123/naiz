@@ -1,0 +1,7 @@
+# piano — GM 0..7 pianos.  Two-carrier pair (alg 6) with detuned "hammer"
+# modulators for a percussive, quick-decay acoustic-ish strike.
+alg=6 fb=0 pan=0xc0
+op=1 dt=0 mul=1  tl=48 ks=2 ar=26 am=0 d1r=9  d2r=8  sl=2 rr=6
+op=3 dt=1 mul=1  tl=46 ks=2 ar=26 am=0 d1r=9  d2r=8  sl=2 rr=6
+op=2 dt=0 mul=4  tl=34 ks=1 ar=26 am=1 d1r=6  d2r=4  sl=3 rr=7
+op=4 dt=0 mul=2  tl=36 ks=1 ar=26 am=1 d1r=7  d2r=5  sl=3 rr=7

@@ -1,0 +1,3 @@
+sceneconf(){Special, menu}
+bg(normal){yellow_grid}
+specialmenu(gallery,scenes,music)

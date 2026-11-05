@@ -1,0 +1,158 @@
+# naiz_lib shared utilities
+
+import os
+
+# === Project path constants ===
+PROJECT_ROOT = os.path.normpath(os.path.join(os.path.dirname(__file__), '..', '..'))
+"""Absolute path to the naiz project root directory."""
+GAMES_DIR = os.path.join(PROJECT_ROOT, 'games')
+"""Directory containing deployable game files."""
+DISKS_DIR = os.path.join(PROJECT_ROOT, 'disks')
+"""Directory containing generated HDI images."""
+COMMERCIAL_DIR = os.path.join(PROJECT_ROOT, 'tools_commercial')
+"""Directory holding non-open-source (commercial/copyrighted) build assets."""
+COMMERCIAL_BASE_HDI = os.path.join(COMMERCIAL_DIR, 'base_msdos5_scsi_48m_clean.hdi')
+"""MS-DOS 5.0 base HDI image (commercial, kept out of the open-source repo)."""
+COMMERCIAL_BIOS_DIR = os.path.join(COMMERCIAL_DIR, 'pc9821bios')
+"""NEC PC-98 BIOS ROM directory (commercial firmware)."""
+COMMERCIAL_DOS_DIR = os.path.join(COMMERCIAL_DIR, 'dos_system')
+"""DOS system files (DOS4GW.EXE, VEM486.*, IO.SYS, ...)."""
+TOOLS_OPEN_DIR = os.path.join(PROJECT_ROOT, 'tools_open')
+"""Directory holding open-source build assets (naiz-openpack); preferred over tools_commercial."""
+OPEN_DOS_DIR = os.path.join(TOOLS_OPEN_DIR, 'dos_system')
+"""Open-source DOS system files (FreeDOS(98) kernel, FDXMS/EMM386, CTMOUSE, ...)."""
+OPEN_BASE_HDI = os.path.join(TOOLS_OPEN_DIR, 'base_freedos98_scsi_10m_clean.hdi')
+"""FreeDOS(98) base HDI image (open-source chain, devdoc 185)."""
+OPEN_BASE_HDI_250M = os.path.join(TOOLS_OPEN_DIR, 'base_freedos98_scsi_250m_clean.hdi')
+"""Larger FreeDOS(98) base HDI for asset-heavy projects (optional)."""
+
+
+def pack_mode():
+    """当前打包方式: 'cmpack' | 'openpack' | ''（未指定）。
+
+    ``NAIZ_PACK`` 由 makegame.sh 的 --pack 选项导出；未设置时返回空串，
+    调用方按旧行为自动择优（tools_open 优先，缺失回退 tools_commercial）。
+    """
+    mode = os.environ.get('NAIZ_PACK', '').strip().lower()
+    return mode if mode in ('cmpack', 'openpack') else ''
+
+
+def resolve_dos_dir():
+    """DOS system dir: honour NAIZ_PACK, else prefer tools_open over commercial."""
+    mode = pack_mode()
+    if mode == 'cmpack':
+        return COMMERCIAL_DOS_DIR
+    if mode == 'openpack':
+        return OPEN_DOS_DIR
+    return OPEN_DOS_DIR if os.path.isdir(OPEN_DOS_DIR) else COMMERCIAL_DOS_DIR
+
+
+def resolve_base_hdi():
+    """Base HDI: honour NAIZ_PACK, else prefer the small open-source image.
+
+    ``NAIZ_OPEN_BASE`` 可指定另一份开源基座（绝对路径，或 tools_open/ 下的文件名），
+    常用场景是做资产多的大项目时改用自己生成的大基座：
+        NAIZ_OPEN_BASE=/path/to/base_250m_clean.hdi ...
+    """
+    mode = pack_mode()
+    if mode == 'cmpack':
+        return COMMERCIAL_BASE_HDI
+    env = os.environ.get('NAIZ_OPEN_BASE', '').strip()
+    if env:
+        return env if os.path.isabs(env) else os.path.join(TOOLS_OPEN_DIR, env)
+    for path in (OPEN_BASE_HDI, OPEN_BASE_HDI_250M):
+        if os.path.isfile(path):
+            return path
+    return COMMERCIAL_BASE_HDI
+
+
+DOS_SYSTEM_DIR = resolve_dos_dir()
+"""Deprecated alias (kept for backward compatibility); auto-selects tools_open over tools_commercial."""
+VENV_DIR = os.path.join(PROJECT_ROOT, 'tools', 'env_setup', 'venv')
+"""Shared Python virtualenv directory (single source of truth)."""
+VENV_PYTHON = os.path.join(VENV_DIR, 'bin', 'python3')
+"""Python interpreter inside the shared venv."""
+
+# === VEM486 memory manager file set (injected into base HDI) ===
+VEM486_FILES = ['VEM486.EXE', 'VEM486.HED', 'VEMEMM.SYS',
+                'VEMHSB.SYS', 'VEMRSM.SYS']
+
+# === Cross-language constants (mirrors core/engine/render.h + scene_layers.h) ===
+
+# Palette indices
+PAL_WHITE = 7
+PAL_TRANSPARENT = 15
+PAL_DIALOG_FILL = 248
+BTN_FILL_IDX = 249
+BTN_HIGHLIGHT_IDX = 252
+BTN_SHADOW_IDX = 253
+
+# All engine-reserved palette indices (must not be used by game art)
+PROTECTED_IDX_ALL = {PAL_WHITE, PAL_TRANSPARENT, 248, 249, 250, 251, 252, 253, 254, 255}
+
+# Screen dimensions
+LAYER_SCREEN_W = 640
+LAYER_SCREEN_H = 400
+
+# Button dimensions (from scene_layers.h BTN_*)
+BTN_W = 100
+BTN_H = 34
+BTN_R = 17
+BTN_GAP = 10
+BTN_COL_GAP = 14
+
+# Dialog layout (from scene_layers.h LAYER_DIALOG_*)
+DIALOG_X = 80
+DIALOG_Y = 280
+DIALOG_W = 480
+DIALOG_H = 115
+DIALOG_INDENT = 12
+DIALOG_RIGHT_INDENT = 12
+DIALOG_TEXT_Y = 28
+DIALOG_HEADER_Y = 6
+DIALOG_BORDER = 2
+DIALOG_BOTTOM = DIALOG_Y + DIALOG_H - DIALOG_BORDER
+
+# Sprite layout (from scene_layers.h LAYER_SPRITE_*)
+LAYER_SPRITE_W = 200
+LAYER_SPRITE_H = 400
+LAYER_MAX_SPRITES = 16
+
+
+def read_u32_le(data, offset):
+    """Read an unsigned 32-bit little-endian integer from bytes at offset."""
+    return int.from_bytes(data[offset:offset+4], "little")
+
+
+def read_u16_le(data, offset):
+    """Read an unsigned 16-bit little-endian integer from bytes at offset."""
+    return int.from_bytes(data[offset:offset+2], "little")
+
+
+def project_assets_dir(project_dir, repo_root=None):
+    """Resolve the per-project source-asset root that BGM/SND/VC payloads
+    live under, i.e. assets/<project>/.
+
+    Audio sources share the root that already holds the images.map PNG
+    sources and the anim/ frame material: assets/<project>/ is where source
+    material goes, projects/<project>/ is where the build writes and keeps
+    scripts.  The ASSETS.DB img_map.filename column is relative to the
+    directory returned here, so callers must not re-derive the path.
+
+    repo_root overrides the repository root (tests pass a tmp_path).
+    """
+    root = repo_root or PROJECT_ROOT
+    name = os.path.basename(os.path.normpath(project_dir))
+    return os.path.join(root, 'assets', name)
+
+
+def to_dos_name(name):
+    """Convert 'FILE.EXT' to (base8, ext3) padded DOS 8.3 name bytes."""
+    name = name.upper()
+    if '.' in name:
+        base, ext = name.rsplit('.', 1)
+    else:
+        base, ext = name, ''
+    base8 = base[:8].ljust(8).encode('ascii', errors='replace')
+    ext3 = ext[:3].ljust(3).encode('ascii', errors='replace')
+    return base8, ext3

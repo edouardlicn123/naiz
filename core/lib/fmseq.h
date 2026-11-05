@@ -1,0 +1,135 @@
+/*
+ * fmseq.h — MIDI -> OPNA voice allocator (devdocs/123 §四 M2).
+ *
+ * Pure library (core/lib): zero outb(), host-testable.  Consumes the
+ * time-ordered MidEvent stream from midi.c and turns it into FM/SSG voice
+ * state, emitting register writes through an injectable sink so the engine
+ * can point it at hal_fm_* and tests can record the writes.
+ *
+ * Voice policy (devdocs/123 §8.2, user-decided):
+ *   - MIDI channels other than 10 (0-based 9) are melodic -> 6 FM voices.
+ *   - GM channel 10 is percussion -> 3 SSG voices: kick/toms -> SSG0
+ *     tone; snare/rim/clap -> SSG1 tone+noise; hats/cymbals + everything
+ *     else -> SSG2 noise-only.
+ *   - Patch family of a MIDI channel comes from the GM program via
+ *     gm_map[program]; NULL maps every program to family 0.  Programs out
+ *     of [0, patch_count) trigger the unmapped callback and fall back to
+ *     family 0 (the callback is the engine's fail-loud log point).
+ *   - Note steal: the coldest free voice, then a pedal-pending one, then the
+ *     oldest (a forced steal keyoffs first so no stuck key bit survives).
+ *   - v1 simplifications (documented in devdocs/123): CC7 ignored; bend is
+ *     a linear +-2-semitone approximation; every note-on re-writes the whole
+ *     patch; SSG drums get a software volume decay driven here (the SSG has
+ *     no 4-operator envelope to do the tail).
+ *   - Click-free re-use (devdoc 156): OPNA keyoff->keyon resets the operator
+ *     phase, which clicks on real hardware/fmgen (ymfm masks it).  A repeated
+ *     note therefore never re-keys the voice it just released: the allocator
+ *     picks the coldest free voice (least recently allocated, i.e. longest
+ *     into its release tail), and fmgen/OPNA then has a decayed phase to key
+ *     on.  This supersedes the legato tie of devdoc 155, which suppressed the
+ *     per-note re-attack entirely and cost ~3 dB of level on monophonic lines.
+ */
+#ifndef LIB_FMSEQ_H
+#define LIB_FMSEQ_H
+
+#include <stddef.h>
+#include <stdint.h>
+#include "fmopn.h"
+#include "midi.h"
+
+#define FMSEQ_MELODY_FM_CH     6            /* FM voices for melodic notes */
+#define FMSEQ_PERCUSSION_SSG_CH 3           /* SSG voices for GM ch 10 */
+#define FMSEQ_MIDI_CHANNELS    16
+#define FMSEQ_PERCUSSION_MIDI_CH 9          /* 0-based GM channel 10 */
+
+/* Per-call dispatch cap: one fmseq_pump() fires at most this many events, so a
+ * large clock jump is spread over several frames instead of flushing a whole
+ * backlog into a single pass (devdoc 147 A3).  Generous enough that steady
+ * playback (0-1 events per frame) is unaffected. */
+#define FMSEQ_PUMP_MAX_PER_CALL 16
+
+/* SSG voice modes (per voice, mapped onto SSG registers). */
+#define FMSEQ_SSG_TONE      0               /* tone output (kick/toms) */
+#define FMSEQ_SSG_NOISE     1               /* noise only (hats/cymbals) */
+#define FMSEQ_SSG_TONE_NOISE 2              /* tone + noise (snare body) */
+
+/* Standard-velocity note values used to classify GM drum kit keys. */
+#define FMSEQ_KICK_LOW      35
+#define FMSEQ_KICK_HIGH     36
+#define FMSEQ_SNARE_LO      38
+#define FMSEQ_SNARE_HI      40
+#define FMSEQ_SSG2_FALLBACK 42              /* hats/cymbals + anything else */
+
+typedef struct {
+    uint8_t active;         /* has a sounding note (keyon held / decay) */
+    uint8_t midi_ch;
+    uint8_t midi_note;
+    uint8_t vel;
+    uint8_t family;         /* patch table index */
+    uint8_t sustain_pending;/* note-off absorbed by the pedal */
+    int      block, fnum;   /* FM: chip block/fnum; SSG tone voice: period */
+    uint8_t  ssg_vol8;      /* 8-bit software amplitude for SSG decay */
+    uint32_t age;           /* allocation order for FIFO steal */
+} FmseqVoice;
+
+typedef struct Fmseq Fmseq;
+
+/* Register write sink.  bank 0 -> ordinary port (0x188/0x18A), bank 1 ->
+ * extended (0x18C/0x18E).  fmseq never touches ports itself. */
+typedef struct {
+    void *ctx;
+    void (*write)(void *ctx, int bank, uint8_t reg, uint8_t val);
+} FmseqSink;
+
+/* Called when a GM program change maps to no patch family; ctx is the
+ * engine's context, default_family is what fmseq will actually use. */
+typedef void (*FmseqUnmapped)(void *ctx, int midi_ch, int program,
+                              int default_family);
+
+/* --- lifecycle ------------------------------------------------------------ */
+
+/* Size of the opaque Fmseq struct, so host tests can allocate it exactly. */
+size_t fmseq_size(void);
+
+/* Initialise with the patch family table.  patches is not owned; it must
+ * outlive the sequence.  gm_map is a 128-entry GM program -> family table
+ * (NULL: everything maps to family 0). */
+void fmseq_init(Fmseq *seq, const FmopnPatch *patches, int patch_count,
+                const uint8_t *gm_map, FmseqUnmapped unmapped, void *ctx);
+
+/* Load the event stream to replay.  count == 0 clears it.  The caller keeps
+ * ownership and must keep the array alive while fmseq_pump is fed. */
+void fmseq_events(Fmseq *seq, const MidEvent *events, int count);
+
+/* Pump up to wall-clock now_ms: dispatch the events with tick_ms <= now_ms,
+ * then decay the SSG percussion voices for the elapsed time.  At most
+ * FMSEQ_PUMP_MAX_PER_CALL events fire per call; any remainder stays pending
+ * and is dispatched by a later call (devdoc 147 A3).  now_ms must be
+ * monotonic across calls (the engine feeds hal_wallclock_smooth_ms,
+ * devdocs/107). */
+void fmseq_pump(Fmseq *seq, const FmseqSink *sink, uint64_t now_ms);
+
+/* Silence everything: keyoff every voice, clear sustain, rewind the event
+ * cursor so a later fmseq_pump replays from the start point of the last
+ * seek. */
+void fmseq_stop(Fmseq *seq, const FmseqSink *sink);
+
+/* --- introspection (tests + engine diagnostics) -------------------------- */
+
+/* Number of currently sounding FM voices. */
+int fmseq_fm_voices(const Fmseq *seq);
+
+/* 1 once the whole loaded event stream has been dispatched.  The engine
+ * uses this as its loop point: rewind to the start of the last seek. */
+int fmseq_finished(const Fmseq *seq);
+
+/* Next loop-start clock for a looping event stream (devdoc 147 A2).  Given the
+ * previous loop start, the song length and the current clock, advance by whole
+ * song lengths so the result satisfies result <= now < result + song_len —
+ * preserving musical phase instead of resetting to `now` (which dropped the
+ * remainder every loop).  song_len == 0 returns now.  Shared by both engine
+ * backends (FM and MPU): looping the parsed event table is backend-independent
+ * even though this lives beside fmseq_finished(). */
+uint64_t fmseq_loop_start(uint64_t last_start, uint64_t song_len, uint64_t now);
+
+#endif /* LIB_FMSEQ_H */

@@ -1,0 +1,7 @@
+# Naiz 资产市场配置 — 市场仓库 / 下载落点
+# Market repo & download target for the asset-market tool (tools/naiz_market).
+
+[market]
+repo = "edouardlicn123/naiz_assets"
+ref = "main"
+dest = "assets_samples"

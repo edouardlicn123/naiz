@@ -1,0 +1,37 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="translated-from" content="202610300931">
+<!-- AI-NOTE: translated-from = the guildbook_cn doc-version this page was translated from. If the cn counterpart's doc-version is newer, re-translate this page from the Chinese source. -->
+
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>startsetting — Naiz Guildbook</title>
+<link rel="stylesheet" href="../style.css">
+</head>
+<body>
+<nav class="sidebar" id="sidebar-nav"></nav>
+<script src="../sidebar-scripts.js"></script>
+<main class="main">
+
+<h1>startsetting — Startup Settings</h1>
+<hr>
+<blockquote><strong>Created</strong>: 2026-08-29</blockquote>
+<p>The <code>startsetting</code> command opens the settings menu, saves the settings, and reloads the font and scenario language when the language changes. The command takes no parameters.</p>
+
+<h2>1. Syntax</h2>
+<pre><code>startsetting</code></pre>
+<table>
+<tr><th>Parameter</th><th>Type</th><th>Description</th></tr>
+<tr><td>—</td><td>—</td><td>No parameters</td></tr>
+</table>
+
+<h2>2. Example</h2>
+<pre><code>mainmenu start
+startsetting</code></pre>
+
+<div class="note-box"><p>It calls the settings-menu run function internally; if the language changed, the CJK font and the NB text are reloaded (see <code>cmd_startsetting</code> in <code>nb_mainmenu.c</code>).</p></div>
+
+</main>
+</body>
+</html>

@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="translated-from" content="202610300931">
+<!-- AI-NOTE: translated-from = the guildbook_cn doc-version this page was translated from. If the cn counterpart's doc-version is newer, re-translate this page from the Chinese source. -->
+
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Animation Design — Naiz Guildbook</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<nav class="sidebar" id="sidebar-nav"></nav>
+<script src="sidebar-animation.js"></script>
+<main class="main">
+
+<h1>Animation Design</h1>
+<hr>
+<p class="page-intro">
+  Guide to producing and playing sequence-frame animations in the Naiz engine. This category has two parts: <strong>Production</strong> (the anima.sh workflow and asset registration) and <strong>Syntax</strong> (a command-by-command .na script reference).
+</p>
+
+<div class="index-section">
+  <div class="index-section-title sec-anim">Animation Production</div>
+  <div class="index-grid-1">
+    <div class="index-card">
+      <a href="pages/anim-制作.html">
+        <span class="card-badge b-anim">an</span>
+        <h3>Animation Production Workflow</h3>
+        <p>anima.sh init / register / check / build; the name index database and .ANI output</p>
+      </a>
+    </div>
+  </div>
+</div>
+
+<div class="index-section">
+  <div class="index-section-title sec-anim">Script Syntax (.na)</div>
+  <div class="index-grid-2">
+    <div class="index-card">
+      <a href="pages/anim-语法.html">
+        <span class="card-badge b-anim">an</span>
+        <h3>Syntax Overview</h3>
+        <p>F1 gate, command set, general rules, V1–V8 checklist</p>
+      </a>
+    </div>
+    <div class="index-card">
+      <a href="pages/anim-animaconf.html">
+        <span class="card-badge b-anim">an</span>
+        <h3>animaconf</h3>
+        <p>Header declaration: regions / tracks / project name</p>
+      </a>
+    </div>
+    <div class="index-card">
+      <a href="pages/anim-frame.html">
+        <span class="card-badge b-anim">an</span>
+        <h3>frame</h3>
+        <p>pixel-track frames: seconds + bare name sequence</p>
+      </a>
+    </div>
+    <div class="index-card">
+      <a href="pages/anim-base.html">
+        <span class="card-badge b-anim">an</span>
+        <h3>base</h3>
+        <p>palette-track base image: exactly once</p>
+      </a>
+    </div>
+    <div class="index-card">
+      <a href="pages/anim-pal.html">
+        <span class="card-badge b-anim">an</span>
+        <h3>pal</h3>
+        <p>Palette diff table: must come after base</p>
+      </a>
+    </div>
+  </div>
+</div>
+
+<hr>
+<p class="muted-note">
+  For the engine-side playback mechanics see <a href="pages/mc05-动画机制.html">mc05 Animation Mechanics</a>; for frame encoding/decoding see <a href="pages/mc04-MAG图片机制.html">mc04 MAG Image Mechanics</a>.
+</p>
+
+</main>
+<script src="topnav.js"></script>
+</body>
+</html>

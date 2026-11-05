@@ -1,0 +1,555 @@
+/*
+ * nb_commands.c — NB script command handlers and dispatch table
+ *
+ * Extracted from nb.c: all cmd_* handlers, resolve helpers, and dispatch table.
+ * Reference: devdocs/0.1版开发文档总结.html#doc-21
+ */
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <limits.h>
+#include "render.h"
+#include "palette.h"
+#include "image.h"
+#include "scene_layers.h"
+#include "hal.h"
+#include "tr.h"
+#include "nb_internal.h"
+#include "nb_saveload.h"
+#include "nb_dialog.h"
+#include "nb_vars.h"
+#include "debug.h"
+#include "nb_asset_table.h"
+#include "nb_anim.h"
+#include "nb_commands.h"
+#include "vm.h"
+#include "strutil.h"
+#include "scene_display.h"
+
+/*=== Asset lookup helpers ==================================================*/
+
+static int resolve_asset(const char *key)
+{
+    const struct { const char *key; int id; } *p;
+    for (p = asset_map; p->key; p++) {
+        if (strcmp(p->key, key) == 0) {
+            NB_DEBUG("resolve_asset: %s -> id=%d\r\n", key, p->id);
+            return p->id;
+        }
+    }
+    return -1;
+}
+
+/* Public asset lookup: searches image assets (asset_map), then falls back
+ * to sprite assets (spr_asset_map) so SPR-type keys resolve too. */
+int nb_asset_id(const char *key)
+{
+    int id = resolve_asset(key);
+    const struct { const char *key; int id; } *p;
+    if (id >= 0)
+        return id;
+    for (p = spr_asset_map; p->key; p++) {
+        if (strcmp(p->key, key) == 0)
+            return p->id;
+    }
+    return -1;
+}
+
+static int resolve_char_id(const char *key)
+{
+    const struct { const char *key; int id; const char *name; } *p;
+    for (p = char_map; p->key; p++) {
+        if (strcmp(p->key, key) == 0)
+            return p->id;
+    }
+    return -1;
+}
+
+static int resolve_expr(int char_id, const char *expr)
+{
+    const struct { int char_id; const char *expr; int asset_id; } *p;
+    for (p = expr_map; p->char_id >= 0; p++) {
+        if (p->char_id == char_id && strcmp(p->expr, expr) == 0)
+            return p->asset_id;
+    }
+    return -1;
+}
+
+static int resolve_expression(int char_id, const char *expr)
+{
+    int asset_id = resolve_expr(char_id, expr);
+    if (asset_id >= 0)
+        return asset_id;
+
+    NB_DEBUG("WARN: char %d expr '%s' not found, fallback to 'normal'\r\n",
+             char_id, expr);
+    asset_id = resolve_expr(char_id, "normal");
+    if (asset_id >= 0)
+        return asset_id;
+
+    NB_DEBUG("ERROR: char %d 'normal' not found either\r\n", char_id);
+    return -1;
+}
+
+/*=== Display prefetch (devdoc 131 方案 D) ==================================*/
+
+/* Resolve a display command's brace key to the IMAGE.DAT id it will show, so
+ * nb.c can warm the LRU cache during an idle dialogue wait (hiding the decode
+ * behind the player's reading time).  Returns -1 when the key is unknown, the
+ * command shows nothing prefetchable, or the id cannot be resolved.
+ *
+ * `expr` is the char command's expression argument (the same value cmd_char
+ * derives at nb_commands.c:310); pass NULL/"" to use the default. */
+int nb_prefetch_key(const char *cmd, const char *key, const char *expr)
+{
+    const struct { const char *key; int id; } *p;
+    int cid;
+
+    if (cmd == NULL || key == NULL || key[0] == '\0')
+        return -1;
+
+    if (strcmp(cmd, "cg") == 0) {
+        for (p = cg_map; p->key; p++)
+            if (strcmp(p->key, key) == 0)
+                return p->id;
+        return -1;
+    }
+    if (strcmp(cmd, "bg") == 0)
+        return nb_asset_id(key);
+    if (strcmp(cmd, "char") == 0) {
+        cid = resolve_char_id(key);
+        if (cid < 0)
+            return -1;
+        return resolve_expr(cid, (expr && expr[0]) ? expr : "normal");
+    }
+    return -1;                               /* not a display-image command */
+}
+
+static const char *resolve_display_name(const char *key)
+{
+    const struct { const char *key; int id; const char *name; } *p;
+    const char *t;
+
+    t = tr(key);
+    if (t != key) return t;
+
+    for (p = char_map; p->key; p++) {
+        if (strcmp(p->key, key) == 0)
+            return p->name;
+    }
+    return key;
+}
+
+static int pos_to_x(char pos)
+{
+    switch (pos) {
+    case 'l': return SPRITE_X_LEFT;
+    case 'c': return SPRITE_X_CENTER;
+    case 'r': return SPRITE_X_RIGHT;
+    default:  return SPRITE_X_CENTER;
+    }
+}
+
+/*
+ * nb_next_field — Extract next comma-delimited field from segment string.
+ *   *s points to start of a "f1,f2,..." segment (leading whitespace skipped).
+ *   On success: copies field into buf (truncated to bufsz), null-terminated;
+ *   advances *s past comma + trailing whitespace; returns 1.
+ *   On failure (no comma found): *s unchanged; returns 0.
+ *
+ * Escaping (added for question option labels that contain a comma):
+ *   ",\"  -> literal ',' inside the field, NOT a delimiter
+ *   "\\"  -> literal '\'
+ *   Any other "\x" is preserved verbatim (backslash included), so a label
+ *   like "C:\path" is not silently mangled.  Because the delimiter scan skips
+ *   every backslash pair, a comma can never hide behind an unknown escape.
+ *   Mirrored byte-for-byte by naiz_lib.nb_line.next_field() so the i18n
+ *   extractor derives exactly the keys the engine looks up.
+ */
+int nb_next_field(const char **s, char *buf, size_t bufsz)
+{
+    const char *p, *comma, *end;
+    size_t out = 0;
+
+    if (bufsz == 0) return 0;
+
+    p = *s;
+    while (*p == ' ' || *p == '\t') p++;
+
+    /* Locate the first delimiter: skip every backslash-escaped pair so an
+     * escaped comma is not mistaken for the field boundary. */
+    comma = p;
+    while (*comma) {
+        if (*comma == '\\' && comma[1]) { comma += 2; continue; }
+        if (*comma == ',') break;
+        comma++;
+    }
+    if (*comma != ',') return 0;
+
+    /* Trim trailing blanks so "Yes ,v" and "Yes,v" resolve to the same key.
+     * The i18n extractor has always stripped them; without this the engine
+     * would look tr("Yes  ") up and silently miss the translation. */
+    end = comma;
+    while (end > p && (end[-1] == ' ' || end[-1] == '\t')) end--;
+
+    /* Copy the field, collapsing the two defined escapes.  out + 1 < bufsz
+     * keeps room for the terminator on every write path. */
+    while (p < end && out + 1 < bufsz) {
+        if (*p == '\\' && (p[1] == ',' || p[1] == '\\')) p++;
+        buf[out++] = *p++;
+    }
+    buf[out] = '\0';
+
+    *s = comma + 1;
+    while (**s == ' ' || **s == '\t') (*s)++;
+    return 1;
+}
+
+/*
+ * nb_has_field_delim — Does an unescaped ',' remain in this segment?
+ *   Mirrors nb_next_field()'s delimiter scan: every backslash pair is skipped,
+ *   so "a\,b,c" reports a delimiter (before 'c') while "a\,b" does not.
+ */
+int nb_has_field_delim(const char *s)
+{
+    while (*s) {
+        if (*s == '\\' && s[1]) { s += 2; continue; }
+        if (*s == ',') return 1;
+        s++;
+    }
+    return 0;
+}
+
+/*=== Command handlers ======================================================*/
+
+/* Grammar (mirrors cmd_cg):
+ *   bg(effect[,transition]){key}   key is the brace payload; the paren
+ *                                  position carries effect/transition params
+ *                                  (currently unused placeholders).
+ *   bg(hidedialog)                 keyword directive, no payload. */
+static void cmd_bg(int argc, const char **argv, const char *cmd_name)
+{
+    int id;
+    const char *key;
+
+    (void)cmd_name;
+    if (argc < 1) { NB_DEBUG("bg: no args\r\n"); return; }
+
+    if (argc == 1 && strcmp(argv[0], "hidedialog") == 0) {
+        NB_DEBUG("bg: hidedialog\r\n");
+        layer_dialog_hide();
+        nb_dialog_reset();
+        return;
+    }
+
+    /* Hard gate: the asset key must arrive via the brace payload; parens
+     * are reserved for parameters and never carry the asset. */
+    if (nb_get_last_brace_arg() != argc - 1) {
+        NB_DEBUG("bg: usage bg(effect[,transition]){asset_key} "
+                 "(parens reserved for params)\r\n");
+        return;
+    }
+    key = argv[argc - 1];
+
+    id = resolve_asset(key);
+    if (id < 0) {
+        NB_DEBUG("bg: unknown asset '%s'\r\n", key);
+        return;
+    }
+    if (display_apply_bg((unsigned short)id) != 0)
+        NB_DEBUG("bg: display_apply_bg(%d) failed\r\n", id);
+    NB_DEBUG("bg: id=%d key=%s\r\n", id, key);
+}
+
+static void cmd_host(int argc, const char **argv, const char *cmd_name)
+{
+    (void)cmd_name;
+    if (argc < 1) return;
+    display_apply_dialog(NULL, tr(argv[0]));
+}
+
+/* Grammar (mirrors cmd_cg):
+ *   char(pos[,expr[,type]]){name}  name is the brace payload; parens carry
+ *                                  display parameters (position/expression/
+ *                                  body|face).  expr/type default like before.
+ *   char(hideall)                  keyword directive, no payload. */
+static void cmd_char(int argc, const char **argv, const char *cmd_name)
+{
+    int char_id, asset_id, x;
+    const char *name, *expr, *type;
+
+    (void)cmd_name;
+    if (argc == 1 && strcmp(argv[0], "hideall") == 0) {
+        /* devdoc 183: no recompose here — layer_dialog_hide() below restores
+         * the whole dialog rect from the pristine underneath, overwriting the
+         * recomposed pixels on the same frame.  The sprite rects are already
+         * bg-restored and every entry deactivated, so the hide's own
+         * redraw/sync paths no-op. */
+        layer_sprite_hide_all_ex(0);
+        layer_dialog_hide();
+        nb_dialog_reset();
+        NB_DEBUG("char: hideall\r\n");
+        return;
+    }
+
+    /* Hard gate: the character name must arrive via the brace payload. */
+    if (argc < 1) return;
+    if (nb_get_last_brace_arg() != argc - 1) {
+        NB_DEBUG("char: usage char(pos[,expr[,type]]){name} "
+                 "(name in braces, parens reserved for params)\r\n");
+        return;
+    }
+    name = argv[argc - 1];
+    if (argc < 2) { NB_DEBUG("char: need position + {name}\r\n"); return; }
+    if (argv[0][0] == '\0') { NB_DEBUG("char: empty pos\r\n"); return; }
+
+    char_id = resolve_char_id(name);
+    if (char_id < 0) {
+        NB_DEBUG("char: unknown character '%s'\r\n", name);
+        return;
+    }
+    if (char_id >= LAYER_MAX_SPRITES) {
+        NB_DEBUG("WARN: char_id=%d exceeds LAYER_MAX_SPRITES (%d)\r\n", char_id, LAYER_MAX_SPRITES);
+        return;
+    }
+
+    x = pos_to_x(argv[0][0]);
+
+    expr = (argc >= 3 && argv[1][0]) ? argv[1] : "normal";
+
+    asset_id = resolve_expression(char_id, expr);
+    if (asset_id < 0) {
+        NB_DEBUG("char: no asset for char '%s' expr '%s'\r\n", name, expr);
+        return;
+    }
+
+    type = (argc >= 4 && argv[2][0]) ? argv[2] : NULL;
+    if (type == NULL) {
+        type = layer_has_sprite(char_id) ? "face" : "body";
+    }
+
+    NB_DEBUG("char: id=%d asset=%d x=%d type=%s\r\n", char_id, asset_id, x, type);
+
+    display_apply_sprite(char_id, asset_id, x, type);
+}
+
+static void cmd_dialogue(int argc, const char **argv, const char *cmd_name)
+{
+    const char *display_name;
+    if (argc < 1) return;
+
+    display_name = resolve_display_name(cmd_name);
+    NB_DEBUG("dialog: %s -> %s\r\n", cmd_name, display_name);
+    display_apply_dialog(display_name, tr(argv[0]));
+}
+
+
+/* Scene configuration: title + type.
+ * Grammar (brace-only): sceneconf(){Title[,type]} — the {..} payload is a
+ * single arg "Title, type", split on ',' below.  The paren alias
+ * sceneconf(Title,type) was removed: parens are reserved for parameters. */
+static void cmd_sceneconf(int argc, const char **argv, const char *cmd_name)
+{
+    char title[NB_LINE_MAX];
+    char type[16];
+    const char *p;
+
+    (void)cmd_name;
+    if (argc < 1) return;
+
+    /* Hard gate: title/type must arrive via the brace payload. */
+    if (nb_get_last_brace_arg() != argc - 1) {
+        NB_DEBUG("sceneconf: usage sceneconf(){title[,type]}\r\n");
+        return;
+    }
+
+    title[0] = '\0';
+    type[0] = '\0';
+
+    /* Text form: {Title, type} arrives as one arg; split on ','. */
+    p = argv[0];
+    if (nb_next_field(&p, title, sizeof(title))) {
+        /* title read; p points to type (may be empty). */
+        if (*p) {
+            str_copy(type, sizeof(type), p);
+        }
+    } else {
+        /* No comma: entire arg is the title, type defaults to NULL. */
+        str_copy(title, sizeof(title), argv[0]);
+    }
+
+    nb_set_scene_conf(tr(title), type[0] ? type : NULL);
+}
+
+/*
+ * cmd_var — Variable read/write command.
+ *   var(id, =, value)   -> nb_var_set(lookup(id), value)
+ *   var(id, +, delta)   -> nb_var_add(lookup(id), delta)
+ *   var(id, -, delta)   -> nb_var_add(lookup(id), -delta)
+ */
+static void cmd_var(int argc, const char **argv, const char *cmd_name)
+{
+    int idx, val;
+
+    (void)cmd_name;
+    if (argc < 3) {
+        NB_DEBUG("var: need 3 args (id, op, value)\r\n");
+        return;
+    }
+
+    idx = nb_var_lookup(argv[0]);
+    if (idx < 0) {
+        hal_logf("WARN: var: unknown variable '%s'\r\n", argv[0]);
+        return;
+    }
+
+    val = atoi(argv[2]);
+
+    if (strcmp(argv[1], "=") == 0) {
+        nb_var_set(idx, val);
+        NB_DEBUG("var: set %s=%d\r\n", argv[0], val);
+    } else if (strcmp(argv[1], "+") == 0) {
+        nb_var_add(idx, val);
+        NB_DEBUG("var: add %s+=%d\r\n", argv[0], val);
+    } else if (strcmp(argv[1], "-") == 0) {
+        /* -(INT_MIN) is UB; pass INT_MIN through and let nb_var_add
+         * clamp with 64-bit arithmetic. */
+        int d = (val == INT_MIN) ? INT_MIN : -val;
+        nb_var_add(idx, d);
+        NB_DEBUG("var: add %s-=%d\r\n", argv[0], val);
+    } else {
+        hal_logf("WARN: var: unknown op '%s' (use =/+/ -)\r\n", argv[1]);
+    }
+}
+
+static void cmd_delay(int argc, const char **argv, const char *cmd_name)
+{
+    const char *p;
+    int neg, whole, frac, ndig;
+    unsigned long ms;
+    /* delay(N) 的语义是"N 秒真实时间"，因此换算成毫秒截止时间，
+     * 不再换算成帧数：帧率不可靠（模拟器下帧泵可能远快于显示速率），
+     * 按帧计数会导致 1.5 秒变成 0.1 秒。 */
+    (void)cmd_name;
+    if (argc < 1 || !argv[0][0]) { NB_DEBUG("delay: no args\r\n"); return; }
+    p = argv[0];
+    neg = 0; whole = 0; frac = 0; ndig = 0;
+    if (*p == '-') { neg = 1; p++; }
+    while (*p >= '0' && *p <= '9') { whole = whole * 10 + (*p - '0'); p++; }
+    if (*p == '.') { p++; while (*p >= '0' && *p <= '9') { frac = frac * 10 + (*p - '0'); ndig++; p++; } }
+    /* 小数部分按 3 位精度并入毫秒：frac / 10^ndig * 1000 */
+    {
+        int i, scale = 1;
+        unsigned long frac_ms;
+        for (i = 0; i < ndig && i < 3; i++) scale *= 10;
+        frac_ms = (unsigned long)frac * 1000UL / (unsigned long)scale;
+        ms = (unsigned long)whole * 1000UL + frac_ms;
+    }
+    if (neg || ms == 0) ms = 1;   /* 非正延迟按 1ms 处理，至少让出一帧 */
+    /* 命令本身不阻塞；挂钟截止后由 vm_delay_tick 重新请求执行。 */
+    if (ms > 3600000UL) ms = 3600000UL;
+    vm_set_delay(ms);
+    vm_pause_process();
+}
+
+/* tag(name) — anchor only (devdoc 203).  Execution passes straight through;
+ * jump()/jumpscene() locate the anchor on demand via nb_seek_tag(). */
+static void cmd_tag(int argc, const char **argv, const char *cmd_name)
+{
+    (void)argc;
+    (void)argv;
+    (void)cmd_name;
+}
+
+/*=== Command dispatch table ===============================================*/
+
+typedef void (*CmdHandler)(int argc, const char **argv, const char *cmd_name);
+
+/* Command metadata bits (devdoc 103 stage 2 C).  Audited by
+ * tools/tests/test_cmd_meta.py: handlers WITHOUT CMD_TOUCHES_DISPLAY must not
+ * call any render/layer/palette/image API (keeps the front/back boundary
+ * from regressing through a new handler).
+ *
+ * IMPORTANT — CMD_BLOCKING / CMD_NEEDS_INPUT / CMD_TOUCHES_AUDIO /
+ * CMD_TERMINATES_SCENE are DOCUMENTATION ONLY: nb_commands_dispatch() calls
+ * the handler and returns, reading no metadata field.  A blocking command
+ * must therefore run its own input loop and return only when the script may
+ * continue; the only engine-side pause for a command is the
+ * nb_dialog_pending() check in nb_process().  Setting CMD_BLOCKING does NOT
+ * make the engine pause, and test_cmd_meta.py only enforces
+ * CMD_TOUCHES_DISPLAY — a new blocking handler that forgets its own pause
+ * will run the rest of the script in a single pass.  See devdoc 116.
+ *
+ * Flag values live in nb_commands.h (shared with nb_process for the
+ * yield-after-display logic introduced in 0.3.060). */
+
+typedef struct {
+    const char *name;
+    CmdHandler  handler;
+    unsigned char flags;
+} CmdEntry;
+
+static const CmdEntry cmd_table[] = {
+    {"bg",           cmd_bg,          CMD_TOUCHES_DISPLAY},
+    {"cg",           cmd_cg,          CMD_TOUCHES_DISPLAY},
+    {"char",         cmd_char,        CMD_TOUCHES_DISPLAY},
+    {"scene",        cmd_scene,       CMD_TERMINATES_SCENE},
+    {"sceneconf",    cmd_sceneconf,   0},
+    {"mainmenu",     cmd_mainmenu,    CMD_BLOCKING | CMD_NEEDS_INPUT | CMD_TOUCHES_DISPLAY},
+    {"startsetting", cmd_startsetting, CMD_BLOCKING | CMD_NEEDS_INPUT | CMD_TOUCHES_DISPLAY},
+    {"question",     cmd_question,    CMD_BLOCKING | CMD_NEEDS_INPUT | CMD_TOUCHES_DISPLAY},
+    {"settingmenu",  cmd_settingmenu, CMD_BLOCKING | CMD_NEEDS_INPUT | CMD_TOUCHES_DISPLAY},
+    {"cgvmenu",      cmd_cgvmenu,     CMD_BLOCKING | CMD_NEEDS_INPUT | CMD_TOUCHES_DISPLAY},
+    {"musicmenu",    cmd_musicmenu,   0},
+    {"specialmenu",  cmd_specialmenu, CMD_BLOCKING | CMD_NEEDS_INPUT | CMD_TOUCHES_DISPLAY},
+    {"bgm",          cmd_bgm,         CMD_TOUCHES_AUDIO},
+    {"sound",        cmd_sound,       CMD_TOUCHES_AUDIO},
+    {"voice",        cmd_voice,       CMD_TOUCHES_AUDIO},
+    {"host",         cmd_host,        CMD_BLOCKING | CMD_TOUCHES_DISPLAY},
+    {"loadscene",    cmd_loadscene,   CMD_BLOCKING | CMD_NEEDS_INPUT | CMD_TOUCHES_DISPLAY},
+    {"var",          cmd_var,         0},
+    {"fei",          cmd_dialogue,    CMD_BLOCKING | CMD_TOUCHES_DISPLAY},
+    {"ira",          cmd_dialogue,    CMD_BLOCKING | CMD_TOUCHES_DISPLAY},
+    {"neon",         cmd_dialogue,    CMD_BLOCKING | CMD_TOUCHES_DISPLAY},
+    {"playanima",    cmd_playanima,   CMD_TOUCHES_DISPLAY},
+    {"waitanima",    cmd_waitanima,   CMD_BLOCKING},
+    {"stopanima",    cmd_stopanima,   CMD_TOUCHES_DISPLAY},
+    {"delay",        cmd_delay,       CMD_BLOCKING},
+    {"tag",          cmd_tag,         0},
+    {"jump",         cmd_jump,        CMD_BLOCKING | CMD_NEEDS_INPUT | CMD_TOUCHES_DISPLAY},
+    {"jumpscene",    cmd_jumpscene,   CMD_BLOCKING | CMD_NEEDS_INPUT | CMD_TOUCHES_DISPLAY |
+                                      CMD_TERMINATES_SCENE},
+    {NULL, NULL, 0}
+};
+
+/*=== Dispatch function ====================================================*/
+
+/* Execute one command by name.  NOTE: the CmdEntry metadata is not consulted
+ * here — no bit is read (see the enum comment above); the handler alone
+ * determines whether the script may continue. */
+/* Returns the CmdEntry flags of the dispatched command (0 if unknown).
+ * nb_process uses the flags to decide whether to yield back to the frame
+ * pump — every CMD_TOUCHES_DISPLAY command (bg/cg/char/playanima/...) now
+ * pauses the VM after dispatch so the main loop runs engine_frame_pump
+ * (clock + audio + anim + reveal) before the next command.  This blocks
+ * the old "run N display commands in one pass, accumulate 30-50ms of
+ * VRAM blit with zero audio pump" stall that users heard as BGM pauses
+ * during sprite swaps, text refreshes, and animation playback.
+ *
+ * CMD_BLOCKING handlers (mainmenu/question/fei/ira/neon/...) pause the
+ * script on their own input loops or nb_dialog_pending() — they don't
+ * need an extra yield. */
+unsigned char nb_commands_dispatch(const char *cmd_name, int argc, const char **argv)
+{
+    const CmdEntry *entry = cmd_table;
+    while (entry->name) {
+        if (strcmp(entry->name, cmd_name) == 0) {
+            NB_DEBUG("nb_process: executing command '%s'\r\n", cmd_name);
+            entry->handler(argc, argv, cmd_name);
+            return entry->flags;
+        }
+        entry++;
+    }
+    hal_logf("WARN: unknown command '%s'\r\n", cmd_name);
+    return 0;
+}

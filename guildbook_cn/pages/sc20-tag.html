@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="doc-version" content="202611051818">
+<!-- AI-NOTE: guildbook_cn is the authoritative Chinese source; guildbook_en holds the English translation. Version format: YYYYMMDDHHMM. Before translating, compare this doc-version with the en counterpart's translated-from meta; if cn is newer, re-translate this page from Chinese to English. Invisible during normal browsing. -->
+
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>tag — Naiz Guildbook</title>
+<link rel="stylesheet" href="../style.css">
+</head>
+<body>
+<nav class="sidebar" id="sidebar-nav"></nav>
+<script src="../sidebar-scripts.js"></script>
+<main class="main">
+
+<h1>tag 场景锚点</h1>
+<hr>
+<blockquote><strong>创建</strong>：2026-11-05<br><strong>最后更新</strong>：2026-11-05</blockquote>
+<p><code>tag()</code> 在当前剧本里声明一个<strong>跳转锚点</strong>，供 <a href="sc21-jump.html">jump 场景内跳转</a> 与 <a href="sc22-jumpscene.html">jumpscene 跨场景跳转</a> 定位。它本身没有任何运行时效果——脚本顺序执行到 tag 行时直接越过。</p>
+
+<h2>1. 语法</h2>
+<pre><code>tag(name)</code></pre>
+<table>
+<tr><th>字段</th><th>说明</th></tr>
+<tr><td><code>name</code></td><td>锚点名。只能是 ASCII 字母、数字、下划线（<code>[A-Za-z0-9_]+</code>），区分大小写</td></tr>
+</table>
+<pre><code>tag(m1)             ← 合法
+tag(badge_01)       ← 合法（下划线）
+tag(第一章)          ← 非法（非 ASCII 标识符）</code></pre>
+
+<h2>2. 书写规则</h2>
+<ul>
+<li><strong>必须单独占一行</strong>：命令名与 <code>(</code> 之间不能有空格，<code>tag(m1)</code> 与 <code>tag (m1)</code> 只有前者生效。</li>
+<li>行尾可以写 <code>#</code> 注释，例如 <code>tag(m1)  # 森林分支</code>。</li>
+<li>同一场景内允许重复同名 tag：<strong>首个命中优先</strong>（从上往下扫描）。</li>
+<li>tag 的作用域<strong>仅限当前场景文件</strong>；不同场景文件里的同名 tag 互不影响。</li>
+<li>tag 不需要成对出现，也没有“跳回锚点”的隐式行为——回跳只是 <code>jump</code> 目标位于当前位置之前。</li>
+<li>构建期校验器只把<strong>括号内、独占一行</strong>的 <code>tag(name)</code> 收集为锚点；写进正文、注释或其它命令参数里的同名文本不会成为锚点。</li>
+</ul>
+
+<h2>3. 跳转落点</h2>
+<p><code>jump</code> / <code>jumpscene</code> 命中某个 tag 后，执行位置是 <strong>tag 行的下一行</strong>；tag 行本身不会被执行（即使执行也是空操作）。</p>
+<pre><code>tag(branch_a)
+host(){进入分支 A}   ← 跳转后从这里开始</code></pre>
+<p>因此 tag 通常写在某段剧情的“入口”上方。注意<strong>落到 tag 时，它前面的行不会补执行</strong>：若目标剧情需要特定背景/立绘/BGM，应把对应命令写在 tag 之后，而不是依赖 tag 之前已经“本该执行”的设置。跨场景落到 tag 时同理（见 <a href="sc22-jumpscene.html">sc22 §3</a>）。</p>
+
+<h2>4. 构建期校验</h2>
+<ul>
+<li><code>jump</code> 引用的 tag 必须存在于<strong>当前场景</strong>，否则校验器报错（不等到运行时）。</li>
+<li><code>jumpscene</code> 第三段给出的 tag 必须存在于<strong>目标场景</strong>，目标场景文件也必须存在。</li>
+<li>运行期兜底：万一 tag 缺失（例如脚本热改），引擎输出 WARN，不跳转，继续执行跳转命令的下一行；<code>jumpscene</code> 则从头播放目标场景。</li>
+</ul>
+
+<h2>5. 示例</h2>
+<pre><code># nbook001.nb
+tag(m_start)
+host(){清晨的森林}
+
+jump(要去哪里？;森林,m_forest;城镇,m_town)
+
+tag(m_forest)
+bg(normal){forest}
+host(){你走进了森林}
+
+tag(m_town)
+bg(normal){town}
+host(){你来到了城镇}</code></pre>
+
+<h2>6. 相关</h2>
+<ul>
+<li><a href="sc21-jump.html">sc21 — jump 场景内跳转</a>：按选项跳到本场景 tag</li>
+<li><a href="sc22-jumpscene.html">sc22 — jumpscene 跨场景跳转</a>：按选项切场景，可落到目标 tag</li>
+<li><a href="sc08-question.html">sc08 — question 选择分支</a>：按选项改变量</li>
+<li><a href="sc04-scene.html">sc04 — scene 场景跳转</a>：无条件/条件链切场景</li>
+</ul>
+
+</main>
+</body>
+</html>

@@ -1,0 +1,694 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Naiz 引擎 0.2 版开发文档总结</title>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Noto Sans SC", "Microsoft YaHei", sans-serif; background: #f5f6f8; color: #1a1a2e; line-height: 1.75; }
+.container { max-width: 1000px; margin: 0 auto; padding: 40px 32px 96px; }
+
+header { background: linear-gradient(135deg, #1a1a2e 0%, #2d2d44 100%); color: #fff; border-radius: 12px; padding: 40px 44px; margin-bottom: 36px; }
+header h1 { font-size: 30px; margin-bottom: 10px; font-weight: 700; }
+header .subtitle { font-size: 15px; color: #c8c8d8; margin-bottom: 20px; }
+header .meta { display: flex; flex-wrap: wrap; gap: 10px; }
+header .badge { background: rgba(255,255,255,0.14); border: 1px solid rgba(255,255,255,0.22); padding: 4px 14px; border-radius: 999px; font-size: 13px; color: #e8e8f0; }
+
+.toc { background: #fff; border: 1px solid #e0e0e0; border-radius: 10px; padding: 28px 32px; margin-bottom: 40px; }
+.toc h2 { font-size: 18px; margin-bottom: 16px; color: #1a1a2e; }
+.toc a { display: block; padding: 6px 0; color: #1976d2; text-decoration: none; font-size: 14px; }
+.toc a:hover { text-decoration: underline; }
+.toc .toc-group { color: #555; font-weight: 700; font-size: 13px; letter-spacing: 1px; margin-top: 14px; padding: 6px 0 2px; text-transform: uppercase; }
+.toc .toc-group:first-child { margin-top: 0; }
+
+.group { margin-bottom: 44px; }
+.group-header { display: flex; align-items: baseline; gap: 12px; border-left: 5px solid #4fc3f7; padding-left: 14px; margin-bottom: 6px; }
+.group-header h2 { font-size: 22px; color: #1a1a2e; }
+.group-header .range { font-size: 13px; color: #888; }
+.group-desc { color: #666; font-size: 14px; margin: 0 0 22px 19px; }
+
+.doc { background: #fff; border: 1px solid #e0e0e0; border-radius: 10px; padding: 22px 26px; margin-bottom: 18px; }
+.doc-head { display: flex; align-items: center; gap: 12px; margin-bottom: 10px; flex-wrap: wrap; }
+.doc-num { background: #1a1a2e; color: #fff; font-size: 13px; font-weight: 700; padding: 3px 10px; border-radius: 5px; letter-spacing: 0.5px; }
+.doc-title { font-size: 18px; font-weight: 700; color: #1a1a2e; }
+.doc-status { margin-left: auto; font-size: 12px; color: #555; background: #f0f4f8; border: 1px solid #d8dee8; padding: 2px 10px; border-radius: 999px; white-space: nowrap; }
+
+.doc h4 { font-size: 13px; color: #666; margin: 12px 0 4px; text-transform: uppercase; letter-spacing: 1px; }
+.doc ul { margin: 0 0 6px 20px; }
+.doc li { margin: 3px 0; font-size: 14px; }
+.doc .landing { background: #f0f8f4; border-left: 3px solid #26a69a; padding: 8px 14px; border-radius: 0 6px 6px 0; font-size: 14px; color: #2b4a3a; margin: 8px 0; }
+.doc .rel { font-size: 13px; color: #777; background: #faf9f6; border-left: 3px solid #d8b56a; padding: 8px 14px; border-radius: 0 6px 6px 0; }
+
+footer { text-align: center; color: #999; font-size: 13px; margin-top: 56px; padding-top: 24px; border-top: 1px solid #e0e0e0; }
+
+@media (max-width: 720px) {
+  .container { padding: 20px 16px 60px; }
+  header { padding: 28px 24px; }
+  .doc-status { margin-left: 0; }
+}
+</style>
+</head>
+<body>
+<div class="container">
+
+<header>
+  <h1>Naiz 引擎 0.2 版开发文档总结</h1>
+  <div class="subtitle">devdocs/ 开发记录全量归档汇总 — 主要思路、最终落点与现状关联</div>
+  <div class="meta">
+    <span class="badge">覆盖 68–115 · 48 份文档</span>
+    <span class="badge">版本 0.2.147</span>
+    <span class="badge">生成于 2026-09</span>
+  </div>
+</header>
+
+<nav class="toc">
+  <h2>目录</h2>
+  <a href="#g1">一、调研审计与早期方案（68–72）</a>
+  <a href="#g2">二、NAIZ_ANIM 动画链（73–83）</a>
+  <a href="#g3">三、层管理统一、调试导出与 CJK 加载（84–87）</a>
+  <a href="#g4">四、CG 全功能链（88–95）</a>
+  <a href="#g5">五、对话框图层化、CJK 精简与整合审计（96–99）</a>
+  <a href="#g6">六、归档、音频、分离改造与打字机（100–107）</a>
+  <a href="#g7">七、光标契约系列与 Special 菜单（108–115）</a>
+</nav>
+
+<!-- ============================================================ -->
+<section class="group" id="g1">
+  <div class="group-header"><h2>一、调研审计与早期方案</h2><span class="range">68 – 72</span></div>
+  <p class="group-desc">0.2 版开篇的整合机会调研、商业内容独立化审计、Deepin 鼠标准修、图像加载提速，以及待实施的 sceneconf 场景配置命令。</p>
+  <div class="doc" id="doc-68">
+    <div class="doc-head"><span class="doc-num">68</span><span class="doc-title">整合机会调研报告</span><span class="doc-status">调研存档</span></div>
+    <h4>核心思路</h4>
+    <ul>
+      <li>音频链路三段断裂：NB 层 bgm/sound/voice 已就绪（core/engine/nb_commands.c），HAL 层仅 hal_log 空桩，创作工具已移出仓库。</li>
+      <li>工具链去重 11 项（NB 行解析、TOML 写入、仿真器常量、PTY 读取、FAT 遍历、HDI 注入、FONT.DAT 构建等），建议收口到 tools/naiz_lib 共享层。</li>
+      <li>引擎清理 8 项（4 菜单 UI 同构、text.c 死桩、vram.c 死码、屏幕尺寸/对话框常量双定义、残留文件），文档整合 5 项。</li>
+    </ul>
+    <div class="landing"><b>最终落点：</b>纯调研、不落地实现；给出立即做/中期/远期优先级表，后续 69/99 等文档承接其中部分项。</div>
+    <div class="rel"><b>现状关联：</b>基线快照性质，对应 core/engine、core/plat/hal.h、tools/naiz_lib、tools/naiz_img 与 docs/B90/B91/B92 体系。</div>
+  </div>
+
+  <div class="doc" id="doc-69">
+    <div class="doc-head"><span class="doc-num">69</span><span class="doc-title">非开源内容审计与商业内容独立化方案</span><span class="doc-status">方案定稿未实施</span></div>
+    <h4>核心思路</h4>
+    <ul>
+      <li>高风险 5 类：商业游戏 HDI、MS-DOS 5.0 基座镜像与内核、NEC BIOS ROM、DOS4GW/VEM486/QMOUSE，均已被 git 追踪且部分为构建硬依赖。</li>
+      <li>独立化方案：新建 tools_commercial/ 集中存放，tools/naiz_lib 新增 COMMERCIAL_* 常量，7 处代码改链接并修 .gitignore 放行例外。</li>
+      <li>CJK.DAT 系 GNU Unifont（GPLv2+）衍生，与 Noto Sans CJK（OFL）对比后用户决策暂缓切换、保留 gen_cjk_font.py 备用。</li>
+    </ul>
+    <div class="landing"><b>最终落点：</b>方案定稿但未执行（目录移动、改链接、文档同步均未做）；refdocs 许可标注头与残留二进制清理亦遗留。</div>
+    <div class="rel"><b>现状关联：</b>构建与镜像子系统：tools/naiz_lib/__init__.py、tools/naiz_img/inject_common.py、make_base_clean.py、inject_dos_system.py、tools/naiz_build/build_game.py、tools/naiz_font/gen_cjk_font.py。</div>
+  </div>
+
+  <div class="doc" id="doc-70">
+    <div class="doc-head"><span class="doc-num">70</span><span class="doc-title">Deepin 鼠标中央限制问题诊断与修复</span><span class="doc-status">已实施</span></div>
+    <h4>核心思路</h4>
+    <ul>
+      <li>根因：Deepin dde-kwin 对 XWarpPointer 非原子处理，每次 OnMouseMove 内 WarpPointer（中心）产生一串非零 delta 合成事件，绝对坐标被逐步覆盖为中心。</li>
+      <li>修复：重写 05-wx-mouse-abspos 补丁，OnMouseMove 去 warp（保留 CaptureMouse 一次性 warp），只保留缩放钳位 + mousemng_setabspos。</li>
+      <li>顺带修构建链路：clone 固定 wx_alpha 分支、新增全补丁链路、CMake -DUSE_SDL=3；二次修复补回漏打的 P1–P4（黑白花屏回归）。</li>
+    </ul>
+    <div class="landing"><b>最终落点：</b>0.2.013 落地：P1–P5 完整版 wxnp21kai 已编译安装（0 errors），引擎侧绝对坐标读取活跃；GUI 端到端效果待物理鼠标确认。</div>
+    <div class="rel"><b>现状关联：</b>模拟器补丁与输入子系统：tools/np2kaipatch/05-wx-mouse-abspos.patch、tools/env_setup/env_np2kai.py、core/plat/mouse.c（0x7E0–0x7E3 绝对端口路径）。</div>
+  </div>
+
+  <div class="doc" id="doc-71">
+    <div class="doc-head"><span class="doc-num">71</span><span class="doc-title">图像加载提速方案</span><span class="doc-status">已实施</span></div>
+    <h4>核心思路</h4>
+    <ul>
+      <li>实测全部资产为 8bpp，真实热点是缓存命中/未命中各一次整幅 mag_copy 深拷贝（256KB 背景 / 80KB 立绘）。</li>
+      <li>P1 引用计数免拷贝：MagImage 加 refcount，mag_retain/mag_release 取代深拷贝，cache 直接持有共享指针，6 处 image_load 调用方 mag_free→mag_release。</li>
+      <li>P2 LRU 4→8 槽、P3 去 padding 逐行 memcpy；P4（4bpp 合并单趟）与调色板/预转 8bpp 因当前无收益撤回或推迟。</li>
+    </ul>
+    <div class="landing"><b>最终落点：</b>0.2.022 落地 P1/P2/P3，host 单元验证全绿，make 0 error/warning，pytest 62 passed；P4 待未来出现 4bpp 资产再评估。</div>
+    <div class="rel"><b>现状关联：</b>图像加载子系统：core/engine/image.c、core/engine/image_cache.c、core/lib/mag.c、core/lib/mag.h、core/engine/layer_sprite.c、core/engine/nb_commands.c（cmd_bg）。</div>
+  </div>
+
+  <div class="doc" id="doc-72">
+    <div class="doc-head"><span class="doc-num">72</span><span class="doc-title">sceneconf 场景配置命令方案</span><span class="doc-status">待实施</span></div>
+    <h4>核心思路</h4>
+    <ul>
+      <li>以 sceneconf(){标题, 类型} 取代 title 指令，类型 normal/cg/menu，缺省或非法回退 normal + hal_log 警告。</li>
+      <li>类型只存运行态 NbState.scene_type（不入 SaveData，SAVE_VERSION 不变），nb_load 重置；menu 类型取代 nb_is_menu_scene() 文件名硬编码，控制 F5/F6 热键。</li>
+      <li>文本形式 {…} 为整体单参，需在 cmd 内按逗号二次拆分，标题经 tr() 翻译沿用 chapter_title 持久化。</li>
+    </ul>
+    <div class="landing"><b>最终落点：</b>设计定稿、未实施；待改引擎 3 文件、迁移 demo 场景首行、更新 B90/B92/guildbook，并按 6 步验证（含 F5/F6 回归与 title 零残留 grep）。</div>
+    <div class="rel"><b>现状关联：</b>NB 剧本子系统：core/engine/nb.c、core/engine/nb_commands.c、core/engine/nb_internal.h、core/engine/nb_parser.c、core/engine/main.c、core/engine/save.c，脚本侧 projects/demo-a2/scene/*.nb。</div>
+  </div>
+</section>
+
+<!-- ============================================================ -->
+<section class="group" id="g2">
+  <div class="group-header"><h2>二、NAIZ_ANIM 动画链</h2><span class="range">73 – 83</span></div>
+  <p class="group-desc">图片序列帧动画从早期草案（73–76，已过时）到统一文档（77）、制作工具链（78–79）、播放侧语法与尺寸定死（80），以及播放链路根修、VSYNC 心跳与对话框并发裁剪（81–83）。</p>
+  <div class="doc" id="doc-73">
+    <div class="doc-head"><span class="doc-num">73</span><span class="doc-title">图片序列帧动画 NAIZ_ANIM 方案</span><span class="doc-status">已过时，仅供参考（由 77 取代）</span></div>
+    <h4>核心思路</h4>
+    <ul>
+      <li>选定引擎内建 anim 播放器：fullscreen（640×400）与 cine（y&lt;280 上方区）双型并行，由 anim 命令 type 参数驱动。</li>
+      <li>双轨播放：调色板轨（底图 blit 一次、每帧只写调色板端口，循环首选零撕裂）与像素轨（整帧替换 + vblank_wait 硬约束）。</li>
+      <li>借鉴 unlove/Love 实证（ECG 全屏帧、SPS 打包、PCL 调色板重映射 + EQA 脚本驱动），但单文件打包多帧（方案 C）暂缓。</li>
+    </ul>
+    <div class="landing"><b>最终落点：</b>方案定稿、未实现；双型×双轨架构与 anim/waitanima/stopanim 命令设计被 76/77 继承，打包方案在 76 转正为 .ANI 容器。</div>
+    <div class="rel"><b>现状关联：</b>历史存档；播放侧事实源现为 devdoc 77 §四与 80，引擎落点为 core/engine/nb_anim.c，制作侧为 tools/naiz_build/anim_*.py 与 anima.sh。</div>
+  </div>
+
+  <div class="doc" id="doc-74">
+    <div class="doc-head"><span class="doc-num">74</span><span class="doc-title">调色板原语封装与场景转场淡入淡出</span><span class="doc-status">已过时，仅供参考（由 77 取代）</span></div>
+    <h4>核心思路</h4>
+    <ul>
+      <li>抽出可复用调色板纯原语 palette.c/h（palette_get_all/set_all/interp，uint8[256][3] 固定布局，整数插值，经 hal.h 访问端口）。</li>
+      <li>场景切换统一走 TRANSITION_PFADE（=6）调色板淡出至纯黑：首步捕获 basis、逐帧插值、末步强制全黑；淡入本轮不做。</li>
+      <li>性能动机：每帧 768 字节端口 I/O 取代 Bayer 抖动逐像素 VRAM 覆盖，零像素破坏、无 BLEND 备份/回写。</li>
+    </ul>
+    <div class="landing"><b>最终落点：</b>方案稿（本轮不写代码）；palette 原语与 PFADE 随后已实现，并入 77 §二/§三（core/engine/palette.c、transition_pfade.c）。</div>
+    <div class="rel"><b>现状关联：</b>历史存档；当前实现为 core/engine/palette.c/h 与 core/engine/transition_pfade.c，配置链 tools/naiz_build/export_config.py（TRANSITION_MAP）。</div>
+  </div>
+
+  <div class="doc" id="doc-75">
+    <div class="doc-head"><span class="doc-num">75</span><span class="doc-title">全转场调色板化方案</span><span class="doc-status">已过时，仅供参考（由 77 取代）</span></div>
+    <h4>核心思路</h4>
+    <ul>
+      <li>删除旧 VRAM 逐像素转场（Bayer fade、几何 blinds/slants、BLEND 备份/回写），全部收敛到 palette 驱动；删 fade 类型与 BLEND mode/buf_bg。</li>
+      <li>blinds 改“先 fill 8 条带索引（PBLINDS_BASE 240）再逐帧 palette 错峰熄灭”（窗口滑动法 t0/t1/factor），首帧顺序为铁律。</li>
+      <li>枚举重编号 CUT0/VBLINDS1/HBLINDS2/DBLINDS3/RDBLINDS4/PFADE5，transition.c 瘦身至约 156 行。</li>
+    </ul>
+    <div class="landing"><b>最终落点：</b>已实施（含实施记录与窗口法公式修正），版本 0.2.030→0.2.031；条带数后复核为 20、新增 CHECKER，见 77 §3.5。</div>
+    <div class="rel"><b>现状关联：</b>历史存档；当前转场实现为 core/engine/transition.c + transition_pfade.c/transition_blinds.c/transition_checker.c + transition_internal.h。</div>
+  </div>
+
+  <div class="doc" id="doc-76">
+    <div class="doc-head"><span class="doc-num">76</span><span class="doc-title">NAIZ_ANIM 修订：ANI 封装容器方案</span><span class="doc-status">已过时，仅供参考（由 77 取代）</span></div>
+    <h4>核心思路</h4>
+    <ul>
+      <li>采纳 73 暂缓的方案 C：naiz 自建 .ANI 单文件容器（魔数 ANIZ、头 + 偏移表 + MAG 帧块 + 调色板表），不与 Love 位级兼容。</li>
+      <li>调色板轨每帧表以内嵌原始数据旁路共享调色板不变量；帧编解码复用 MAG；动画帧不经 image_cache。</li>
+      <li>fps 严格为 60 整约数集并按 type/track 分默认档（fullscreen/PIXEL 默认 12，调色板轨 30）。</li>
+    </ul>
+    <div class="landing"><b>最终落点：</b>规划稿 v1；容器思想并入 77 §4.5/§4.6，fps 合法集后被 78 的逐帧 tick 表取代。</div>
+    <div class="rel"><b>现状关联：</b>历史存档；容器权威实现现为 tools/naiz_lib/anim_container.py（.ANI v1 含 tick 表），格式定义见 docs/B92 §3。</div>
+  </div>
+
+  <div class="doc" id="doc-77">
+    <div class="doc-head"><span class="doc-num">77</span><span class="doc-title">动画与转场系统统一文档</span><span class="doc-status">活动文档（取代 73/74/75/76）</span></div>
+    <h4>核心思路</h4>
+    <ul>
+      <li>三块合一：palette 原语（已实现）→ 转场系统（已实现，C3 拆分为 transition.c/pfade/blinds/checker + internal.h）→ NAIZ_ANIM（规划核心，.ANI 容器）。</li>
+      <li>固化播放侧蓝图：AnimState 单活动动画、anim_tick 挂 nb_process 帧首、anim/waitanima/stopanim 命令语义、fullscreen 每帧对话框重建、cine 永不写 y≥280。</li>
+      <li>收录 78 修订注记：固定 fps 合法集 → 逐帧 tick 表、naizbook 脚本驱动素材组织、pal 显式索引稀疏格式。</li>
+    </ul>
+    <div class="landing"><b>最终落点：</b>播放侧权威文档（§四），制作侧细化移交 78；转场/palette 章节为已实现现状快照，动画引擎实施顺延。</div>
+    <div class="rel"><b>现状关联：</b>core/engine/palette.c/h、transition*.c；制作侧 tools/naiz_build/anim_import.py、anima.sh。</div>
+  </div>
+
+  <div class="doc" id="doc-78">
+    <div class="doc-head"><span class="doc-num">78</span><span class="doc-title">动画制作工具链：naizbook 脚本与 ANI 容器 v1</span><span class="doc-status">活动文档（制作侧已实施）</span></div>
+    <h4>核心思路</h4>
+    <ul>
+      <li>每动画一个 naizbook 脚本：animconf(){区域,轨道,循环} 头 + frame()/base()/pal() 逐帧声明（路径,秒数），秒→tick 换算 max(1, round(sec×60))。</li>
+      <li>.ANI v1 修订 77：新增逐帧 tick 表（nframes×u16，紧随偏移表），fps 头字段退化为标称值；pal 输入改显式索引 4 列稀疏差异链，组装仍存完整 768B/帧。</li>
+      <li>工具链三层：tools/naiz_lib/anim_container.py（格式权威）+ tools/naiz_build/anim_script.py（解析）+ tools/naiz_build/anim_import.py（组装），入口 anima.sh，产物仅 animation/output/*.ANI。</li>
+    </ul>
+    <div class="landing"><b>最终落点：</b>2026-08-21 当日落地：65 例新增 pytest 全绿、全量 243 绿，TEST/GLOWTEST 冒烟双轨验证通过，版本 0.2.037→0.2.038。</div>
+    <div class="rel"><b>现状关联：</b>tools/naiz_lib/anim_container.py、tools/naiz_build/anim_script.py、tools/naiz_build/anim_import.py、仓库根 anima.sh、animation/naizbook/ 与 animation/output/ 目录约定。</div>
+  </div>
+
+  <div class="doc" id="doc-79">
+    <div class="doc-head"><span class="doc-num">79</span><span class="doc-title">动画脚本分离：.na 后缀与 scripts 目录及 anima 工作流重组</span><span class="doc-status">已实施</span></div>
+    <h4>核心思路</h4>
+    <ul>
+      <li>动画脚本与剧本脚本彻底分离：.na（动画）vs .nb（剧本）；取消场景声明设计，引擎零改动，分离由工具链强制。</li>
+      <li>解析器入口新增 F1 后缀校验（非 .na 拒收）；术语口径改为“动画脚本(.na)”vs“剧本脚本(.nb)”（旧名 naizbook 仅留历史档）。</li>
+      <li>anima.sh 重组为项目操作菜单 + 脚本生成子菜单，新增 check 只读双向对账（+未登记/-失效行/~待更新/=未变，差异 exit 1）。</li>
+    </ul>
+    <div class="landing"><b>最终落点：</b>2026-08-24 实施：存量 animatest 脚本 git mv 至 scripts/*.na，测试夹具同步，新增后缀拒收/diff 只读/check 退出码用例。</div>
+    <div class="rel"><b>现状关联：</b>tools/naiz_build/anim_script.py（F1 校验）、tools/naiz_build/anim_register.py（--check）、anima.sh（check/build/buildall/list）、animation/projects/&lt;项目&gt;/scripts/ 目录。</div>
+  </div>
+
+  <div class="doc" id="doc-80">
+    <div class="doc-head"><span class="doc-num">80</span><span class="doc-title">ANI 播放侧 playanima 语法与尺寸定死方案</span><span class="doc-status">活动文档（播放语法权威）</span></div>
+    <h4>核心思路</h4>
+    <ul>
+      <li>命令定名 playanima/waitanima/stopanima：名走花括号载荷 playanima(){name}，修饰参 once|loop（缺省 once），类型自省于容器头；追加 (once|loop,sec) 总时长窗口形式。</li>
+      <li>路线 S 尺寸定死：fullscreen ≡ 640×400@(0,0)、cine ≡ 640×280@(0,0)，坐标机制整体删除；制作端与播放端双重尺寸校验。</li>
+      <li>引擎口径：anim_tick 挂 main.c 外层帧首（非 nb_process 内）、waitanima 置 wait + vm_pause_process、一切终止汇入 anim_stop_internal 单点；成品落位 projects/&lt;game&gt;/ani/*.ANI，anim_map 并入 nb_asset_table.h 第四表。</li>
+    </ul>
+    <div class="landing"><b>最终落点：</b>三阶段计划中阶段 1/2 与 3.1/3.2 已完成，3.3 NP2kai 实机目检待执行；与 77 §4.7 冲突处以本文为准。</div>
+    <div class="rel"><b>现状关联：</b>core/engine/nb_anim.h/c（AnimState/wait/loop/ticks[frame]）、core/engine/image.c（image_raw_blob）、core/engine/main.c（挂载+输入互斥）、projects/&lt;game&gt;/ani/ 管线。</div>
+  </div>
+
+  <div class="doc" id="doc-81">
+    <div class="doc-head"><span class="doc-num">81</span><span class="doc-title">ANI 动画播放链路三重根因排查与解析器括号剥离缺陷修复</span><span class="doc-status">修复记录（已验证）</span></div>
+    <h4>核心思路</h4>
+    <ul>
+      <li>三重根因：A vram_blit_sprite 逐字节 volatile 写过慢（新增 vram_row_copy 快路径）→ B pixel 轨未编程帧自带调色板（anim_draw_frame 内 256 色 hal_set_palette）→ C nb_parser 括号循环吞掉花括号载荷（循环条件补 *p != '{'）。</li>
+      <li>取证升级：串口/截图探针全灭后改用 DBG.LOG→HDI→Python 抽取管线，一轮定位 MAPMISS（name='{testfull}' 花括号未剥）。</li>
+      <li>回归：playanima(once){testfull} 全屏端到端可见、可等待、自然结束才推进；版本 0.1.006→0.1.007，fullaudit 6/6。</li>
+    </ul>
+    <div class="landing"><b>最终落点：</b>已修复落地；遗留 8 项风险（含 cine/palette 轨未端到端验证、parser 语义盲区、AUTOEXIT 穿透契约、vblank 速率未量化）。</div>
+    <div class="rel"><b>现状关联：</b>core/engine/nb_parser.c（括号循环修复）、core/engine/render.c（vram_row_copy）、core/engine/nb_anim.c（pixel 轨调色板编程）、core/engine/main.c/nb.c（日志洪水清理）。</div>
+  </div>
+
+  <div class="doc" id="doc-82">
+    <div class="doc-head"><span class="doc-num">82</span><span class="doc-title">VSYNC 心跳失准排查与 GDC 状态位掩码根修</span><span class="doc-status">修复记录（已验证）</span></div>
+    <h4>核心思路</h4>
+    <ul>
+      <li>根因：hal_vblank_wait 轮询 GDC bit2（FIFO EMPTY，恒 1 从不等待）而非 bit5 VSYNC → 主循环无 60Hz 节拍，loop+sec 的 300 tick 全速烧完。</li>
+      <li>一行根修 core/plat/pc98.h：GDC_SYNC_REFRESH 0x04→0x20；叠加漏网 bug：a-&gt;loop 从未赋值（一切动画按 once 跑），同补。</li>
+      <li>实测心跳仅 ~20.5Hz（NP2kai 解释开销），遂改时间基步进：hal_wallclock_ms（INT 21h AH=2Ch）+ 浮点 tick 累积器（steps clamp 180）；guest 时钟 5000ms 整自证精确。</li>
+    </ul>
+    <div class="landing"><b>最终落点：</b>0.1.008 完成：loop 动画时长精确，ESC 分支补 !anim_waiting() 守卫，原版 (once){testfull} 回归正常，fullaudit 全过。</div>
+    <div class="rel"><b>现状关联：</b>core/plat/pc98.h（位掩码）、core/plat/hal_pc98.c + hal.h（hal_wallclock_ms）、core/engine/nb_anim.c（loop 赋值/墙钟步进/AnimState.last_ms/ms_accum）、core/engine/main.c（ESC 守卫）。</div>
+  </div>
+
+  <div class="doc" id="doc-83">
+    <div class="doc-head"><span class="doc-num">83</span><span class="doc-title">动画与对话框并发播放 clip_h 裁剪方案</span><span class="doc-status">方案待实施（起点 0.2.061）</span></div>
+    <h4>核心思路</h4>
+    <ul>
+      <li>waitanima 阻塞改为可选并行：对话框打开时 fullscreen 动画只写 y=0..279（vram_blit_sprite clip_h=LAYER_DIALOG_Y），对话框区文字像素不被覆盖；cine 天然 640×280 无需裁剪。</li>
+      <li>改动仅 core/engine/nb_anim.c 两处（pixel 轨与 palette 轨首 blit 各一），anim_rebuild_dialog_if_open、cursor_refresh、prot_pal 保留不动。</li>
+      <li>已知代价：动画底部 120 行与两侧窄边不可见（显示旧背景），对多数 VN 场景可接受。</li>
+    </ul>
+    <div class="landing"><b>最终落点：</b>方案待实施：版本号 0.2.061→0.2.062，验证计划为 make + NP2kai 四项功能目检 + pytest 回归。</div>
+    <div class="rel"><b>现状关联：</b>core/engine/nb_anim.c（anim_draw_frame 双轨分派）、已就绪的 vram_blit_sprite clip_h 机制、layer_dialog.c 对话框帧/快照系统。</div>
+  </div>
+</section>
+
+<!-- ============================================================ -->
+<section class="group" id="g3">
+  <div class="group-header"><h2>三、层管理统一、调试导出与 CJK 加载</h2><span class="range">84 – 87</span></div>
+  <p class="group-desc">显示层序显式化与层管理 API 收口（84–85）、可视化调试层导出（86）、CJK 按语言加载与游戏前设置菜单（87）。</p>
+  <div class="doc" id="doc-84">
+    <div class="doc-head"><span class="doc-num">84</span><span class="doc-title">显示层序显式化与层状态查询统一</span><span class="doc-status">已实施（0.2.062→0.2.063）</span></div>
+    <h4>核心思路</h4>
+    <ul>
+      <li>定义显式层序 LAYER_Z_BG 0 / SPRITE 1 / ANIM 2 / DIALOG 3 / TEXT 4 / CURSOR 5，下层先画、高层覆盖，替代隐式写入顺序约定。</li>
+      <li>以 layer_is_active / layer_set_active + g_layer_active[] 统一查询，替代分散的 layer_dialog_drawn、layer_has_sprite、layer_bg_snapshot_valid。</li>
+      <li>新增 layer_get_bounds / layer_can_blit_at：立绘与动画在对话框打开时限写 y&lt;280，对话框/文字只写 y&gt;=280；新增 anim_is_playing（读 g_anim.active）。</li>
+    </ul>
+    <div class="landing"><b>最终落点：</b>只做显式化与查询统一，不封装调用者操作序列（留给 85）。</div>
+    <div class="rel"><b>现状关联：</b>产物 core/engine/scene_layers.h、layer.c、layer_internal.h、layer_bg.c、layer_sprite.c、layer_dialog.c、nb_anim.c、nb_anim.h；为 85/86 提供基础。</div>
+  </div>
+
+  <div class="doc" id="doc-85">
+    <div class="doc-head"><span class="doc-num">85</span><span class="doc-title">统一的层管理 API</span><span class="doc-status">已实施（0.2.063→0.2.064）</span></div>
+    <h4>核心思路</h4>
+    <ul>
+      <li>新增 5 个统一入口 layer_bg_change、layer_sprite_update、layer_dialog_show、layer_dialog_hide_clean、layer_sprite_hide，内部消化 open/snap 与 show/replace/face 分支。</li>
+      <li>调用者从多步仪式简化为一行：cmd_bg（7→1 行）、cmd_char（8→1 行）、dialog_show 与 cmd_question 共用 layer_dialog_show。</li>
+      <li>复用 84 的 LAYER_Z_* 与 layer_is_active，新增 layer_has_any_sprite 辅助末立绘判定与对话区背景重建。</li>
+    </ul>
+    <div class="landing"><b>最终落点：</b>净增约 70 行但调用侧免除状态机心智负担；另提议防复发规则 C26（调用者禁用直查状态选路径）。</div>
+    <div class="rel"><b>现状关联：</b>改动 core/engine/scene_layers.h、layer_bg.c、layer_sprite.c、layer_dialog.c、nb_commands.c、nb_dialog.c、nb_question.c。</div>
+  </div>
+
+  <div class="doc" id="doc-86">
+    <div class="doc-head"><span class="doc-num">86</span><span class="doc-title">可视化调试工具：层导出与合成预览</span><span class="doc-status">已实施（0.2.064→0.2.065）</span></div>
+    <h4>核心思路</h4>
+    <ul>
+      <li>选用 PPM（P6 + raw RGB）免第三方库导出调试图像，经 hal_get_palette 做索引到 RGB 转换。</li>
+      <li>新增 layer_debug.h/.c：layer_dump、layer_dump_composite、layer_dump_all；立绘层用 VRAM 与背景快照差值，合成层直接读 VRAM。</li>
+      <li>串口 dump：命令 bg|sprite|dialog|anim|all|status + debug_dump_layer_status 输出六层活跃状态；可选 test_layer_dump.py 以基准 MD5 做合成图回归。</li>
+    </ul>
+    <div class="landing"><b>最终落点：</b>纯调试能力；后续可扩展自动基准、实时预览、帧录制、脏区可视化。</div>
+    <div class="rel"><b>现状关联：</b>新增 core/engine/layer_debug.h、layer_debug.c；改动 core/engine/debug.c、core/Makefile、layer_internal.h（导出 snapshot 访问器）。</div>
+  </div>
+
+  <div class="doc" id="doc-87">
+    <div class="doc-head"><span class="doc-num">87</span><span class="doc-title">CJK 按语言加载与游戏前设置菜单</span><span class="doc-status">已实施（0.2.065→0.2.066）</span></div>
+    <h4>核心思路</h4>
+    <ul>
+      <li>按语言只载对应 Unicode 范围，拆 10 个 CJK_*.DAT：默认英语省 99.7%（1016KB→3KB）。</li>
+      <li>启动后移：settings_load 先行，首次启动（无 settings.txt）先跑纯英语 ASCII 设置菜单，再 cjk_init(cjk_file_for_lang())；后续启动跳过菜单。</li>
+      <li>设置菜单 640×400：Naiz Settings + Language &lt; &gt; 选择器 + Start Game，10 语言循环切换并 settings_save 写入 settings.txt。</li>
+      <li>工具链扩展 gen_cjk_font.py（Extended Latin U+00C0–00FF）与 build_game.py 批量生成多语言字库。</li>
+    </ul>
+    <div class="landing"><b>最终落点：</b>新增 settings_menu.c/.h 与 10 个 CJK_*.DAT；重启后直进游戏，CJK 按 lang 动态加载。</div>
+    <div class="rel"><b>现状关联：</b>改动 core/engine/main.c、settings.c、settings.h、settings_menu.c、settings_menu.h、core/Makefile、tools/naiz_font/gen_cjk_font.py、tools/naiz_build/build_game.py；运行产物 settings.txt、CJK_*.DAT。</div>
+  </div>
+</section>
+
+<!-- ============================================================ -->
+<section class="group" id="g4">
+  <div class="group-header"><h2>四、CG 全功能链</h2><span class="range">88 – 95</span></div>
+  <p class="group-desc">CG 七阶段：数据管线（88）→ 解锁存档 API（89）→ 展示命令（90）→ 画廊入口（91）→ 网格 UI（92）→ 文档收口（93）→ 未完成与验收（94），以及换图自动复位对话框方案（95）。</p>
+  <div class="doc" id="doc-88">
+    <div class="doc-head"><span class="doc-num">88</span><span class="doc-title">CG 数据管线：type='CG' 全流程</span><span class="doc-status">阶段 1（已落地）</span></div>
+    <h4>核心思路</h4>
+    <ul>
+      <li>新增一等资源类型 type='CG'，独立 cg_map[]，不混入 IMG/SPR 池，画廊可精确遍历。</li>
+      <li>渲染语义等价非 sprite 全屏背景：不透明、共享全局调色板，与 bg 零冲突。</li>
+      <li>仅改 build_game.py 白名单 + export_asset_table.py 新增 cg_map[] + validator 感知；pack_images.py 零改动（非 ANI 行已按普通图打包）。</li>
+    </ul>
+    <div class="landing"><b>最终落点：</b>地基落地：cg_map[] 生成 + IMAGE.DAT 打包 + demo-a2 登记，验收后进入 89/90。</div>
+    <div class="rel"><b>现状关联：</b>tools/naiz_build/export_asset_table.py（cg_map[]）、build_game.py（CG 白名单）、nb_asset_table.h（cg_map[]）、IMAGE.DAT。</div>
+  </div>
+
+  <div class="doc" id="doc-89">
+    <div class="doc-head"><span class="doc-num">89</span><span class="doc-title">CG 解锁存档 API</span><span class="doc-status">阶段 2（已落地）</span></div>
+    <h4>核心思路</h4>
+    <ul>
+      <li>补齐 sys_save_unlock_cg / sys_save_is_cg_unlocked，公开非 static（对称 unlock_scene），声明于 save.h。</li>
+      <li>cg_id 为 1-based 逻辑号 [1, CG_TOTAL]，越界静默防御；位布局沿 scene_flags 写法，幂等 OR 置位 + 即时写盘。</li>
+      <li>跨阶段契约：cg_id = cg_map[] 数组下标 + 1，由 90（写入）与 92（查询）共同遵守。</li>
+    </ul>
+    <div class="landing"><b>最终落点：</b>存档层落地：SYSTEM.SAV cg_flags 读写 API，曝光并预告 B90/B18 过期描述待阶段 7 修正。</div>
+    <div class="rel"><b>现状关联：</b>core/engine/save.h、save_sys.c（unlock_cg / is_cg_unlocked + cg_flags）、SYSTEM.SAV cg_flags。</div>
+  </div>
+
+  <div class="doc" id="doc-90">
+    <div class="doc-head"><span class="doc-num">90</span><span class="doc-title">CG 展示命令 cmd_cg</span><span class="doc-status">阶段 3（已落地）</span></div>
+    <h4>核心思路</h4>
+    <ul>
+      <li>语法 cg(){asset_key}，只查 cg_map，不经 nb_asset_id()，与 bg 命名空间独立；括号形态 cg(key) 被硬性拒绝。</li>
+      <li>推翻“不复用 layer_bg_change”设想：必须走完整 layer_bg_change（含快照重建），否则后续对话框/精灵恢复穿帮。</li>
+      <li>先 sys_save_unlock_cg 再绘制；anim_stop() 隐式停动画；失败路径 NB_DEBUG 不中断剧本。</li>
+    </ul>
+    <div class="landing"><b>最终落点：</b>展示层落地：新建 nb_cg.c（cmd_cg + cmd_table 注册 + validator 签名），CG 即当前背景。</div>
+    <div class="rel"><b>现状关联：</b>core/engine/nb_cg.c（cmd_cg）、layer_bg_change 渲染路径、cg_map[]、sys_save_unlock_cg。</div>
+  </div>
+
+  <div class="doc" id="doc-91">
+    <div class="doc-head"><span class="doc-num">91</span><span class="doc-title">CG 画廊：入口骨架与主菜单桥接</span><span class="doc-status">阶段 4（已落地）</span></div>
+    <h4>核心思路</h4>
+    <ul>
+      <li>主菜单 gallery 分支由 TODO 改为 nb_load("cgview.nb")；新建 cgview.nb（sceneconf + bg + cgvmenu()），menu 类型禁用 F5/F6。</li>
+      <li>cmd_cgvmenu 实现为阻塞 while 循环骨架（对齐 save_load_menu），入口 drain 遗留键，退出统一回 mainmenu.nb。</li>
+      <li>阶段 4 只画标题 + 提示，网格/解锁/翻页全部预埋给阶段 5 插入点。</li>
+    </ul>
+    <div class="landing"><b>最终落点：</b>回路打通：主菜单 → cgview.nb → cgvmenu 骨架 → ESC/点击回主菜单，可目视验证。</div>
+    <div class="rel"><b>现状关联：</b>projects/demo-a2/scene/cgview.nb、core/engine/nb_mainmenu.c（cmd_mainmenu gallery 分支、cmd_cgvmenu 骨架）。</div>
+  </div>
+
+  <div class="doc" id="doc-92">
+    <div class="doc-head"><span class="doc-num">92</span><span class="doc-title">CG 画廊：网格 UI 与全屏预览</span><span class="doc-status">阶段 5/6（已落地）</span></div>
+    <h4>核心思路</h4>
+    <ul>
+      <li>管线补 #define CG_COUNT；4×3 网格（144×100/格）+ Back + 翻页；解锁蓝底编号 vs 锁定黑底 [LOCKED]。</li>
+      <li>焦点/翻页对齐 save_load_menu；ENTER/点击触发 gallery_preview（is_unlocked 门控 + layer_bg_change），退出经 gallery_exit_preview 恢复背景 + 调色板保序。</li>
+      <li>翻页/预览全量重绘 + force_draw，焦点移动仅增量重绘两格。</li>
+    </ul>
+    <div class="landing"><b>最终落点：</b>画廊实现完成：网格浏览 + 锁定占位 + 翻页 + 全屏预览 + 双层 ESC 回程；真缩略图顺延二期；实机验收转 94。</div>
+    <div class="rel"><b>现状关联：</b>export_asset_table.py（CG_COUNT）、后拆分为 nb_cggallery.c（GAL_* + cmd_cgvmenu）、sys_save_is_cg_unlocked、CG_COUNT/cg_map。</div>
+  </div>
+
+  <div class="doc" id="doc-93">
+    <div class="doc-head"><span class="doc-num">93</span><span class="doc-title">CG 画廊：文档收口</span><span class="doc-status">阶段 7（已收口）</span></div>
+    <h4>核心思路</h4>
+    <ul>
+      <li>零代码改动，仅同步 B92（cg/cgvmenu 命令行、六表 + CG_COUNT）与 B90（cmd_cg/cmd_cgvmenu、解锁 API 移出内部 static）。</li>
+      <li>复查补修 B18 §2.4：过期行号区间改为逐行精确行号，补列 unlock_cg/is_cg_unlocked。</li>
+      <li>澄清 devdoc 89 无误、脱节点仅在 B90（+B18）；登记 devdoc 92 描述偏差为记录性滞后。</li>
+    </ul>
+    <div class="landing"><b>最终落点：</b>文档层收口完成：B92/B90/B18 同步；版本停 0.2.077；实机验收与真缩略图转 94。</div>
+    <div class="rel"><b>现状关联：</b>docs/B92-NB脚本命令参考.md、docs/B90-参考-函数索引.md、docs/B18-存档读档系统设计.md。</div>
+  </div>
+
+  <div class="doc" id="doc-94">
+    <div class="doc-head"><span class="doc-num">94</span><span class="doc-title">CG 画廊：未完成部分与实机验收</span><span class="doc-status">挂起（实机验收 2 项 + 二期真缩略图）</span></div>
+    <h4>核心思路</h4>
+    <ul>
+      <li>唯一执行入口：承接 NP2kai 实机手动验收与二期真缩略图。</li>
+      <li>代码审计 8 PASS / 2 NEEDS_MANUAL，并修复 DOWN 键 Back 不可达 bug（sel+GAL_COLS &gt; last_idx）。</li>
+      <li>附带 R9 拆分整合（nb_cggallery.c 独立）与 R10 头文件审计增强记录。</li>
+    </ul>
+    <div class="landing"><b>最终落点：</b>部分待办：2 项需用户实机目检；真缩略图顺延二期；导航 bug 已修（0.2.077 → 0.2.080）。</div>
+    <div class="rel"><b>现状关联：</b>core/engine/nb_cggallery.c（由 nb_mainmenu.c 拆出）、nb_mainmenu.c DOWN 修复、SYSTEM.SAV cg_flags。</div>
+  </div>
+
+  <div class="doc" id="doc-95">
+    <div class="doc-head"><span class="doc-num">95</span><span class="doc-title">背景 CG 换图自动复位对话框</span><span class="doc-status">方案未实施（只写 devdoc）</span></div>
+    <h4>核心思路</h4>
+    <ul>
+      <li>根因：layer_bg_change 已复位图层状态，但 NB 翻页 DialogState 仍需 hidedialog 补 nb_dialog_reset()，且尾随 hide 带来 55KB 冗余写。</li>
+      <li>设计：cmd_bg/cmd_cg 资产分支补 nb_dialog_reset()；layer_dialog_hide() 加 !dialog_drawn 早退（O(1)，兼修精灵被盖隐患）。</li>
+      <li>bg(hidedialog)/cg(hidedialog) 保留为独立指令，show 后尾随变无害空转。</li>
+    </ul>
+    <div class="landing"><b>最终落点：</b>未实施：三处改动 + B92 一句更新 + bump 均待办，核销表全空。</div>
+    <div class="rel"><b>现状关联：</b>（待改）core/engine/nb_commands.c（cmd_bg）、nb_cg.c（cmd_cg）、layer_dialog.c（layer_dialog_hide）；docs/B92 一句语义更新。</div>
+  </div>
+</section>
+
+<!-- ============================================================ -->
+<section class="group" id="g5">
+  <div class="group-header"><h2>五、对话框图层化、CJK 精简与整合审计</h2><span class="range">96 – 99</span></div>
+  <p class="group-desc">对话框图层化架构设计（96，未实施）、CJK 语料精简字库方案与实施（97–98，目检挂起）、整合机会审计与落地（99）。</p>
+  <div class="doc" id="doc-96">
+    <div class="doc-head"><span class="doc-num">96</span><span class="doc-title">对话框图层化架构设计</span><span class="doc-status">设计未实施，本轮不落代码</span></div>
+    <h4>核心思路</h4>
+    <ul>
+      <li>v2 可行性复查修正三论断：clip_h 仅约束 layer_sprite_face/redraw，全身 show/replace 满高直写靠事后 refresh 盖回；under_dialog 换源直取；R17 自动 reset 与跨图存活冲突。</li>
+      <li>目标架构为软件图层 + z 序合成：BG → 精灵（开框时剪到 y&lt;280）→ under_dialog → Dialog 合成层，真不变量为框内 dialog 恒最后画，消灭防腐账本与全部 VRAM 回读。</li>
+      <li>最深改动为文本渲染目标 text_set_target()/text_set_target_vram()，调用方仅 nb_dialog.c 与 nb_save_dialog.c；分 A/B/C/D 四阶段独立验证实施。</li>
+    </ul>
+    <div class="landing"><b>最终落点：</b>设计 + 路线图冻结（含跨图存活与关框重绘两裁决），未落代码，实施需按阶段单独授权。</div>
+    <div class="rel"><b>现状关联：</b>处置对象 core/engine/layer_bg.c、layer_dialog.c、layer_sprite.c、render_text.c；设计新增 dialog_layer 缓冲、under_dialog、dialog_paint_box、dialog_layer_blit、layer_dialog_close，尚未落地。</div>
+  </div>
+
+  <div class="doc" id="doc-97">
+    <div class="doc-head"><span class="doc-num">97</span><span class="doc-title">CJK 按语言语料精简字库与拉丁语系准备方案</span><span class="doc-status">设计未实施</span></div>
+    <h4>核心思路</h4>
+    <ul>
+      <li>缺口是无 CJK_&lt;lang&gt;.DAT 而全回退 1.0MB 全量 CJK.DAT；改为 collect_cps() 按 scene/*.nb + i18n 值列收集码位、排序合并 run，按语言生成紧凑字库。</li>
+      <li>字形源可插拔 P1 unifont.hex 优先、P2 全量 CJK.DAT 子集兜底、缺形零填逐码位 WARN；CJK 族基座 U+3000–303F、拉丁族基座 U+00A0–00FF，CJKF v1 格式不变。</li>
+      <li>构建新增 deploy_cjk_fonts() 置于 deploy_i18n 之后、固定 10 语言现场生成并删全量部署；引擎仅 MAX_CJK_RANGES 128→2048、nb_lang_is_cjk 补 cht、tr_table 静态改堆动态。</li>
+    </ul>
+    <div class="landing"><b>最终落点：</b>仅设计未实施，实施另立变更单；目标文本常驻 1.49MB→30–175KB，软盘净省≥0.5MB。</div>
+    <div class="rel"><b>现状关联：</b>涉及 core/lib/cjk.c、core/lib/tr.c、core/engine/nb.c、tools/naiz_font/gen_cjk_font.py、tools/naiz_build/build_game.py、tools/naiz_conv/i18n_gen.py，文档收口 docs/B90 与 B92 §3。</div>
+  </div>
+
+  <div class="doc" id="doc-98">
+    <div class="doc-head"><span class="doc-num">98</span><span class="doc-title">CJK 按语言语料精简字库：实施进度与换机续作</span><span class="doc-status">主体完成，串口目检挂起待换机</span></div>
+    <h4>核心思路</h4>
+    <ul>
+      <li>对照 97 清单实施：unifont-17.0.05.hex 落地、gen_cjk_font.py 重写 collect_cps/subset/merge、build_game.py 新增 deploy_cjk_fonts、cjk.c→2048、nb.c 补 cht、tr.c 动态化、kor 译文就位。</li>
+      <li>自动化验证全绿：pytest 351 passed、make 0 err/warn、fullaudit 6/6；build 产物无 CJK.DAT、10 个 CJK_&lt;lang&gt;.DAT 合计约 30KB，Python 仿真头校验与 kor 字形全查通过。</li>
+      <li>本机双串口 harness 恒 0 字节致串口切语言验证无法完成，改截图法 kor-mainmenu 像素分析证实菜单渲染，字形精读留待换机人工目检。</li>
+    </ul>
+    <div class="landing"><b>最终落点：</b>软件改动与自动化验证全部完成并 bump 至 0.2.094；唯一遗留 NP2kai 运行期目检挂起，待换机续作。</div>
+    <div class="rel"><b>现状关联：</b>产物 tools/naiz_font/unifont-17.0.05.hex、games/demo-a2/CJK_&lt;lang&gt;.DAT、projects/demo-a2/i18n/*_kor.txt、docs/runtime-shots/kor-mainmenu-20260912.png。</div>
+  </div>
+
+  <div class="doc" id="doc-99">
+    <div class="doc-head"><span class="doc-num">99</span><span class="doc-title">整合机会审计与落地</span><span class="doc-status">已执行（P0 五项 + P1 两项）</span></div>
+    <h4>核心思路</h4>
+    <ul>
+      <li>symbol_audit A/B/E + grep 文本扫描 + 人工复核，揪出 4 个 0 调用死导出、对话框几何 13+7 处重复、slot_y/slot_ys 双表、strncpy+NUL 26 处、clean-box 与菜单退出顺序不一致。</li>
+      <li>落地 7 项：删 4 死导出、新增 LAYER_DIALOG_CONTENT_X/W/Y/H 宏、槽位并表 + SLOT_ABS()/SLOTS_PER_PAGE、公共 layer_dialog_clear()、标题去重、新 str_copy() 收口 11 文件、menu 退出对齐 close→restore，行为等价。</li>
+      <li>检讨指出现行 39 条规则无重复计数/同构检测能力，建议新增 HEUR 高重复阈值告警并把 A/B 节纳入 fullaudit 失败判据。</li>
+    </ul>
+    <div class="landing"><b>最终落点：</b>P0 五项 + P1 两项全部落地，版本 0.2.106→0.2.107，symbol_audit A/B 归零，make/pytest/fullaudit 全绿。</div>
+    <div class="rel"><b>现状关联：</b>产物 core/lib/strutil.h/.c（str_copy）、scene_layers.h 内容几何宏、layer_dialog.c 的 layer_dialog_clear()、nb_saveload.c 槽位内聚、nb_menu.c 退出对齐，docs/B90 函数索引同步。</div>
+  </div>
+</section>
+
+<!-- ============================================================ -->
+<section class="group" id="g6">
+  <div class="group-header"><h2>六、归档、音频、分离改造与打字机</h2><span class="range">100 – 107</span></div>
+  <p class="group-desc">TOC 归档与音频后端计划（100–101，待实施）、菜单审计（102，计划中）、引擎前后端分离与显示 op 化（103，已完结）、nb_validator（104）、打字机文字与去抖（105–106）、虚拟时钟下沉（107）。</p>
+  <div class="doc" id="doc-100">
+    <div class="doc-head"><span class="doc-num">100</span><span class="doc-title">剧本与图像归档 TOC 化：按需读取与共享封装</span><span class="doc-status">待实施（Phase 1–5）</span></div>
+    <h4>核心思路</h4>
+    <ul>
+      <li>IMAGE.DAT 从整档 malloc 常驻改为 TOC 常驻 + 按需读单 entry，峰值从约 15–20MB 压到约 5MB，格式不变（count + 每项 20B + 顺序数据）。</li>
+      <li>场景脚本打包为共用布局的 SCENE.DAT（8.3 大写短名寻址），解决 FAT 根目录上限、簇尾碎片与部署树散 .nb 残留；剧本仍是 1×32KB 按需模型。</li>
+      <li>抽跨模块共享封装：C 侧 core/lib/farchive.{c,h}（open/lookup_id/lookup_name/read_alloc/read_buf），Python 侧 toc_archive.py::make_toc_archive()，pack_images 与 pack_scenes 共用。</li>
+    </ul>
+    <div class="landing"><b>最终落点：</b>待实施：Phase 1–5 均未落地，公共 API 零改动、归档缺失回退散文件的兼容设计已定稿。</div>
+    <div class="rel"><b>现状关联：</b>core/engine/image.c（image_init/image_load/image_raw_blob）、core/engine/nb.c（nb_load/nb_init）、tools/naiz_lib/image_dat 与 pack_images.py、tools/naiz_build/build_game.py deploy_runtime、docs/B92 §3 与 docs/B90 待登记。</div>
+  </div>
+
+  <div class="doc" id="doc-101">
+    <div class="doc-head"><span class="doc-num">101</span><span class="doc-title">音频后端：MIDI 直放与 86 板 PCM 实施计划</span><span class="doc-status">计划中（P1–P7 未落地）</span></div>
+    <h4>核心思路</h4>
+    <ul>
+      <li>bgm 用 SMF 原样打包、运行时解析为事件表并按毫秒调度，直写 MPU-PC98 UART（基址 0xC0D0，命令口写 0x3F，轮询 BUSY 位），缺卡降级旧 stub。</li>
+      <li>sound/voice 用 WAV 构建期转 8bit mono .pcm（NAIZPCM 魔数 + rate 档），运行时逐帧灌 86 板 YM3438 PCM FIFO（60Hz 轮询泵，单通道后到覆盖）。</li>
+      <li>分层：core/engine/audio.c 调度与泵、core/lib/midi.{c,h} 纯 SMF 解析、core/plat/hal 层寄存器写；复用 devdoc 100 的 farchive（AUDIO.DAT）与 make_toc_archive。</li>
+    </ul>
+    <div class="landing"><b>最终落点：</b>待实施：midi 解析、MPU 初启、PCM 泵、audio.c 接线、wav_convert/gen_test_midi/pack_audio 工具链、验证与文档，交付清单全未勾选。</div>
+    <div class="rel"><b>现状关联：</b>core/plat/hal_pc98.c 音频 stub、core/engine/nb_audio.c（bgm/sound/voice 命令已就绪）、ASSETS.DB 新增 BGM/SND/VC 类型、tools/naiz_audio/ 待建。</div>
+  </div>
+
+  <div class="doc" id="doc-102">
+    <div class="doc-head"><span class="doc-num">102</span><span class="doc-title">菜单 UI 整合机会审计与封装方案</span><span class="doc-status">计划中（本轮源码未改）</span></div>
+    <h4>核心思路</h4>
+    <ul>
+      <li>审计四个系统菜单，钉死 5 处退出收尾序列、载入/画廊分页条与 Back 按钮、键盘/鼠标双写 Yes/No 确认状态机、画廊独藏 2x 标题宽度公式、三处漂移 10 语言表等重复证据。</li>
+      <li>P1–P8 封装：menu_finish()、分页 widget（draw/page_hit/pagecount/back_draw/back_hit）、menu_confirm_input()、text_title_width()、langdefs.py 单一事实源、slot_chapter_label 与网格导航去重。</li>
+      <li>行为等价、外科手术：仅 P2 画廊 Back 居中与计数器 2px、P4 标题公式零视觉差为例外；布局不同的控件与对话框改 menu 承载等项明确不整合。</li>
+    </ul>
+    <div class="landing"><b>最终落点：</b>待实施：待批准后按 §7 清单 P1–P8 落地并 bump 至 0.2.120。</div>
+    <div class="rel"><b>现状关联：</b>core/engine/nb_menu.c、nb_saveload.c、nb_cggallery.c、nb_save_dialog.c、settings_menu.c、render_text.c、tools/naiz_conv/i18n_gen.py 与 gen_cjk_font.py、待增 tools/naiz_lib/langdefs.py。</div>
+  </div>
+
+  <div class="doc" id="doc-103">
+    <div class="doc-head"><span class="doc-num">103</span><span class="doc-title">引擎前后端分离改造：交互抽象与显示 op 化</span><span class="doc-status">已完结归档</span></div>
+    <h4>核心思路</h4>
+    <ul>
+      <li>对照 Ren'Py 审计 7 处越界：nb_process 逐行解析执行渲染三合一、对话框逐帧重绘与 dialog_show 反控 VM、handler 直操显示内部、阻塞 UI 住 handler、换场多入口。</li>
+      <li>阶段 1 交互收口：新 nb_interact.c 的 ui_interact()（选项阻塞循环收敛）与 save_request()（F5/F6/ESC 与菜单存读档统一入口）。</li>
+      <li>阶段 2 显示 op 化：新 scene_display.c 的 display_apply_* 窄接口、删 nb.c 逐帧重绘并把暂停权移交 nb_dialog_pending()、CmdEntry 声明位、音频停止归 scene_switch 单入口；回滚/AST/Screen DSL 明确不做。</li>
+    </ul>
+    <div class="landing"><b>最终落点：</b>已完结：阶段 1（0.2.121）、阶段 2（0.2.122）、独立小项 B 未知命令常 WARN、F test_cmd_doc_sync.py、K slot_info（0.2.123）全部落地，余仅人工 NP2kai 回归比对。</div>
+    <div class="rel"><b>现状关联：</b>core/engine/nb_interact.c、scene_display.{c,h}、nb_dialog_pending()/dismiss()、scene_switch()、tools/tests/test_cmd_meta.py 与 test_cmd_doc_sync.py、docs/B90 与 B92 命令表。</div>
+  </div>
+
+  <div class="doc" id="doc-104">
+    <div class="doc-head"><span class="doc-num">104</span><span class="doc-title">纯逻辑剧本 Lint 工具 nb_validator 增补方案</span><span class="doc-status">已落地（0.2.124）</span></div>
+    <h4>核心思路</h4>
+    <ul>
+      <li>根因是解析脱钩：引擎 question/scene 按分号顶级分段，旧 Python 按逗号拆分致个数检查失效；抽 split_semi() 对齐 nb_parse_line_semi 单一事实源。</li>
+      <li>V1–V3：var 越界用 variables.json 的 var_tbl 做 known-range 传播（含 question 选项分支并集），V2 question 改专用 validate_question() 深查段数与四字段，V3 delay 复刻 playanima 正数校验。</li>
+      <li>V4 白名单 nb_lint_accepted.txt（file:lineno|pattern 子串断言，命中打印但不计数）；start.sh fullaudit 由 6 步扩为 7 步，validator 置 [3/7]。</li>
+    </ul>
+    <div class="landing"><b>最终落点：</b>V1–V4、start.sh 7 步、test_nb_lint.py（20 例）全实施，pytest 415 通过、fullaudit 7/7。</div>
+    <div class="rel"><b>现状关联：</b>tools/naiz_build/nb_validator.py、tools/naiz_lib/nb_line.py、projects/*/variables.json 与 nb_lint_accepted.txt、start.sh、tools/tests/test_nb_lint.py、docs/B91 §2。</div>
+  </div>
+
+  <div class="doc" id="doc-105">
+    <div class="doc-head"><span class="doc-num">105</span><span class="doc-title">打字机文字方案</span><span class="doc-status">已落地（0.2.125）</span></div>
+    <h4>核心思路</h4>
+    <ul>
+      <li>对齐 Ren'Py typewriter：正文按 UTF-8 字符逐字揭示、角色名整段先出；揭示中确认输入仅跳满本页，再确认才翻页/收尾；每页重演；AUTOEXIT 直通不变。</li>
+      <li>DialogState 加 page_start/reveal_end/reveal_active 三字段，新接口 nb_dialog_reveal_tick/active/finish，主循环与 wait loop 挂 tick 并在确认分支消费揭示。</li>
+      <li>渲染用方案 A：调用侧截断串经既有整页路径重画，不动 draw_text 核心；速度四档 Instant/16/32/64 存 settings.txt，设置菜单加 Text Speed 行并走 tr() 与 SYSTEM_UI_KEYS 登记。</li>
+    </ul>
+    <div class="landing"><b>最终落点：</b>逐字揭示、四档速率、点击跳满语义与设置行全部实现，AUTOEXIT 无头语义零变化。</div>
+    <div class="rel"><b>现状关联：</b>core/engine/nb_dialog.{c,h}、main.c wait loop、settings.h 与 settings_menu.c、tools/naiz_conv/i18n_gen.py 与 sys_*.txt、tools/tests/test_text_speed_settings.py。</div>
+  </div>
+
+  <div class="doc" id="doc-106">
+    <div class="doc-head"><span class="doc-num">106</span><span class="doc-title">打字机逐字节拍去抖动方案</span><span class="doc-status">已落地（0.2.133）</span></div>
+    <h4>核心思路</h4>
+    <ul>
+      <li>症状是同页行内中途卡一下再自动续；Step 0 串口探针钉死根因为 NP2kai 下 DOS 时钟整秒量子化 + 成块交付（冻结 3–6s 后一次跳 1000–6000ms），相邻 delta 量化致停拍与追字爆发。</li>
+      <li>实施方案 A+：绝对期望位置替代 ms 累加器，叠加虚拟时钟钳制每 pass 增量到 [40,100]ms（地板防冻结、天花板防爆发），保留页级基线重锚与回绕处理。</li>
+      <li>否决方案 B（累加器插值）与方案 C（PIT 更细时钟，非单调已实测否决）；不改时钟源、不动渲染层与速度档位。</li>
+    </ul>
+    <div class="landing"><b>最终落点：</b>NP2kai 长句复测逐字 max/avg 为 2.09（≤2.5 门限），探针零残留，pytest 432 通过、fullaudit 7/7。</div>
+    <div class="rel"><b>现状关联：</b>core/engine/nb_dialog.c（reveal_tick 与 REVEAL_PASS_MIN/MAX_MS）、core/plat/hal_pc98.c 的 hal_wallclock_ms()、tools/tests/test_reveal_final_page.py。</div>
+  </div>
+
+  <div class="doc" id="doc-107">
+    <div class="doc-head"><span class="doc-num">107</span><span class="doc-title">虚拟时钟下沉与时钟隐患收口</span><span class="doc-status">已落地（0.2.134）</span></div>
+    <h4>核心思路</h4>
+    <ul>
+      <li>106 的本地虚拟钟只修了打字机；同根因波及动画 freeze-burst（H1，delta=0 冻结、补齐 steps 爆表）与 BGM 静默连发（H2，cur 停滞后事件连发）。</li>
+      <li>下沉 HAL 层 hal_wallclock_smooth_ms() 为单一事实源（首 pass 回 0，增量钳制 [40,100]ms，宏观约 raw、微观有界单调），reveal/anim/audio 三方统一迁移并删本地钳制。</li>
+      <li>H3（delay 与选项超时的 pass 计数拉长）登记为已接受语义不动；H4 补 hal 契约注释，真机 60Hz 下 MIN/MAX 需另标定。</li>
+    </ul>
+    <div class="landing"><b>最终落点：</b>smooth 时钟与三方迁移实现，探针判据全过（delta 恒 ∈ [40,100]），BGM 探针因无 MPU 转单元测试覆盖，pytest 433、fullaudit 7/7。</div>
+    <div class="rel"><b>现状关联：</b>core/plat/hal.h 与 hal_pc98.c（SMOOTH_CLOCK_MIN/MAX_MS）、nb_dialog.c、nb_anim.c 的 anim_tick、audio.c 的 bgm poll、tools/tests/test_reveal_final_page.py、docs/B19 与 FAQ。</div>
+  </div>
+</section>
+
+<!-- ============================================================ -->
+<section class="group" id="g7">
+  <div class="group-header"><h2>七、光标契约系列与 Special 菜单</h2><span class="range">108 – 115</span></div>
+  <p class="group-desc">软件光标层契约六连修（108–113：抹字→顿闪→缺窗→残影→增量岛→选项残留）、Special 菜单落地（114）、菜单增量 blit 跨行距根修（115）。</p>
+  <div class="doc" id="doc-108">
+    <div class="doc-head"><span class="doc-num">108</span><span class="doc-title">软件光标层契约与对话框抹字收口</span><span class="doc-status">已落地（0.2.135）</span></div>
+    <h4>核心思路</h4>
+    <ul>
+      <li>根因：光标是 VRAM save/restore 裸层而非独立图层，dialog_layer_blit 整块 vram_write 前缺 invalidate，erase 恢复旧字幕帧即抹字。</li>
+      <li>否决 blit 后 cursor_refresh：光标 24×24 探出对话框边界时残影被采为背景；确立重叠即擦整块语义。</li>
+      <li>新增 cursor_touch 四向重叠检测 + hal_mouse_touch_cursor 透传，非重叠纯 no-op，重叠才 erase + valid=0。</li>
+    </ul>
+    <div class="landing"><b>最终落点：</b>dialog_layer_blit 及 OOM 直写、menu_layer blit 路径补齐 touch 上报，守卫 test_cursor_layer.py 5 例。</div>
+    <div class="rel"><b>现状关联：</b>core/engine/cursor.c、core/plat/hal_mouse.c、core/engine/layer_dialog.c、core/engine/menu_layer.c 当前 touch 契约与守卫测试来源。</div>
+  </div>
+
+  <div class="doc" id="doc-109">
+    <div class="doc-head"><span class="doc-num">109</span><span class="doc-title">光标揭示顿闪消除：写后直绘与不透明矩形快路径</span><span class="doc-status">已落地（0.2.136）</span></div>
+    <h4>核心思路</h4>
+    <ul>
+      <li>根因：touch 在 pass 中部异步 erase，重画被 cursor_render 的 vblank 等待拖到下一帧，每揭示 pass 箭头缺席约一整帧形成 20Hz 闪烁。</li>
+      <li>cursor_render 新增 stale 同位置直绘：同位失效即直接 cursor_draw 重捕获背景，移动/传送仍走 vblank 同步 erase+draw 对。</li>
+      <li>新增 cursor_touch_opaque 不透明变体：全内含写入跳过前置 erase 仅置 valid=0，跨边仍 erase；仅全像素不透明写者可用。</li>
+    </ul>
+    <div class="landing"><b>最终落点：</b>dialog_layer_blit 改用 opaque 上报，热路径每 pass 省 576 次恢复写。</div>
+    <div class="rel"><b>现状关联：</b>core/engine/cursor.c 的 covered_fully/opaque 与 stale 直绘分支、layer_dialog.c 对话框热路径的直接前身（后被 112 岛机制取代）。</div>
+  </div>
+
+  <div class="doc" id="doc-110">
+    <div class="doc-head"><span class="doc-num">110</span><span class="doc-title">光标写入全程零缺窗：对话框合成缓冲预拼光标</span><span class="doc-status">已落地（0.2.137）</span></div>
+    <h4>核心思路</h4>
+    <ul>
+      <li>根因：109 只修尾部 vblank，bank 切换整块 vram_write 数 ms 内箭头全程缺席，切表情 sprite 突发同理，pass 末回补太晚。</li>
+      <li>新增 cursor_composite_splice(buf,stride,fx,fy,fw,fh)：盒完整落入时先 memcpy 缓冲原文作 erase 基准，再按 fill/cursor 像素模型混入箭头。</li>
+      <li>dialog_layer_blit 改为 touch_opaque → splice → vram_write 三段式，写入每行自带箭头；精灵侧不 splice 保持 pass 末直绘兜底。</li>
+    </ul>
+    <div class="landing"><b>最终落点：</b>对话框写入全程零缺窗，pass 末 cursor_render 同位早退。</div>
+    <div class="rel"><b>现状关联：</b>core/engine/cursor.c 的 splice 混合模型与 layer_dialog.c 三段式 blit 顺序约定的来源（111 改为一次性副本，112 删除）。</div>
+  </div>
+
+  <div class="doc" id="doc-111">
+    <div class="doc-head"><span class="doc-num">111</span><span class="doc-title">光标移动残影根治：splice 只进一次性书写副本</span><span class="doc-status">已落地（0.2.138）</span></div>
+    <h4>核心思路</h4>
+    <ul>
+      <li>根因：splice 就地污染跨 pass 持久 dialog_layer，dither 孔位跳写使旧箭头残留，且下次 memcpy 把含箭头缓冲采为背景致自我污染永久化。</li>
+      <li>持久 dialog_layer 永不写箭头，新增一次性主存副本 dialog_blit_tmp，每 blit 先 memcpy 再 splice 只进 tmp 后 vram_write。</li>
+      <li>顺序保持 touch_opaque → splice → vram_write，tmp 与既有快照同生命周期，OOM 降级为不预拼直写。</li>
+    </ul>
+    <div class="landing"><b>最终落点：</b>移动残影无源，防残影基准干净。</div>
+    <div class="rel"><b>现状关联：</b>core/engine/layer_dialog.c 的 dialog_blit_tmp 一次性副本机制来源，后被 112 的 dialog_blit_prev 基线快照取代。</div>
+  </div>
+
+  <div class="doc" id="doc-112">
+    <div class="doc-head"><span class="doc-num">112</span><span class="doc-title">对话框增量写入与光标合成岛：闪烁涂抹与整框消失根除</span><span class="doc-status">已落地（0.2.139）</span></div>
+    <h4>核心思路</h4>
+    <ul>
+      <li>A/B 结论：残影↔splice，闪烁↔全幅 bank 写撕裂；删除 splice 链路，改逐行 diff 只写变化 band，打字每 pass 从万级 I/O 降至数行写。</li>
+      <li>光标合成岛：盒全在框内时写入跳过盒列，draw/erase 背景取 layer_dialog_composite 权威文本；跨边回退 touch 契约。</li>
+      <li>整框消失根因：hide 恢复 under 只清 dialog_drawn 不清 prev 致基准漂移；新增 dialog_blit_baseline_valid，hide/show/reset 置失效首幅整幅重发。</li>
+    </ul>
+    <div class="landing"><b>最终落点：</b>闪烁/涂抹/整框消失根除，删除 touch_opaque 与 splice 全链路。</div>
+    <div class="rel"><b>现状关联：</b>core/engine/layer_dialog.c 的 dialog_blit_prev + dialog_write_rows + baseline_valid、core/engine/cursor.c 的 box_background/cursor_dialog_rows、layer_dialog_composite 现状机制来源。</div>
+  </div>
+
+  <div class="doc" id="doc-113">
+    <div class="doc-head"><span class="doc-num">113</span><span class="doc-title">diff 增量写时代的对话框 overlay 残留：选项菜单强制整幅重发</span><span class="doc-status">已落地（0.2.139）</span></div>
+    <h4>核心思路</h4>
+    <ul>
+      <li>根因：@q 选项按钮是 rect 内临时 VRAM overlay，全幅时代靠整框重绘隐式清除，diff 后未命中行判未变跳过致残留。</li>
+      <li>新增 layer_dialog_blit_force()：置 baseline_valid=0 后调 dialog_layer_blit 一帧整幅重发覆盖一切 overlay。</li>
+      <li>nb_question.c 的 ui_interact 返回后调 menu_restore_item_palette → layer_dialog_show → blit_force 再继续 reveal diff。</li>
+    </ul>
+    <div class="landing"><b>最终落点：</b>选项关闭显式整幅复原契约确立，yes/no/超时均无残留。</div>
+    <div class="rel"><b>现状关联：</b>core/engine/layer_dialog.c 与 scene_layers.h 的 layer_dialog_blit_force、core/engine/nb_question.c 交互返回收口的现状来源。</div>
+  </div>
+
+  <div class="doc" id="doc-114">
+    <div class="doc-head"><span class="doc-num">114</span><span class="doc-title">Special 菜单落地：LOAD 式全屏列表与菜单归属场景</span><span class="doc-status">已落地（0.2.140）</span></div>
+    <h4>核心思路</h4>
+    <ul>
+      <li>照抄 LOAD 范式：大标题 + 480×44 凹刻行 + &gt; 焦点指示 + 翻页条 + Back，入口全量首绘、循环内文本级增量重绘。</li>
+      <li>新建 nb_special.c 的 specialmenu(gallery,scenes,music)，SPECIAL_ROWS=4 分页，gallery/scenes 路由 + menu 归属，music 为日志桩。</li>
+      <li>新增 g_menu_return 归属状态：special 写 special.nb、mainmenu 清零，cgview 退出经 gallery_return_home 回读。</li>
+    </ul>
+    <div class="landing"><b>最终落点：</b>主菜单瘦身为 continue,load,start,special,settings,exit，special.nb 落地。</div>
+    <div class="rel"><b>现状关联：</b>core/engine/nb_special.c、nb_mainmenu.c 的 g_menu_return 访问器、nb_cggallery.c 退出归属、special.nb 与 i18n SPECIAL 键的现状来源。</div>
+  </div>
+
+  <div class="doc" id="doc-115">
+    <div class="doc-head"><span class="doc-num">115</span><span class="doc-title">菜单增量 blit 跨行距拷贝根修与 VRAM 紧凑缓冲契约审计</span><span class="doc-status">已落地（0.2.142）</span></div>
+    <h4>核心思路</h4>
+    <ul>
+      <li>根因一：menu_layer_blit_rect 把 640 行距 composite 切片按 w=100 行距一次 vram_write，1 行后全错位致 continue/start 花屏；修复为逐行 h==1 发布。</li>
+      <li>根因二：cursor_composite_splice 用 576 字节连续 memcpy 保存 24×24 盒背景，跨 480 行距成斜纹；修复为逐行 24 字节拷贝。</li>
+      <li>全库 vram_read/write 九处调用方审计：仅上两处违反紧凑缓冲契约，其余快照/全幅/透明分支均合规。</li>
+    </ul>
+    <div class="landing"><b>最终落点：</b>键盘增量标签花屏与叙述框斜纹残影根除，确立紧凑缓冲行距==w 契约。</div>
+    <div class="rel"><b>现状关联：</b>core/engine/menu_layer.c 逐行发布、core/engine/cursor.c 逐行背景拷贝、render_vram.c 紧凑缓冲契约注释的现状来源。</div>
+  </div>
+</section>
+
+<footer>
+  Naiz 引擎 0.2 版开发文档总结 · 由 devdocs/（68–115，48 份）精炼整理生成 · 版本 0.2.147
+</footer>
+
+</div>
+</body>
+</html>

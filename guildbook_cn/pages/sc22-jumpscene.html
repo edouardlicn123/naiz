@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="doc-version" content="202611051818">
+<!-- AI-NOTE: guildbook_cn is the authoritative Chinese source; guildbook_en holds the English translation. Version format: YYYYMMDDHHMM. Before translating, compare this doc-version with the en counterpart's translated-from meta; if cn is newer, re-translate this page from Chinese to English. Invisible during normal browsing. -->
+
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>jumpscene — Naiz Guildbook</title>
+<link rel="stylesheet" href="../style.css">
+</head>
+<body>
+<nav class="sidebar" id="sidebar-nav"></nav>
+<script src="../sidebar-scripts.js"></script>
+<main class="main">
+
+<h1>jumpscene 跨场景跳转</h1>
+<hr>
+<blockquote><strong>创建</strong>：2026-11-05<br><strong>最后更新</strong>：2026-11-05</blockquote>
+<p><code>jumpscene()</code> 显示一组选项；玩家选中后<strong>丢弃当前场景剩余内容并切换场景</strong>，可选地直接落到目标场景里的某个 <a href="sc20-tag.html">tag 锚点</a>。</p>
+
+<h2>1. 语法</h2>
+<pre><code>jumpscene(prompt;label1,scene1[,tag1];label2,scene2[,tag2];...)</code></pre>
+<p>分号 <code>;</code> 为顶层分隔符：第一段是问题文本，其余每段是 <code>label,scene</code> 必填、<code>tag</code> 可选的选项。</p>
+<table>
+<tr><th>字段</th><th>必填</th><th>说明</th></tr>
+<tr><td><code>prompt</code></td><td>是</td><td>问题文本（第一段，不参与逗号切分）</td></tr>
+<tr><td><code>label</code></td><td>是</td><td>选项显示文本；含逗号用 <code>\,</code> 转义</td></tr>
+<tr><td><code>scene</code></td><td>是</td><td>目标场景，见 §2 归一化规则</td></tr>
+<tr><td><code>tag</code></td><td>否</td><td>新场景加载后落到该锚点；省略则从场景第一行播放</td></tr>
+</table>
+<ul>
+<li>最多 10 个选项段；界面最多同时显示 4 个。</li>
+<li><code>label</code> 的转义规则与 <a href="sc08-question.html">question §1.1</a> 相同，由 <code>nb_next_field()</code> 统一处理。</li>
+<li>缺 <code>scene</code> 的段会被丢弃并输出 WARN；<code>tag</code> 可为空（等价于不指定）。</li>
+</ul>
+
+<h2>2. scene 归一化</h2>
+<p>与 <a href="sc04-scene.html">scene 命令</a>共用同一套解析，以下写法等价：</p>
+<table>
+<tr><th>写法</th><th>实际场景文件</th></tr>
+<tr><td><code>003</code></td><td><code>nbook003.nb</code></td></tr>
+<tr><td><code>nb003</code></td><td><code>nbook003.nb</code></td></tr>
+<tr><td><code>nbook003</code></td><td><code>nbook003.nb</code></td></tr>
+<tr><td><code>nbook003.nb</code></td><td><code>nbook003.nb</code></td></tr>
+<tr><td><code>logo</code> / <code>op</code> / <code>mainmenu</code></td><td><code>logo.nb</code> / <code>op.nb</code> / <code>mainmenu.nb</code></td></tr>
+<tr><td><code>end</code></td><td><code>mainmenu.nb</code>（返回主菜单）</td></tr>
+</table>
+
+<h2>3. 运行行为</h2>
+<ul>
+<li>选中后，当前场景<strong>尚未执行的行全部丢弃</strong>（包括本行之后的内容），然后切到目标场景。</li>
+<li>未指定 <code>tag</code>：新场景从第一行开始播放。</li>
+<li>指定 <code>tag</code>：新场景加载完成后，执行位置定位到该 tag 的下一行；<strong>tag 之前的所有行都不会执行</strong>，包括 <code>sceneconf</code>、开场 <code>bg</code>/<code>bgm</code>/<code>char</code>。因此落点区块必须自带所需的环境设置（把 <code>bg</code>/<code>bgm</code>/<code>char</code> 写在 tag 之后）。</li>
+<li><strong>章节标题注意</strong>：落到 tag 会跳过目标场景的 <code>sceneconf</code>，该场景的章节标题不会被设置，存档界面回退显示场景文件名。若该场景依赖章节标题，建议不指定 <code>tag</code>（从头播放），或接受回退显示。</li>
+<li><strong>目标 tag 缺失</strong>（运行期兜底）：输出 WARN，新场景从头播放。</li>
+<li><strong>超时</strong>：选项交互有 30 秒超时；超时按“未选择”处理——<strong>留在当前场景</strong>，继续执行 <code>jumpscene</code> 行的下一行。</li>
+<li>选择索引（0 起始）写入 <code>last_choice</code>。</li>
+<li>切换场景会经过常规过渡、场景重置与资源预载流程，与 <code>scene</code> 命令一致。</li>
+</ul>
+
+<h2>4. 构建期校验</h2>
+<ul>
+<li>目标 <code>scene</code> 必须能归一化到项目中存在的 <code>scene/*.nb</code> 文件。</li>
+<li>若给出 <code>tag</code>，该 tag 必须存在于<strong>目标场景</strong>。</li>
+<li>选项数必须在 1–10；<code>prompt</code> 不可为空。</li>
+</ul>
+
+<h2>5. 示例</h2>
+<pre><code>jumpscene(要出发吗？;去森林,nb002,forest_start;去城镇,003;留在这里,mainmenu)</code></pre>
+<ul>
+<li>选“去森林”→ 切到 <code>nbook002.nb</code>，并落到 <code>tag(forest_start)</code> 的下一行。</li>
+<li>选“去城镇”→ 切到 <code>nbook003.nb</code>，从第一行播放。</li>
+<li>选“留在这里”→ 回主菜单。</li>
+</ul>
+<p>落到 tag 会跳过它前面的所有行，因此落点区块要把所需的环境设置写在 tag 之后：</p>
+<pre><code># nbook002.nb
+sceneconf(){Forest, normal}
+tag(forest_start)
+bg(normal){forest}
+bgm(){forest_theme}
+host(){你走进了森林}</code></pre>
+<p>这样从别的场景跳到 <code>forest_start</code> 时，背景与 BGM 仍会被正确设置；<code>sceneconf</code> 因位于 tag 之前而被跳过（见 §3 的章节标题注意）。</p>
+
+<h2>6. 与 scene / jump 的区别</h2>
+<table>
+<tr><th>命令</th><th>触发方式</th><th>跨场景</th><th>落到场景中间</th></tr>
+<tr><td><code>scene</code></td><td>无条件或变量条件链</td><td>是</td><td>否（只能从头播放）</td></tr>
+<tr><td><code>jump</code></td><td>玩家选项</td><td>否</td><td>是（本场景 tag）</td></tr>
+<tr><td><code>jumpscene</code></td><td>玩家选项</td><td>是</td><td>是（目标场景 tag，可选）</td></tr>
+</table>
+
+<h2>7. 相关</h2>
+<ul>
+<li><a href="sc20-tag.html">sc20 — tag 场景锚点</a>：落点声明</li>
+<li><a href="sc21-jump.html">sc21 — jump 场景内跳转</a>：不换场景的分支</li>
+<li><a href="sc04-scene.html">sc04 — scene 场景跳转</a>：无条件/条件链切场景</li>
+<li><a href="sc08-question.html">sc08 — question 选择分支</a>：选项 + 变量联动</li>
+</ul>
+
+</main>
+</body>
+</html>

@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="translated-from" content="202610300931">
+<!-- AI-NOTE: translated-from = the guildbook_cn doc-version this page was translated from. If the cn counterpart's doc-version is newer, re-translate this page from the Chinese source. -->
+
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>bg — Naiz Guildbook</title>
+<link rel="stylesheet" href="../style.css">
+</head>
+<body>
+<nav class="sidebar" id="sidebar-nav"></nav>
+<script src="../sidebar-scripts.js"></script>
+<main class="main">
+
+<h1>bg — Background Switch</h1>
+<hr>
+<blockquote><strong>Created</strong>: 2026-07-27</blockquote>
+<p><code>bg()</code> switches the scene background, or closes the dialogue box and restores the background area.</p>
+
+<h2>1. Syntax</h2>
+<pre><code>bg(effect[, transition]){key}
+bg(hidedialog)</code></pre>
+<p><strong>The object (the background key) goes in the curly-brace payload</strong>; the parenthesis slots are reserved for the effect / transition parameters (placeholders for now, not in effect yet). This follows the same convention as <code>cg(){key}</code>: "object in braces, parentheses = parameters ± keyword".</p>
+<table>
+<tr><th>Parameter</th><th>Type</th><th>Description</th></tr>
+<tr><td><code>key</code></td><td>string</td><td>Asset name, matching <code>asset_map.name</code> (not filename), written in the curly-brace payload</td></tr>
+<tr><td><code>effect</code></td><td>string</td><td>Display mode (<code>normal</code> etc.), parenthesis parameter slot (currently a placeholder)</td></tr>
+<tr><td><code>transition</code></td><td>string</td><td>Optional transition parameter (currently a placeholder)</td></tr>
+</table>
+
+<h3>1.1 Subcommands</h3>
+<table>
+<tr><th>Command</th><th>Description</th></tr>
+<tr><td><code>bg(hidedialog)</code></td><td>Closes the dialogue box and restores the background area (keyword directive, no payload)</td></tr>
+</table>
+
+<h2>2. Example</h2>
+<pre><code>bg(normal){splbg}
+bg(normal, normal){logo}
+bg(normal, normal){powered}
+bg(hidedialog)</code></pre>
+<div class="note-box"><p><strong>Note</strong>: the <code>bg(key)</code> form (key written inside the parentheses) is deprecated and is rejected by the engine and the scenario validator — the background key must go inside the braces.</p></div>
+
+</main>
+</body>
+</html>

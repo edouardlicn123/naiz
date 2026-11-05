@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="translated-from" content="202611051818">
+<!-- AI-NOTE: translated-from = the guildbook_cn doc-version this page was translated from. If the cn counterpart's doc-version is newer, re-translate this page from the Chinese source. -->
+
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>jump — Naiz Guildbook</title>
+<link rel="stylesheet" href="../style.css">
+</head>
+<body>
+<nav class="sidebar" id="sidebar-nav"></nav>
+<script src="../sidebar-scripts.js"></script>
+<main class="main">
+
+<h1>jump — In-Scene Jump</h1>
+<hr>
+<blockquote><strong>Created</strong>: 2026-11-05 <strong>Last updated</strong>: 2026-11-05</blockquote>
+<p><code>jump()</code> shows a list of choices; after the player selects one, the script <strong>stays in the current scene</strong> and jumps to just after a <a href="sc20-tag.html">tag anchor</a> in this scene.</p>
+
+<h2>1. Syntax</h2>
+<pre><code>jump(prompt;label1,tag1;label2,tag2;...)</code></pre>
+<p>Semicolon <code>;</code> is the top-level delimiter: the first segment is the prompt, and every following segment is a two-field <code>label,tag</code> option.</p>
+<table>
+<tr><th>Field</th><th>Description</th></tr>
+<tr><td><code>prompt</code></td><td>Prompt text (first segment, not split on commas)</td></tr>
+<tr><td><code>label</code></td><td>Display text of the option</td></tr>
+<tr><td><code>tag</code></td><td>Anchor in this scene to jump to (must be declared by <code>tag(name)</code>)</td></tr>
+</table>
+
+<h3>1.1 Option Segment Rules</h3>
+<ul>
+<li>A segment must have exactly two fields. A missing <code>tag</code>, or an extra comma (e.g. <code>A,m1,extra</code>), causes the segment to be dropped with a WARN.</li>
+<li>If the <code>label</code> itself needs a comma, escape it as <code>\,</code> (same rule as <a href="sc08-question.html">question §1.1</a>, handled by <code>nb_next_field()</code>).</li>
+<li><code>tag</code> allows letters/digits/underscores only and is case-sensitive.</li>
+<li>Leading/trailing whitespace around fields is trimmed: <code>A , m1</code> equals <code>A,m1</code>.</li>
+<li>At most 10 option segments (parser limit); the UI shows at most 4 at once.</li>
+</ul>
+
+<h2>2. Runtime Behavior</h2>
+<ul>
+<li>After selecting option N, execution moves to <strong>the line after</strong> <code>tagN</code>; jumps may go forward or backward.</li>
+<li>No scene switch: background, BGM, sprites and current scene state stay as they are until commands at the target change them.</li>
+<li>The choice index (zero-based) is also written to <code>last_choice</code>; <a href="sc09-var.html">var</a> can read it to record the route.</li>
+<li><strong>Missing tag</strong>: the engine logs a WARN, does not jump, and continues with the line after the <code>jump</code> line.</li>
+<li><strong>Timeout</strong>: the choice interaction has a 30-second timeout; on timeout the choice counts as “not selected”, so the script continues with the next line without jumping.</li>
+<li>Like <code>question</code>, <code>jump</code> blocks the script until the player makes a choice.</li>
+</ul>
+
+<h2>3. Difference from question / jumpscene</h2>
+<table>
+<tr><th>Command</th><th>After selection</th><th>Crosses scenes</th><th>Changes variables</th></tr>
+<tr><td><code>question</code></td><td>Applies <code>op/delta</code>, continues to the next line</td><td>No</td><td>Yes</td></tr>
+<tr><td><code>jump</code></td><td>Jumps to the line after a tag in this scene</td><td>No</td><td>No (can read <code>last_choice</code>)</td></tr>
+<tr><td><code>jumpscene</code></td><td>Switches scene, optionally landing on a target tag</td><td>Yes</td><td>No (can read <code>last_choice</code>)</td></tr>
+</table>
+<p>If a choice must also change variables, assign them with <code>var</code> at the jump target, or use <code>question</code> followed by <code>scene</code>.</p>
+
+<h2>4. Build-Time Validation</h2>
+<ul>
+<li>Every <code>tag</code> must exist in the current scene, otherwise the validator reports an error.</li>
+<li>The option count must be 1–10; undeclared or invalid tag names are reported at build time.</li>
+<li>The runtime missing-tag fallback exists only for unusual cases such as hot-edited scripts.</li>
+</ul>
+
+<h2>5. Example</h2>
+<p>An entrance choice:</p>
+<pre><code>jump(Where to?;Forest,m_forest;Town,m_town)</code></pre>
+<p>Forward jump and backward loop over the same block:</p>
+<pre><code>tag(m_loop)
+host(){Listen again?}
+jump(Listen again?;Again,m_loop;Leave,m_end)
+
+tag(m_end)
+host(){You leave}</code></pre>
+<ul>
+<li>“Again” → returns to the line after <code>tag(m_loop)</code>, forming a loop.</li>
+<li>“Leave” → jumps to the line after <code>tag(m_end)</code>.</li>
+</ul>
+
+<h2>6. See Also</h2>
+<ul>
+<li><a href="sc20-tag.html">sc20 — tag: scene anchors</a>: landing points for jump</li>
+<li><a href="sc22-jumpscene.html">sc22 — jumpscene: cross-scene jump</a>: use this when the scene must change</li>
+<li><a href="sc08-question.html">sc08 — question: choice branches</a>: choices linked with variables</li>
+<li><a href="sc04-scene.html">sc04 — scene: scene jump</a>: unconditional / conditional scene switching</li>
+</ul>
+
+</main>
+</body>
+</html>

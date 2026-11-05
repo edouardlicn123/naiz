@@ -1,0 +1,154 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="translated-from" content="202610300931">
+<!-- AI-NOTE: translated-from = the guildbook_cn doc-version this page was translated from. If the cn counterpart's doc-version is newer, re-translate this page from the Chinese source. -->
+
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Layer Rendering and Costume-Change Mechanics — Naiz Guildbook</title>
+<link rel="stylesheet" href="../style.css">
+</head>
+<body>
+<nav class="sidebar" id="sidebar-nav"></nav>
+<script src="../sidebar-reference.js"></script>
+<main class="main">
+<h1>Layer Rendering and Costume-Change Mechanics</h1>
+<blockquote><strong>Created</strong>: 2026-06-27<br><strong>Last updated</strong>: 2026-09-11</blockquote>
+<p>This page explains the Naiz engine's layer-rendering architecture from a <strong>creator's</strong> point of view — how sprites, the dialogue box, and the background stack on top of each other, and the rendering strategy for expression and costume changes.</p>
+<hr>
+
+<h2>1. The layer stack (bottom to top)</h2>
+<p>The PC-98 PEGC provides 2 graphics planes (Graphic Plane A + B) combined into a single-layer 8-bit 256-color VRAM (640×400), plus a separate hardware text plane (Text Plane). The engine uses only the graphics VRAM (the drawing target can switch between VRAM and the RAM composite buffer: <code>render_set_target</code> / <code>text_set_target</code>); the text plane is unusable — it is invisible under DOS/4GW protected mode, see <a href="fd01-引擎基本概念.html#1.4">fd01 §1.4</a>. The engine achieves a multi-layer stack on the single-layer VRAM through <strong>ordered multi-pass rendering</strong>:</p>
+<pre><code>Layer 0: background (bg MAG)
+Layer 1: dialogue-box background-region restore
+Layer 2: sprites (character sprites, up to 16)
+Layer 3: dialogue box (transparent/semi-transparent/solid base color)
+Layer 4: text (dialogue lines, drawn over the dialogue box)
+Layer 5: menu overlay (menu_layer, RAM composite buffer → fullscreen blit)</code></pre>
+<p>Each pass writes only the region belonging to its layer and never overwrites what is already drawn beneath. Menus (main menu/load/settings/gallery) are "transient overlays": when activated, the content is first drawn into a dedicated RAM composite buffer, then published to VRAM fullscreen by <code>menu_layer_blit</code>; on exit the underlying picture is restored. See <a href="#menu-layer">§6 The menu layer</a>.</p>
+
+<h2>2. Sprite (character sprite) mechanics</h2>
+<p>The engine controls sprites via the <code>char</code> command. See <a href="mc02-立绘与角色.html">mc02 Sprites and Characters</a> for details.</p>
+<h3>2.1 Showing and positioning</h3>
+<pre><code>char charlie l            # show charlie on the left (default body; the left position mirrors horizontally)
+char charlie r expr_happy # show charlie on the right, expression happy (face)
+char charlie c body       # show charlie in the center (body, full figure)</code></pre>
+<h3>2.2 Expression change / costume change</h3>
+<pre><code>char charlie l expr_angry # refreshes only the face region (face mode, dialogue box not redrawn)
+char charlie c body       # switches the body; not limited by clip_h</code></pre>
+<p><strong>face constraint</strong>: an expression change (face) draws only in the upper-body region <code>y &lt; 280</code> and never touches the dialogue-box area.</p>
+<p><strong>Full-height drawing (since R20)</strong>: sprites (body / full figure) are drawn <strong>at full height</strong>, no longer clipped because of the dialogue box — the dialogue box is composited on top of them (higher in z-order), and the PAT75 pseudo-transparency holes let the sprite's legs show through; <code>calc_sprite_clip_h()</code> now serves only the upper-body clipping of face expressions.</p>
+
+<h2>3. Dialogue box rendering</h2>
+<p>For the dialogue box's <strong>visual styles</strong>, see <a href="cf03-对话框样式方案.html">cf03 Dialogue Box Style Scheme</a>. This section covers how the dialogue box appears, updates, and is cleaned up within the render pipeline.</p>
+<h3>3.1 When it appears</h3>
+<p>The dialogue box is triggered by <strong>text commands</strong>: when the scenario's first line of dialogue (<code>host{...}</code>, dialogue commands, etc.) appears, the engine pops up the dialogue box automatically. The flow:</p>
+<ol>
+<li>The text command calls <code>dialog_show()</code> (nb_dialog.c)</li>
+<li>If the dialogue box is not yet shown → <code>layer_dialog_show()</code>: build the composite buffer and publish "the frame + the current page of text" to VRAM</li>
+<li>If the dialogue box is already shown (page turn / subsequent lines) → redraw the frame page within the composite buffer and update the text</li>
+</ol>
+<p>In other words: <strong>within one scene the dialogue box pops up only once</strong>; subsequent lines reuse the same frame and only replace the text content.</p>
+<h3>3.2 First popup (layer_dialog_show)</h3>
+<p>On first appearance it is built in this order:</p>
+<ol>
+<li>Allocate the <strong>composite buffer</strong> <code>dialog_layer</code> (480×115: frame + current page of text) and the <strong>active base</strong> <code>dialog_occluder</code> (plain background for the dialogue-box region + any sprite pixels already inside the frame)</li>
+<li>Draw the dialogue box's base color (semi-transparent pattern or solid fill, per the style setting) plus the 2px white border into the composite buffer</li>
+<li>Mark "dialogue box shown"</li>
+</ol>
+<p>On every subsequent text refresh, only the frame page is redrawn within the composite buffer (clearing the previous page's text) plus the new text written, and the whole frame is published to VRAM — <strong>nothing outside the base color and border needs redrawing</strong>.</p>
+<h3>3.3 Composite buffer vs. active base</h3>
+<p>The dialogue-box region is carried by two independent RAM allocations with opposite purposes:</p>
+<table>
+<thead>
+<tr><th>Memory</th><th>Contents</th><th>Purpose</th></tr>
+</thead>
+<tbody>
+<tr><td><code>dialog_layer</code></td><td><strong>Composite buffer</strong> (frame + current page of text)</td><td>After compositing, the whole frame is blitted to VRAM; after a background change the base is rebuilt against the new underlying picture, and the frame + current page of text are regenerated via "render projection"</td></tr>
+<tr><td><code>dialog_occluder</code></td><td><strong>Active base</strong> (plain background for the dialogue-box region + sprite pixels inside the frame)</td><td>Serves as the composite buffer's base (the PAT75 pseudo-transparency holes show the background/sprites through); when the dialogue box is <strong>hidden</strong>, it is used to restore that region to plain background</td></tr>
+</tbody>
+</table>
+<p>Key point: the plain base behind the dialogue box comes from the background layer (<code>under_dialog</code>). The active base must be rebuilt after every background change and every character added or removed; otherwise the pseudo-transparency and the hide-restore would use the wrong picture.</p>
+<h3>3.4 Dialogue box disappearance / cleanup</h3>
+<p>Three cases by trigger, with different degrees of cleanup:</p>
+<table>
+<thead>
+<tr><th>Scenario</th><th>Trigger</th><th>What happens</th></tr>
+</thead>
+<tbody>
+<tr><td>Normal hide</td><td><code>bg(hidedialog)</code> or <code>char(hideall)</code></td><td>The dialogue-box region is restored to plain background → the box disappears; the composite buffer and active base are kept, so it can pop up again quickly</td></tr>
+<tr><td>Background change</td><td><code>bg(...){key}</code></td><td><strong>The frame + current page of text survive across images</strong> (rebuilt against the new underlying picture and republished); <code>cg(){key}</code> instead retracts the dialogue box automatically and clears the dialogue</td></tr>
+<tr><td>Scene switch</td><td><code>scene(...)</code></td><td>All state is cleared and the buffer memory <strong>freed</strong>; the next scene's first dialogue line pops the box up again</td></tr>
+</tbody>
+</table>
+<h3>3.5 Character-coupled cleanup</h3>
+<p>When a character's body overlaps the dialogue-box region, cleanup must happen in order:</p>
+<ul>
+<li><strong>Hiding one character</strong>: if that character's body overlaps the dialogue box → after hiding, <strong>rebuild the active base</strong> and republish the composite buffer (the pseudo-transparency holes show the new picture)</li>
+<li><strong>The last character disappearing</strong>: first restore the background in the character region (above the dialogue box), then <strong>rebuild the active base</strong> (the picture above the dialogue box has changed)</li>
+<li><strong><code>char(hideall)</code></strong> (hide all characters) — the full chain:
+  <ol>
+  <li>Hide every character one by one (rebuilding the active base each time)</li>
+  <li>Hide the dialogue box: restore the plain background to the dialogue-box region</li>
+  <li>Clear the dialogue state (character name and dialogue buffer reset to zero)</li>
+  </ol>
+</li>
+</ul>
+
+<h2>4. Background / CG and scene switching</h2>
+<ul>
+<li><code>bg(){key}</code>: loads the new background MAG and captures the picture underneath; the dialogue box <strong>survives across images</strong> — the active base is automatically rebuilt against the new underlying picture, the "frame + current page of text" are regenerated via "render projection" and published (the background key goes in the curly-brace payload)</li>
+<li><code>cg(){key}</code>: shows the CG fullscreen and <strong>automatically retracts the dialogue box</strong>, clearing the current line (a fullscreen event; the next dialogue line reopens the box)</li>
+<li><code>bg(hidedialog)</code> / <code>cg(hidedialog)</code>: only retracts the dialogue box and restores the dialogue-box region's background; no new image is loaded</li>
+<li>Every <code>scene(...)</code> switch: the screen is automatically cleared to black, then the new scene's <code>bg(...)</code> command runs</li>
+</ul>
+
+<h2>5. Sprite operations quick reference</h2>
+<table>
+<thead>
+<tr><th>NB command</th><th>Effect</th><th>Rendering strategy</th></tr>
+</thead>
+<tbody>
+<tr><td><code>char(pos, body){name}</code></td><td>Show the sprite (default body)</td><td>Full-height covering blit + rebuild the dialogue-box active base</td></tr>
+<tr><td><code>char(pos, expr){name}</code></td><td>Expression change</td><td>clip_h limits drawing to the upper body (y&lt;280), no rebuild</td></tr>
+<tr><td><code>char(pos, body){name}</code></td><td>Full-body change</td><td>Full-height complete redraw + rebuild the dialogue-box active base</td></tr>
+<tr><td><code>char(hideall)</code></td><td>Hide all sprites + dialogue box + clear the dialogue</td><td>Hide sprite by sprite (rebuilding the base) → restore the dialogue-box background → clear the dialogue state (see §3.5)</td></tr>
+</tbody>
+</table>
+
+<h2 id="menu-layer">6. The menu layer (menu_layer)</h2>
+<p>Four menus — the main menu (<code>mainmenu()</code>), load/save (save/load), settings (<code>settingmenu()</code>), and the CG gallery (<code>cgvmenu()</code>) — share one reusable wrapper, <code>menu_layer</code>: when a menu activates, its content is first drawn into a dedicated <strong>RAM composite buffer</strong>, and finally published to VRAM fullscreen. This and the dialogue box's composite buffer (§3.3) are <strong>two independent mechanisms</strong> — the dialogue box persists throughout the presentation, while menus are transient overlays.</p>
+<p>Menus come in two modes:</p>
+<table>
+<thead>
+<tr><th>Mode</th><th>Approach</th><th>Currently used by</th></tr>
+</thead>
+<tbody>
+<tr><td><strong>opaque</strong> (full opaque mask)</td><td>On open, the underlying VRAM picture is <strong>snapshotted as the base</strong> (<code>menu_layer_open</code>); content is drawn into the composite buffer and published fullscreen by <code>menu_layer_blit</code> or locally by <code>blit_rect</code>; on <strong>close</strong> the base is restored in one block (<code>menu_layer_close(1)</code>) and the underlying picture comes back intact</td><td>All four menus</td></tr>
+<tr><td><strong>transparent</strong> (see-through cutout)</td><td>The composite buffer is filled with the transparent index and the blit <strong>skips transparent pixels one by one</strong> (does not obscure the layer below, needs no base memory); on close, <strong>no restore</strong></td><td>Reserved (for future menu reuse)</td></tr>
+</tbody>
+</table>
+<p>Local changes such as focus movement go through an <strong>incremental session</strong>: <code>menu_layer_begin_draw()</code> (reattach the buffer target) → redraw only the changed text/indicators → <code>menu_layer_commit()</code> → <code>menu_layer_blit_rect()</code> (publish only the changed rectangles). The settings menu additionally uses <code>menu_layer_erase_to_base()</code> to erase the old language name/cursor region back to the underlying picture before drawing the new one, replacing the old VRAM snapshot array. For the API contract and integration examples, see the header comment in <code>menu_layer.h</code>.</p>
+
+<h2>7. Cross-document references</h2>
+<table>
+<thead>
+<tr><th>Document</th><th>Content</th></tr>
+</thead>
+<tbody>
+<tr><td><a href="mc02-立绘与角色.html">mc02 Sprites and Characters</a></td><td>Sprite asset production guidelines, transparency conventions, and the 200×400 canvas standard</td></tr>
+<tr><td><a href="cf03-对话框样式方案.html">cf03 Dialogue Box Style Scheme</a></td><td>The 10 dialogue-box preset styles and how to choose among them</td></tr>
+<tr><td>B15-图层渲染与换装机制.md</td><td>The complete implementation specification: API signatures, data structures, and decision tables</td></tr>
+<tr><td>B02-显示管线规范.md</td><td>VRAM layout, primitive functions, bank switching</td></tr>
+<tr><td>Source: layer_dialog.c / layer_sprite.c</td><td>Implementation of the dialogue box's composite buffer/active base, cleanup, and character-coupled logic</td></tr>
+<tr><td>Source: menu_layer.c / menu_layer.h</td><td>The menu layer's RAM composite buffer, the opaque/transparent dual modes, and the API integration contract</td></tr>
+<tr><td>Source: nb_dialog.c</td><td>The trigger chain from text command to dialogue box (dialog_show)</td></tr>
+</tbody>
+</table>
+
+<hr>
+<p>For the engine's <strong>low-level specifications</strong>, see the A/B-series Markdown documents under <code>docs/</code> (<code>B02</code>, <code>B15</code>, etc.).</p>
+</main>
+</body>
+</html>

@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="translated-from" content="202610300931">
+<!-- AI-NOTE: translated-from = the guildbook_cn doc-version this page was translated from. If the cn counterpart's doc-version is newer, re-translate this page from the Chinese source. -->
+
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>anima.sh Usage Guide — Naiz Guildbook</title>
+<link rel="stylesheet" href="../style.css">
+</head>
+<body>
+<nav class="sidebar" id="sidebar-nav"></nav>
+<script src="../sidebar-tools.js"></script>
+<main class="main">
+
+<h1>anima.sh Usage Guide</h1>
+<blockquote><strong>Created</strong>: 2026-08-29<br><strong>Last updated</strong>: 2026-08-29</blockquote>
+<p><code>anima.sh</code> is the <strong>animation production tool</strong>: it compiles <code>.na</code> animation scripts into <code>.ANI</code> files the game can use. For the script syntax, see the "Production Workflow" page under the Animation Design category (this page is a standalone document under the production-tools category and does not duplicate that content). <strong>For daily use, running it directly and working through the number menu level by level is the recommended way</strong>; command-line subcommands suit scripts or experienced users.</p>
+<hr>
+
+<h2>1. Interactive menu (primary usage)</h2>
+<p>Run it with no arguments:</p>
+<pre><code>./anima.sh</code></pre>
+<p>You get a <strong>three-level number menu</strong>; at every step, type a number and press Enter:</p>
+
+<h3>① Project list (first level)</h3>
+<p>Lists all animation projects (e.g. <code>1) myanim …</code>), plus:</p>
+<ul>
+<li><code>i</code> creates a new animation project (init skeleton)</li>
+<li><code>0</code> exits</li>
+</ul>
+<p>Pick a number to enter a project.</p>
+
+<h3>② Action menu (second level, project selected)</h3>
+<table>
+<tr><th>Menu number</th><th>Function</th></tr>
+<tr><td><code>1</code></td><td>Check asset registration (check): whether every asset nickname used in the scripts is registered, and whether any has gone stale</td></tr>
+<tr><td><code>2</code></td><td>register sync: scan the assets and register them into the index db</td></tr>
+<tr><td><code>3</code></td><td>Build animations: enter the script submenu to build a specific animation</td></tr>
+<tr><td><code>0</code></td><td>Back one level (project list)</td></tr>
+</table>
+
+<h3>③ Script submenu (third level, after choosing "3 Build animations")</h3>
+<p>Lists all <code>.na</code> scripts in the project; pick a number to enter a script, then choose:</p>
+<table>
+<tr><th>Menu number</th><th>Function</th></tr>
+<tr><td><code>1</code></td><td>build: build this animation (produces the <code>.ANI</code>)</td></tr>
+<tr><td><code>2</code></td><td>build --sync: sync the index db automatically first, then build</td></tr>
+<tr><td><code>0</code></td><td>Back one level (action menu)</td></tr>
+</table>
+<p><em>Beginner tip: for a first animation, the usual order is to press <code>2</code> in ② to register the assets, then use <code>3 → 1/2</code> to build.</em></p>
+
+<h2>2. Command-line usage (advanced / scripting)</h2>
+<p>Once familiar, or when writing automation scripts, pass a subcommand directly and skip the menu:</p>
+<pre><code>./anima.sh &lt;子命令&gt; &lt;参数&gt;</code></pre>
+<table>
+<tr><th>Subcommand</th><th>What it does</th></tr>
+<tr><td><code>init &lt;项目&gt;</code></td><td>Create the animation project skeleton: <code>animation/projects/&lt;项目&gt;/{config.toml,scripts/,db/}</code></td></tr>
+<tr><td><code>register &lt;项目&gt;</code></td><td>Scan the assets under <code>assets/&lt;项目&gt;/anim/</code> and register them into the name index db</td></tr>
+<tr><td><code>check &lt;项目&gt;</code></td><td>Read-only two-way reconciliation: unregistered / stale rows / pending updates; non-zero exit code on any difference</td></tr>
+<tr><td><code>build &lt;项目&gt;/&lt;脚本&gt;</code></td><td>Produces <code>animation/output/&lt;STEM大写&gt;.ANI</code>; add <code>--sync</code> to sync the index db first</td></tr>
+<tr><td><code>buildall [--flags]</code></td><td>Build every script of every project</td></tr>
+<tr><td><code>list</code></td><td>List <code>&lt;项目&gt;/&lt;脚本&gt;</code></td></tr>
+</table>
+
+<h2>3. Common usage examples</h2>
+<pre><code># In the interactive menu: i to create a project → pick the project → press 2 to register → press 3→1 to build (recommended)
+./anima.sh
+# Equivalent command-line form:
+./anima.sh init myanim
+./anima.sh register myanim
+./anima.sh build myanim/blink
+
+# Register automatically before building
+./anima.sh build myanim/blink --sync
+
+# Check that the asset registration is complete
+./anima.sh check myanim
+
+# Build all animations in one go
+./anima.sh buildall</code></pre>
+
+<h2>4. Notes</h2>
+<ul>
+<li>Script files must end in <code>.na</code> and live under <code>animation/projects/&lt;项目&gt;/scripts/</code>.</li>
+<li>You must <code>register</code> before building (or pass <code>--sync</code> to build); otherwise the asset nicknames written in scripts cannot be mapped to real files.</li>
+<li><code>check</code> is for CI / pre-commit self-checks: it returns a non-zero exit code when there are unregistered or stale assets.</li>
+<li>Finished <code>.ANI</code> files are output to <code>animation/output/</code> and packed into the HDI by the game-data build (<code>makegame.sh build</code>).</li>
+</ul>
+
+<h2>5. Related</h2>
+<ul>
+<li><a href="tool-start.html">start.sh</a> / <a href="tool-makegame.html">makegame.sh</a> — environment setup and game build.</li>
+</ul>
+
+</main>
+</body>
+</html>

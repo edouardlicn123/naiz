@@ -1,0 +1,20 @@
+# flute — GM 72..79 (flute/recorder/pan/whistle).  alg 4 = two independent
+# 2-op pairs (out = op1->op2 + op3->op4); pair B is silenced (tl=127) so the
+# voice is a single 2-op stack.
+# Pair A (op1->op2): a *weak* same-frequency modulator (mul=1, tl=52) over a
+# strong mul=1 fundamental, so the steady tone is near-sine (flute spectrum =
+# dominant fundamental + faint harmonics).  The modulator has a slower attack
+# (ar=12) than the carrier (ar=16) and settles low (sl=10), so the harmonics
+# swell in on the onset like breath and then nearly vanish.
+# The carrier attack is deliberately soft (ar=16, ~tens of ms) instead of the
+# chip-max ar=28: the source line is detached (80% gate), so a hard attack
+# made every note read as a *keyed* instrument ("like playing a keyboard").
+# rr=8 gives a gentle release that fills the inter-note gaps.
+# pms=1 = a *light* pitch vibrato (LFO LFRQ=2, ~6 Hz / ~5 cents measured on the
+# ymfm oracle) = the intended natural flute flutter.  An earlier note said
+# pms=2; the audited value is 1.  AMS 0 = no tremolo.  (devdocs/153, 154)
+alg=4 fb=0 pan=0xc0 ams=0 pms=1
+op=1 dt=0 mul=1 tl=54 ks=1 ar=12 am=0 d1r=5 d2r=3 sl=10 rr=8
+op=2 dt=0 mul=1 tl=2  ks=1 ar=16 am=0 d1r=4 d2r=2 sl=2  rr=8
+op=3 dt=0 mul=1 tl=127 ks=0 ar=0 am=0 d1r=0 d2r=0 sl=0 rr=0
+op=4 dt=0 mul=1 tl=127 ks=0 ar=0 am=0 d1r=0 d2r=0 sl=0 rr=0

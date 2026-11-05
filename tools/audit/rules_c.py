@@ -1,0 +1,879 @@
+"""C-language anti-regression rules (AGENTS section 17, C1-C25).
+
+Each checker takes the file text and returns a list of
+(lineno, description) findings.  AUTO rules are deterministic;
+HEUR rules produce candidates that need human confirmation.
+"""
+
+import re
+from collections import Counter
+
+# ---------------------------------------------------------------------------
+# helpers
+# ---------------------------------------------------------------------------
+
+
+def _line(text, pos):
+    return text.count("\n", 0, pos) + 1
+
+
+def _strip_c_comments(text):
+    """Remove /*..*/ and //.. comments so rules do not fire on prose.
+
+    Block comments are replaced with an equal number of newlines so reported
+    line numbers stay aligned with the original source.
+    """
+    def _blk(m):
+        return "\n" * m.group(0).count("\n")
+
+    text = re.sub(r"/\*.*?\*/", _blk, text, flags=re.DOTALL)
+    text = re.sub(r"//[^\n]*", "", text)
+    return text
+
+
+def _find_switch_blocks(text):
+    """Yield (start_line, block_text) for each switch (...) { ... } block."""
+    blocks = []
+    for m in re.finditer(r"\bswitch\s*\([^)]*\)\s*\{", text):
+        start = m.end() - 1  # the '{'
+        depth = 0
+        pos = start
+        while pos < len(text):
+            ch = text[pos]
+            if ch == "{":
+                depth += 1
+            elif ch == "}":
+                depth -= 1
+                if depth == 0:
+                    break
+            pos += 1
+        if depth != 0:
+            continue
+        blocks.append((_line(text, m.start()), text[start:pos + 1]))
+    return blocks
+
+
+def _has_null_check(text, var, after):
+    """True if 'var' is null-checked inside the 400-char window after 'after'."""
+    window = text[after:after + 400]
+    return bool(re.search(r"\b" + re.escape(var) + r"\b\s*==\s*NULL", window) or
+                re.search(r"\b" + re.escape(var) + r"\b\s*!=\s*NULL", window) or
+                re.search(r"!\s*\b" + re.escape(var) + r"\b", window))
+
+
+_CTRL_KEYWORDS = {"if", "for", "while", "switch", "return", "sizeof",
+                  "do", "else"}
+
+
+def _find_functions(text):
+    """Return [(name, start, end)] brace-balanced function spans.
+
+    Operates on comment-stripped text.  The header regex requires a '{'
+    terminator and excludes control-flow keywords so 'if (...){' is not
+    misread as a function.
+    """
+    out = []
+    for m in re.finditer(
+            r"(?m)(?:^|[;{}])\s*"
+            r"(?:[A-Za-z_]\w*(?:\s*\*\s*)?\s+)*"
+            r"(?P<name>[A-Za-z_]\w*)\s*\([^;{}]*\)\s*\{", text):
+        name = m.group("name")
+        if name in _CTRL_KEYWORDS:
+            continue
+        start = m.end() - 1
+        depth = 0
+        pos = start
+        while pos < len(text):
+            ch = text[pos]
+            if ch == "{":
+                depth += 1
+            elif ch == "}":
+                depth -= 1
+                if depth == 0:
+                    break
+            pos += 1
+        if depth == 0:
+            out.append((name, m.start(), pos + 1))
+    return out
+
+
+def _func_span(functions, pos):
+    for name, s, e in functions:
+        if s <= pos < e:
+            return (name, s, e)
+    return None
+
+
+# ---------------------------------------------------------------------------
+# memory / file safety (C1-C9, C11, C14, C15)
+# ---------------------------------------------------------------------------
+
+RE_ALLOC = re.compile(
+    r"(?:[A-Za-z_]\w*(?:\s*\*\s*)?\s+)?"
+    r"(?P<var>[A-Za-z_]\w*)\s*=\s*(?:\([^;]*?\)\s*)?"
+    r"(?:malloc|calloc|realloc)\s*\([^;]*;"
+)
+
+RE_ALLOC_EMBEDDED = re.compile(
+    r"if\s*\(\s*\(?\s*(?P<var>[A-Za-z_]\w*)\s*=\s*"
+    r"(?:\([^)]*\)\s*)?(?:malloc|calloc|realloc)\s*\([^;]*?\)\s*\)?"
+    r"\s*(?P<cmp>==|!=)\s*NULL\s*\)"
+)
+
+
+def _immediate_null_test(text, var, start):
+    """True when a NULL test for var appears within the next ~3 statements.
+
+    Covers both 'x=malloc(n); if(!x) ...' and grouped allocs like
+    'x=calloc(); y=calloc(); if(!x||!y) ...'.  Window is bounded so a null
+    check much later (e.g. after unrelated statements) is still reported.
+    """
+    end = start
+    for _ in range(3):
+        nxt = text.find(";", end)
+        if nxt == -1:
+            end = min(len(text), end + 200)
+            break
+        end = nxt + 1
+    window = text[start:min(end, start + 400)]
+    return bool(re.search(r"\b" + re.escape(var) + r"\b\s*(?:==|!=)\s*NULL",
+                          window) or
+                re.search(r"!\s*\b" + re.escape(var) + r"\b", window))
+
+
+def check_c1(text, _path):
+    """malloc/calloc/realloc result must be NULL-checked (HEUR).
+
+    Accepted forms: 'x = malloc(n); if (!x) ...' immediately after the
+    statement, or an if-condition that embeds the alloc with a NULL compare.
+    """
+    out = []
+    clean = _strip_c_comments(text)
+    embedded = []
+    for m in RE_ALLOC_EMBEDDED.finditer(clean):
+        embedded.append((m.start(), m.end(), m.group("var")))
+    for m in RE_ALLOC.finditer(clean):
+        if any(s <= m.start() < e for s, e, _ in embedded):
+            continue
+        var = m.group("var")
+        if _immediate_null_test(clean, var, m.end()):
+            continue
+        out.append((_line(clean, m.start()),
+                    f"malloc/calloc/realloc result '{var}' not null-checked "
+                    "immediately after the statement"))
+    return out
+
+
+RE_FOPEN = re.compile(r"(?P<var>[A-Za-z_]\w*)\s*=\s*fopen\s*\([^;]*;")
+
+
+def check_c2(text, _path):
+    """fopen result must be checked and failure handled."""
+    out = []
+    clean = _strip_c_comments(text)
+    for m in RE_FOPEN.finditer(clean):
+        if _has_null_check(clean, m.group("var"), m.end()):
+            continue
+        out.append((_line(clean, m.start()),
+                    f"fopen result '{m.group('var')}' not null-checked here"))
+    return out
+
+
+def check_c3(text, _path):
+    """fread/fwrite/fgets results should be checked (if-condition context)."""
+    out = []
+    clean = _strip_c_comments(text)
+    for m in re.finditer(r"\b(fread|fwrite|fgets)\s*\(", clean):
+        ctx = clean[max(0, m.start() - 120):m.start()]
+        if re.search(r"\bif\s*\(|\bwhile\s*\(", ctx.splitlines()[-3:0] or ctx):
+            continue
+        out.append((_line(clean, m.start()),
+                    f"'{m.group(1)}(' return value may be unchecked"))
+    return out
+
+
+def check_c4(text, _path):
+    """strncpy must be followed by manual NUL termination (HEUR).
+
+    The terminator assignment ('dest[i] = '\\0'' / '= 0') must appear within
+    the following statements (up to 6 lines / 3 ';' boundaries); a terminator
+    much further away is treated as missing so the reviewer confirms.
+    """
+    out = []
+    clean = _strip_c_comments(text)
+    funcs = _find_functions(clean)
+    for m in re.finditer(r"\bstrncpy\s*\(\s*([A-Za-z_]\w*"
+                         r"(?:\s*(?:->|\.)\s*[A-Za-z_]\w*)*)", clean):
+        dest = m.group(1)
+        span = _func_span(funcs, m.start())
+        limit = span[2] if span else len(clean)
+        end = m.end()
+        for _ in range(3):
+            nxt = clean.find(";", end)
+            if nxt == -1 or nxt >= limit:
+                end = min(limit, end + 160)
+                break
+            end = nxt + 1
+        window = clean[m.end():min(end, m.end() + 400)]
+        if re.search(re.escape(dest) + r"\s*\[[^]]*\]\s*=\s*(?:['\"]\\0['\"]|\b0\b)",
+                     window):
+            continue
+        out.append((_line(clean, m.start()),
+                    "strncpy without an explicit NUL terminator in the "
+                    "following statements"))
+    return out
+
+
+def check_c5(text, _path):
+    """sprintf is banned; use snprintf (AUTO)."""
+    clean = _strip_c_comments(text)
+    return [(_line(clean, m.start()), "sprintf() used; must be snprintf")
+            for m in re.finditer(r"\bsprintf\s*\(", clean)]
+
+
+def check_c8(text, _path):
+    """Signed-int arithmetic edge patterns worth a manual look (HEUR)."""
+    out = []
+    clean = _strip_c_comments(text)
+    for m in re.finditer(r"\b(atoi|strtol|atoi_a|strtoul)\s*\([^)]*\)"
+                         r"\s*-\s*\w|-\s*\batoi\b", clean):
+        out.append((_line(clean, m.start()),
+                    "atoi/strtol result negated: INT_MIN edge is UB"))
+    for m in re.finditer(r"\bvmax\s*-\s*\w+|-\s*\bval\b|\bvmin\s*\+\s*\w+", clean):
+        out.append((_line(clean, m.start()),
+                    "variable-range +/- with large script deltas"))
+    return out
+
+
+def check_c10(text, _path):
+    """switch block missing a default branch (HEUR)."""
+    out = []
+    clean = _strip_c_comments(text)
+    for line, block in _find_switch_blocks(clean):
+        if not re.search(r"\bdefault\s*:", block):
+            out.append((line, "switch block has no default branch"))
+    return out
+
+
+def check_c11(text, _path):
+    """assert() is banned (AUTO)."""
+    clean = _strip_c_comments(text)
+    return [(_line(clean, m.start()), "assert() used; may be stripped by NDEBUG")
+            for m in re.finditer(r"\bassert\s*\(", clean)]
+
+
+def check_c21(text, _path):
+    """strcpy/strcat/gets are unbounded and banned (AUTO).
+
+    'gets' has no bounds argument at all; strcpy/strcat cannot declare how
+    many bytes they copy, so any use is an audit-blocking violation.
+    """
+    clean = _strip_c_comments(text)
+    out = []
+    for m in re.finditer(r"\b(strcpy|strcat|gets)\s*\(", clean):
+        out.append((_line(clean, m.start()),
+                    f"{m.group(1)}() unbounded; use snprintf/strncpy + "
+                    "explicit NUL"))
+    return out
+
+
+def check_c13(text, _path):
+    """Unused static function detection (HEUR)."""
+    out = []
+    clean = _strip_c_comments(text)
+    names = {}
+    for m in re.finditer(r"^\s*static\s+(?:const\s+)?\w+(?:\s+\w+)*\s+"
+                         r"(\w+)\s*\([^;]*\)\s*\{", clean, flags=re.M):
+        names[m.group(1)] = m.start()
+    for name, pos in names.items():
+        uses = len(re.findall(r"\b" + re.escape(name) + r"\b", clean))
+        if uses < 2:
+            out.append((_line(clean, pos), f"static '{name}()' appears unused"))
+        if len(names) <= 1:
+            pass
+    return out
+
+
+def check_c14(text, _path):
+    """Silent error returns in functions that otherwise log (HEUR).
+
+    A braced 'if (...) { return err; }' without hal_log/NB_DEBUG is a
+    candidate only when the enclosing function logs on other paths; pure
+    validator functions that never log are not flagged (that is their norm).
+    """
+    out = []
+    clean = _strip_c_comments(text)
+    funcs = _find_functions(clean)
+    for m in re.finditer(r"if\s*\([^)]*\)\s*\{[^{}]*?return\s*[^;]*;",
+                         clean, flags=re.DOTALL):
+        body = m.group(0)
+        if "hal_log" in body or "NB_DEBUG" in body:
+            continue
+        if not re.search(r"\breturn\s*(NULL|0|1|-1)\s*;", body):
+            continue
+        span = _func_span(funcs, m.start())
+        if span is None:
+            continue
+        fname, fs, fe = span
+        if "hal_log" not in clean[fs:fe] and \
+                "NB_DEBUG" not in clean[fs:fe]:
+            continue
+        out.append((_line(clean, m.start()),
+                    f"error return path without hal_log (function '{fname}' "
+                    "logs elsewhere)"))
+    return out
+
+
+def check_c15(text, _path):
+    """File-level fopen/fclose balance as a leak hint (HEUR)."""
+    clean = _strip_c_comments(text)
+    opened = len(re.findall(r"\bfopen\s*\(", clean))
+    closed = len(re.findall(r"\bfclose\s*\(", clean))
+    if opened and opened > closed:
+        return [(1, f"fopen count {opened} > fclose count {closed}; "
+                     "verify every early return closes the stream")]
+    return []
+
+
+RE_MEMCPY = re.compile(
+    r"\b(memcpy|memmove)\s*\(\s*(\w+)[^,]*,\s*\w+\s*,\s*(?:sizeof\(\w+\)|[^)]*)\s*\)")
+
+
+def check_c9(text, _path):
+    """memcpy/memmove size vs target buffer size (HEUR, manual confirm)."""
+    out = []
+    clean = _strip_c_comments(text)
+    for m in RE_MEMCPY.finditer(clean):
+        out.append((_line(clean, m.start()),
+                    f"{m.group(1)} into '{m.group(2)}': confirm size fits target"))
+    return out
+
+
+def check_c7(text, _path):
+    """Hardcoded numeric fseek/skip offsets near struct parsing (HEUR)."""
+    out = []
+    clean = _strip_c_comments(text)
+    if re.search(r"\bfseek\s*\(", clean):
+        for m in re.finditer(r"\bfseek\s*\([^;]*?,\s*(\d+)\s*,", clean):
+            off = int(m.group(1))
+            if off > 4:
+                out.append((_line(clean, m.start()),
+                            f"fseek offset {off}: verify against struct layout "
+                            "(prefer offsetof)"))
+    return out
+
+
+def check_c6(text, path):
+    """Index / pointer-bound review targets (HEUR lightweight)."""
+    out = []
+    clean = _strip_c_comments(text)
+    if re.search(r"\b(atoi|strtol)\b|\[[^]]*\]\s*=\s*[^;]*;", clean):
+        for m in re.finditer(r"&stream|\[[^]]*\]\s*\[\s*\w+\s*\]", clean):
+            out.append((_line(clean, m.start()),
+                        "array index / pointer bound: manually confirm range"))
+            if len(out) >= 6:
+                break
+    return out
+
+
+# ---------------------------------------------------------------------------
+# Tier-2 deterministic rules: C22 INT_MIN negation, C23 double-free,
+# C24 memcpy target-size cross-check, C25 use-after-free
+# ---------------------------------------------------------------------------
+
+RE_SIGNED_DECL = re.compile(
+    r"(?:^|[;{}])\s*(?:register\s+|const\s+)?"
+    r"(?:(?:signed\s+)?(?:int|short\b|long\s+long)|int8_t|int16_t|int32_t)"
+    r"\s+(?P<var>[A-Za-z_]\w*)\s*(?:[;=,\[]|$)")
+
+
+def _signed_decls(span_text):
+    """Return set of function-local signed integer variable names."""
+    return {m.group("var") for m in RE_SIGNED_DECL.finditer(span_text)}
+
+
+RE_MINUS_VAR = re.compile(r"-\s*(?P<var>[A-Za-z_]\w*)\b")
+
+
+def _is_negation(text, mstart):
+    """True when the '-' before a variable is unary negation, not a binary
+    subtraction (``x - var``), an index/deref subtraction (``a[i] - var``,
+    ``f(x) - var``) or a pre-decrement (``--var``)."""
+    if mstart > 0 and text[mstart - 1] == "-":
+        return False  # --var decrement
+    i = mstart - 1
+    while i >= 0 and text[i] in " \t\r\n":
+        i -= 1
+    if i < 0:
+        return True
+    c = text[i]
+    if c == "]" or c == ")" or c.isalnum() or c == "_":
+        return False
+    return True
+
+
+def check_c22(text, _path):
+    """Negating a function-local signed int: -x when x==INT_MIN is UB (AUTO).
+
+    Recognises ``-var``, ``var * -1``, ``var / -1`` and ``0 - var`` for
+    variables declared as signed integers in the same function.  A negation
+    is exempt when the same statement already guards with an INT_MIN
+    comparison (``(var == INT_MIN) ? INT_MIN : -var``), which is the
+    canonical safe formulation.
+    """
+    out = []
+    clean = _strip_c_comments(text)
+
+    def _guarded(span, var, mstart):
+        stmt = max(span.rfind(";", 0, mstart),
+                   span.rfind("{", 0, mstart), 0)
+        esc = re.escape(var) + r"(?:\[[^]]*\])?"
+        guard = re.compile(esc + r"\s*(?:==|!=)\s*INT_MIN|INT_MIN\s*(?:==|!=)\s*" + esc)
+        return bool(guard.search(span[stmt:mstart]))
+
+    for name, fs, fe in _find_functions(clean):
+        span = clean[fs:fe]
+        for var in _signed_decls(span):
+            reported = set()
+            esc = re.escape(var)
+            for m in RE_MINUS_VAR.finditer(span):
+                if m.group("var") != var or not _is_negation(span, m.start()):
+                    continue
+                line = _line(clean, fs + m.start())
+                if (line, var) in reported or _guarded(span, var, m.start()):
+                    continue
+                reported.add((line, var))
+                out.append((line, f"negating signed '{var}': -INT_MIN is UB; "
+                                  "widen to long/unsigned or guard"))
+            for pat in (esc + r"\s*\*\s*-\s*1\b",
+                        esc + r"\s*/\s*-\s*1\b",
+                        r"0\s*-\s*" + esc + r"\b"):
+                for m in re.finditer(pat, span):
+                    line = _line(clean, fs + m.start())
+                    if (line, var) in reported or _guarded(span, var, m.start()):
+                        continue
+                    reported.add((line, var))
+                    out.append((line, f"negating signed '{var}': -INT_MIN is "
+                                      "UB; widen to long/unsigned or guard"))
+    return out
+
+
+def _frees(span_text):
+    return [(m.start(), m.group(1))
+            for m in re.finditer(r"\bfree\s*\(\s*([A-Za-z_]\w*)\s*\)",
+                                 span_text)]
+
+
+def check_c23(text, _path):
+    """free() of the same pointer twice on the SAME execution path (AUTO).
+
+    A NULL/malloc reset between the frees clears the pointer, and a
+    control-flow terminator (return/break/continue/goto/exit) between them
+    puts the two frees on mutually exclusive paths — the common "free on each
+    error path then on success" cleanup pattern is not a double free.
+    """
+    out = []
+    clean = _strip_c_comments(text)
+    term = re.compile(r"\b(?:return|break|continue|goto)\b|exit\s*\(")
+    for name, fs, fe in _find_functions(clean):
+        span = clean[fs:fe]
+        seen = {}
+        for pos, var in _frees(span):
+            if var in seen:
+                since = span[seen[var]:pos]
+                if re.search(r"\b" + re.escape(var)
+                             + r"\s*=\s*(?:NULL|\([^)]*\)\s*NULL)", since) or \
+                        re.search(r"\b" + re.escape(var)
+                                  + r"\s*=\s*\(?[^;]*?(?:malloc|calloc|realloc)"
+                                     r"\s*\(", since):
+                    del seen[var]
+                    continue
+                if term.search(since):
+                    # reached only after an early return/break -> exclusive.
+                    del seen[var]
+                    continue
+                out.append((_line(clean, fs + pos),
+                            f"double free of '{var}' (no NULL reset between)"))
+            else:
+                seen[var] = pos
+    return out
+
+
+RE_MEMCPY_ARR = re.compile(
+    r"\b(memcpy|memmove)\s*\(\s*([A-Za-z_]\w*)\s*,\s*[^,]+,\s*"
+    r"(?:(\d+)|sizeof\s*\(\s*([A-Za-z_]\w*)\s*\))\s*\)")
+
+RE_BYTE_ARRAY_DECL = re.compile(
+    r"(?:^|[;{}])\s*(?:(?:unsigned\s+)?char|uint8_t|int8_t|BYTE|byte)\s+"
+    r"(?P<name>[A-Za-z_]\w*)\s*\[\s*(?P<size>\d+)\s*\]\s*")
+
+
+def check_c24(text, _path):
+    """memcpy/memmove size exceeds the destination byte-array (AUTO).
+
+    Only byte-sized element arrays with literal dimensions are compared;
+    pointer targets / unknown sizes stay with the C9 heuristic.
+    """
+    out = []
+    clean = _strip_c_comments(text)
+    for name, fs, fe in _find_functions(clean):
+        span = clean[fs:fe]
+        arr = {m.group("name"): int(m.group("size"))
+               for m in RE_BYTE_ARRAY_DECL.finditer(span)}
+        if not arr:
+            continue
+        for m in RE_MEMCPY_ARR.finditer(span):
+            dst = m.group(2)
+            if dst not in arr:
+                continue
+            dst_sz = arr[dst]
+            if m.group(3) is not None:
+                n = int(m.group(3))
+                if n > dst_sz:
+                    out.append((_line(clean, fs + m.start()),
+                                f"{m.group(1)} copies {n} bytes into "
+                                f"'{dst}'[{dst_sz}]"))
+            else:
+                src = m.group(4)
+                if src in arr and arr[src] > dst_sz:
+                    out.append((_line(clean, fs + m.start()),
+                                f"{m.group(1)} copies sizeof('{src}') "
+                                f"[{arr[src]}] into '{dst}'[{dst_sz}]"))
+    return out
+
+
+def check_c25(text, _path):
+    """Dereference of a freed pointer in the same block (HEUR).
+
+    Scans from each free() to the end of the enclosing block (``}``, or a
+    ``return``/``break``/``continue``/``goto``) looking for ``->``/``[``/
+    ``(`` access of the pointer before any reassignment.  The classic
+    "free on each error path then on success" pattern never shares a block
+    with a later dereference, so it does not produce cross-branch noise.
+    """
+    out = []
+    clean = _strip_c_comments(text)
+    block_term = re.compile(r"[\}]|\b(?:return|break|continue|goto)\b|\bexit\s*\(")
+    for name, fs, fe in _find_functions(clean):
+        span = clean[fs:fe]
+        for pos, var in _frees(span):
+            tail = span[pos + len("free(") + len(var):]
+            remain = block_term.split(tail, 1)[0]
+            esc = re.escape(var)
+            m = re.search(esc + r"\s*(?:->|\[|\()", remain)
+            if m and not re.search(esc + r"\s*=", remain[:m.start()]):
+                out.append((_line(clean, fs + pos),
+                            f"'{var}' dereferenced after free() before "
+                            "reassignment"))
+    return out
+
+
+# ---------------------------------------------------------------------------
+# Tier-3 HEUR rules from the R13/R14 full-project audits
+# ---------------------------------------------------------------------------
+
+def check_c26(text, _path):
+    """Ownership-split free (HEUR): ``if (cond) free(p->member); free(p);``
+
+    R13 mag_release: the struct free was outside the ``!p->is_pool`` guard
+    that skipped the pixel free, so pool-owned images whose struct lives
+    inside the caller's work buffer were handed to free() (interior pointer,
+    heap corruption).  A guarded member free immediately followed by an
+    unguarded base free is the shape to confirm.
+    """
+    out = []
+    clean = _strip_c_comments(text)
+    for m in re.finditer(
+            r"if\s*\([^;{}]*\)\s*free\s*\(\s*(\w+)\s*->\s*\w+\s*\)\s*;"
+            r"\s*free\s*\(\s*\1\s*\)\s*;", clean, flags=re.DOTALL):
+        out.append((_line(clean, m.start()),
+                    f"ownership-split free: 'free({m.group(1)})' follows a "
+                    "flag-guarded 'free({...}->...)' but escapes the guard; "
+                    "verify the base pointer is not an interior buffer "
+                    "pointer owned by the caller"))
+    return out
+
+
+RE_NEGSUB = re.compile(
+    r"\[\s*(argc|nargs|num_args|arg_count|npargs)\w*\s*-\s*(\d+)\s*\]")
+RE_NEGSUB_GUARD = re.compile(
+    r"if\s*\(\s*(argc|nargs|num_args|arg_count|npargs)\w*\s*"
+    r"(?:<|<=|==)\s*(\d+)\s*\)")
+
+
+def check_c27(text, _path):
+    """Count-derived negative subscript (HEUR).
+
+    R13 cmd_char: ``argv[argc-1]`` was reached with argc==0 (empty ``char()``
+    / bare ``char``), indexing argv[-1].  Only arg-count-style names are
+    scanned to keep loop counters out; a ``count < K`` / ``count == 0``
+    guard anywhere in the function exempts the use.
+    """
+    out = []
+    clean = _strip_c_comments(text)
+    for name, fs, fe in _find_functions(clean):
+        span = clean[fs:fe]
+        guards = {(m.group(1), int(m.group(2)))
+                  for m in RE_NEGSUB_GUARD.finditer(span)}
+        for m in RE_NEGSUB.finditer(span):
+            var = m.group(1)
+            k = int(m.group(2))
+            if k == 0:
+                continue
+            if any(v == var and g <= k for v, g in guards):
+                continue
+            out.append((_line(clean, fs + m.start()),
+                        f"negative-index risk: '{var}[{var}-{k}]' without an "
+                        f"'{var}<{k}' / '{var}==0' guard in the function"))
+    return out
+
+
+RE_STRIDE_W = r"(?:[a-z]\w*_[Ww]\b|\w*[Ww]idth\w*|(?<![A-Za-z0-9_])[Ww](?![A-Za-z0-9_]))"
+RE_STRIDE_H = r"(?:[a-z]\w*_[Hh]\b|\w*[Hh]eight\w*|(?<![A-Za-z0-9_])[Hh](?![A-Za-z0-9_]))"
+RE_STRIDED_READ = re.compile(
+    r"\b([A-Za-z_]\w*)\s*\*\s*(" + RE_STRIDE_W + r")\b"
+    r"|\b(" + RE_STRIDE_W + r")\s*\*\s*([A-Za-z_]\w*)\b")
+
+
+def check_c28(text, _path):
+    """Row-strided read without a height extent (HEUR).
+
+    R14 cine OOB: layer_capture_bg_dialog_from_image took a width param and
+    indexed rows via ``pixels + src_row * img_w`` but never clamped against
+    the image's own height (only LAYER_SCREEN_H), so a 640x280 palette-track
+    cine read 115 rows past the buffer end.  A function that multiplies a
+    width-named stride and exposes no height-named parameter/mention in the
+    surrounding scope is a manual-review candidate.
+    """
+    out = []
+    clean = _strip_c_comments(text)
+    seen = set()
+    for name, fs, fe in _find_functions(clean):
+        span = clean[fs:fe]
+        paren = clean.find("(", fs)
+        if paren < 0 or paren >= fe:
+            continue
+        open_brace = clean.find("{", paren)
+        if open_brace < 0 or open_brace >= fe:
+            continue
+        header = clean[paren:open_brace]
+        body = clean[open_brace:fe]
+        if not re.search(RE_STRIDE_W, header):
+            continue
+        if re.search(RE_STRIDE_H, header) or re.search(RE_STRIDE_H, body):
+            continue
+        for m in RE_STRIDED_READ.finditer(span):
+            line = _line(clean, fs + m.start())
+            if line in seen:
+                continue
+            seen.add(line)
+            out.append((line,
+                        f"row-stride read ('{m.group(0)}') in '{name}' with "
+                        "no height extent in scope; verify row index is "
+                        "clamped against the buffer's own row count"))
+    return out
+
+
+def check_c29(text, _path):
+    """Computed struct pointer with start-only bound check (HEUR).
+
+    R13/R14 mag_decode_into: ``img = (MagImage *)(buf + off_img)`` was gated
+    by ``if (off_img > buf_size)`` alone, so the struct's own trailing bytes
+    could run past buf_size; the fixed form also checks
+    ``off + sizeof(T) > buf_size``.  Any guarded buffer+offset struct cast
+    whose guard lacks a sizeof term is a candidate.
+    """
+    out = []
+    clean = _strip_c_comments(text)
+    for name, fs, fe in _find_functions(clean):
+        span = clean[fs:fe]
+        for m in re.finditer(
+                r"\b(\w+)\s*=\s*\([^;{}]*?\*\s*\)\s*\(\s*(\w+)\s*\+\s*"
+                r"(\w+)\s*\)", span):
+            off = m.group(3)
+            win = span[max(0, m.start() - 400):m.start()]
+            guard = re.search(r"if\s*\([^()]*\b" + re.escape(off)
+                              + r"\b[^()]*\)\s*(?:return|goto)", win)
+            if guard and "sizeof" not in guard.group(0):
+                out.append((_line(clean, fs + m.start()),
+                            f"struct pointer from buffer+offset with a "
+                            f"start-only bound on '{off}' ('{name}'); add "
+                            "the sizeof term to the guard"))
+    return out
+
+
+# ---------------------------------------------------------------------------
+# Three-in-one single source-of-truth guards (C32/C33/C34) and repeated
+# constant arithmetic (C35) -- integrate-results anti-regression (R29)
+# ---------------------------------------------------------------------------
+
+
+def check_c32(text, path):
+    """strncpy() allowed only inside core/lib/strutil.c (AUTO).
+
+    R29 deleted 26 hand-rolled ``strncpy + manual NUL`` idioms and
+    introduced str_copy() as the single fact source.  strncpy() must not
+    reappear at call sites: beyond strutil.c any strncpy() use is a
+    deterministic violation telling the author to use str_copy() (which also
+    guarantees the trailing NUL).
+    """
+    p = str(path)
+    if p.endswith("core/lib/strutil.c"):
+        return []
+    clean = _strip_c_comments(text)
+    return [(_line(clean, m.start()), "strncpy() outside core/lib/strutil.c; "
+                                      "use str_copy() from strutil.h")
+            for m in re.finditer(r"\bstrncpy\s*\(", clean)]
+
+
+def check_c33(text, _path):
+    """Adjacent layer_dialog_show()+dialog_layer_blit() pair (HEUR).
+
+    R29 promoted the two-call 'clean box' idiom to the public
+    layer_dialog_clear() and the pair must not be re-inlined.  A
+    consecutive (or comment-only-separated) show() + blit() outside the
+    body of layer_dialog_clear() itself is a candidate.
+    """
+    out = []
+    clean = _strip_c_comments(text)
+    funcs = _find_functions(clean)
+    for m in re.finditer(
+            r"\blayer_dialog_show\s*\(\s*\)\s*;[^A-Za-z0-9_]{0,60}"
+            r"\bdialog_layer_blit\s*\(\s*\)\s*;", clean):
+        span = _func_span(funcs, m.start())
+        if span is not None and span[0] == "layer_dialog_clear":
+            continue
+        out.append((_line(clean, m.start()),
+                    "adjacent layer_dialog_show()+dialog_layer_blit(); "
+                    "use layer_dialog_clear() instead"))
+    return out
+
+
+def check_c34(text, _path):
+    """Identical static array initializer repeated in one file (HEUR).
+
+    R29 merged a duplicated 4-element slot-position array (slot_y/slot_ys)
+    into a single file-level table.  Two static arrays of the same element
+    count whose initializer token stream is identical are a single
+    source-of-truth candidate.
+    """
+    out = []
+    clean = _strip_c_comments(text)
+    seen = {}
+    for m in re.finditer(
+            r"\b(?:static\s+)?(?:const\s+)?\w+(?:[^=;{}]*?\w)?\s*\["
+            r"[^\]]*\]\s*=\s*\{([^{}]*)\}", clean):
+        body = re.sub(r"\s+|/\*.*?\*/", "", m.group(1))
+        if not body or not re.fullmatch(r"(?:[A-Za-z0-9_+\-*/(),.\"]+)*", body):
+            continue
+        if not body or len(re.findall(r"[A-Za-z0-9_]\s*[,}]", body)) < 1:
+            continue
+        if body in seen:
+            first = seen[body]
+            out.append((_line(clean, m.start()),
+                        f"static array initializer identical to one at "
+                        f"line {first}; share a single table"))
+        else:
+            seen[body] = _line(clean, m.start())
+    return out
+
+
+RE_C32_EXPR = re.compile(
+    r"(?<![A-Za-z0-9_])([A-Z][A-Z0-9_]+|\d+)\s*[+\-*]\s*"
+    r"([A-Z][A-Z0-9_]+|\d+)(?![A-Za-z0-9_])")
+
+
+def check_c35(text, path):
+    """Same constant arithmetic expression repeated in one file (HEUR).
+
+    R29 consolidated 13+7 hand-written dialog-content geometry expressions
+    into LAYER_DIALOG_CONTENT_* macros.  A binary arithmetic expression of
+    macros / integer literals that appears three or more times in one file
+    (macro definitions excluded) is a candidate for a named constant/macro.
+    At least one operand must be a real macro (2+ char UPPER_SNAKE) so that
+    pure integer arithmetic like '1+2' does not produce noise.
+    """
+    out = []
+    clean = _strip_c_comments(text)
+    for m in re.finditer(r"#define[^\n]*", clean):
+        clean = clean[:m.start()] + "\n" * m.group(0).count("\n") + \
+            clean[m.end():]
+    counts = {}
+    for m in RE_C32_EXPR.finditer(clean):
+        lhs, rhs = m.group(1), m.group(2)
+        if not (lhs[0].isalpha() or rhs[0].isalpha()):
+            continue
+        expr = re.sub(r"\s+", "", m.group(0))
+        counts.setdefault(expr, []).append(m.start())
+    for expr, positions in counts.items():
+        if len(positions) >= 3:
+            out.append((_line(clean, positions[0]),
+                        f"constant expression '{expr}' repeated "
+                        f"{len(positions)}x in this file; consider a "
+                        "named macro/constant"))
+    return out
+
+
+# ---------------------------------------------------------------------------
+# lifecycle / logic (C16-C20) -- MANUAL review hints only
+# ---------------------------------------------------------------------------
+
+MANUAL_NOTES = {
+    "C6": "Index/pointer bounds: re-read mag.c (decoder stride/palette), "
+          "nb_parser.c (token buffer), keyboard.c (BIOS ring), render_text.c "
+          "(glyph coords) for out-of-range access.",
+    "C7": "Struct offsets / file parsing: confirm save.c/save_io.c/save_sys.c "
+          "use offsetof-derived sizes, not hardcoded skips.",
+    "C9": "memcpy/memmove target capacity: verify each size argument against "
+          "the destination array size (HEUR hits above need confirmation).",
+    "C16": "Save-format jumps: read position + skip must equal the target "
+          "field offset; re-check SaveData layout end to end.",
+    "C17": "Cursor ghosting: in nb_save_dialog.c/nb_menu.c/nb.c every "
+          "mouse_invalidate_cursor() must be followed by a full redraw of the "
+          "old cursor area, else mouse_erase_cursor() first.",
+    "C18": "Fast-path side effects: image cache hits must preserve every "
+          "external side effect of the slow path (image_set_palette etc.).",
+    "C19": "Interpreter: verify cmd_table dispatch, nb_load/scene_end state "
+          "reset completeness, and VM variable/stack bounds.",
+    "C20": "Dead logic: hunt always-true/always-false conditions and if() "
+          "typos; re-check layer.c scene_end and the transition_run call.",
+    "C30": "Dialog/sprite backdrop restore: every hide path "
+          "(layer_sprite_hide when dialog is not drawn, dialog close, "
+          "cg(hidedialog)) must restore the captured background; review each "
+          "hide/deactivate branch for a missing restore (R13 sprite ghost).",
+    "C31": "Menu/gallery focus repaint: when focus moves off a highlighted "
+          "control (Back button, selected cell), that control must be "
+          "repainted in its idle colour; verify every arrow/click transition "
+          "paints the losing control (R13 gallery Back residual).",
+}
+
+
+def registry():
+    return {
+        "C1": (check_c1, "HEUR", "malloc/calloc/realloc NULL check"),
+        "C2": (check_c2, "HEUR", "fopen result check"),
+        "C3": (check_c3, "HEUR", "fread/fwrite/fgets result check"),
+        "C4": (check_c4, "HEUR", "strncpy NUL termination"),
+        "C5": (check_c5, "AUTO", "sprintf banned, use snprintf"),
+        "C7": (check_c7, "HEUR", "struct offset/skip sanity"),
+        "C8": (check_c8, "HEUR", "signed-int edge arithmetic"),
+        "C9": (check_c9, "HEUR", "memcpy/memmove target capacity"),
+        "C10": (check_c10, "HEUR", "switch missing default"),
+        "C11": (check_c11, "AUTO", "assert() banned"),
+        "C21": (check_c21, "AUTO", "unbounded string ops (strcpy/strcat/gets)"),
+        "C13": (check_c13, "HEUR", "unused static function"),
+        "C14": (check_c14, "HEUR", "error path without hal_log"),
+        "C15": (check_c15, "HEUR", "fopen/fclose balance"),
+        "C22": (check_c22, "AUTO", "INT_MIN negation of signed int"),
+        "C23": (check_c23, "AUTO", "double free without NULL reset"),
+        "C24": (check_c24, "AUTO", "memcpy size vs dest array"),
+        "C25": (check_c25, "HEUR", "use-after-free candidate"),
+        "C26": (check_c26, "HEUR", "ownership-split free"),
+        "C27": (check_c27, "HEUR", "count-derived negative subscript"),
+        "C28": (check_c28, "HEUR", "row-stride read without height extent"),
+        "C29": (check_c29, "HEUR", "struct ptr start-only bound"),
+        "C32": (check_c32, "AUTO", "strncpy only in core/lib/strutil.c"),
+        "C33": (check_c33, "HEUR", "adjacent show+blit; use layer_dialog_clear"),
+        "C34": (check_c34, "HEUR", "duplicated static array initializer"),
+        "C35": (check_c35, "HEUR", "repeated constant arithmetic expression"),
+    }

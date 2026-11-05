@@ -1,0 +1,122 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="translated-from" content="202610300931">
+<!-- AI-NOTE: translated-from = the guildbook_cn doc-version this page was translated from. If the cn counterpart's doc-version is newer, re-translate this page from the Chinese source. -->
+
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Dialogue Box Style Scheme — Naiz Guildbook</title>
+<link rel="stylesheet" href="../style.css">
+</head>
+<body>
+<nav class="sidebar" id="sidebar-nav"></nav>
+<script src="../sidebar-reference.js"></script>
+<main class="main">
+<h1>Dialogue Box Style Scheme</h1>
+<blockquote><strong>Created</strong>: 2026-06-10<br><strong>Last updated</strong>: 2026-06-10</blockquote>
+<p>In the Naiz engine, <strong>the dialogue box is not just a container for text — it is part of the work's visual language</strong>. This page gives creators 10 preset styles: 5 colors × 2 densities (solid / 75% semi-transparent).</p>
+<hr>
+<h2>1. Style overview</h2>
+<h3>Encoding rule</h3>
+<pre><code>style = (color_index << 1) | dither_bit
+  color_index: 0=black, 1=blue, 2=dark red, 3=green, 4=purple
+  dither_bit:  0=solid, 1=75% dither
+
+Range 0-9, contiguous with no gaps</code></pre>
+<h3>Full table</h3>
+<table>
+<thead>
+<tr><th>#</th><th>Name</th><th>Density</th><th>Base RGB</th><th>Visual effect</th></tr>
+</thead>
+<tbody>
+<tr><td>0</td><td><code>SOLID_BLACK</code></td><td>Solid</td><td>0,0,0</td><td>Classic black background, highest readability</td></tr>
+<tr><td>1</td><td><code>DITHER75_BLACK</code></td><td>75%</td><td>0,0,0</td><td>Semi-transparent, nearly black</td></tr>
+<tr><td>2</td><td><code>SOLID_BLUE</code></td><td>Solid</td><td>0,0,255</td><td>Pure blue background, PC-98 tradition</td></tr>
+<tr><td>3</td><td><code>DITHER75_BLUE</code></td><td>75%</td><td>0,0,255</td><td>Semi-transparent blue</td></tr>
+<tr><td>4</td><td><code>SOLID_RED</code></td><td>Solid</td><td>128,0,0</td><td>Dark red background, drama / sadness</td></tr>
+<tr><td>5</td><td><code>DITHER75_RED</code></td><td>75%</td><td>128,0,0</td><td>Semi-transparent red</td></tr>
+<tr><td>6</td><td><code>SOLID_GREEN</code></td><td>Solid</td><td>0,128,0</td><td>Deep green background, forest / nature</td></tr>
+<tr><td>7</td><td><code>DITHER75_GREEN</code></td><td>75%</td><td>0,128,0</td><td>Semi-transparent green</td></tr>
+<tr><td>8</td><td><code>SOLID_PURPLE</code></td><td>Solid</td><td>128,0,128</td><td>Purple background, mystery / romance</td></tr>
+<tr><td>9</td><td><code>DITHER75_PURPLE</code></td><td>75%</td><td>128,0,128</td><td>Semi-transparent purple</td></tr>
+</tbody>
+</table>
+<h3>1.1 Solid (5 styles)</h3>
+<table>
+<thead>
+<tr><th>Style</th><th>Color value</th><th>Best for</th></tr>
+</thead>
+<tbody>
+<tr><td><code>SOLID_BLACK</code> (0)</td><td>#000000 black</td><td>Every scene; the starting standard, highest readability</td></tr>
+<tr><td><code>SOLID_BLUE</code> (2)</td><td>#0000FF blue</td><td>Blue-dominated scenes such as ocean or night sky</td></tr>
+<tr><td><code>SOLID_RED</code> (4)</td><td>#800000 dark red</td><td>Dramatic, sad, tense scenes</td></tr>
+<tr><td><code>SOLID_GREEN</code> (6)</td><td>#008000 deep green</td><td>Forest, nature, calm scenes</td></tr>
+<tr><td><code>SOLID_PURPLE</code> (8)</td><td>#800080 purple</td><td>Mystery, romance, fantasy scenes</td></tr>
+</tbody>
+</table>
+<h3>1.2 75% semi-transparent (5 styles)</h3>
+<p><strong>How it works</strong>: inside the dialogue box region the engine writes the overlay color (black / blue / red / green / purple) with a <strong>Bayer 4×4 ordered dither</strong> pattern, so 25% of the pixels keep the background. The dot pattern:</p>
+<pre><code>Row 0: ▓▓▓░▓▓▓░  (0xEE)
+Row 1: ░▓▓▓░▓▓▓  (0x77)
+Row 2: ▓░▓▓▓░▓▓  (0xBB)
+Row 3: ▓▓░▓▓▓░▓  (0xDD)</code></pre>
+<p><strong>Shared behavior</strong>:</p>
+<ul><li><strong>Border</strong>: always a 2px solid white line</li><li><strong>Text</strong>: white, with no solid backing — drawn directly on the semi-transparent background</li><li><strong>Line advance</strong>: the old text area is covered with the same pattern as the dialogue box, then the new characters are drawn</li></ul>
+<table>
+<thead>
+<tr><th>Style</th><th>Color value</th><th>Visual effect</th></tr>
+</thead>
+<tbody>
+<tr><td><code>DITHER75_BLACK</code> (1)</td><td>#000000 black</td><td>Nearly solid, background faintly visible</td></tr>
+<tr><td><code>DITHER75_BLUE</code> (3)</td><td>#0000FF blue</td><td>Semi-transparent blue, blends into blue scenes</td></tr>
+<tr><td><code>DITHER75_RED</code> (5)</td><td>#800000 dark red</td><td>Semi-transparent red, keeps the mood</td></tr>
+<tr><td><code>DITHER75_GREEN</code> (7)</td><td>#008000 deep green</td><td>Semi-transparent green, blends in naturally</td></tr>
+<tr><td><code>DITHER75_PURPLE</code> (9)</td><td>#800080 purple</td><td>Semi-transparent purple, dreamy</td></tr>
+</tbody>
+</table>
+<p><strong>Readability tip</strong>: white text sits on a semi-transparent background, so readability drops over busy artwork. Use a transparent style on simple backgrounds and fall back to solid on complex ones.</p>
+<hr>
+<h2>2. Selection guide</h2>
+<table>
+<thead>
+<tr><th>Scene type</th><th>Recommended style</th></tr>
+</thead>
+<tbody>
+<tr><td>Everyday dialogue — any scene</td><td><code>SOLID_BLACK</code> (0)</td></tr>
+<tr><td>Ocean, night sky, blue interiors</td><td><code>SOLID_BLUE</code> (2) or <code>DITHER75_BLUE</code> (3)</td></tr>
+<tr><td>Drama, memory, tension</td><td><code>SOLID_RED</code> (4) or <code>DITHER75_RED</code> (5)</td></tr>
+<tr><td>Forest, nature, calm</td><td><code>SOLID_GREEN</code> (6) or <code>DITHER75_GREEN</code> (7)</td></tr>
+<tr><td>Mystery, romance, fantasy</td><td><code>SOLID_PURPLE</code> (8) or <code>DITHER75_PURPLE</code> (9)</td></tr>
+<tr><td>High readability + slight transparency</td><td><code>DITHER75_BLACK</code> (1)</td></tr>
+</tbody>
+</table>
+<p><strong>Golden rule</strong>: when the background is busy and varied, make <code>SOLID_BLACK</code> the default and use transparent or colored styles locally for special atmosphere.</p>
+<hr>
+<h2>3. Configuration and use</h2>
+<h3>3.1 config.toml</h3>
+<pre><code>[dialog] style = 3      # 0-9, matching the table above</code></pre>
+<h3>3.2 Interaction with background loading</h3>
+<pre><code>Order (fixed):
+1. Switch background — the new background fills the screen and a snapshot is saved
+2. First dialogue after that — the dialogue box is drawn in the current style</code></pre>
+<p>For implementation details, see <code>B15-Layer Rendering and Costume Changes.md</code> §2.3.</p>
+<hr>
+<h2>4. Relation to other documents</h2>
+<table>
+<thead>
+<tr><th>Document</th><th>Content</th></tr>
+</thead>
+<tbody>
+<tr><td><code>C01-Engine Basic Concepts.md</code> §3</td><td>The basic concept of "dialogue"</td></tr>
+<tr><td><code>B12-VRAM Rendering Strategy.md</code> §4</td><td>Four-pass render order and partial refresh</td></tr>
+<tr><td><code>B02-Display Pipeline Specification.md</code> §9</td><td>Dialogue box layout parameters, border structure</td></tr>
+<tr><td><code>B15-Layer Rendering and Costume Changes.md</code> §2</td><td>Dialogue box style internals (DIALOG_COLORS, bit encoding)</td></tr>
+<tr><td><code>B15-Layer Rendering and Costume Changes.md</code> §3</td><td>Dialogue box lifecycle API</td></tr>
+<tr><td><code>B11-MAG Image Loading and Display Specification.md</code> §12</td><td>Three-segment palette reservation protection</td></tr>
+</tbody>
+</table>
+
+</main>
+</body>
+</html>

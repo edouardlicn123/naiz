@@ -1,0 +1,142 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="translated-from" content="202610300931">
+<!-- AI-NOTE: translated-from = the guildbook_cn doc-version this page was translated from. If the cn counterpart's doc-version is newer, re-translate this page from the Chinese source. -->
+
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Transition Settings — Naiz Guildbook</title>
+<link rel="stylesheet" href="../style.css">
+</head>
+<body>
+<nav class="sidebar" id="sidebar-nav"></nav>
+<script src="../sidebar-reference.js"></script>
+<main class="main">
+
+<h1>Transition Settings</h1>
+<hr>
+<blockquote><strong>Created</strong>: 2026-07-27</blockquote>
+
+<p>The Naiz engine can play a full-screen visual transition when scenes switch. You configure it in the project <code>config.toml</code>, and the build compiles it into the engine.</p>
+
+<h2>1. Scene transitions</h2>
+<p>A scene jump (the <code>scene()</code> command) plays a full-screen transition. There are 7 choices:</p>
+
+<table>
+<tr><th>Type</th><th>Key name</th><th>Description</th></tr>
+<tr>
+  <td>Normal</td>
+  <td><code>cut</code></td>
+  <td>Switches immediately with no transition effect. The fastest option.</td>
+</tr>
+<tr>
+  <td>Fade</td>
+  <td><code>pfade</code></td>
+  <td>Palette fade-out: the whole 256-color table is interpolated towards black frame by frame, and background pixels are fully preserved.</td>
+</tr>
+<tr>
+  <td>Vertical blinds</td>
+  <td><code>vblinds</code></td>
+  <td>20 vertical strips. The black edge advances from left to right frame by frame; each strip grows from narrow to full width until everything is black, and uncovered areas keep the original picture.</td>
+</tr>
+<tr>
+  <td>Horizontal blinds</td>
+  <td><code>hblinds</code></td>
+  <td>20 horizontal strips. The black edge advances from top to bottom frame by frame; each strip grows from narrow to full width until everything is black.</td>
+</tr>
+<tr>
+  <td>Forward diagonal blinds</td>
+  <td><code>dblinds</code></td>
+  <td>20 diagonal strips, direction ↖↘. The black edge advances along the diagonal frame by frame.</td>
+</tr>
+<tr>
+  <td>Reverse diagonal blinds</td>
+  <td><code>rdblinds</code></td>
+  <td>20 diagonal strips, direction ↗↙. The black edge advances along the diagonal frame by frame.</td>
+</tr>
+<tr>
+  <td>Checker</td>
+  <td><code>checker</code></td>
+  <td>16×10 squares of 40px. Odd-rank and even-rank cells black out in two waves along the diagonal; the wavefront keeps the checker texture the whole way, and the last frame is fully black.</td>
+</tr>
+</table>
+
+<h2>2. config.toml settings</h2>
+<p>Configure it through the following fields in the project <code>config.toml</code>; the build compiles it into the engine automatically (no <code>settings.txt</code> needed):</p>
+
+<table>
+<tr><th>Section</th><th>Field</th><th>Default</th><th>Description</th></tr>
+<tr>
+  <td><code>[transition]</code></td>
+  <td><code>type</code></td>
+  <td><code>pfade</code></td>
+  <td>Scene transition type. Options: <code>cut</code> <code>pfade</code> <code>vblinds</code> <code>hblinds</code> <code>dblinds</code> <code>rdblinds</code> <code>checker</code></td>
+</tr>
+<tr>
+  <td><code>[transition]</code></td>
+  <td><code>frames</code></td>
+  <td><code>16</code></td>
+  <td>Scene transition frame count (1–64). 16 frames ≈ 0.3 seconds at 60fps</td>
+</tr>
+</table>
+
+<p>Full example:</p>
+<pre><code>[transition]
+type = "checker"
+frames = 32</code></pre>
+
+<h2>3. Blind direction diagrams</h2>
+
+<p>The blind family cuts the screen into 20 strips, and every strip grows from narrow to full black in sync (the black edge advances in one direction: everything before the edge is already black, everything after keeps the original picture). The examples use <code>vblinds</code> (left to right) and <code>hblinds</code> (top to bottom).</p>
+
+<h3>Vertical blinds (vblinds)</h3>
+<p>Strip direction is vertical; the black edge advances from left to right. 20 strips × 32px.</p>
+<pre>Step 0:  │░░░░░░░░│░░░░░░░░│░░░░░░░░│
+Step 1:  │████░░░░│████░░░░│████░░░░│    ← each strip darkens from its left edge first, the boundary moves right
+Step N:  │████████│████████│████████│    ← everything is black</pre>
+<p><code>░</code> = original picture visible, <code>▌</code> = target black</p>
+
+<h3>Horizontal blinds (hblinds)</h3>
+<p>Strip direction is horizontal; the black edge advances from top to bottom. 20 strips × 20px.</p>
+<pre>Step 0:  ──░░░░░░──  ──░░░░░░──
+         ──░░░░░░──  ──░░░░░░──
+Step 1:  ──████░░──  ──████░░──  ← each strip darkens from its top edge first, the boundary moves down
+         ──░░░░░░──  ──░░░░░░──
+Step N:  ──████████──  ──████████──  ← everything is black</pre>
+
+<h3>Forward diagonal blinds (dblinds)</h3>
+<p>Diagonal strip direction ↖↘ (backslash direction). 20 strips × 32px; the black edge advances along the diagonal.</p>
+<pre>Dir:     ╲╱╲╱╲╱
+         ╱╲╱╲╱╲
+         ╲╱╲╱╲╱</pre>
+<p>The position coordinate <code>(x + y) % 32</code> decides which strip each pixel belongs to, and the edge sweeps through in that coordinate order.</p>
+
+<h3>Reverse diagonal blinds (rdblinds)</h3>
+<p>Diagonal strip direction ↗↙ (slash direction). 20 strips × 32px; the black edge advances along the diagonal.</p>
+<pre>Dir:     ╱╲╱╲╱╲
+         ╲╱╲╱╲╱
+         ╱╲╱╲╱╲</pre>
+<p>The position coordinate <code>(x + h-1-y) % 32</code> decides which strip each pixel belongs to.</p>
+
+<h2>3.5 Checker</h2>
+<p>The screen is cut into 16×10 squares of 40px; the rank of cell <code>(i,j)</code> is <code>r = i+j</code> (0..24).
+Even-rank cells black out in sequence along the diagonal during the first half of the transition, and odd-rank cells fill in during the second half.
+Adjacent cells always differ in rank by 1 (opposite parity), so two adjacent cells never turn black in the same frame and the wavefront keeps the checker texture the whole way.</p>
+<p>Activation timing (32 frames):</p>
+<pre>  rank r          activation frame            example cells
+  even r=0,2,…,24  →  (31·r)/48          (0,0)→0, (0,2)→1, (0,4)→2 …
+  odd  r=1,3,…,23  →  (31·(24+r))/48     (0,1)→16, (0,3)→17, (0,23)→30 …</pre>
+<p>All 160 cells activate once within 32 frames; the last odd rank (r=23) turns black on frame 30, so frames 30–31 are fully black (R=24 is even, and the black screen finishes 1 frame before the last one).</p>
+
+<h2>4. Notes</h2>
+<ul>
+  <li><strong>Diagonal blind performance</strong>: <code>dblinds</code> and <code>rdblinds</code> advance the diagonal strips row by row every frame, which costs a few more small rectangle fills than vertical/horizontal blinds, but drawing is still incremental per frame (only the newly covered narrow strips are drawn), so the overhead stays manageable.</li>
+  <li><strong>Original picture preserved</strong>: the blind family keeps the original pixels until the edge sweeps over them; <code>pfade</code> preserves the whole background image. <code>cut</code> has no intermediate state.</li>
+  <li><strong>Frame count range</strong>: <code>transition.frames</code> takes 1–64. 8–32 frames is recommended for scenes.</li>
+  <li><strong>Frame count = 1</strong>: visually equivalent to <code>cut</code> mode (finishes in a single frame).</li>
+</ul>
+
+</main>
+</body>
+</html>

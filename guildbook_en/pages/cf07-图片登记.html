@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="translated-from" content="202610300931">
+<!-- AI-NOTE: translated-from = the guildbook_cn doc-version this page was translated from. If the cn counterpart's doc-version is newer, re-translate this page from the Chinese source. -->
+
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Image Registration — Naiz Guildbook</title>
+<link rel="stylesheet" href="../style.css">
+</head>
+<body>
+<nav class="sidebar" id="sidebar-nav"></nav>
+<script src="../sidebar-reference.js"></script>
+<main class="main">
+
+<h1>Image Registration (images.map)</h1>
+<blockquote><strong>Created</strong>: 2026-09-27<br><strong>Last updated</strong>: 2026-09-27</blockquote>
+<p>This page explains, from a <strong>creator's</strong> point of view, how a new image gets into the game: <code>images.map</code> declares the PNG→MAG conversion, <code>ASSETS.DB</code> registers the asset row, and <code>build</code> packs everything into <code>IMAGE.DAT</code>. For the MAG format and palette mechanics see <a href="mc04-MAG图片机制.html">mc04 MAG Image Mechanics</a>; for build commands see <a href="tool-makegame.html">makegame.sh</a>.</p>
+<hr>
+
+<h2>1. File location and format</h2>
+<p>Each project has a mapping table at <code>assets/&lt;game&gt;/images.map</code>, and <code>assets/common/images.map</code> holds assets shared by all projects (<strong>common is processed first, then the project's own</strong>). One line registers one image:</p>
+<pre><code>&lt;png path&gt;  &lt;MAG path&gt;  [options...]</code></pre>
+<ul>
+<li><code>png path</code>: source file relative to <code>assets/&lt;game&gt;/</code>; anything PIL can read works (PNG/JPG alike).</li>
+<li><code>MAG path</code>: output relative to <code>projects/&lt;game&gt;/</code>, usually under <code>images/</code>; <strong>the MAG base name must be ≤8 characters</strong> (the DOS 8.3 constraint — longer names get truncated and collide at the HDI short-name stage).</li>
+<li>Lines starting with <code>#</code> are comments; the file header comment is the complete option reference.</li>
+</ul>
+<p>Example (4 new images in demo-a2):</p>
+<pre><code>png/bg/bg-beach1.jpg       images/beach1.MAG   --256color --cover
+png/bg/bg-home-day.jpg     images/homeday.MAG  --256color --cover
+png/cg/cg01.png            images/cg01.MAG     --256color --cover</code></pre>
+
+<h2>2. Per-line options</h2>
+<table>
+<tr><th>Option</th><th>Meaning</th></tr>
+<tr><td><code>--256color</code></td><td>Quantize to the shared 256-color palette (the default marker, used for backgrounds, sprites, and CG alike)</td></tr>
+<tr><td><code>--sprite</code></td><td>Character sprite: palette index 15 is reserved as the transparency marker and excluded from quantization; pixels with alpha&lt;128 map to index 15</td></tr>
+<tr><td><code>--cover</code></td><td>Scale by the long edge to fill 640×400 and center-crop the overflow (keeps the aspect ratio, no letterboxing). Without it the mode is contain: scale by the short edge, center the result, and leave borders. Backgrounds/CG that must fill the screen need it</td></tr>
+<tr><td><code>--dither</code></td><td>Floyd-Steinberg dithering during quantization</td></tr>
+<tr><td><code>--no-resize</code></td><td>Skip the automatic scale to 640×400 and keep the source pixels (backgrounds only)</td></tr>
+<tr><td><code>--filter-white</code></td><td>Map near-white pixels to the palette white before quantization</td></tr>
+</table>
+<p>The build is incremental: an image is re-converted only when the source is newer <strong>or its options changed</strong> (the signature is recorded in <code>projects/&lt;game&gt;/.mag_conv_state.json</code>); everything else is skipped.</p>
+
+<h2>3. Three steps to register</h2>
+<p>Writing <code>images.map</code> alone is not enough — the MAG must also be named in the asset database before the engine can find it:</p>
+<ol>
+<li>Add a line to <code>images.map</code> (choose the options: backgrounds get <code>--cover</code>, sprites get <code>--sprite</code>).</li>
+<li>Insert a row by hand into the <code>img_map</code> table of <code>projects/&lt;game&gt;/ASSETS.DB</code> (the same treatment as ANI; there is no automated registration entry yet):
+<pre><code>INSERT INTO img_map (name, filename, type) VALUES ('beach1','images/beach1.MAG','IMG');</code></pre>
+<code>name</code> is the scenario reference key (lowercase); <code>type</code> is <code>'IMG'</code> (background) / <code>'SPR'</code> (sprite) / <code>'CG'</code> (event image, added to the gallery).</li>
+<li>Run <code>./makegame.sh build &lt;game&gt;</code>: PNG→MAG → <code>IMAGE.DAT</code> repacked → <code>nb_asset_table.h</code> regenerated (including <code>cg_map</code>).</li>
+</ol>
+
+<h2>4. Referencing from the scenario</h2>
+<ul>
+<li>Background: <code>bg(){beach1}</code>; event CG: <code>cg(){cg01}</code> — always put the object in the <strong>brace payload</strong>; parenthesized forms such as <code>bg(beach1)</code> are rejected.</li>
+<li><code>cg(){key}</code> hides the dialogue box automatically and permanently unlocks the image in the gallery after it is shown; the next line of dialogue reopens the box automatically.</li>
+</ul>
+
+<h2>5. Removing old images (4 layers of cleanup)</h2>
+<p>Retired images must be cleaned out everywhere, or leftovers ship in the package: remove the line from <code>images.map</code> → delete the source PNG and the MAG under <code>projects/.../images</code> → DELETE from <code>ASSETS.DB</code> by <code>filename</code> → drop the matching signature from <code>.mag_conv_state.json</code>. Before you start, confirm there are zero references in <code>scene/*.nb</code> and <code>expressions.json</code>. Deleting an entry from <code>IMAGE.DAT</code> leaves an empty slot, so existing asset ids do not shift.</p>
+
+</main>
+</body>
+</html>

@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="translated-from" content="202611051818">
+<!-- AI-NOTE: translated-from = the guildbook_cn doc-version this page was translated from. If the cn counterpart's doc-version is newer, re-translate this page from the Chinese source. -->
+
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>jumpscene — Naiz Guildbook</title>
+<link rel="stylesheet" href="../style.css">
+</head>
+<body>
+<nav class="sidebar" id="sidebar-nav"></nav>
+<script src="../sidebar-scripts.js"></script>
+<main class="main">
+
+<h1>jumpscene — Cross-Scene Jump</h1>
+<hr>
+<blockquote><strong>Created</strong>: 2026-11-05 <strong>Last updated</strong>: 2026-11-05</blockquote>
+<p><code>jumpscene()</code> shows a list of choices; after the player selects one, <strong>the remainder of the current scene is discarded and the scene switches</strong>, optionally landing directly on a <a href="sc20-tag.html">tag anchor</a> in the target scene.</p>
+
+<h2>1. Syntax</h2>
+<pre><code>jumpscene(prompt;label1,scene1[,tag1];label2,scene2[,tag2];...)</code></pre>
+<p>Semicolon <code>;</code> is the top-level delimiter: the first segment is the prompt, and every following segment has a required <code>label,scene</code> plus an optional <code>tag</code>.</p>
+<table>
+<tr><th>Field</th><th>Required</th><th>Description</th></tr>
+<tr><td><code>prompt</code></td><td>Yes</td><td>Prompt text (first segment, not split on commas)</td></tr>
+<tr><td><code>label</code></td><td>Yes</td><td>Option display text; escape commas as <code>\,</code></td></tr>
+<tr><td><code>scene</code></td><td>Yes</td><td>Target scene, see §2 normalization</td></tr>
+<tr><td><code>tag</code></td><td>No</td><td>Anchor to land on after the new scene loads; omit to play from the first line</td></tr>
+</table>
+<ul>
+<li>At most 10 option segments; the UI shows at most 4 at once.</li>
+<li><code>label</code> escaping is identical to <a href="sc08-question.html">question §1.1</a>, handled by <code>nb_next_field()</code>.</li>
+<li>A segment missing <code>scene</code> is dropped with a WARN; an empty <code>tag</code> equals “no tag”.</li>
+</ul>
+
+<h2>2. Scene Normalization</h2>
+<p>This shares the same resolution as the <a href="sc04-scene.html">scene command</a>; the following forms are equivalent:</p>
+<table>
+<tr><th>Form</th><th>Actual scene file</th></tr>
+<tr><td><code>003</code></td><td><code>nbook003.nb</code></td></tr>
+<tr><td><code>nb003</code></td><td><code>nbook003.nb</code></td></tr>
+<tr><td><code>nbook003</code></td><td><code>nbook003.nb</code></td></tr>
+<tr><td><code>nbook003.nb</code></td><td><code>nbook003.nb</code></td></tr>
+<tr><td><code>logo</code> / <code>op</code> / <code>mainmenu</code></td><td><code>logo.nb</code> / <code>op.nb</code> / <code>mainmenu.nb</code></td></tr>
+<tr><td><code>end</code></td><td><code>mainmenu.nb</code> (back to the main menu)</td></tr>
+</table>
+
+<h2>3. Runtime Behavior</h2>
+<ul>
+<li>After selection, <strong>all remaining lines of the current scene are discarded</strong> (including everything after this line), then the target scene is loaded.</li>
+<li>Without <code>tag</code>: the new scene plays from its first line.</li>
+<li>With <code>tag</code>: once the new scene is loaded, execution is placed at the line after that tag. <strong>No line before the tag runs</strong>, including <code>sceneconf</code>, opening <code>bg</code>/<code>bgm</code>/<code>char</code>. The landing block must therefore set up its own environment (put <code>bg</code>/<code>bgm</code>/<code>char</code> after the tag).</li>
+<li><strong>Chapter title caveat</strong>: landing on a tag skips the target scene's <code>sceneconf</code>, so its chapter title is not set and the save UI falls back to the scene filename. If that scene relies on the chapter title, omit <code>tag</code> (play from the top) or accept the fallback.</li>
+<li><strong>Missing target tag</strong> (runtime fallback): logs a WARN and plays the new scene from the top.</li>
+<li><strong>Timeout</strong>: the choice interaction has a 30-second timeout; on timeout the choice counts as “not selected” — <strong>the current scene continues</strong> with the line after <code>jumpscene</code>.</li>
+<li>The choice index (zero-based) is written to <code>last_choice</code>.</li>
+<li>The switch goes through the usual transition, scene reset and asset-preload flow, exactly like the <code>scene</code> command.</li>
+</ul>
+
+<h2>4. Build-Time Validation</h2>
+<ul>
+<li>The target <code>scene</code> must normalize to an existing <code>scene/*.nb</code> file in the project.</li>
+<li>If <code>tag</code> is given, it must exist in the <strong>target scene</strong>.</li>
+<li>The option count must be 1–10 and <code>prompt</code> must not be empty.</li>
+</ul>
+
+<h2>5. Example</h2>
+<pre><code>jumpscene(Set off?;To the forest,nb002,forest_start;To town,003;Stay here,mainmenu)</code></pre>
+<ul>
+<li>“To the forest” → switch to <code>nbook002.nb</code> and land after <code>tag(forest_start)</code>.</li>
+<li>“To town” → switch to <code>nbook003.nb</code> and play from the first line.</li>
+<li>“Stay here” → return to the main menu.</li>
+</ul>
+<p>Because landing on a tag skips everything before it, the landing block must put its environment setup after the tag:</p>
+<pre><code># nbook002.nb
+sceneconf(){Forest, normal}
+tag(forest_start)
+bg(normal){forest}
+bgm(){forest_theme}
+host(){You walk into the forest}</code></pre>
+<p>This way, jumping to <code>forest_start</code> from another scene still sets the background and BGM; <code>sceneconf</code> is skipped because it precedes the tag (see the chapter-title caveat in §3).</p>
+
+<h2>6. Difference from scene / jump</h2>
+<table>
+<tr><th>Command</th><th>Trigger</th><th>Crosses scenes</th><th>Lands mid-scene</th></tr>
+<tr><td><code>scene</code></td><td>Unconditional or variable condition chain</td><td>Yes</td><td>No (from the top only)</td></tr>
+<tr><td><code>jump</code></td><td>Player choice</td><td>No</td><td>Yes (a tag in this scene)</td></tr>
+<tr><td><code>jumpscene</code></td><td>Player choice</td><td>Yes</td><td>Yes (optional tag in the target scene)</td></tr>
+</table>
+
+<h2>7. See Also</h2>
+<ul>
+<li><a href="sc20-tag.html">sc20 — tag: scene anchors</a>: landing-point declarations</li>
+<li><a href="sc21-jump.html">sc21 — jump: in-scene jump</a>: branching without a scene switch</li>
+<li><a href="sc04-scene.html">sc04 — scene: scene jump</a>: unconditional / conditional scene switching</li>
+<li><a href="sc08-question.html">sc08 — question: choice branches</a>: choices linked with variables</li>
+</ul>
+
+</main>
+</body>
+</html>

@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="doc-version" content="202611051818">
+<!-- AI-NOTE: guildbook_cn is the authoritative Chinese source; guildbook_en holds the English translation. Version format: YYYYMMDDHHMM. Before translating, compare this doc-version with the en counterpart's translated-from meta; if cn is newer, re-translate this page from Chinese to English. Invisible during normal browsing. -->
+
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>jump — Naiz Guildbook</title>
+<link rel="stylesheet" href="../style.css">
+</head>
+<body>
+<nav class="sidebar" id="sidebar-nav"></nav>
+<script src="../sidebar-scripts.js"></script>
+<main class="main">
+
+<h1>jump 场景内跳转</h1>
+<hr>
+<blockquote><strong>创建</strong>：2026-11-05<br><strong>最后更新</strong>：2026-11-05</blockquote>
+<p><code>jump()</code> 显示一组选项；玩家选中后<strong>不离开当前场景</strong>，直接跳到本场景内某个 <a href="sc20-tag.html">tag 锚点</a> 之后。</p>
+
+<h2>1. 语法</h2>
+<pre><code>jump(prompt;label1,tag1;label2,tag2;...)</code></pre>
+<p>分号 <code>;</code> 为顶层分隔符：第一段是问题文本，其余每段是一个 <code>label,tag</code> 两字段选项。</p>
+<table>
+<tr><th>字段</th><th>说明</th></tr>
+<tr><td><code>prompt</code></td><td>问题文本（第一段，不参与逗号切分）</td></tr>
+<tr><td><code>label</code></td><td>选项显示文本</td></tr>
+<tr><td><code>tag</code></td><td>选中后跳转到的本场景锚点名（须由 <code>tag(name)</code> 声明）</td></tr>
+</table>
+
+<h3>1.1 选项段规则</h3>
+<ul>
+<li>选项段必须恰好两个字段；缺 <code>tag</code>、或段内多出逗号（如 <code>A,m1,extra</code>）都会被丢弃并输出 WARN。</li>
+<li><code>label</code> 本身需要逗号时用 <code>\,</code> 转义（规则与 <a href="sc08-question.html">question §1.1</a> 相同，由 <code>nb_next_field()</code> 统一处理）。</li>
+<li><code>tag</code> 只允许字母/数字/下划线，区分大小写。</li>
+<li>字段首尾空白会被裁剪：<code>A , m1</code> 与 <code>A,m1</code> 等价。</li>
+<li>最多 10 个选项段（解析限制）；界面最多同时显示 4 个。</li>
+</ul>
+
+<h2>2. 运行行为</h2>
+<ul>
+<li>选中第 N 项后，执行位置跳到 <code>tagN</code> 的<strong>下一行</strong>；可以向前跳，也可以向后回跳。</li>
+<li>不切换场景：背景、BGM、立绘与当前场景状态保持原样，直到目标位置上的命令自行改变它们。</li>
+<li>选择索引（0 起始）同样写入 <code>last_choice</code>，可用 <a href="sc09-var.html">var</a> 读取后记录路线。</li>
+<li><strong>tag 缺失</strong>：运行期输出 WARN，不跳转，脚本继续执行 <code>jump</code> 行的下一行。</li>
+<li><strong>超时</strong>：选项交互有 30 秒超时；超时按“未选择”处理，不跳转，继续执行下一行。</li>
+<li>与 <code>question</code> 一样，<code>jump</code> 会阻塞剧本直到玩家做出选择。</li>
+</ul>
+
+<h2>3. 与 question / jumpscene 的区别</h2>
+<table>
+<tr><th>命令</th><th>选中后</th><th>跨场景</th><th>可变变量</th></tr>
+<tr><td><code>question</code></td><td>按 <code>op/delta</code> 改变量，继续下一行</td><td>否</td><td>是</td></tr>
+<tr><td><code>jump</code></td><td>跳到本场景 tag 的下一行</td><td>否</td><td>否（可读 <code>last_choice</code>）</td></tr>
+<tr><td><code>jumpscene</code></td><td>切到目标场景，可落到目标 tag</td><td>是</td><td>否（可读 <code>last_choice</code>）</td></tr>
+</table>
+<p>需要“选项同时改变量”时，可以在 <code>jump</code> 目标位置先用 <code>var</code> 赋值，或改用 <code>question</code> 后再接 <code>scene</code>。</p>
+
+<h2>4. 构建期校验</h2>
+<ul>
+<li>每个 <code>tag</code> 必须在本场景中存在，否则校验器报错。</li>
+<li>选项数必须在 1–10；tag 未声明/名字非法都会在构建期指出。</li>
+<li>运行期的 tag 缺失兜底只用于脚本热改等非常规情况。</li>
+</ul>
+
+<h2>5. 示例</h2>
+<p>入口选择：</p>
+<pre><code>jump(要去哪里？;森林,m_forest;城镇,m_town)</code></pre>
+<p>前向跳转与回跳（循环同一段剧情）：</p>
+<pre><code>tag(m_loop)
+host(){再听一遍吗？}
+jump(要重听吗？;重听,m_loop;离开,m_end)
+
+tag(m_end)
+host(){你离开了}</code></pre>
+<ul>
+<li>选“重听”→ 回到 <code>tag(m_loop)</code> 的下一行，形成循环。</li>
+<li>选“离开”→ 跳到 <code>tag(m_end)</code> 的下一行。</li>
+</ul>
+
+<h2>6. 相关</h2>
+<ul>
+<li><a href="sc20-tag.html">sc20 — tag 场景锚点</a>：jump 的落点声明</li>
+<li><a href="sc22-jumpscene.html">sc22 — jumpscene 跨场景跳转</a>：需要换场景时使用</li>
+<li><a href="sc08-question.html">sc08 — question 选择分支</a>：选项 + 变量联动</li>
+<li><a href="sc04-scene.html">sc04 — scene 场景跳转</a>：无条件/条件链切场景</li>
+</ul>
+
+</main>
+</body>
+</html>

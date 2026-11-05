@@ -1,0 +1,22 @@
+diff --git a/wx/kbtrans.cpp b/wx/kbtrans.cpp
+index 455d7e6..f83c430 100644
+--- a/wx/kbtrans.cpp
++++ b/wx/kbtrans.cpp
+@@ -40,7 +40,7 @@
+ 	{ WXK_RETURN,     0x1c, 0x1c },
+ 	{ WXK_BACK,       0x0e, 0x0e },
+ 	{ WXK_TAB,        0x0f, 0x0f },
+-	{ WXK_SPACE,      0x35, 0x35 },
++	{ WXK_SPACE,      0x34, 0x34 },
+ 	/* Cursor keys */
+ 	{ WXK_UP,         0x3a, 0x3a },
+ 	{ WXK_DOWN,       0x3d, 0x3d },
+@@ -80,7 +80,7 @@
+ /* ASCII key mappings (0x20-0x7e) for 106-key layout */
+ static const UINT8 ascii_to_pc98_106[0x60] = {
+ /*       0     1     2     3     4     5     6     7     8     9     A     B     C     D     E     F */
+-/* 20 */ 0x35, NC,   NC,   NC,   NC,   NC,   NC,   0x27, /* ' ( ) ... */
++/* 20 */ 0x34, NC,   NC,   NC,   NC,   NC,   NC,   0x27, /* ' ( ) ... */
+ /* 28 */ NC,   NC,   NC,   NC,   NC,   0x0b, NC,   0x0c, /* - . / */
+ /* 30 */ 0x0a, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07,
+ /* 38 */ 0x08, 0x09, 0x26, NC,   NC,   NC,   NC,   NC,

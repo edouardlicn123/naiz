@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="translated-from" content="202610300931">
+<!-- AI-NOTE: translated-from = the guildbook_cn doc-version this page was translated from. If the cn counterpart's doc-version is newer, re-translate this page from the Chinese source. -->
+
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>bgm / sound / voice — Naiz Guildbook</title>
+<link rel="stylesheet" href="../style.css">
+</head>
+<body>
+<nav class="sidebar" id="sidebar-nav"></nav>
+<script src="../sidebar-scripts.js"></script>
+<main class="main">
+
+<h1>bgm / sound / voice — Audio Commands</h1>
+<hr>
+<blockquote><strong>Created</strong>: 2026-08-13 <strong>Revised</strong>: 0.3.019 (the original text called this a "platform placeholder stub with no actual sound", contradicting the real implementation shipped since 0.2.115 — corrected)</blockquote>
+<p><code>bgm()</code>, <code>sound()</code>, and <code>voice()</code> control background music, sound effects, and voice respectively. All three are <strong>fully implemented</strong>: BGM plays MIDI parsed in real time through the OPN/OPM sound source, while sound effects and voice stream through the YM3433B PCM FIFO. Nothing is a placeholder.</p>
+
+<h2>1. Syntax</h2>
+<pre><code>bgm(){key}
+bgm(stop)
+sound(){key}
+voice(){key}</code></pre>
+<p><strong>The object (the audio key) goes in the curly-brace payload</strong>; <code>bgm(stop)</code> is a keyword directive. This follows the same convention as <code>bg(effect){key}</code>: "object in braces, parentheses = parameters ± keyword".</p>
+<table>
+<tr><th>Command</th><th>Parameter</th><th>Description</th></tr>
+<tr><td><code>bgm</code></td><td><code>{key}</code> or <code>stop</code></td><td>Play / stop BGM (can loop)</td></tr>
+<tr><td><code>sound</code></td><td><code>{key}</code></td><td>Play a sound effect (SE, one-shot)</td></tr>
+<tr><td><code>voice</code></td><td><code>{key}</code></td><td>Play voice (one-shot)</td></tr>
+</table>
+
+<h2>2. Parameters</h2>
+<ul>
+<li><code>key</code> is the audio asset key, written in the curly-brace payload, taken from the <code>name</code> column of <code>ASSETS.DB</code></li>
+<li><code>bgm(stop)</code> stops the current BGM (sends All-Notes-Off to all 16 channels)</li>
+<li><code>sound</code> / <code>voice</code> currently only support playback, with no stop form; neither <strong>ever loops</strong></li>
+<li>The <code>bgm(key)</code> / <code>sound(key)</code> / <code>voice(key)</code> forms (key written inside the parentheses) are deprecated and are rejected by the engine and the scenario validator</li>
+</ul>
+
+<h2>3. Example</h2>
+<pre><code>bgm(){morning}      # Play the morning BGM (looping)
+bgm(stop)           # Stop the BGM
+sound(){door_knock} # Door knock sound effect
+voice(){fei_hello}  # Character voice</code></pre>
+
+<h2>4. Registering Assets (Where the Keys Come From)</h2>
+<p>Audio <strong>source files</strong> live under <code>assets/&lt;project&gt;/</code> and are registered in the <code>img_map</code> table of <code>ASSETS.DB</code>; the build packs them into a single <code>AUDIO.DAT</code> at the root of the deployment tree. Source files are <strong>not injected into the HDI</strong>; at runtime only <code>AUDIO.DAT</code> is read.</p>
+<table>
+<tr><th>Type</th><th>Source location</th><th>Format</th><th>Registration</th></tr>
+<tr><td>BGM</td><td><code>assets/&lt;project&gt;/bgm/</code></td><td><code>.mid</code> (SMF, parsed at runtime, original bytes passed through)</td><td><code>type='BGM'</code></td></tr>
+<tr><td>Sound effect</td><td><code>assets/&lt;project&gt;/se/</code></td><td><code>.pcm</code> (8-bit mono container)</td><td><code>type='SND'</code></td></tr>
+<tr><td>Voice</td><td><code>assets/&lt;project&gt;/voice/</code></td><td><code>.pcm</code> (same as above)</td><td><code>type='VC'</code></td></tr>
+</table>
+<ul>
+<li>The <code>filename</code> column is written relative to <code>assets/&lt;project&gt;/</code> (e.g. <code>bgm/morning.mid</code>); the <code>name</code> column is the key used in the scenario</li>
+<li><code>wav_convert.py</code> converts WAV to <code>.pcm</code> and registers it automatically (<code>--type SND|VC --name &lt;key&gt;</code>); there is no BGM converter, so produce a test track with <code>gen_test_midi.py</code> and then register it <strong>by hand</strong></li>
+<li>The <code>name</code> is also the TOC entry name inside <code>AUDIO.DAT</code>, so it must satisfy <strong>DOS 8.3</strong> and stay unique after truncation — a name collision is rejected as a hard packing failure</li>
+</ul>
+
+<h2>5. Volume and Switches</h2>
+<ul>
+<li><strong>BGM volume</strong> = MIDI <strong>CC7</strong> (channel volume) 0–127, sent to all 16 channels; volume changes take effect <strong>immediately</strong>, with no need to replay</li>
+<li><strong>Sound effect / voice volume</strong> = the A466 electronic volume attenuation, <strong>0–15 with the direction reversed (0 is loudest)</strong>; the two share one PCM path, so there is <strong>only one volume level and they cannot be adjusted separately</strong></li>
+<li>The player settings have separate switches for BGM / sound effects / voice. Turning a channel off only truly releases the shared PCM path when that channel <strong>currently holds</strong> it — muting sound effects will not cut off a voice that is playing</li>
+</ul>
+
+<div class="note-box">
+<p><strong>Do not translate the keys</strong>: the keys of <code>bgm()</code> / <code>sound()</code> / <code>voice()</code> are <strong>asset names</strong>; they are not looked up through <code>tr()</code>, so a translation makes the engine look for audio files that do not exist. Leave the translation empty (= play under the original name).</p>
+<p><strong>Known minor flaw</strong>: <code>i18n_gen</code> extracts these keys as translatable text (unlike the exclusion lists for <code>char</code> / <code>bg</code> / <code>cg</code>), so they sit permanently in <code>game_&lt;lang&gt;.txt</code> as empty values. Leaving them empty is correct — do not fill in translations.</p>
+<p><strong>Robustness</strong>: if a key is unregistered, <code>AUDIO.DAT</code> is missing, or a <code>.pcm</code> header is invalid, the engine prints the matching <code>BGM WARN:</code> / <code>PCM WARN:</code> serial diagnostic and skips playback instead of crashing.</p>
+</div>
+
+</main>
+</body>
+</html>
