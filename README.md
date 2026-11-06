@@ -7,6 +7,15 @@
 
 ---
 
+## Repositories
+
+- **Naiz engine (this repository)**: https://github.com/edouardlicn123/naiz
+- **Naiz Script Studio**: https://github.com/edouardlicn123/naiz-studio
+
+Naiz Studio is a separate repository and must be placed next to this checkout under the same parent directory. See its README for details.
+
+---
+
 ## Overview
 
 Naiz 是面向 PC-98 的视觉小说（ADV）制作套件：剧本与配置都是可直接编辑的纯文本，素材就是普通的图片与音频文件，构建后以 **32-bit 保护模式**程序的形式，在真机 PC-9801/9821 或 NP2kai 模拟器上运行。
@@ -31,6 +40,8 @@ Naiz 是面向 PC-98 的视觉小说（ADV）制作套件：剧本与配置都�
 ./start.sh check    # 仅环境检测
 ```
 
+首次运行会在 `~/venv` 创建共享 Python 虚拟环境；同父目录下的 `naiz-studio` 复用同一 venv，不会重复创建。
+
 构建并运行演示项目：
 
 ```bash
@@ -51,6 +62,7 @@ Naiz 是面向 PC-98 的视觉小说（ADV）制作套件：剧本与配置都�
 | `makegame.sh` | `build` 编译项目、`make` 打包 HDI、`makegame` 二合一、`test [--serial]` 启动模拟器、`audio` 设置模拟器音频延迟 |
 | `anima.sh` | `.na` 动画脚本 → `.ANI` 容器（init / register / check / mp4 / build / buildall / list） |
 | `market.sh` | 从公开市场仓库整包下载素材（list / get / get-all / sync / menu） |
+| `~/naiz-studio` | 网页版 NB 剧本 IDE（独立仓库，需与本仓库同父目录，通过 `./studio.sh` 启动） |
 | `tools/` | Python 工具链：`naiz_img` 镜像注入、`naiz_build` 数据打包与校验、`naiz_conv` 格式转换与 i18n、`naiz_audio` 音频、`diag` 诊断、`env_setup` 环境安装 |
 
 包级索引见 `docs/B90-参考-函数索引.md`。

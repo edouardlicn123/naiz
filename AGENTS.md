@@ -1,12 +1,12 @@
 # Naiz — AI 编程规则
 
-> **当前版本**: `0.4.013`（`projects/demo-a2/config.toml`）
+> **当前版本**: `0.4.015`（`projects/demo-a2/config.toml`）
 >
-> **最新条目**: `CHANGELOG.md` `c93` — NB 脚本新增 `tag`/`jump`/`jumpscene`（场景内锚点 + 选项驱动跳转，devdoc 203）：`nb_seek_tag` 线性扫描不建表、one-shot pending tag 经 `scene_switch` 单入口、`nb_prompt_options` 三命令共享交互、validator 构建期 tag 存在性校验；`pytest` 893 passed / 2 skipped。**本行只放当前状态指针**：历史条目正文一律只写进 `CHANGELOG.md`（规则见 §十三「变更后更新规约」），本文件不承载任何开发历史摘要——§一–§十七 只存**规则与当前状态**。
-> **当前状态**（0.4.013 / c93）：三条跳转命令已进 `cmd_table` 与 B92/B90，validator/i18n 同步；运行期冒烟与 30 s 超时按 devdoc 203 §七 待实机执行。
-> **开发历史**：`CHANGELOG.md`（唯一载体）；本文件只存规则与当前状态，不承载历史摘要。历史速查 → CHANGELOG.md（最新：c93），新条目追加到 CHANGELOG.md 顶部。
+> **最新条目**: `CHANGELOG.md` `c95` — Studio 迁移至同父目录 `~/naiz-studio`（devdoc 204）：主仓库不再含 `studio/` 与 `studio.sh`，guildbook 与音频源留在 naiz；Studio 默认以 `../naiz` 为项目根，`audio_cache/` 仅作本地临时缓存；naiz 与 Studio 共用 `~/venv`，`ensure_venv.sh` / `env_utils.py` / `env_toolchains.py` / `build_game.py` / `naiz_lib` 已统一指向；`pytest` 893 passed / 2 skipped。**本行只放当前状态指针**：历史条目正文一律只写进 `CHANGELOG.md`（规则见 §十三「变更后更新规约」），本文件不承载任何开发历史摘要——§一–§十七 只存**规则与当前状态**。
+> **当前状态**（0.4.015 / c95）：Studio 与 naiz 并列放置；共享 venv 位于 `~/venv`；guildbook 与 `assets/<game>/bgm/` 仍在主仓库。devdoc 203 的 tag/jump/jumpscene 运行期冒烟仍待实机执行。
+> **开发历史**：`CHANGELOG.md`（唯一载体）；本文件只存规则与当前状态，不承载历史摘要。历史速查 → CHANGELOG.md（最新：c95），新条目追加到 CHANGELOG.md 顶部。
 > **防复发机制**：§十七（39 条规则逐一对照）；写完 devdoc 须过 §十「规格与实现的收敛责任」（行号校准 + 声称逐条落地，pytest 全绿不算证据）。
-> **构建验证**：`make -C core` + `core/*.err` 全为空（诊断走 `.err`，**不在 stdout**）。`pytest` 893 passed, 2 skipped（含守卫）。
+> **构建验证**：`make -C core` + `core/*.err` 全为空（诊断走 `.err`，**不在 stdout**）。`pytest` 893 passed, 2 skipped（含守卫）；venv 统一为 `~/venv`，naiz 与 naiz-studio 共用。
 
 ## 一、Git 限制
 

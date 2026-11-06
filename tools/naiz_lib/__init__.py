@@ -2,6 +2,11 @@
 
 import os
 
+try:
+    from env_setup.env_utils import VENV_DIR, VENV_PYTHON
+except ImportError:  # imported as `tools.naiz_lib` (repo root on sys.path)
+    from tools.env_setup.env_utils import VENV_DIR, VENV_PYTHON
+
 # === Project path constants ===
 PROJECT_ROOT = os.path.normpath(os.path.join(os.path.dirname(__file__), '..', '..'))
 """Absolute path to the naiz project root directory."""
@@ -68,10 +73,8 @@ def resolve_base_hdi():
 
 DOS_SYSTEM_DIR = resolve_dos_dir()
 """Deprecated alias (kept for backward compatibility); auto-selects tools_open over tools_commercial."""
-VENV_DIR = os.path.join(PROJECT_ROOT, 'tools', 'env_setup', 'venv')
-"""Shared Python virtualenv directory (single source of truth)."""
-VENV_PYTHON = os.path.join(VENV_DIR, 'bin', 'python3')
-"""Python interpreter inside the shared venv."""
+# VENV_DIR / VENV_PYTHON are imported above from env_setup.env_utils
+# (shared `~/venv` for naiz and naiz-studio).
 
 # === VEM486 memory manager file set (injected into base HDI) ===
 VEM486_FILES = ['VEM486.EXE', 'VEM486.HED', 'VEMEMM.SYS',

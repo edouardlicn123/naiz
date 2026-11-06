@@ -413,12 +413,13 @@ HAL_IRQ_C = ROOT / "core" / "plat" / "hal_irq.c"
 
 
 def test_bgm_irq_is_gated_and_defaults_on():
-    """NAIZ_BGM_IRQ 默认 1：bootmenu 开关（devdoc 175 §十一）需要两个路径
-    同时编进同一构建。ISR 在候选扫描选举后自动接管；用户可在 bootmenu
-    或通过 serial debug 的 `irq off` 回切协作泵对比听感。"""
+    """NAIZ_BGM_IRQ 默认 1：ISR 在候选扫描选举后自动接管，协作泵保留为
+    安装/探测失败时的自动回退，因此两个路径必须同时编进同一构建。
+    启动菜单不再提供 COOP/ISR 切换（devdoc 175 §十一），诊断仍可用
+    serial debug 的 `irq off`。"""
     h = HAL_H.read_text(encoding="utf-8")
     assert "#define NAIZ_BGM_IRQ 1" in h, (
-        "NAIZ_BGM_IRQ must default to 1 (bootmenu BGM Mode toggle needs both paths compiled in)")
+        "NAIZ_BGM_IRQ must default to 1 (ISR + cooperative fallback need both paths compiled in)")
     gated = h[h.index("#if NAIZ_BGM_IRQ"):]
     for decl in ("hal_bgm_irq_init(void)",
                  "hal_bgm_irq_probe_step(void)",

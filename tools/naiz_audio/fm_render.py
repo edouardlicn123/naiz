@@ -6,7 +6,7 @@ raw bytes to the fmbench CLI, and reads the rendered WAV back as a numpy
 array.  Results are cached by a hash of (patch bytes + job parameters).
 
 fmbench is a host-only developer tool: nothing here ships to the engine or
-the HDI.  Requires numpy (present in tools/env_setup/venv).
+the HDI.  Requires numpy (present in the shared ~/venv).
 
 Usage:
     fm_render.py <patch.fmp> <out.wav> [--note N] [--vel N] [--dur MS]
