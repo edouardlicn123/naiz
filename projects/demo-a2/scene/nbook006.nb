@@ -1,0 +1,7 @@
+sceneconf(){Chapter of Earth, normal}
+bg(normal){homenite}
+bgm(){melody_town}
+host(){The earth chapter begins here.}
+host(){Night falls over the ancient house.}
+host(){To be continued.}
+scene(end)

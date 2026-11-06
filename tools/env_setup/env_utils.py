@@ -51,6 +51,11 @@ DJGPP_BIN = os.path.join(DJGPP_DIR, "djgpp", "bin", "i586-pc-msdosdjgpp-gcc")
 NAIZ_CONF_DIR = os.path.expanduser("~/.config/naiz")
 NAIZ_CONF_FILE = os.path.join(NAIZ_CONF_DIR, "env.conf")
 
+# Shared by naiz and the sibling naiz-studio repository.  Keep in sync with
+# tools/env_setup/ensure_venv.sh, which is the shell-side entry point.
+VENV_DIR = os.path.expanduser("~/venv")
+VENV_PYTHON = os.path.join(VENV_DIR, "bin", "python3")
+
 REPO_MAP = {
     "np2kai":   {"github": NP2KAI_REPO,           "china": NP2KAI_REPO_MIRROR},
     "gcc":      {"github": GCC_IA16_REPO,         "china": GCC_IA16_REPO_MIRROR},

@@ -3,6 +3,35 @@
 自 R1 起全部 Bug 修复与功能演进记录（条目顺序沿用 AGENTS.md 既有历史排列）；`AGENTS.md` 仅保留当前版本与规则。**新条目约定**：每轮修复/演进完成后，在下方 `---` 分隔线之后（第一条位置）追加变更摘要，并在 AGENTS.md 头部同步「当前版本」。**条目格式**：每条以 `### <版本号> — <标题>` 开头（版本号化标题行 + `<a id="cN">` 锚点，N 按条目序递增），正文整段或分小节；历史速查直接读下方「版本索引」。
 ---
 
+<a id="c95"></a>
+### 0.4.015 — Studio 独立仓库迁移与共享 `~/venv` 统一（devdoc 204）
+
+**动机**：Studio 作为网页 IDE 与主仓库生命周期不同，继续放在 `naiz/studio` 会让主仓库携带独立前端与缓存；同时 naiz 与 Studio 各自维护 venv 会造成重复占用。目标是把 Studio 拆到同父目录的 `~/naiz-studio`，guildbook 与音频源留在主仓库，两个项目共用 `~/venv`。
+
+**实施**：
+- `studio/`、`studio.sh` 迁至 `~/naiz-studio`；`guildbook_cn/`、`guildbook_en/`、`assets/<game>/bgm/` 保持原位。
+- `server.py`：新增 `STUDIO_DIR`，静态资源、`midi_render` 导入、`audio_cache/` 均改为相对 Studio 自身目录；`ROOT` 默认改为 `STUDIO_DIR.parent / "naiz"`，仍支持 `--root` / `NAIZ_ROOT` 覆盖；guildbook 与素材路径继续指向 naiz。
+- `studio.sh`：默认项目根为同父目录 `naiz`，解析 `--root`，找不到时提示并列布局；source naiz 的 `ensure_venv.sh` 并调用 `ensure_venv`，固定使用 `$VENV_PYTHON`。
+- 共享 venv：`ensure_venv.sh` 改为 `$HOME/venv`；`env_utils.py` 新增 `VENV_DIR` / `VENV_PYTHON` 唯一常量；`env_toolchains.py`、`build_game.py`、`naiz_lib` 改为引用同一常量（`naiz_lib` 兼容 `naiz_lib` / `tools.naiz_lib` 两种导入方式）。
+- `studio/audio_cache/` 不迁移、不入库，`naiz-studio/.gitignore` 追加 `audio_cache/`；首次试听从 `assets/<game>/bgm/` 重新生成。
+- 文档：主 `README.md` 新增 Repositories 指向与共享 venv 说明；`naiz-studio` 新增英文 `README.md`，写明必须与 naiz 同父目录、启动方式与共享 venv。
+- `tools/tests/test_devdoc_refs.py`：`build_game.py` 行号锚点随 venv 常量调整更新（396 / 542 / 557 / 564）。
+
+**验证**：`pytest tools/tests` 893 passed / 2 skipped；`make -C core` 0 err/0 warn；`makegame.sh makegame demo-a2` 成功（37 文件，`disks/demo-a2.hdi` 已更新）；Studio `/`、`/static/app.js`、`/guidebook/cn|en`、`/api/projects` 均 200，`/api/build/demo-a2` 任务 code 0，BGM 预览 200 且缓存写入 `~/naiz-studio/audio_cache/`；错误 `NAIZ_ROOT` 给出并列布局提示。版本 0.4.014 → **0.4.015**。
+
+<a id="c94"></a>
+### 0.4.014 — 启动菜单移除 BGM Mode 切换，保留 ISR 自动回退
+
+**动机**：OPNA FM BGM 与 PCM FIFO 在 ISR 选举成功后已统一由 Timer-B 推进，启动菜单的 COOP/ISR 手动切换只剩诊断价值，且占用一行 UI 与焦点导航（devdoc 175 §十一）。
+
+**实施**：
+- `core/engine/bootmenu.c`：删除 `FOCUS_BGMMODE`、`BGMMODE_Y`、`BGMMODE_NOTE_Y`、`BGMMODE_NAMES`、命中区与焦点分支；菜单恢复为 Language + Start Game 两项（`FOCUS_START` = 1）。`bootmenu_draw()` 去掉 `bgmmode` 参数与 BGM 行/注释绘制，`full=2` 仅处理语言变更。
+- **保留自动回退**：不移除 `audio_tick()` 协作泵与 `hal_bgm_irq_set_on(0)`；IRQ 安装失败、候选线全静默、MPU-401-only 等场景仍由 `hal_irq` 自动留在 COOP，无需用户选择。串口 `irq off` 仍可用于 A/B 诊断。
+- `tools/tests/test_devdoc_refs.py`：`bootmenu.c` 行号锚点更新（`find_lang_index` 109 / `bootmenu_run` 206 / `prefs_set_lang` 316）。
+- `tools/tests/test_frame_pump.py`：更新说明为「默认 ISR + 自动协作回退，两路径仍需同时编译」，移除对启动菜单开关的描述。
+
+**验证**：`make -C core` 0 err/0 warn；`pytest tools/tests` 全绿；版本 bump 0.4.013 → **0.4.014**。启动后串口应出现 `ISR owns the pump`，且启动菜单不再显示 BGM Mode。
+
 <a id="c93"></a>
 ### 0.4.013 — NB 脚本 tag/jump/jumpscene：场景内锚点与选项驱动跳转（devdoc 203）
 
@@ -1024,6 +1053,8 @@
 
 | 条目 |
 |------|
+| [0.4.015 — Studio 独立仓库迁移与共享 `~/venv` 统一（devdoc 204）](#c95) |
+| [0.4.014 — 启动菜单移除 BGM Mode 切换，保留 ISR 自动回退](#c94) |
 | [0.4.013 — NB 脚本 tag/jump/jumpscene：场景内锚点与选项驱动跳转（devdoc 203）](#c93) |
 | [0.3.061 — 行号白名单自动同步工具 + i18n 键 `=` 守卫（token 节省工具改进）](#c89) |
 | [0.3.060 — bootmenu BGM Mode 注释行（ISR/COOP 对比说明）](#c88) |

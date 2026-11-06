@@ -1,7 +1,7 @@
 {
   "version": 2,
-  "git_head": "2c54cf3",
-  "checked_at": "2026-11-05T18:22:12",
+  "git_head": "162548f",
+  "checked_at": "2026-11-06T11:15:56",
   "files": {
     "core/build.sh": {
       "sha256": "0e6bb3f41cae8f6c5a014a49767f93990ddd3e2c461a85ec991c01b40b66b11e",
@@ -45,12 +45,12 @@
       "findings": []
     },
     "core/engine/bootmenu.c": {
-      "sha256": "8cf65874a523f17beb8a4356a6a8b906329dd8ef2469475bd6bb1591865d43f5",
+      "sha256": "2b09dde9d3f83458e03bca9ccf526319b2df224be824035599c682360a073407",
       "violations": 0,
       "candidates": 1,
       "findings": [
         {
-          "line": 116,
+          "line": 69,
           "rule": "C35",
           "level": "HEUR"
         }
@@ -337,7 +337,7 @@
       "findings": []
     },
     "core/engine/nb_config.h": {
-      "sha256": "292915234bb915e3a274fd96ca75e979fa81d730a0d87dc5c29a86bae0078dca",
+      "sha256": "761bf5343787ea9b1a3a198b37f46116af38dc6bb33ab3f12f4cad627ffd4e9c",
       "violations": 0,
       "candidates": 0,
       "findings": []
@@ -1138,18 +1138,18 @@
       ]
     },
     "tools/env_setup/env_toolchains.py": {
-      "sha256": "57a7df6779df07e35fc100a3a3731e374cee4f5edae626026667542a1edee7fd",
+      "sha256": "32526148b7e5843a28c078432b06431d8a0d25256dd542ccc7f2514331ed073e",
       "violations": 0,
       "candidates": 0,
       "findings": []
     },
     "tools/env_setup/env_utils.py": {
-      "sha256": "a39cac5d9fc50177119cbfee74f5c3973f91649f34003e369f11e200de69ddc3",
+      "sha256": "09f35451587695372c372c0a34f46398da7f88cfef3e18933878d72046ec8894",
       "violations": 0,
       "candidates": 1,
       "findings": [
         {
-          "line": 121,
+          "line": 126,
           "rule": "P8",
           "level": "HEUR"
         }
@@ -1168,7 +1168,7 @@
       "findings": []
     },
     "tools/naiz_audio/fm_render.py": {
-      "sha256": "4a236e58583008c30091a81da84e0fac79394dc5fd79fc1ace557ddfa5db4746",
+      "sha256": "ffba140acd2023ec2f91441ef56f13798749686762401b5e10345a54059aed92",
       "violations": 0,
       "candidates": 0,
       "findings": []
@@ -1303,12 +1303,12 @@
       "findings": []
     },
     "tools/naiz_build/build_game.py": {
-      "sha256": "ed1ee24c331907a45f84069bf1a287f6843ce887328ef63d383766c767fd2fd6",
+      "sha256": "63e44f7d5e883b8675ed05aa8d7c3a6442ee9ac990a3702dae823b987b137321",
       "violations": 0,
       "candidates": 1,
       "findings": [
         {
-          "line": 145,
+          "line": 148,
           "rule": "P8",
           "level": "HEUR"
         }
@@ -1561,7 +1561,7 @@
       "findings": []
     },
     "tools/naiz_lib/__init__.py": {
-      "sha256": "78b20b306a62cf877edda7a82763c21f80599733b1719dbf72866555ffde135e",
+      "sha256": "d4d321692998e1f8ef2d6cf6a7f6e08b5371e752dac57e68ee7ea5b4dd5a1b4f",
       "violations": 0,
       "candidates": 0,
       "findings": []
@@ -1714,8 +1714,8 @@
     "candidates": 68,
     "fresh_violations": 0,
     "fresh_candidates": 0,
-    "verified": 20,
+    "verified": 19,
     "stale": 0,
-    "open": 48
+    "open": 49
   }
 }

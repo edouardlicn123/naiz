@@ -23,12 +23,15 @@ from pathlib import Path
 
 
 ROOT = Path(__file__).resolve().parent.parent.parent
-VENV_PYTHON = ROOT / "tools" / "env_setup" / "venv" / "bin" / "python3"
-if not VENV_PYTHON.exists():
-    print("WARN: venv not found at", VENV_PYTHON, "falling back to sys.executable")
-    VENV_PYTHON = Path(sys.executable)
 
 sys.path.insert(0, str(ROOT / "tools"))
+
+from env_setup.env_utils import VENV_PYTHON as _VENV_PYTHON
+
+VENV_PYTHON = Path(_VENV_PYTHON)
+if not VENV_PYTHON.exists():
+    print("WARN: shared venv not found at", VENV_PYTHON, "falling back to sys.executable")
+    VENV_PYTHON = Path(sys.executable)
 
 from naiz_lib import (
     PROTECTED_IDX_ALL, OPEN_DOS_DIR, resolve_base_hdi, resolve_dos_dir, to_dos_name,

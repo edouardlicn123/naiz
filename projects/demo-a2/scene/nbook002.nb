@@ -1,10 +1,24 @@
-sceneconf(){Have question?, normal}
+sceneconf(){A normal day, normal}
 bg(normal){homeday}
 bgm(){melody_town}
+host(){Ira,Fei and Neon living in a ancent house.}
+sound(){chime}
 char(l,normal,body){fei}
 char(r,normal,body){ira}
-fei(){Ira.do you want to go to seaside with me?}
-ira(){Hmm...}
-question(Go with whom?;Ira\,not Neon,bond_ira,+,1;Neon,bond_neon,+,1)
-fei(){OIC.}
-scene(bond_ira,>=,1,003;bond_neon,>=,1,004)
+ira(){Good Morning,Fei.}
+char(l,smile,face){fei}
+fei(){Now I feel happy that I have finished my homework.}
+voice(){hi}
+ira(){Really?You Forgot the exam on next week,you have to have great effort to solve it.It is a very important test as we know.And more,you have lots of house work,including washing dishes,cleaning floor,cut the weeds.And more...}
+sound(){ding}
+char(l,sad,face){fei}
+fei(){Oh,NO!}
+fei(){No way,I am planing to the beach.}
+char(r,sad,face){ira}
+fei(){You again.}
+char(c,normal,face){neon}
+neon(){That is great!Sun shine and beach,what a great time.}
+char(hideall)
+host(){A day passed,and what will happen on next day?}
+bgm(stop)
+scene(003)

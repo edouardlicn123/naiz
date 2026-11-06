@@ -11,7 +11,7 @@ import sys
 from .env_utils import (
     OW_DIR, DJGPP_DIR, DJGPP_BIN,
     GCC_IA16_DIR, GCC_IA16_REPO, GCC_IA16_PREFIX,
-    MIRROR, _resolve_repo,
+    MIRROR, _resolve_repo, VENV_DIR, VENV_PYTHON,
     run_step, _git_clone_with_retry, _pkg_install,
 )
 
@@ -24,8 +24,8 @@ def cmd_pip_install():
         print(f"[✗] 未找到 requirements.txt: {requirements}")
         sys.exit(1)
 
-    venv_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..", "tools", "env_setup", "venv")
-    venv_python = os.path.join(venv_dir, "bin", "python3")
+    venv_dir = VENV_DIR
+    venv_python = VENV_PYTHON
     venv_pip = os.path.join(venv_dir, "bin", "pip")
     if not os.path.exists(venv_python):
         print("  [*] 创建虚拟环境...")

@@ -95,7 +95,7 @@ LINE_REF_WHITELIST = {
     ("nb_setting.c", 171): "SET_VAL_W",
     ("nb_setting.c", 242): "draw_text",
     ("nb_saveload.c", 45): "clipped",
-    ("build_game.py", 539): "nb_asset_table.h",
+    ("build_game.py", 542): "nb_asset_table.h",
     ("render_text.c", 245): "text_width",
     # devdoc 119 §3.4 renamed this key; the row literal moved with it
     ("nb_setting.c", 150): "Sound & Voice Vol",
@@ -111,9 +111,9 @@ LINE_REF_WHITELIST = {
     ("prefs.c", 244): "USER.CFG",
     ("prefs.c", 269): "prefs_set_lang",
     ("prefs.h", 75): "prefs_get_version",
-    ("bootmenu.c", 127): "find_lang_index",
-    ("bootmenu.c", 255): "bootmenu_run",
-    ("bootmenu.c", 409): "prefs_set_lang",
+    ("bootmenu.c", 109): "find_lang_index",
+    ("bootmenu.c", 206): "bootmenu_run",
+    ("bootmenu.c", 316): "prefs_set_lang",
     ("main.c", 151): "LANG] boot",
     ("main.c", 155): "cjk_load_for_lang",
     ("nb.c", 167): "prefs_load",
@@ -123,9 +123,9 @@ LINE_REF_WHITELIST = {
     ("nb_menu.c", 273): "prefs_get_version",
     ("tr.c", 28): "tr_table",
     ("tr.c", 168): "break",
-    ("build_game.py", 393): "stale_settings.unlink",
-    ("build_game.py", 554): "export_config_py",
-    ("build_game.py", 561): "compile_engine",
+    ("build_game.py", 396): "stale_settings.unlink",
+    ("build_game.py", 557): "export_config_py",
+    ("build_game.py", 564): "compile_engine",
 }
 
 # devdoc 118/119/120/136/138/139 已在 "0.4.001 start" 提交中归档删除，

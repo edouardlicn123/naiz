@@ -1,18 +1,20 @@
 #!/bin/bash
 # ensure_venv.sh — Locate / create the shared Python venv.
 #
-# Single source of truth for the venv path. Shared by start.sh and makegame.sh.
+# Single source of truth for the shared venv path.  Used by naiz (start.sh,
+# makegame.sh, ...) and by the sibling naiz-studio repository.
 # Usage (sourced):  source ensure_venv.sh  → exports $VENV_DIR, ensures $VENV_PYTHON
 #   After sourcing, use "$VENV_PYTHON" instead of hardcoding bin/python3.
 #
-# Requires $ROOT to be set to the naiz project root before sourcing.
+# Requires $ROOT to be set to the naiz project root before sourcing (only
+# used for requirements.txt; the venv itself lives in the user's home).
 
 if [ -z "${ROOT:-}" ]; then
     echo "ERROR: ensure_venv.sh requires \$ROOT to be set" >&2
     exit 1
 fi
 
-VENV_DIR="$ROOT/tools/env_setup/venv"
+VENV_DIR="$HOME/venv"
 VENV_PYTHON="$VENV_DIR/bin/python3"
 
 ensure_venv() {
