@@ -45,6 +45,10 @@ SYSTEM_UI_KEYS = {
     "CG GALLERY", "No CGs available.", "[LOCKED]",
     "No save data.", "Load failed.",
     "SPECIAL",
+    # devdoc 205: rename page title / prompt / voiced-kana toggle / OK button
+    # (title key renamed from RENAME → NAME in 0.4.018; any legacy 'RENAME='
+    # lines in sys_*.txt will be marked # ORPHANED on next i18n_gen run).
+    "NAME", "Enter your name", "VOICE", "OK",
 }
 
 # Common question option labels (English source) that are global UI vocabulary.

@@ -20,6 +20,47 @@ char *str_copy(char *dst, size_t n, const char *src)
     return dst;
 }
 
+int utf8_len_cps(const char *s)
+{
+    int n = 0;
+    const unsigned char *p = (const unsigned char *)s;
+
+    if (!p) return 0;
+    while (*p) {
+        if ((*p & 0xC0) != 0x80) n++;   /* leading byte of a codepoint */
+        p++;
+    }
+    return n;
+}
+
+/* Byte length implied by a UTF-8 leading byte; invalid bytes count as 1. */
+int utf8_cp_len(unsigned char c)
+{
+    if ((c & 0x80) == 0x00) return 1;
+    if ((c & 0xE0) == 0xC0) return 2;
+    if ((c & 0xF0) == 0xE0) return 3;
+    if ((c & 0xF8) == 0xF0) return 4;
+    return 1;
+}
+
+void utf8_truncate_cps(char *s, int max_cps, int max_bytes)
+{
+    int n, cps = 0, pos = 0;
+
+    if (!s) return;
+    if (max_cps < 0) max_cps = 0;
+    if (max_bytes < 0) max_bytes = 0;
+    n = (int)strlen(s);
+    while (pos < n) {
+        int len = utf8_cp_len((unsigned char)s[pos]);
+        if (len > n - pos) len = n - pos;      /* malformed tail */
+        if (cps + 1 > max_cps || pos + len > max_bytes) break;
+        pos += len;
+        cps++;
+    }
+    s[pos] = '\0';
+}
+
 char *str_toc8(char *dst, size_t n, const char *src)
 {
     const char *last_dot;

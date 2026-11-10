@@ -96,6 +96,15 @@ def generate(project_dir, output_path):
     bl_dialog = 1 if cfg.get_bool("blackletter", "dialog", False) else 0
     default_lang = _default_lang(cfg, config_path)
 
+    # [flow].rename (devdoc 205): opt-in rename page before chapter 1.
+    # Enabling it without the scene would silently fall back to a missing .nb
+    # at runtime, so a missing scene/rename.nb is a hard build error.
+    flow_rename = 1 if cfg.get_bool("flow", "rename", False) else 0
+    if flow_rename and not os.path.isfile(os.path.join(project_dir, "scene", "rename.nb")):
+        print(f"  ERROR: [flow].rename=true but scene/rename.nb is missing "
+              f"in {project_dir}")
+        sys.exit(1)
+
     # Transition keeps its historical lenient handling; changing it here would
     # alter behaviour for projects that already rely on the default.
     ttype = cfg.get_str("transition", "type", "pfade")
@@ -116,6 +125,7 @@ def generate(project_dir, output_path):
     lines.append('#define NAIZ_BLACKLETTER_TITLE %d' % bl_title)
     lines.append('#define NAIZ_BLACKLETTER_DIALOG %d' % bl_dialog)
     lines.append('#define NAIZ_DEFAULT_LANG "%s"' % escape(default_lang))
+    lines.append('#define NAIZ_FLOW_RENAME %d' % flow_rename)
     lines.append('')
     lines.append('#define NAIZ_TRANSITION_TYPE %d' % tval)
     lines.append('#define NAIZ_TRANSITION_FRAMES %d' % tframes)
@@ -125,9 +135,9 @@ def generate(project_dir, output_path):
         f.write('\n'.join(lines))
 
     print("export_config: version=%s dlgstyle=%d btnstyle=%d blackletter=%d/%d "
-          "default_lang=%s transition=%s frames=%d -> %s"
+          "default_lang=%s flow_rename=%d transition=%s frames=%d -> %s"
           % (version, dlgstyle, btnstyle, bl_title, bl_dialog, default_lang,
-             ttype, tframes, output_path))
+             flow_rename, ttype, tframes, output_path))
     return 1
 
 

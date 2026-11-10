@@ -10,6 +10,7 @@
 #include "scene_layers.h"
 #include "hal.h"
 #include "nb_dialog.h"
+#include "nb_vars.h"
 #include "prefs.h"
 #include "strutil.h"
 
@@ -19,6 +20,52 @@
 /* Dialog text buffer (max 1KB). */
 #include "tr.h"
 static char dialog_text_buf[TR_VAL_LEN];
+
+#define NB_MYNAME_TOKEN     "%myname%"
+#define NB_MYNAME_TOKEN_LEN 8
+
+/* Replace every %myname% with the current myname value (devdoc 205 §13).
+ * Absent token returns the caller's pointer untouched, so +99% of lines
+ * never copy.  Expansion happens before paging, so a name change later
+ * cannot desync a page already on screen. */
+const char *nb_text_expand_vars(const char *src)
+{
+    static char out[TR_VAL_LEN];
+    const char *p, *name;
+    int idx, pos = 0;
+
+    if (!src || strstr(src, NB_MYNAME_TOKEN) == NULL)
+        return src;
+
+    idx = nb_var_lookup("myname");
+    name = (idx >= 0) ? nb_var_get_str(idx) : "";
+    if (name[0] == '\0') name = "me";
+
+    p = src;
+    while (*p != '\0') {
+        if (strncmp(p, NB_MYNAME_TOKEN, NB_MYNAME_TOKEN_LEN) == 0) {
+            int need = (int)strlen(name);
+            if (pos + need >= TR_VAL_LEN) break;
+            memcpy(out + pos, name, (size_t)need);
+            pos += need;
+            p += NB_MYNAME_TOKEN_LEN;
+        } else {
+            if (pos >= TR_VAL_LEN - 1) break;
+            out[pos++] = *p++;
+        }
+    }
+    /* Back off to the last complete codepoint when clipped mid-sequence. */
+    {
+        int lead = pos;
+        while (lead > 0 && ((unsigned char)out[lead - 1] & 0xC0) == 0x80) lead--;
+        if (lead > 0) {
+            int len = utf8_cp_len((unsigned char)out[lead - 1]);
+            if (pos - (lead - 1) < len) pos = lead - 1;
+        }
+    }
+    out[pos] = '\0';
+    return out;
+}
 
 /* Dialog paging state — private to this module. */
 typedef struct {

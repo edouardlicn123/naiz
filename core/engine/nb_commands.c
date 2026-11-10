@@ -130,6 +130,16 @@ static const char *resolve_display_name(const char *key)
     const struct { const char *key; int id; const char *name; } *p;
     const char *t;
 
+    /* Reserved speaker `me` signs with the player's custom name (devdoc 205).
+     * Checked before tr()/char_map so it can never be shadowed by a
+     * translation or a character entry. */
+    if (strcmp(key, "me") == 0) {
+        int idx = nb_var_lookup("myname");
+        if (idx >= 0 && nb_var_get_str(idx)[0] != '\0')
+            return nb_var_get_str(idx);
+        return "me";
+    }
+
     t = tr(key);
     if (t != key) return t;
 
@@ -506,6 +516,8 @@ static const CmdEntry cmd_table[] = {
     {"sound",        cmd_sound,       CMD_TOUCHES_AUDIO},
     {"voice",        cmd_voice,       CMD_TOUCHES_AUDIO},
     {"host",         cmd_host,        CMD_BLOCKING | CMD_TOUCHES_DISPLAY},
+    {"me",           cmd_dialogue,    CMD_BLOCKING | CMD_TOUCHES_DISPLAY},
+    {"nameinput",    cmd_nameinput,   CMD_BLOCKING | CMD_NEEDS_INPUT | CMD_TOUCHES_DISPLAY},
     {"loadscene",    cmd_loadscene,   CMD_BLOCKING | CMD_NEEDS_INPUT | CMD_TOUCHES_DISPLAY},
     {"var",          cmd_var,         0},
     {"fei",          cmd_dialogue,    CMD_BLOCKING | CMD_TOUCHES_DISPLAY},

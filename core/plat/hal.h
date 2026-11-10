@@ -19,6 +19,7 @@
  *   - hal_kbd_init()     键盘初始化
  *   - hal_kbd_update()   每帧轮询
  *   - hal_kbd_is_down()    消耗性查询
+ *   - hal_kbd_get_char()   消耗性字符读取（文本输入用）
  *   - hal_kbd_flush()      清空缓冲
  *   - hal_kbd_drain_advance() 确认键释放等待
  *   - hal_kbd_wait_any()     任意键等待
@@ -451,6 +452,7 @@ unsigned long hal_bgm_irq_take_pending_units(void);
 void hal_kbd_init(void);
 void hal_kbd_update(void);
 int  hal_kbd_is_down(unsigned char scancode);
+unsigned char hal_kbd_get_char(void);
 void hal_kbd_flush(void);
 void hal_kbd_drain_advance(void);
 void hal_kbd_wait_any(void);

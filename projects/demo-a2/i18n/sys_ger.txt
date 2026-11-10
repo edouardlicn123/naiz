@@ -50,3 +50,7 @@ Mid=Mittel
 Low=Niedrig
 Read Progress=Lesefortschritt
 [LOCKED]=[GESPERRT]
+Enter your name=Namen eingeben
+NAME=UMBENENNEN
+VOICE=STIMMHAFT
+OK=OK

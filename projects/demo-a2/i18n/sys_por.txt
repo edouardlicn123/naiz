@@ -50,3 +50,7 @@ Mid=Médio
 Low=Baixo
 Read Progress=Progresso de leitura
 [LOCKED]=[BLOQUEADO]
+Enter your name=Digite seu nome
+NAME=RENOMEAR
+VOICE=SONORA
+OK=OK

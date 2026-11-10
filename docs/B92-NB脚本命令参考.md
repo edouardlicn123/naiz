@@ -28,14 +28,16 @@
 | `jumpscene` | `cmd_jumpscene` (nb_scene.c) | `jumpscene(<prompt;label,scene[,tag];...>)` | 弹选项，选中后切场景并丢弃当前场景剩余内容；`scene` 归一化与 `scene` 命令共用（`003`/`nb003`/`nbook003`/`nbook003.nb` → `nbook003.nb`）；第三段可选，给出则新场景加载后落到该 tag，缺省从头播；目标 tag 缺失 WARN 后从头播 |
 | `var` | `cmd_var` (nb_commands.c) | `var <id> <=/+|/-> <value>` | 变量读写（赋值/加减），需在 variables.json 定义 |
 | `settingmenu` | `cmd_settingmenu` (nb_setting.c) | `settingmenu()` | 游戏内设置菜单（LOAD 范式全屏列表）：凹刻行 + 行内 `< 值 >` 调档 + Back + focus_on_back；`←→` 步进取值故无键盘翻页；当前仅 Text Speed（取值/标签同源同长 `SETTINGS_TEXT_SPEEDS`/`_LABELS`，均经 tr() 渲染），取值即时生效、退出时 `settings_save` 落盘；Back/Esc→`nb_get_menu_return()`（空则 mainmenu.nb）。**Language 不在此**（固定在开机 `startsetting`） |
-| `startsetting` | `cmd_startsetting` (nb_mainmenu.c:107) | `startsetting()` | **设置菜单（已实现）**：`settings_menu_run()` + `settings_save()`，语言变更时重载 CJK 字库/翻译表并按黑花体设置刷新 |
+| `startsetting` | `cmd_startsetting` (nb_mainmenu.c:121) | `startsetting()` | **设置菜单（已实现）**：`settings_menu_run()` + `settings_save()`，语言变更时重载 CJK 字库/翻译表并按黑花体设置刷新 |
 | `musicmenu` | `cmd_musicmenu` (nb_mainmenu.c) | — | 音乐菜单（TODO 桩，见 STUBS） |
+| `nameinput` | `cmd_nameinput` (nb_nameinput.c) | `nameinput()` | **改名页（0.4.016，devdoc 205）**：阻塞式输入循环（鼠标/键盘/字符 FIFO），英文与假名双布局、假名 4 页、VOICE 浊音切换；确认后写 `myname` 字符串变量（空则回落默认 `me`），再切 `nbook001.nb`；Back/Esc 回 `mainmenu.nb`。是否在 New Game 前进入由 `config.toml` `[flow] rename` 的编译期宏 `NAIZ_FLOW_RENAME` 决定 |
 | `cg` | `cmd_cg` (nb_cg.c) | `cg(){<asset_key>}` | 展示 CG（type='CG' 资产）：资产 key 必须写在花括号负载中——括号位预留给未来的参数设置，**不再承载资产描述**（`cg(key)` 括号形态被硬性拒绝）；绘制后永久解锁该 CG 至 SYSTEM.SAV；**换图同时自动收起对话框并清空当前对白**（R20 全屏事件语义），下一句台词在其上重新开框 |
 | | | `cg(hidedialog)` | 关闭对话框，还原背景区域（与 `bg(hidedialog)` 平行；`cg(){key}` 已自动收起对话框，此指令用于显式收口，见 R20） |
 | `cgvmenu` | `cmd_cgvmenu` (nb_cggallery.c:206) | — | 打开 CG 画廊（由 cgview.nb 调用）：网格浏览 + 锁定占位 + 翻页 + 全屏预览 + 解锁位图缓存（R22）；ESC/Back 回**菜单归属场景** `nb_get_menu_return()`（默认 mainmenu.nb，0.2.140 起 special 进入则回 special.nb）；0.2.079 自 nb_mainmenu.c 拆出，0.2.092 起 menu_layer 渲染；**0.3.006** 已解锁格改显构建期生成的真实缩略图（`cg_thumb_map[]`，缺图回退蓝底），左上角带「%02d」序号角标（深底板白字，0.3.007 起去掉 "CG " 前缀） |
 | `host` | `cmd_host` (nb_commands.c) | `host <text>` | 系统旁白（无角色名） |
 | `loadscene` | `cmd_loadscene` (nb_saveload.c:400) | — | 打开读档选单（由 loadscene.nb 调用），经 `save_load_menu(is_load=1, from_mainmenu=0)` 进入两阶段渲染菜单 |
 | `fei` / `ira` / `neon` | `cmd_dialogue` (nb_commands.c) | `<name>{<text>}` 或 `<name>(<text>)` | 角色台词（自动带角色名） |
+| `me` | `cmd_dialogue` (nb_commands.c) | `me{<text>}` 或 `me(<text>)` | **保留角色名（devdoc 205）**：`me` 不依赖 characters.json，恒可用；渲染时经 `resolve_display_name()` 前置特判，取字符串变量 `myname`（空则回落 `me`）。任何场景都可用 `me` 作主角台词 |
 | `bgm` | `cmd_bgm` (nb_audio.c:17) | `bgm(){<key>}` / `bgm(stop)` | BGM 播放（key 在花括号负载；`bgm(stop)` keyword 停止）。0.2.115 运行时 SMF 解析 + 时序调度写 MPU-401（16ch All-Notes-Off 停止；loop 回绕 EOF）。**BGM 通路 = MIDI over MPU-401 扩展卡**：无该卡的环境（`hal_audio_detect()` 返回 0，串口打 `AUD WARN: no MPU-401`）下全部静音，属设计内降级；`scene()` 会停所有音频，故每个场景需各自 `bgm()`，末尾无需 `bgm(stop)` |
 | `sound` | `cmd_sound` (nb_audio.c:32) | `sound(){<key>}` | SE 播放（key 在花括号负载；8bit mono PCM 泵 86 板，切音覆盖） |
 | `voice` | `cmd_voice` (nb_audio.c:43) | `voice(){<key>}` | 语音播放（key 在花括号负载；与 SE 共享单 PCM 通道，后到覆盖）。**不得与 `sound` 相邻两行**：两者皆非阻塞、同一 pass 内背靠背执行，后者瞬顶，前者发声 <1 ms（`nbook001.nb` 的 `voice(){hi}` 曾被紧邻 `sound(){ding}` 顶掉）；中间至少隔一个对白页。语音**必须** PCM——FM 合成只能出「机器人音」（devdoc 122 §三） |

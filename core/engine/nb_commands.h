@@ -44,6 +44,10 @@ int  nb_prompt_options(const char *prompt, const char *const *labels, int n);
 /* CG display command (nb_cg.c, registered in cmd_table). */
 void cmd_cg(int argc, const char **argv, const char *cmd_name);
 
+/* Name-entry page (nb_nameinput.c, registered in cmd_table).  Blocking:
+ * owns its input loop and performs the scene switch itself (devdoc 205 §9). */
+void cmd_nameinput(int argc, const char **argv, const char *cmd_name);
+
 /* Handlers split into nb_audio.c / nb_mainmenu.c (registered in cmd_table). */
 void cmd_bgm(int argc, const char **argv, const char *cmd_name);
 void cmd_sound(int argc, const char **argv, const char *cmd_name);

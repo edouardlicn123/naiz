@@ -40,6 +40,7 @@ SIGNATURES = {
     'char':     (1, 3, 'char(pos[,expr[,type]]){name} | char(hideall)'),
     'scene':    (1, None, 'scene(name)'),
     'sceneconf': (0, 0, 'sceneconf(){title[,type]}'),
+    'nameinput': (0, 0, 'nameinput()'),
     'mainmenu': (5, None, 'mainmenu(x, y, w, h, opt, ...)'),
     'specialmenu': (1, None, 'specialmenu(entry, ...)'),
     'host':     (0, 0, 'host(){text}'),
@@ -588,7 +589,9 @@ def validate_scene(nb_path, ref):
                                 f"  {nb_path.name}:{lineno}: scene id {sid!r} "
                                 "no matching .nb file found")
 
-        elif cmd in char_keys:
+        elif cmd in char_keys or cmd == 'me':
+            # `me` is the reserved protagonist speaker (devdoc 205), resolved
+            # from the myname string variable rather than characters.json.
             if text is None or not text.strip():
                 errors.append(
                     f"  {nb_path.name}:{lineno}: dialogue command "

@@ -51,7 +51,7 @@ description = "Naiz Engine 技术演示"
 
 # 版本号 X.Y.ZZZ —— 由 bump_version 自动维护，请勿手动修改
 # Version X.Y.ZZZ — auto-maintained by bump_version, do not edit by hand
-version = "0.4.015"
+version = "0.4.024"
 
 # ---- 场景转场 / Scene transition ----
 # 场景切换时的全屏视觉过渡，构建时编译进引擎（无需 settings.txt）。
@@ -139,3 +139,15 @@ title = false
 #   false = 关（默认）
 #   false = off (default)
 dialog = false
+
+# ---- 剧情流程 / Story flow ----
+# 编译进引擎的流程开关（export_config.py -> nb_config.h）。
+# Flow switches compiled into the engine by export_config.py.
+[flow]
+# New Game（以及没有存档时的 Continue）是否先进入改名页 rename。
+# Whether New Game (and Continue with no save) opens the rename page first.
+#   true  = 先进入 rename 场景（要求 scene/rename.nb 存在，否则 build 报错）
+#   true  = open rename first (scene/rename.nb must exist or the build fails)
+#   false = 直接进入第一章（默认）
+#   false = straight to chapter 1 (default)
+rename = true

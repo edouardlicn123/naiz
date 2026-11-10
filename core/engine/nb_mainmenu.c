@@ -16,6 +16,7 @@
 #include "save.h"
 #include "nb_saveload.h"
 #include "nb.h"
+#include "nb_config.h"
 #include "debug.h"
 #include "prefs.h"
 #include "bootmenu.h"
@@ -39,6 +40,19 @@ void nb_set_menu_return(const char *scene)
 const char *nb_get_menu_return(void)
 {
     return g_menu_return;
+}
+
+/* devdoc 205: New Game — and Continue with no save — may stop at the rename
+ * page first.  Both paths share this helper so the flow switch has one
+ * entry point. */
+static void start_new_game(void)
+{
+    nb_var_init();
+#if NAIZ_FLOW_RENAME
+    scene_switch("rename.nb", SCENE_SWITCH_MENU);
+#else
+    scene_switch("nbook001.nb", SCENE_SWITCH_MENU);
+#endif
 }
 
 void cmd_mainmenu(int argc, const char **argv, const char *cmd_name)
@@ -80,13 +94,12 @@ void cmd_mainmenu(int argc, const char **argv, const char *cmd_name)
         if (best_slot >= 0)
             save_request(SAVE_OP_SLOT_LOAD, best_slot);
         else
-            { nb_var_init(); scene_switch("nbook001.nb", SCENE_SWITCH_MENU); }
+            start_new_game();
     } else if (strcmp(argv[sel + 4], "load") == 0) {
         save_request(SAVE_OP_CAPTURE_TEMP, -1);
         save_request(SAVE_OP_OPEN_LOAD, -1);
     } else if (strcmp(argv[sel + 4], "start") == 0) {
-        nb_var_init();
-        scene_switch("nbook001.nb", SCENE_SWITCH_MENU);
+        start_new_game();
     } else if (strcmp(argv[sel + 4], "scenes") == 0) {
         hal_log("scene select: not implemented\r\n");
     } else if (strcmp(argv[sel + 4], "special") == 0) {

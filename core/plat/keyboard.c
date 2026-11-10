@@ -32,6 +32,7 @@
 #endif
 
 #define KBD_BUF_SIZE     64
+#define KBD_CHAR_BUF_SIZE 64   /* parallel single-byte char FIFO (devdoc 205) */
 #define KBD_DELAY_ITER   50000  /* polling gap between BIOS-buffer resets */
 #define KBD_RELEASE_TIMEOUT_MS  2000UL  /* release wait upper bound, real time */
 #define KBD_WAIT_ANY_TIMEOUT_MS 3000UL  /* "press any key" upper bound, real time */
@@ -51,6 +52,14 @@
 
 static unsigned char kbd_buf[KBD_BUF_SIZE];
 static int          kbd_buf_len;
+
+/* Parallel character FIFO: one byte per printable MAKE, taken from the low
+ * byte of the BIOS entry (high byte is the scan code).  Only ASCII plus CR
+ * and BS are stored; the name-entry UI maps them to UTF-8.  Every path that
+ * clears kbd_buf must clear this FIFO too, or stale text leaks across
+ * boundaries just like stale scan codes do. */
+static unsigned char kbd_char_buf[KBD_CHAR_BUF_SIZE];
+static int          kbd_char_len;
 
 /* Frame-drop counter: when >0, hal_kbd_update() drains BIOS events without
  * adding them to the local buffer. Used after scene transitions to
@@ -89,6 +98,7 @@ static void kbd_bios_reset(void)
 void hal_kbd_init(void)
 {
     kbd_buf_len = 0;
+    kbd_char_len = 0;
 }
 
 /*
@@ -111,10 +121,12 @@ void hal_kbd_update(void)
     volatile unsigned char *mem = (unsigned char *)0UL;
     unsigned char count;
     unsigned int head;
-    unsigned char sc;
+    unsigned char sc, ch;
 
-    /* Frame-drop: drain BIOS events but discard them. */
+    /* Frame-drop: drain BIOS events but discard them.  Discarding input also
+     * means discarding pending characters. */
     if (kbd_ignore_frames > 0) {
+        kbd_char_len = 0;
         kbd_ignore_frames--;
         count = mem[BIOS_COUNT];
         if (count > 0) {
@@ -148,6 +160,7 @@ void hal_kbd_update(void)
                  | ((unsigned int)mem[BIOS_HEAD + 1] << 8);
 
             sc = mem[head + 1];
+            ch = mem[head];
 
             if (sc & 0x80) {
                 KBD_LOG("BREAK sc=0x%02X\r\n", sc & 0x7F);
@@ -163,6 +176,17 @@ void hal_kbd_update(void)
                     memmove(kbd_buf, kbd_buf + 1, KBD_BUF_SIZE - 1);
                     kbd_buf[KBD_BUF_SIZE - 1] = sc;
                 }
+                /* Only printable ASCII goes to the text FIFO; 0x00 means
+                 * "no character" and CR/BS/TAB are driven by scan codes. */
+                if (ch >= 0x20 && ch <= 0x7E) {
+                    if (kbd_char_len < KBD_CHAR_BUF_SIZE) {
+                        kbd_char_buf[kbd_char_len++] = ch;
+                    } else {
+                        memmove(kbd_char_buf, kbd_char_buf + 1,
+                                KBD_CHAR_BUF_SIZE - 1);
+                        kbd_char_buf[KBD_CHAR_BUF_SIZE - 1] = ch;
+                    }
+                }
             }
 
             head += 2;
@@ -173,6 +197,19 @@ void hal_kbd_update(void)
             mem[BIOS_COUNT]    = count - 1;
         }
     }
+}
+
+/* Pop one pending printable character (FIFO).  Returns 0 when empty;
+ * 0x00 is never stored, so 0 is an unambiguous "nothing pending" answer. */
+unsigned char hal_kbd_get_char(void)
+{
+    unsigned char ch;
+
+    if (kbd_char_len <= 0) return 0;
+    ch = kbd_char_buf[0];
+    memmove(kbd_char_buf, kbd_char_buf + 1, kbd_char_len - 1);
+    kbd_char_len--;
+    return ch;
 }
 
 /*
@@ -211,6 +248,7 @@ int hal_kbd_is_down(unsigned char sc)
 void hal_kbd_flush(void)
 {
     kbd_buf_len = 0;
+    kbd_char_len = 0;
     kbd_ignore_frames = 0;
     kbd_bios_reset();
     KBD_LOG("flush\r\n");
@@ -343,4 +381,5 @@ void hal_kbd_drain_advance(void)
      * 之前只清了 BIOS 缓冲区，kbd_buf 里的残留会让确认键
      * 在输入循环第一次检查时就被命中，表现为选择题一闪而过。 */
     kbd_buf_len = 0;
+    kbd_char_len = 0;
 }

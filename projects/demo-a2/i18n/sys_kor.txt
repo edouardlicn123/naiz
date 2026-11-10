@@ -50,3 +50,7 @@ Mid=보통
 Low=낮음
 Read Progress=읽기 진행
 [LOCKED]=[잠김]
+Enter your name=이름을 입력하세요
+NAME=이름 변경
+VOICE=탁음
+OK=확인

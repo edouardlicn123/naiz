@@ -70,7 +70,7 @@ int display_apply_sprite(int char_id, int asset_id, int x, const char *type)
 int display_apply_dialog(const char *charname, const char *text)
 {
     audio_pump_once();   /* 199E: drain before dialog render pass */
-    dialog_show(charname, text);
+    dialog_show(charname, nb_text_expand_vars(text));
     audio_pump_once();   /* 199E: drain any backlog the render built up */
     return 0;
 }

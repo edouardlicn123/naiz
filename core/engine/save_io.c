@@ -67,13 +67,19 @@ int save_file_write(const char *path, void *data, size_t sz,
 
 /*
  * save_file_read — Read a save file, validating magic / version / checksum.
- * Fills buf with up to bufsz bytes.  When the stored version is lower than
- * max_version, only min_size bytes are read (older, smaller layout).
+ * Fills buf with up to bufsz bytes.  The byte count follows the stored
+ * version so a legacy file is read with exactly its write length:
+ *   ver < 3  -> v2_size   (SaveData minus chapter_title)
+ *   ver < 4  -> v3_size   (SaveData minus var_strings)
+ *   ver == 4 -> bufsz     (full struct)
+ * Callers with a version-independent layout (SystemSave) pass bufsz for
+ * both v2_size and v3_size.
  * cs_offset is the caller struct's checksum field offset
  * (offsetof(SaveData, checksum) / offsetof(SystemSave, checksum)).
  * Returns 0 on success, -1 on failure (with hal_log diagnostics).
  */
-int save_file_read(const char *path, void *buf, size_t bufsz, size_t min_size,
+int save_file_read(const char *path, void *buf, size_t bufsz,
+                   size_t v2_size, size_t v3_size,
                    unsigned int expected_magic, unsigned int max_version,
                    size_t cs_offset, const char *tag)
 {
@@ -108,7 +114,12 @@ unsigned int saved_cs, sum;
         fclose(f);
         return -1;
     }
-    read_sz = (ver < max_version) ? min_size : bufsz;
+    if (ver < 3)
+        read_sz = v2_size;
+    else if (ver < max_version)
+        read_sz = v3_size;
+    else
+        read_sz = bufsz;
     if (read_sz > bufsz) read_sz = bufsz;
     memset(p, 0, bufsz);
     rewind(f);

@@ -50,3 +50,7 @@ Mid=中
 Low=低
 Read Progress=閱讀進度
 [LOCKED]=[未解鎖]
+Enter your name=請輸入姓名
+NAME=改名
+VOICE=濁音
+OK=確定
