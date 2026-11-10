@@ -221,10 +221,12 @@ def test_generate_max_ranges_guard(tmp_path):
 
 
 def test_lang_base_ranges():
-    assert lang_base_ranges("jpn") == [(0x3000, 0x303F)]
-    assert lang_base_ranges("kor") == [(0x3000, 0x303F)]
-    assert lang_base_ranges("fre") == [(0x00A0, 0x00FF)]
-    assert lang_base_ranges("eng") == []
+    # devdoc 205: kana are always present for the rename page keyboard.
+    kana = [(0x3040, 0x309F), (0x30A0, 0x30FF)]
+    assert lang_base_ranges("jpn") == [(0x3000, 0x303F)] + kana
+    assert lang_base_ranges("kor") == [(0x3000, 0x303F)] + kana
+    assert lang_base_ranges("fre") == [(0x00A0, 0x00FF)] + kana
+    assert lang_base_ranges("eng") == kana
 
 
 def test_validate_collect_lang():

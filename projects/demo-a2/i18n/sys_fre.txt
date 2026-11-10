@@ -50,3 +50,7 @@ Mid=Moyen
 Low=Faible
 Read Progress=Progression
 [LOCKED]=[VERROUILLÉ]
+Enter your name=Entrez votre nom
+NAME=RENOMMER
+VOICE=SONORE
+OK=OK

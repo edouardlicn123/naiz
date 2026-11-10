@@ -7,6 +7,11 @@
  * pages on wake. */
 void dialog_show(const char *charname, const char *text);
 
+/* Expand %myname% with the current string-variable value (devdoc 205).
+ * Returns src unchanged when the token is absent; otherwise a pointer to an
+ * internal static buffer (TR_VAL_LEN) owned by nb_dialog.c. */
+const char *nb_text_expand_vars(const char *src);
+
 /* Dialog state accessors (text buffer / offset / charname) */
 const char *nb_dialog_get_text(void);
 int         nb_dialog_get_offset(void);

@@ -22,6 +22,35 @@
 /* Mouse state */
 static int mouse_buttons_before = 0;
 static int mouse_buttons_now = 0;
+
+/* Button-state debounce (devdoc 205 实机: 鼠标划过虚拟键盘时偶尔按下按键).
+ *
+ * Root cause: even in NP2kai absolute-coordinate mode, button bits are read
+ * from the 8255 PPI (mouse_read_8255).  Under rapid host-mouse movement the
+ * 8255 status register's button bits flicker for a single frame, producing a
+ * spurious 0->1 rising edge in mouse_update's click-detection loop.  That
+ * phantom click carries the current mouse position — which sits over the
+ * on-screen keyboard — so a random character gets inserted.
+ *
+ * Fix: require the raw button state to remain identical for BTN_DEBOUNCE_FRAMES
+ * consecutive frames before committing it to mouse_buttons_now.  A one-frame
+ * flicker is rejected; a real press held for >=2 frames passes through with
+ * one frame of latency (~16 ms @60Hz), acceptable for menu UIs. */
+#define BTN_DEBOUNCE_FRAMES 2
+static int mouse_btn_raw_last = 0;
+static int mouse_btn_stable_count = 0;
+
+static int mouse_debounce_buttons(int raw)
+{
+    if (raw == mouse_btn_raw_last) {
+        if (mouse_btn_stable_count < BTN_DEBOUNCE_FRAMES)
+            mouse_btn_stable_count++;
+    } else {
+        mouse_btn_raw_last = raw;
+        mouse_btn_stable_count = 0;
+    }
+    return (mouse_btn_stable_count >= BTN_DEBOUNCE_FRAMES) ? raw : mouse_buttons_now;
+}
 static int mouse_x_now = 320;
 static int mouse_y_now = 200;
 static int mouse_is_initialized = 0;
@@ -223,7 +252,7 @@ void hal_mouse_update(void)
             mouse_x_now = mouse_x_game = nx;
             mouse_y_now = mouse_y_game = ny;
         }
-        mouse_buttons_now = btn;
+        mouse_buttons_now = mouse_debounce_buttons(btn);
         mouse_idle_frames = 0;
         use_abs = 1;
         use_np2 = 1;
@@ -242,7 +271,7 @@ void hal_mouse_update(void)
                 mouse_int33_active = 1;
                 mouse_x_now = _cx; mouse_y_now = _dx;
                 mouse_x_game = _cx; mouse_y_game = _dx;
-                mouse_buttons_now = _bx & 0x07;
+                mouse_buttons_now = mouse_debounce_buttons(_bx & 0x07);
                 mouse_idle_frames = 0;
                 use_abs = 1;
                 /* Drain 8255 so stale deltas don't accumulate while off */
@@ -260,7 +289,7 @@ void hal_mouse_update(void)
     /*=== 8255 PPI fallback path ===*/
     if (!use_abs) {
         mouse_read_8255(&dx_raw, &dy_raw, &btn);
-        mouse_buttons_now = btn;
+        mouse_buttons_now = mouse_debounce_buttons(btn);
 
         dx = dx_raw;
         dy = dy_raw;

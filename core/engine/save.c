@@ -26,11 +26,20 @@ static void save_collect(SaveData *s)
         for (i = 0; i < NB_VAR_COUNT; i++)
             s->var_values[i] = v[i];
     }
+    {
+        const char (*sv)[NB_VAR_STR_MAX] = nb_var_get_str_state();
+        for (i = 0; i < NB_STRVAR_SLOTS; i++)
+            str_copy(s->var_strings[i], NB_VAR_STR_MAX, sv[i]);
+    }
 }
 
 static void save_apply(const SaveData *s)
 {
     nb_var_set_state(s->var_values);
+    /* The single common entry for both temp and slot loads: an empty string
+     * row (v2/v3 file, or a never-set variable) falls back to the definition
+     * default, never to "". */
+    nb_var_set_str_state(s->var_strings);
     nb_set_lang(s->lang);
     scene_switch(s->filename, SCENE_SWITCH_APPLY);
     /* Mark the loaded scene as unlocked */
@@ -52,11 +61,12 @@ static int save_write(const char *path, SaveData *s)
 
 static int save_read(const char *path, SaveData *s)
 {
-    /* SAVE_VERSION 2 files use the pre-chapter_title layout: everything up
-     * to (but excluding) chapter_title.  Parameterized here instead of a
-     * hardcoded size so field reordering keeps the older layout match. */
+    /* v2 ends before chapter_title, v3 ends before var_strings.  Both sizes
+     * are offsetof()-derived so field reordering keeps each older layout
+     * match (devdoc 205 §5.2). */
     if (save_file_read(path, s, sizeof(SaveData),
                        offsetof(SaveData, chapter_title),
+                       offsetof(SaveData, var_strings),
                        SAVE_MAGIC, SAVE_VERSION,
                        offsetof(SaveData, checksum), "[SAVE]") != 0)
         return -1;
@@ -69,6 +79,11 @@ static int save_read(const char *path, SaveData *s)
     s->filename[sizeof(s->filename) - 1] = '\0';
     s->lang[sizeof(s->lang) - 1] = '\0';
     s->chapter_title[sizeof(s->chapter_title) - 1] = '\0';
+    {
+        int i;
+        for (i = 0; i < NB_STRVAR_SLOTS; i++)
+            s->var_strings[i][NB_VAR_STR_MAX - 1] = '\0';
+    }
     hal_log("[SAVE] read ok\r\n");
     return 0;
 }

@@ -3,6 +3,115 @@
 自 R1 起全部 Bug 修复与功能演进记录（条目顺序沿用 AGENTS.md 既有历史排列）；`AGENTS.md` 仅保留当前版本与规则。**新条目约定**：每轮修复/演进完成后，在下方 `---` 分隔线之后（第一条位置）追加变更摘要，并在 AGENTS.md 头部同步「当前版本」。**条目格式**：每条以 `### <版本号> — <标题>` 开头（版本号化标题行 + `<a id="cN">` 锚点，N 按条目序递增），正文整段或分小节；历史速查直接读下方「版本索引」。
 ---
 
+<a id="c101"></a>
+### 0.4.024 — 改名页两修：OK 文字切换后消失 + 8255 按钮防抖
+
+devdoc 205 落地后两次实机 bug 修补。
+
+**1. 切换语言后 OK 键文字消失**
+
+`ni_draw_bottom_labels` 只画 EN/PAGE/VOICE 三个 label，**不画 OK**。初始绘制时 `ni_draw_static` 单独画了一次 OK label，但 `publish_bottom` 里 `erase_to_base` 把整个底部区域擦掉后只调 `ni_draw_bottom_labels`——OK label 没被重画。修复：`ni_draw_bottom_labels` 末尾补 `ni_draw_btn_label(NI_OK_X, NI_OK_W, tr("OK"), 1)`，删掉 `ni_draw_static` 里重复的那行。
+
+**2. 鼠标划过虚拟键盘时偶尔按下按键（HAL 层 8255 按钮防抖）**
+
+根因：NP2kai 绝对坐标模式下，按钮状态仍从 8255 PPI 读（`mouse_read_8255`）。鼠标快速移动时 8255 状态寄存器的按钮位瞬时抖动一帧，在 `mouse_update` 的上升沿检测里产生假 click。假 click 坐标=当前鼠标位置（落在键盘 grid 上）→ 随机字符被插入。menu_show 不受影响是因为菜单项 hit 区域小，假 click 落在菜单项上的概率低。
+
+修复：`mouse.c` 新增 `mouse_debounce_buttons()`，要求原始按钮状态连续 2 帧稳定才采纳（`BTN_DEBOUNCE_FRAMES=2`）。一帧抖动被拒绝，真实按下延迟 ~16ms（可接受）。三条路径（NP2kai/INT33/8255）的 `mouse_buttons_now =` 统一走防抖。
+
+**验证**：`make -C core` 无 `.err`；`python -m pytest -q` **907 passed, 2 skipped**；`./start.sh fullaudit` 全绿；HDI 重新注入。版本 0.4.023 → **0.4.024**。
+
+<a id="c100"></a>
+### 0.4.023 — 改名页尾部按钮帧消失修复 + gallery 背景 + Back 风格统一
+
+devdoc 205 落地后两次实机 UI 修补。
+
+**1. 底部按钮圆角帧在 EN↔JP 切换后消失**
+
+`ni_publish_bottom` 里先 `menu_layer_erase_to_base`（把整个底部区域擦回 bg），然后只调 `ni_draw_bottom_labels` —— 它**只画文字，不画 frame**。原来 frame 只在 `ni_draw_static` 初始化时画一次，擦完就没了。Back 按钮的 frame 在 erase 区域之外（x=66 vs erase 起始 x=156）所以没受影响，OK/PAGE/VOICE/EN 四个按钮的 frame 全部消失，只剩文字和可点击的 hitbox。修复：publish_bottom 里 erase_to_base 之后、draw_bottom_labels 之前先重画 4 个 `ni_draw_btn_frame`。
+
+**2. 底部按钮 fill_rect 盖平 emboss（对齐 Back 风格）**
+
+`ni_draw_btn_label` 原来先画 `fill_rect` 把 `rounded_emboss` 内部的 bevel 盖平，导致 Back 按钮（纯 emboss + 文字）和 EN/PAGE/VOICE/OK 按钮（平色块 + 文字）看起来不是同一排。删掉 fill_rect，让文字直接画在 emboss bevel 上，四个按钮视觉上和 Back 完全一致。
+
+**3. 改名页背景换 gallery 同款**
+
+`rename.nb` 的 `bg(normal){bg_load}` → `bg(){gallery}`，和画廊页 `cgview.nb` 同款。
+
+**空名回落 me**：`variables.json` 里 myname 的 `initial` 值 `"me"` 正确导出到 `nb_var_defs.h:18`（`initial_str = "me"`）。整条链路（init → display → trim+fallback）代码已覆盖，无需额外改动。
+
+**验证**：`make -C core` 无 `.err`；`python -m pytest -q` **907 passed, 2 skipped**；`./start.sh fullaudit` 全绿；HDI 重新注入。版本 0.4.021 → **0.4.023**（多次 bump 自然收敛）。
+
+<a id="c99"></a>
+### 0.4.021 — 快速连点卡死修复：publish 内 draw_cursor_force 阻塞 VBlank
+
+**症状**：改名页快速连点鼠标（layout 切换、按键）数秒后界面卡死。
+
+**根因**：三个 `ni_publish_*` 函数末尾各调一次 `hal_mouse_draw_cursor_force()` —— 它内部**无条件阻塞等 `hal_vblank_wait()`**（无 same-position early exit）。主循环开头 `engine_frame_pump()` 已经有一次 `vblank_wait()` 了（帧 pacing），publish 内再来一次 force wait 就是**每帧至少 2 次 VBlank 等待**。快速连点 layout 切换按钮时每次触发 2 个 publish（keys + bottom）= 2 次 force = 2 次 vblank 阻塞，再叠 frame_pump 的那次 = **每帧 3 次 VBlank 等待 ≈ 48ms ≈ 20fps**。`menu_show()` 从不卡就是因为它**从不调 `draw_cursor_force`**。
+
+**修复**：三个 `ni_publish_*` 函数末尾的 `hal_mouse_draw_cursor_force()` 全部删除。cursor 刷新统一交给主循环末尾那行 `hal_mouse_draw_cursor()`（普通 render，**有 same-position early exit**——mouse 不动时零开销；mouse 动了才等 VBlank + redraw）。publish 内部只做 `invalidate_cursor`（擦光标 + valid=0）+ `blit_rect(touch_cursor 标脏)`，下次 render 进来 valid=0 自动 capture 当前正确背景。
+
+**验证**：`make -C core` 无 `.err`；`python -m pytest -q` **907 passed, 2 skipped**；`./start.sh fullaudit` 全绿；HDI 重新注入。版本 0.4.020 → **0.4.021**。
+
+<a id="c98"></a>
+### 0.4.019 — 改名页收尾修补：光标/残留/grid 统一 + 标题 NAME + 日文功能键
+
+devdoc 205 落地后三次实机反馈修补的最终收口。
+
+**1. EN↔JP 切换残留框线（0.4.018）**
+
+`ni_publish_keys` / `ni_publish_bottom` 在 `ni_draw_*` 之后调用 `menu_layer_blit_rect`，但从未先清底。英文键盘（10×45px、起始 x=80）切假名（12×36px、起始 x=87）后，旧英文按键的右边框残留穿在新假名按键之间；反向切换时 VOICE 标签也会残留。修复：publish 前加 `menu_layer_erase_to_base` 清整个重绘区域（与 `menu_pagenav_draw` 的两阶段 erase+draw 范式一致）。
+
+**2. 所有语言 grid 统一 12×4（0.4.019）**
+
+原先 EN cols=10、key_w=45；JP cols=12、key_w=36、起始 x=87——两套几何在 layout 切换时会残留框线（上面那条修补只是对症清底）。统一 `NI_KEY_COLS=12`，EN 扩成 12 列、key_w 统一 36px、起始 x=80；删除 `NI_KANA_X0` / `NI_KANA_W` / `NI_KANA_COLS` 三个分叉宏。`ni_cols` / `ni_cell_text` / `ni_key_rect` 三个函数去掉 layout 分叉。
+
+**3. 日文模式功能键 SPACE / DEL（0.4.019）**
+
+原先假名 grid 的 row 4 末尾两列全空，日文输入下无法直接空格/退格。EN row 4 原来 10 列末尾放 SPACE/DEL，现在 EN 和 JP 统一：row 4 cols 10 = SPACE、col 11 = DEL。假名表用特殊 codepoint 标记（`0xFFFE` = SPACE、`0xFFFF` = DEL），`ni_cell_text` 识别 marker 返回字符串 label，`ni_activate` 已按 label 分发，无需额外逻辑。4 张假名表 row 4 末尾均填 marker。
+
+**4. 标题 RENAME → NAME（0.4.019）**
+
+用户反馈 "RENAME" 语义太生硬。`SYSTEM_UI_KEYS` 的 `RENAME` 键改名为 `NAME`，`tr("RENAME")` 调用点一并改 `tr("NAME")`，9 语言 `sys_*.txt` 里的 key 名 `RENAME=xxx` 重命名为 `NAME=xxx`（译文值不变）。
+
+**验证**：`make -C core` 无 `.err`；`python -m pytest -q` **907 passed, 2 skipped**；`./start.sh fullaudit` 全绿；`./makegame.sh build demo-a2 && ./makegame.sh make demo-a2` 成功（HDI 重新注入）。版本 0.4.017 → **0.4.019**（多次 bump 自然收敛）。
+
+<a id="c97"></a>
+### 0.4.017 — 改名页光标消失实机修复（invalidate + 每帧 draw_cursor）
+
+**症状**：devdoc 205 落地后实机测试改名页，鼠标"卡住"不动——方向键触发一次 UI 重绘后恢复，再移动鼠标又卡住；多次后光标彻底消失。
+
+**根因**：两个独立 bug 叠加：
+
+1. `ni_publish_name/keys/bottom()` 里用 `hal_mouse_erase_cursor()` 擦光标（只还原 VRAM、**不**置 `cursor_saved.valid=0`），随后 `menu_layer_blit_rect()` 把那块区域写成新画面，最后 `cursor_render_force()` 因 valid 仍=1 先 `cursor_erase(cursor_saved, old_x, old_y)` —— **用 blit 之前 capture 的老背景去还原** 刚刚被 blit 成新画面的那块 VRAM。每次 publish 都把 cursor 旧位置"挖"回 publish 前的老内容，叠加后键盘区被一层层旧画面覆盖，视觉上就是卡住+脏掉+arrow 消失。
+
+2. `nb_nameinput.c` 主循环末尾**没有** `hal_mouse_draw_cursor()`（`menu_show()` 每帧都调），所以在两次 publish 之间鼠标移动时光标完全不跟随，只在下一次 publish 时被动 force 重绘在当前位置。
+
+**修复**：
+- `hal_mouse_erase_cursor()` → `hal_mouse_invalidate_cursor()`（先 erase 再置 valid=0；`cursor_render_force()` 进来时 valid=0 不会再误还原旧位置，而是直接 capture 当前位置的真实新背景 + 画 arrow）。
+- 主循环末尾补 `hal_mouse_draw_cursor()`，保证光标跟随每帧鼠标移动（与 `menu_show()` 共享菜单循环契约）。
+- `ni_publish_bottom()` 的 blit 宽度由 404 修正为 426——原宽度 156+404=560 只覆盖到 VOICE 按钮右边缘 14 px 处，OK 按钮区域从未被 publish 重绘过。
+
+**验证**：`make -C core` 无 `.err`；`python -m pytest -q` **907 passed, 2 skipped**；`./start.sh fullaudit` 全绿；HDI 重新注入 `disks/demo-a2.hdi`。版本 0.4.016 → **0.4.017**。
+
+<a id="c96"></a>
+### 0.4.016 — 改名页 + 字符串变量 `myname` + `me` 保留角色（devdoc 205）
+
+**动机**：主角姓名此前无法由玩家自定义，NB 角色名只能是 characters.json 中的静态键。新增改名页，并让脚本以保留角色 `me` 指代玩家主角。
+
+**实施**：
+- 字符串变量：`variables.json` 新增 `myname`（`type=string`、`initial="me"`、`maxlen=12`）；`export_vars.py` 生成 `NB_STRVAR_COUNT` / `NB_VAR_STR_MAX` / `var_str_slot[]`；`nb_vars.c` 新增字符串槽与 get/set/default/state API（`nb_var_str_slot()` 为文件内 static）。
+- 存档 v4：`SAVE_VERSION=4`、`SAVE_VERSION_MIN=2`，`SaveData.var_strings` 为尾部字段；`save_io.c` 三档读长（v2=`offsetof(chapter_title)`、v3=`offsetof(var_strings)`、v4=`sizeof`）；`save_apply()` 恢复字符串状态。
+- HAL：`keyboard.c` 新增 BIOS 字符 FIFO（`hal_kbd_get_char()`），init/flush/drain/ignore-frames/溢出五点同步清空；供改名页读取可打印 ASCII。
+- 改名页：新增 `core/engine/nb_nameinput.c`（阻塞式输入循环、两阶段菜单绘制、英文/假名双布局、假名 4 页、VOICE 浊音切换、Back/OK/EN-JP/PAGE/VOICE 命中区）；`rename.nb`（`sceneconf(){, menu}` + `nameinput()`）；空名回落默认 `me`。
+- 入口：`nb_mainmenu.c` 的 New Game 与「Continue 无存档」统一走 `start_new_game()`，由 `config.toml` `[flow] rename` 的编译期宏 `NAIZ_FLOW_RENAME` 选择 `rename.nb` 或 `nbook001.nb`。
+- 保留角色 `me`：`cmd_table` 注册；`resolve_display_name()` 前置特判取 `myname`（空则回落 `me`）；`nb_validator.py` 接受 `me`。
+- `%myname%` 展开：`nb_text_expand_vars()`（`nb_dialog.c`）在 `dialog_show()` 前替换；`scene_display.c` 接入。
+- 字体：`gen_cjk_font.py` 的 `lang_base_ranges()` 为所有语言并入平假名/片假名区段；`test_cjk_font.py` 同步。
+- i18n：`SYSTEM_UI_KEYS` 新增 `RENAME` / `Enter your name` / `VOICE` / `OK`，9 语言 `sys_*.txt` 补齐译文。
+- 守卫：新增 `test_nb_strvar.py` / `test_save_layout.py` / `test_nameinput_boundary.py` / `test_i18n_name_placeholder.py`；`test_devdoc_refs.py` 锚点随实施位移更新（`nb_mainmenu.c` 128/130、`save.h` 20）。
+
+**验证**：`make -C core` 无 `.err`；`python -m pytest -q` **907 passed, 2 skipped**；`./start.sh fullaudit` 全绿（`symbol_audit -s A,B --gate` 通过）；`./makegame.sh build demo-a2 && ./makegame.sh make demo-a2` 成功。版本 0.4.015 → **0.4.016**。实机冒烟待人工按 devdoc 205 §16 执行。
+
 <a id="c95"></a>
 ### 0.4.015 — Studio 独立仓库迁移与共享 `~/venv` 统一（devdoc 204）
 
@@ -1053,6 +1162,12 @@
 
 | 条目 |
 |------|
+| [0.4.024 — 改名页两修：OK 文字切换后消失 + 8255 按钮防抖](#c101) |
+| [0.4.023 — 改名页尾部按钮帧消失修复 + gallery 背景 + Back 风格统一](#c100) |
+| [0.4.021 — 快速连点卡死修复：publish 内 draw_cursor_force 阻塞 VBlank](#c99) |
+| [0.4.019 — 改名页收尾修补：光标/残留/grid 统一 + 标题 NAME + 日文功能键](#c98) |
+| [0.4.017 — 改名页光标消失实机修复（invalidate + 每帧 draw_cursor）](#c97) |
+| [0.4.016 — 改名页 + 字符串变量 `myname` + `me` 保留角色（devdoc 205）](#c96) |
 | [0.4.015 — Studio 独立仓库迁移与共享 `~/venv` 统一（devdoc 204）](#c95) |
 | [0.4.014 — 启动菜单移除 BGM Mode 切换，保留 ISR 自动回退](#c94) |
 | [0.4.013 — NB 脚本 tag/jump/jumpscene：场景内锚点与选项驱动跳转（devdoc 203）](#c93) |

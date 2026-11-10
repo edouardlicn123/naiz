@@ -83,10 +83,15 @@ LINE_REF_WHITELIST = {
     ("hal_audio.c", 134): "hal_pcm_set_volume",
     ("hal_audio.c", 168): "PCM_VOL_PATH_PCM",
     ("nb_asset_table.h", 69): "CG_COUNT",
-    ("save.h", 16): "CG_TOTAL",
+    # devdoc 205 expanded the SAVE_VERSION comment block (+4), shifting
+    # CG_TOTAL from 16 to 20.
+    ("save.h", 20): "CG_TOTAL",
     ("save_sys.c", 12): "SYSTEM.SAV",
     ("main.c", 143): "prefs_save",
-    ("nb_mainmenu.c", 115): "prefs_save",
+    # devdoc 205 (rename page) added the start_new_game helper before
+    # cmd_startsetting, shifting its prefs citations by +13 (115/117 ->
+    # 128/130).
+    ("nb_mainmenu.c", 128): "prefs_save",
     # devdoc 119 §3.4: the i18n width guard's geometry anchors.  These were
     # cited before they were registered, and the off-by-one that followed
     # (241 written as 240) passed silently -- see
@@ -119,7 +124,7 @@ LINE_REF_WHITELIST = {
     ("nb.c", 167): "prefs_load",
     ("nb.c", 172): "nb_set_lang",
     ("nb.c", 349): "nb_set_lang",
-    ("nb_mainmenu.c", 117): "prefs_get_lang",
+    ("nb_mainmenu.c", 130): "prefs_get_lang",
     ("nb_menu.c", 273): "prefs_get_version",
     ("tr.c", 28): "tr_table",
     ("tr.c", 168): "break",
@@ -138,7 +143,7 @@ KNOWN_GOOD_REFS = {
     ("nb_saveload.c", 73), ("nb_saveload.c", 76), ("nb_saveload.c", 379),
     ("nb_saveload.c", 386), ("nb_audio.c", 29), ("nb_audio.c", 40),
     ("nb_audio.c", 51), ("nb_audio.c", 43), ("nb.c", 316),
-    ("audio.h", 13), ("audio.h", 20), ("save_sys.c", 66),
+    ("audio.h", 13), ("audio.h", 20), ("save_sys.c", 67),
     ("prefs.h", 50), ("prefs.h", 60),
 }
 

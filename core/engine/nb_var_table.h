@@ -4,7 +4,14 @@
 #ifndef NB_VAR_TABLE_H
 #define NB_VAR_TABLE_H
 
-#define NB_VAR_COUNT 3
+#define NB_VAR_COUNT 4
+#define NB_STRVAR_COUNT 1
+#define NB_VAR_STR_MAX 40
+#define NB_VAR_MAXLEN 12
+
+/* String slot count clamped to >=1 so a project without string
+ * variables still declares a valid C array. */
+#define NB_STRVAR_SLOTS 1
 
 typedef struct {
     const char *id;
@@ -13,6 +20,9 @@ typedef struct {
     int initial;
     int min;
     int max;
+    int is_string;          /* 1 = string slot, 0 = int */
+    const char *initial_str; /* string default; "" for int vars */
+    int maxlen;             /* codepoint limit for string vars */
 } NbVarDef;
 
 #endif /* NB_VAR_TABLE_H */

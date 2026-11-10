@@ -7,11 +7,15 @@
 #define SAVE_SLOTS          12
 #define SAVE_MAGIC          0x4E41495A
 #define SYSTEM_SAVE_MAGIC   0x5953544D
-#define SAVE_VERSION        3
-/* SAVE_VERSION_MIN 2: v2 save layout = current SaveData minus chapter_title.
- * save_read() reads exactly offsetof(SaveData, chapter_title) bytes for a
- * v2 file so the older format stays loadable.  Bump SAVE_VERSION when the
- * struct layout changes; keep MIN at the oldest still-loadable layout. */
+#define SAVE_VERSION        4
+/* SAVE_VERSION_MIN 2: still-loadable layouts, oldest first.
+ *   v2 = current SaveData minus chapter_title;
+ *   v3 = current SaveData minus var_strings;
+ *   v4 = full struct.
+ * save_read() passes one length per older layout so each file is read with
+ * exactly the byte count it was written with (checksum included).  Bump
+ * SAVE_VERSION when the struct layout changes; keep MIN at the oldest
+ * still-loadable layout. */
 #define SAVE_VERSION_MIN    2
 #define CG_TOTAL            99
 #define ENDING_TOTAL        16
@@ -30,6 +34,7 @@ typedef struct {
     char         filename[64];
     char         lang[8];
     char         chapter_title[64];
+    char         var_strings[NB_STRVAR_SLOTS][NB_VAR_STR_MAX];
 } SaveData;
 
 typedef struct {
@@ -66,7 +71,8 @@ typedef struct {
 int save_file_write(const char *path, void *data, size_t sz,
                     unsigned int magic, unsigned int version,
                     size_t cs_offset, const char *tag);
-int save_file_read(const char *path, void *buf, size_t bufsz, size_t min_size,
+int save_file_read(const char *path, void *buf, size_t bufsz,
+                   size_t v2_size, size_t v3_size,
                    unsigned int expected_magic, unsigned int max_version,
                    size_t cs_offset, const char *tag);
 int save_read_header(const char *path, SaveHeader *h);

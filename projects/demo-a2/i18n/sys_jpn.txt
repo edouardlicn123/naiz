@@ -50,3 +50,7 @@ Mid=中
 Low=小
 Read Progress=読了割合
 [LOCKED]=[ロック]
+Enter your name=名前を入力してください
+NAME=名前変更
+VOICE=濁音
+OK=決定

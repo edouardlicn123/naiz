@@ -6,10 +6,16 @@
 
 #include "nb_var_table.h"
 
+/* int variable index -> string slot; -1 = not a string variable */
+static const int var_str_slot[NB_VAR_COUNT] = {
+    -1, -1, -1, 0
+};
+
 static const NbVarDef var_defs[NB_VAR_COUNT] = {
-    {"bond_fei", "Fei好感度", "Fei对玩家的好感度", 0, 0, 100},
-    {"bond_ira", "Ira好感度", "Ira对玩家的好感度", 0, 0, 100},
-    {"bond_neon", "Neon好感度", "Neon对玩家的好感度", 0, 0, 100},
+    {"bond_fei", "Fei好感度", "Fei对玩家的好感度", 0, 0, 100, 0, "", 0},
+    {"bond_ira", "Ira好感度", "Ira对玩家的好感度", 0, 0, 100, 0, "", 0},
+    {"bond_neon", "Neon好感度", "Neon对玩家的好感度", 0, 0, 100, 0, "", 0},
+    {"myname", "主角姓名", "玩家自定义的主角名，默认 me", 0, 0, 0, 1, "me", 12},
 };
 
 #endif /* NB_VAR_DEFS_H */

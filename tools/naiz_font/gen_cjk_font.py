@@ -193,12 +193,17 @@ def collect_cps(proj_dir, lang, with_base=True):
 
 
 def lang_base_ranges(lang):
-    """Family base ranges for a runtime language code (empty for eng)."""
+    """Family base ranges for a runtime language code.
+
+    Kana are included for every runtime language: the rename page's on-screen
+    keyboard always draws hiragana/katakana, whatever the UI language is
+    (devdoc 205 §10.3).  English has no Latin/CJK base block, only kana.
+    """
     if lang in CJK_FAMILY:
-        return [CJK_BASE]
+        return [CJK_BASE, HIRAGANA[1:], KATAKANA[1:]]
     if lang in LATIN_FAMILY:
-        return [LATIN_BASE]
-    return []
+        return [LATIN_BASE, HIRAGANA[1:], KATAKANA[1:]]
+    return [HIRAGANA[1:], KATAKANA[1:]]
 
 
 def merge_ranges(cps):

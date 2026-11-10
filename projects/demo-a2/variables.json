@@ -2,6 +2,7 @@
   "variables": [
     {"id": "bond_fei",  "name": "Fei好感度", "desc": "Fei对玩家的好感度", "initial": 0, "min": 0, "max": 100},
     {"id": "bond_ira",  "name": "Ira好感度", "desc": "Ira对玩家的好感度", "initial": 0, "min": 0, "max": 100},
-    {"id": "bond_neon", "name": "Neon好感度", "desc": "Neon对玩家的好感度", "initial": 0, "min": 0, "max": 100}
+    {"id": "bond_neon", "name": "Neon好感度", "desc": "Neon对玩家的好感度", "initial": 0, "min": 0, "max": 100},
+    {"id": "myname",    "name": "主角姓名",   "desc": "玩家自定义的主角名，默认 me", "type": "string", "initial": "me", "maxlen": 12}
   ]
 }

@@ -24,7 +24,9 @@ static int sys_write(const char *path, SystemSave *s)
 
 static int sys_read(const char *path, SystemSave *s)
 {
-    if (save_file_read(path, s, sizeof(SystemSave), sizeof(SystemSave),
+    /* SystemSave layout is version-independent: every layout size is bufsz. */
+    if (save_file_read(path, s, sizeof(SystemSave),
+                       sizeof(SystemSave), sizeof(SystemSave),
                        SYSTEM_SAVE_MAGIC, SAVE_VERSION,
                        offsetof(SystemSave, checksum), "[SYS]") != 0)
         return -1;

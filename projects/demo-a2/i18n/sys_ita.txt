@@ -50,3 +50,7 @@ Mid=Medio
 Low=Basso
 Read Progress=Avanzamento lettura
 [LOCKED]=[BLOCCATO]
+Enter your name=Inserisci il nome
+NAME=RINOMINA
+VOICE=SONORA
+OK=OK
