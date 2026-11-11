@@ -1,6 +1,9 @@
 /*
  * hal_audio.c — PC-98 audio HAL: MPU-401 (MIDI) + 86-board PCM (devdoc 101).
  *
+ * The OPNA FM half of the audio HAL lives in hal_fm.c; the A460/A466
+ * registers the two halves share are in hal_audio_regs.h.
+ *
  * MIDI (MPU-PC98 / MPU-98II, ports 0xC0D0/0xC0D2):
  *   - hal_audio_detect(): reset (0xFF) then UART (0x3F), each acknowledged
  *     by 0xFE on the data port.  On a real machine without a card, or an
@@ -23,6 +26,7 @@
 #include <stddef.h>  /* NULL */
 #include "hal.h"
 #include "pc98.h"
+#include "hal_audio_regs.h"
 
 /* --- MPU-401 / MPU-PC98 --- */
 
@@ -73,8 +77,6 @@ void hal_midi_out(uint8_t b)
 
 /* --- 86-board PCM --- */
 
-#define PCM_ID_PORT      0xA460
-#define PCM_STATUS_PORT  0xA466
 #define PCM_CTRL_PORT    0xA468
 #define PCM_DACTRL_PORT  0xA46A
 #define PCM_DATA_PORT    0xA46C
@@ -93,12 +95,8 @@ void hal_midi_out(uint8_t b)
 /* 0xFF + 1 * 128 = 32768 = exactly the 32KB FIFO capacity. */
 #define PCM_IRQ_INTERVAL_MAX 0xFF
 
-/* A466 electronic volume: bit7-5 select the path (101b = VOL6 = PCM direct
- * output), bit3-0 are the attenuation — REVERSED, 0 = loudest and 15 still
- * audible.  True PCM mute is A66E bit0, not this register. */
-#define PCM_VOL_PATH_PCM    0xA0
-#define FM_VOL_PATH_VOL1    0x00
-#define PCM_VOL_ATTEN_MAX   15
+/* A466 electronic volume / path constants are shared with hal_fm.c and live
+ * in hal_audio_regs.h (PCM_VOL_PATH_PCM / FM_VOL_PATH_VOL1 / PCM_VOL_ATTEN_MAX). */
 
 /* Sample rate per A468 bit2-0 (F02 §4.3).  Used to convert "how much real
  * time has passed since the last tick" into "how many bytes the FIFO needs";
@@ -153,7 +151,7 @@ void hal_pcm_play(const uint8_t *data, uint32_t len, int rate, int loop)
         rate = 7;
     rate_code = (uint8_t)rate;
 
-    outb(PCM_ID_PORT, 0x01);  /* OPNA mask: bit0=1 selects OPNA, bit1=0 = not forced silent */
+    outb(PCM_ID_PORT, PCM_OPNA_SELECT);  /* select OPNA, not forced silent */
 
     /* Raise A468 bit5 so A46A decodes as the FIFO interrupt interval; pulse
      * the reset bit; set the interval to the full 32KB FIFO. */
@@ -186,127 +184,6 @@ void hal_pcm_stop(void)
     g_pcm.active = 0;
 }
 
-/* --- 86-board OPNA FM (devdocs/123 M3, F03 §3.8) --- */
-
-/* Port pair for the ordinary register group (SSG / RHYTHM / system / FM
- * ch1-3).  A write to the address latch selects a register for the next
- * data access; the data port both writes that register and reads it back. */
-#define FM_ADDR_LATCH       0x0188
-#define FM_DATA_PORT        0x018A
-
-/* Port pair for the extended register group (FM ch4-6, ADPCM).  It only
- * routes through when A460 bit0 selects the OPNA (hal_fm_init below, and
- * hal_pcm_play already raises it). */
-#define FM_EXT_ADDR_LATCH   0x018C
-#define FM_EXT_DATA_PORT    0x018E
-
-#define FM_FM_CHANNELS      6   /* YM2608 FM voices (F03 §3.3) */
-#define FM_SSG_MIX_SILENT   0x3F  /* reg7: every bit 0 disables that output */
-
-/* LFO rate index (reg $22 bits2-0, LFRQ).  Rate rises as the index grows;
- * index 2 is roughly 6.6 Hz, a natural vibrato/tremolo speed.  Only channels
- * whose patch leaves AMS/PMS > 0 react, so this is inert for the rest. */
-#define FM_LFO_RATE         2
-
-/* Per-write register trace (devdocs/123 §1.5 判据 5): audit every
- * (port, addr, val) on the serial channel.  Compile-time switch — a 60Hz
- * register pump would spam the trace during normal use, so flip this to 1
- * and rebuild (then ./makegame.sh make) only for a trace session. */
-#define FM_TRACE_ENABLED 0
-
-int hal_fm_detect(void)
-{
-    /* Capability ID read (F03 §3.8 fact 3): latch 0xFF, then read back.
-     * An OPNA answers 1; an empty bus reads 0xFF.
-     *
-     * Must raise A460 bit0 (select OPNA) BEFORE touching 0188/018A, because
-     * the OPNA's register window is only routed when OPNA is selected
-     * (F03 §3.8 fact 1 — same gate that protects the 018C/018E extended
-     * window).  Without this the detect always fails on cold boot, before
-     * any hal_pcm_play() or hal_fm_init() has set A460.
-     *
-     * bit1 = 0 is critical too: A460 bit1 forces OPNA silent (F02 §3.2),
-     * and hal_pcm_play writes 0x01 for exactly this reason.  We mirror it
-     * here so the detect sequence itself never mutes the chip. */
-    outb(PCM_ID_PORT, 0x01);
-    outb(FM_ADDR_LATCH, 0xFF);
-    return inb(FM_DATA_PORT) == 1;
-}
-
-void hal_fm_init(void)
-{
-    /* A460 bit0 selects the OPNA; without it the extended window
-     * 0x18C/0x18E never routes (F03 §3.8 fact 1).  bit1=0 keeps the FM
-     * voice unmuted (AGENTS §十四 音频通路 note 3). */
-    outb(PCM_ID_PORT, 0x01);
-    /* Prime FM VOL1 at full loudness (attenuation 0). */
-    outb(PCM_STATUS_PORT, (uint8_t)(FM_VOL_PATH_VOL1 | 0x00));
-    /* Enable all six FM voices (reg $29 bit7 = SCH).  YM2608 wakes up with
-     * SCH=0, where channels 4-6 are simply not assigned (manual: "Channel 4-6
-     * is not good at assign"); the datasheet says to set bit 7 first to use
-     * the chip's six-voice mode.  Without this the fmseq allocator silently
-     * drops any note it places on voice 3-5 (devdoc 156).  bits 0-5 are the
-     * timer IRQ enables, left 0 (the engine polls, it takes no OPNA IRQ). */
-    hal_fm_write_reg(0, 0x29, 0x80);
-    /* Enable the LFO (reg $22): bit3 on, bits2-0 = rate (F03 §3.3).  This is
-     * the chip-wide oscillator that $B4 AMS/PMS depths modulate; with those
-     * bits 0 the register has no audible effect. */
-    hal_fm_write_reg(0, 0x22, (uint8_t)(0x08 | FM_LFO_RATE));
-}
-
-void hal_fm_set_volume(int atten)
-{
-    /* A466 VOL1 (FM direct) attenuation, reversed 0 (loudest) .. 15. */
-    if (atten < 0)
-        atten = 0;
-    if (atten > PCM_VOL_ATTEN_MAX)
-        atten = PCM_VOL_ATTEN_MAX;
-    outb(PCM_STATUS_PORT, (uint8_t)(FM_VOL_PATH_VOL1 | (atten & 0x0F)));
-}
-
-void hal_fm_shutdown(void)
-{
-    int ch;
-
-#if NAIZ_BGM_IRQ
-    { extern void _disable(void); _disable(); }
-#endif
-    /* Key off every FM voice: $28 carries the channel bits (bit2 selects
-     * FM4-6, F03 §3.8 fact 2) and a zero key mask. */
-    for (ch = 0; ch < FM_FM_CHANNELS; ch++)
-        hal_fm_write_reg(0, 0x28, (uint8_t)((ch >= 3 ? 4 : 0) | (ch % 3)));
-    /* SSG: disable every mixer output. */
-    hal_fm_write_reg(0, 0x07, FM_SSG_MIX_SILENT);
-#if NAIZ_BGM_IRQ
-    { extern void _enable(void); _enable(); }
-#endif
-}
-
-void hal_fm_write_reg(int bank, uint8_t addr, uint8_t val)
-{
-    /* devdoc 198: the OPNA port pair ($188/$18A or $18C/$18E) is not atomic --
-     * if the Timer-B ISR fires between outb(addr_latch) and outb(data), the
-     * handler's FM_TIMER_CTRL write clobbers the address latch, and the main
-     * thread's data byte lands on $27 (Timer-B control).  If that data has
-     * D3==0 (ENABLE_B), the timer is permanently disabled.  Protect the pair
-     * with cli/sti.  Skip cli if we're already inside the ISR (IF=0 already,
-     * and sti would let the ISR re-enter itself). */
-#if NAIZ_BGM_IRQ
-    int in_isr = hal_bgm_irq_in_isr();
-    if (!in_isr) { extern void _disable(void); _disable(); }
-#endif
-    if (bank == 0) {
-        outb(FM_ADDR_LATCH, addr);
-        outb(FM_DATA_PORT, val);
-    } else {
-        outb(FM_EXT_ADDR_LATCH, addr);
-        outb(FM_EXT_DATA_PORT, val);
-    }
-#if NAIZ_BGM_IRQ
-    if (!in_isr) { extern void _enable(void); _enable(); }
-#endif
-}
-
 /* Stage 3: unit-based PCM pump (devdoc 168).  delta_units is in 1/16 ms units
  * (258 units ≈ 16.154 ms at NB=200 / φM=7.9872 MHz); converts to ms for the
  * byte-rate calculation.  Unit-based replacement for the retired ms-based tick. */
@@ -337,7 +214,7 @@ void hal_pcm_advance_units(uint32_t units)
         push = g_pcm.len - g_pcm.pos;
 
     for (i = 0; i < push; i++) {
-        if (inb(PCM_STATUS_PORT) & 0x80)
+        if (inb(PCM_STATUS_PORT) & PCM_STATUS_FIFO_FULL)
             break;
         outb(PCM_DATA_PORT, g_pcm.data[g_pcm.pos]);
         g_pcm.pos++;

@@ -50,7 +50,7 @@ static int save_dlg_slot_hit(int mx, int my, int *row, int *col)
         my >= LAYER_DIALOG_Y + LAYER_DIALOG_H - LAYER_DIALOG_BORDER)
         return 0;
     if (mx < LAYER_DIALOG_CONTENT_X ||
-        mx >= LAYER_DIALOG_X + LAYER_DIALOG_W - LAYER_DIALOG_RIGHT_INDENT)
+        mx >= LAYER_DIALOG_RIGHT - LAYER_DIALOG_RIGHT_INDENT)
         return 0;
     r = (my - LAYER_DIALOG_CONTENT_Y) / 20;
     c = (mx - LAYER_DIALOG_CONTENT_X) / (LAYER_DIALOG_CONTENT_W / 6);

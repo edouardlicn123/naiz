@@ -47,6 +47,7 @@
 #define BIOS_BUF_START   0x0502UL   /* 缓冲区起始，16 项 × 2 字节 = 32 字节 */
 #define BIOS_BUF_END     0x0522UL   /* 缓冲区结束（末尾之后） */
 #define BIOS_HEAD        0x0524UL   /* word: 下一个读取偏移 */
+#define BIOS_HEAD_HI     (BIOS_HEAD + 1)  /* 高字节 */
 #define BIOS_TAIL        0x0526UL   /* word: 下一个写入偏移 */
 #define BIOS_COUNT       0x0528UL   /* byte: 缓冲区内按键数量 */
 
@@ -81,7 +82,7 @@ static void kbd_bios_reset(void)
     mem[BIOS_COUNT]    = 0;
     /* HEAD = BIOS_BUF_START（小端写入） */
     mem[BIOS_HEAD]     = (unsigned char)(BIOS_BUF_START & 0xFF);
-    mem[BIOS_HEAD + 1] = (unsigned char)((BIOS_BUF_START >> 8) & 0xFF);
+    mem[BIOS_HEAD_HI] = (unsigned char)((BIOS_BUF_START >> 8) & 0xFF);
     /* TAIL = BIOS_BUF_START */
     mem[BIOS_TAIL]     = (unsigned char)(BIOS_BUF_START & 0xFF);
     mem[BIOS_TAIL + 1] = (unsigned char)((BIOS_BUF_START >> 8) & 0xFF);
@@ -133,13 +134,13 @@ void hal_kbd_update(void)
             KBD_LOG("ignore: draining %d BIOS events\r\n", count);
             while (count--) {
                 head = (unsigned int)mem[BIOS_HEAD]
-                     | ((unsigned int)mem[BIOS_HEAD + 1] << 8);
+                     | ((unsigned int)mem[BIOS_HEAD_HI] << 8);
                 sc = mem[head + 1];
                 head += 2;
                 if (head >= BIOS_BUF_END)
                     head = BIOS_BUF_START;
                 mem[BIOS_HEAD] = (unsigned char)(head & 0xFF);
-                mem[BIOS_HEAD + 1] = (unsigned char)((head >> 8) & 0xFF);
+                mem[BIOS_HEAD_HI] = (unsigned char)((head >> 8) & 0xFF);
             }
             mem[BIOS_COUNT] = 0;
         }
@@ -157,7 +158,7 @@ void hal_kbd_update(void)
                 break;
 
             head = (unsigned int)mem[BIOS_HEAD]
-                 | ((unsigned int)mem[BIOS_HEAD + 1] << 8);
+                 | ((unsigned int)mem[BIOS_HEAD_HI] << 8);
 
             sc = mem[head + 1];
             ch = mem[head];
@@ -193,7 +194,7 @@ void hal_kbd_update(void)
             if (head >= BIOS_BUF_END)
                 head = BIOS_BUF_START;
             mem[BIOS_HEAD]     = (unsigned char)(head & 0xFF);
-            mem[BIOS_HEAD + 1] = (unsigned char)((head >> 8) & 0xFF);
+            mem[BIOS_HEAD_HI] = (unsigned char)((head >> 8) & 0xFF);
             mem[BIOS_COUNT]    = count - 1;
         }
     }
@@ -271,7 +272,7 @@ static int kbd_bios_has_make(unsigned char sc)
     if (count == 0)
         return 0;
     head = (unsigned int)mem[BIOS_HEAD]
-         | ((unsigned int)mem[BIOS_HEAD + 1] << 8);
+         | ((unsigned int)mem[BIOS_HEAD_HI] << 8);
     while (count--) {
         if (mem[head + 1] == sc)
             return 1;
@@ -356,12 +357,12 @@ void hal_kbd_wait_any(void)
     if (mem[BIOS_COUNT] == 0) return;
 
     head = (unsigned int)mem[BIOS_HEAD]
-         | ((unsigned int)mem[BIOS_HEAD + 1] << 8);
+         | ((unsigned int)mem[BIOS_HEAD_HI] << 8);
     head += 2;
     if (head >= BIOS_BUF_END)
         head = BIOS_BUF_START;
     mem[BIOS_HEAD]     = (unsigned char)(head & 0xFF);
-    mem[BIOS_HEAD + 1] = (unsigned char)((head >> 8) & 0xFF);
+    mem[BIOS_HEAD_HI] = (unsigned char)((head >> 8) & 0xFF);
     mem[BIOS_COUNT]    = mem[BIOS_COUNT] - 1;
 }
 

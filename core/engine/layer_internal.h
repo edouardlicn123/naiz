@@ -19,7 +19,7 @@
  * place.  Returns NULL on OOM (after logging via tag). */
 static inline unsigned char *layer_snapshot_alloc_dialog(const char *tag)
 {
-    unsigned char *buf = (unsigned char *)malloc(LAYER_DIALOG_W * LAYER_DIALOG_H);
+    unsigned char *buf = (unsigned char *)malloc(LAYER_DIALOG_AREA);
     if (!buf) hal_logf("OOM: %s malloc fail\r\n", tag);
     return buf;
 }

@@ -17,7 +17,7 @@ op1->op2 and op3->op4.  Do NOT read N as a chip register slot: the OPN core
 addresses operators in register-slot order 1-3-2-4, i.e. algorithm operator
 k lives in register slot FMOPN_OP_SLOT[k] = {0,2,1,3} (confirmed against
 ymfm `operator_map` and NP2kai fmgen `slottable`).  That map lives in
-core/lib/fmopn.c fmopn_op_slot (single source of truth).
+core/lib/fmopn_patch.c fmopn_op_slot (single source of truth).
 
 Compiled layout (32 bytes, one patch): the file stores operators in
 algorithm order, so file idx k holds algorithm operator k+1 (this file's
@@ -51,7 +51,7 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
 from naiz_lib import project_assets_dir  # noqa: E402
 
 # Source `op=N` (algorithm operator) is stored at file idx N-1, so the file is
-# laid out in algorithm order (identity).  core/lib/fmopn.c maps file idx ->
+# laid out in algorithm order (identity).  core/lib/fmopn_patch.c maps file idx ->
 # chip register slot via fmopn_op_slot = {0,2,1,3}.
 OP_FILE = [0, 1, 2, 3]
 

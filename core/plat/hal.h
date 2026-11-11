@@ -512,6 +512,8 @@ void hal_video_check_palette(void);
 
 /* VRAM bank size in bytes (32KB = 32768). */
 #define VRAM_BANK_SZ       32768
+/* Mask for wrapping a linear VRAM offset into the 32KB bank window. */
+#define VRAM_BANK_MASK     (VRAM_BANK_SZ - 1)
 
 /* Select VRAM bank 0-7 for the window at 0xA8000. */
 void hal_vram_bank_select(int bank);

@@ -215,7 +215,7 @@ static void anim_fill_dialog_border(void)
 {
     fill_rect(0, LAYER_DIALOG_Y,
               LAYER_DIALOG_X, LAYER_SCREEN_H - LAYER_DIALOG_Y, 0);
-    fill_rect(LAYER_DIALOG_X + LAYER_DIALOG_W, LAYER_DIALOG_Y,
+    fill_rect(LAYER_DIALOG_RIGHT, LAYER_DIALOG_Y,
               LAYER_SCREEN_W - LAYER_DIALOG_X - LAYER_DIALOG_W,
               LAYER_SCREEN_H - LAYER_DIALOG_Y, 0);
 }

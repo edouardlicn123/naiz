@@ -23,21 +23,21 @@ static unsigned long nz_seq;
 static int nz_arrowpx(const unsigned char *buf)
 {
     int i, n = 0;
-    for (i = 0; i < CURSOR_SAVED_W * CURSOR_SAVED_H; i++)
+    for (i = 0; i < CURSOR_SAVED_AREA; i++)
         if (buf[i] == PAL_CURSOR_BLACK) n++;
     return n;
 }
 static void nz_capture(const char *tag, const unsigned char *buf, int x, int y)
 {
     int i, wht = 0;
-    for (i = 0; i < CURSOR_SAVED_W * CURSOR_SAVED_H; i++)
+    for (i = 0; i < CURSOR_SAVED_AREA; i++)
         if (buf[i] == PAL_WHITE) wht++;
     hal_logf("[CT]%08lX %s %d,%d %d %d\r\n", nz_seq++, tag, x, y,
              nz_arrowpx(buf), wht);
 }
 static void nz_erase_verify(const char *tag, int x, int y)
 {
-    unsigned char check[CURSOR_SAVED_W * CURSOR_SAVED_H];
+    unsigned char check[CURSOR_SAVED_AREA];
     vram_read(x, y, CURSOR_SAVED_W, CURSOR_SAVED_H, check);
     nz_capture(tag, check, x, y);
 }
@@ -130,9 +130,9 @@ static void draw_shape(int x, int y)
             addr = sy * LAYER_SCREEN_W + sx;
             VRAM_SET_BANK(addr, cur_bank);
             if (is_fill_pixel(row, col))
-                win[addr & (VRAM_BANK_SZ - 1)] = PAL_WHITE;
+                win[addr & VRAM_BANK_MASK] = PAL_WHITE;
             if (is_cursor_pixel(row, col))
-                win[addr & (VRAM_BANK_SZ - 1)] = PAL_CURSOR_BLACK;
+                win[addr & VRAM_BANK_MASK] = PAL_CURSOR_BLACK;
         }
     }
 }

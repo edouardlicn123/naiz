@@ -1,10 +1,10 @@
 # Naiz — AI 编程规则
 
-> **当前版本**: `0.4.024`（`projects/demo-a2/config.toml`）
+> **当前版本**: `0.4.026`（`projects/demo-a2/config.toml`）
 >
-> **最新条目**: `CHANGELOG.md` `c101` — 改名页两修：① OK 文字切换后消失（`ni_draw_bottom_labels` 漏画 OK label，`publish_bottom` 的 `erase_to_base` 擦掉后没重画）② 鼠标划过键盘偶尔按下按键（NP2kai 模式下按钮状态仍从 8255 PPI 读，快速移动时按钮位一帧抖动产生假 click；`mouse.c` 新增 `mouse_debounce_buttons()` 要求连续 2 帧稳定才采纳）。**本行只放当前状态指针**：历史条目正文一律只写进 `CHANGELOG.md`（规则见 §十三「变更后更新规约」），本文件不承载任何开发历史摘要——§一–§十七 只存**规则与当前状态**。
-> **当前状态**（0.4.024 / c101）：Studio 与 naiz 并列放置；共享 venv 位于 `~/venv`；guildbook 与 `assets/<game>/bgm/` 仍在主仓库。改名页已 0.4.017（cursor）→ 0.4.018（残留框线）→ 0.4.019（grid+功能键+标题）→ 0.4.021（快速连点卡死）→ 0.4.023（帧消失+风格统一+gallery 背景）→ 0.4.024（OK 文字消失+8255 防抖）多轮实机修补；devdoc 205 §16 的完整运行期冒烟仍待实机执行；devdoc 203 的 tag/jump/jumpscene 运行期冒烟同样待实机。
-> **开发历史**：`CHANGELOG.md`（唯一载体）；本文件只存规则与当前状态，不承载历史摘要。历史速查 → CHANGELOG.md（最新：c98），新条目追加到 CHANGELOG.md 顶部。
+> **最新条目**: `CHANGELOG.md` `c103` — C35 重复常量表达式收口：`LAYER_SCREEN_AREA`/`LAYER_DIALOG_RIGHT`/`LAYER_DIALOG_AREA`/`CURSOR_SAVED_AREA`/`VRAM_BANK_MASK`/`BIOS_HEAD_HI` 等具名宏落地 20 文件，无行为变化。**本行只放当前状态指针**：历史条目正文一律只写进 `CHANGELOG.md`（规则见 §十三「变更后更新规约」），本文件不承载任何开发历史摘要——§一–§十七 只存**规则与当前状态**。
+> **当前状态**（0.4.026 / c103）：Studio 与 naiz 并列放置；共享 venv 位于 `~/venv`；guildbook 与 `assets/<game>/bgm/` 仍在主仓库。改名页已 0.4.017（cursor）→ 0.4.018（残留框线）→ 0.4.019（grid+功能键+标题）→ 0.4.021（快速连点卡死）→ 0.4.023（帧消失+风格统一+gallery 背景）→ 0.4.024（OK 文字消失+8255 防抖）多轮实机修补；0.4.025 完成音频 HAL/FM 模型拆分，0.4.026 完成 C35 常量具名化（均无实机行为变化）。devdoc 205 §16 的完整运行期冒烟仍待实机执行；devdoc 203 的 tag/jump/jumpscene 运行期冒烟同样待实机。
+> **开发历史**：`CHANGELOG.md`（唯一载体）；本文件只存规则与当前状态，不承载历史摘要。历史速查 → CHANGELOG.md（最新：c103），新条目追加到 CHANGELOG.md 顶部。
 > **防复发机制**：§十七（39 条规则逐一对照）；写完 devdoc 须过 §十「规格与实现的收敛责任」（行号校准 + 声称逐条落地，pytest 全绿不算证据）。
 > **构建验证**：`make -C core` + `core/*.err` 全为空（诊断走 `.err`，**不在 stdout**）。`pytest` 907 passed, 2 skipped（含守卫）；venv 统一为 `~/venv`，naiz 与 naiz-studio 共用。
 
@@ -304,13 +304,13 @@ naiz_midi / naiz_music 已作为独立项目移出到 `~/`。详见 `docs/B91-�
 | 通路 | 硬件 | 引擎 | 现状 |
 |---|---|---|---|
 | BGM | **MIDI over MPU-401**（PC-98 扩展卡） | `core/lib/midi.*` + `hal_midi_out()` | 本地静音（宿主无 MIDI 设备，`hal_audio_detect()` 返回 0） |
-| BGM（**FM**） | **FM over 86 板 OPNA**（板载标配） | `core/lib/fmopn.*` + `core/lib/fmseq.*` + `hal_fm_*()`（`hal_audio.c`，`outb` 唯一出处）；后端自动检测（有 MPU 走 MIDI、否则 FM、都无 fail-loud） | **已实现**（S0–S5 devdoc 123 / S6 音色 devdoc 124 / S7 LFO+15 族 devdoc 135）；`$22`=LFO 使能+速率、`$B4`=pan/AMS/PMS |
+| BGM（**FM**） | **FM over 86 板 OPNA**（板载标配） | `core/lib/fmopn.*` + `core/lib/fmseq.*` + `hal_fm_*()`（`hal_fm.c`，`outb` 唯一出处）；后端自动检测（有 MPU 走 MIDI、否则 FM、都无 fail-loud） | **已实现**（S0–S5 devdoc 123 / S6 音色 devdoc 124 / S7 LFO+15 族 devdoc 135）；`$22`=LFO 使能+速率、`$B4`=pan/AMS/PMS |
 | SE / 语音 | **86 板 YM3433B PCM**（标配） | `pcm_play()` + FIFO 泵 | 可闻 |
 
 1. **86 板只有一条 PCM FIFO，`sound` 与 `voice` 共享、后到覆盖**（`audio.c` 单一 `g_pcm_buf`；`docs/B92` §命令表）。**`voice`/`sound` 不得相邻两行**——两者非阻塞（§十四.6/§十四.7），会在同一 pass 内背靠背执行，后者把前者顶掉、实际发声 <1 ms。中间至少隔一个对白页。反面教材：`nbook001.nb` 的 `voice(){hi}` 曾被紧邻的 `sound(){ding}` 瞬顶（`hi` 0.50 s / `ding` 0.40 s，PCM 单通道，devdoc 122 §三）。
 2. **BGM 静音先看串口有没有 `AUD MPU OK`**（`audio.c` init 成功分支）。见到 `AUD WARN: no MPU-401` 即已定性，**不必再怀疑脚本、key 登记或 `AUDIO.DAT`**。BGM 在无 MPU 环境静音是**设计内降级**，不是 bug。
 3. **BGM 不可走 PCM 循环**：单通道会被任意 SE 掐断且不自动恢复（规则 1 的推广）；且 `pcm_play()` 硬编码 `loop=0`，脚本 `sound(){<key>}` 无 flags 参数。
-4. **内容与格式的对应是硬约束**：语音/音效**必须** PCM（人声波形复杂，FM 只能合成「机器人音」）；BGM 走 **FM**（PC-98 原生即 FMP/PMD 用 OPM 音源出曲 + PCM 驱动出语音，见 `docs/refdocs/F01_sound_boards.md`）。HAL 已实现 `hal_fm_*()`（`core/plat/hal_audio.c`，引擎链路上 `outb()` 唯一出处），经 `core/lib/fmopn.*`/`core/lib/fmseq.*` 驱动 OPNA（devdoc 123）。**BGM 静音先分流**：无 MPU-401 环境走 FM 后端，串口应见 `AUD OPNA OK` 与 `FM: N patch families ready`；见到 `FM WARN` 说明某族 patch 缺失/非法而回落到内置默认。
+4. **内容与格式的对应是硬约束**：语音/音效**必须** PCM（人声波形复杂，FM 只能合成「机器人音」）；BGM 走 **FM**（PC-98 原生即 FMP/PMD 用 OPM 音源出曲 + PCM 驱动出语音，见 `docs/refdocs/F01_sound_boards.md`）。HAL 已实现 `hal_fm_*()`（`core/plat/hal_fm.c`，引擎链路上 `outb()` 唯一出处），经 `core/lib/fmopn.*`/`core/lib/fmseq.*` 驱动 OPNA（devdoc 123）。**BGM 静音先分流**：无 MPU-401 环境走 FM 后端，串口应见 `AUD OPNA OK` 与 `FM: N patch families ready`；见到 `FM WARN` 说明某族 patch 缺失/非法而回落到内置默认。
 5. **不存在可用的 WAV→FM 自动转换**：FM 是参数化模型、WAV 是任意波形，反推是欠定的逆问题、无唯一解。业界方向是反向——用 tracker（如 FamiTracker，YM2612 与 PC-98 YM2608 的 FM 核心同源）按 FM 音色作曲并导出 WAV/MIDI，**使音乐资产与引擎播放通路解耦**。详见 devdoc 122 §五。
 6. **`scene()` 会停所有音频**（`scene_switch()` → `audio_stop_all()`）。不要指望 BGM/语音跨场景延续，也不要在每个场景末尾堆 `bgm(stop)`（`scene()` 本就会停）。
 7. **音频 key 必须登记**：脚本里每个 `bgm`/`sound`/`voice` 的花括号 key 都要有 `ASSETS.DB` 中 `type` 为 `BGM`/`SND`/`VC` 的行。`tools/naiz_build/nb_validator.py` 只校验 `IMG`/`ANI`/`CG`，**不查音频 key**——未登记的 key 能通过 `build`，只在实机表现为一行 `BGM WARN: '…' is not a registered BGM asset`。防呆：`tools/tests/test_audio_asset_paths.py::test_scene_audio_keys_are_registered`。

@@ -65,7 +65,7 @@ static int dump_bg_layer(const char *filename)
         return -1;
     }
 
-    size = LAYER_SCREEN_W * LAYER_SCREEN_H;
+    size = LAYER_SCREEN_AREA;
     rgb = (uint8_t *)malloc((size_t)size * 3);
     if (!rgb) {
         hal_log("layer_debug: OOM for bg rgb buffer\r\n");
@@ -90,7 +90,7 @@ static int dump_dialog_layer(const char *filename)
         return -1;
     }
 
-    size = LAYER_DIALOG_W * LAYER_DIALOG_H;
+    size = LAYER_DIALOG_AREA;
     rgb = (uint8_t *)malloc((size_t)size * 3);
     if (!rgb) {
         hal_log("layer_debug: OOM for dialog rgb buffer\r\n");
@@ -109,7 +109,7 @@ static int dump_sprite_layer(const char *filename)
     int size, i;
     uint8_t pal[PALETTE_SIZE][3];
 
-    size = LAYER_SCREEN_W * LAYER_SCREEN_H;
+    size = LAYER_SCREEN_AREA;
     vram_buf = (uint8_t *)malloc((size_t)size);
     bg_snap = (uint8_t *)malloc((size_t)size);
     rgb = (uint8_t *)malloc((size_t)size * 3);
@@ -153,7 +153,7 @@ static int dump_composite_layer(const char *filename)
     uint8_t *vram_buf, *rgb;
     int size;
 
-    size = LAYER_SCREEN_W * LAYER_SCREEN_H;
+    size = LAYER_SCREEN_AREA;
     vram_buf = (uint8_t *)malloc((size_t)size);
     rgb = (uint8_t *)malloc((size_t)size * 3);
 

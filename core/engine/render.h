@@ -29,6 +29,7 @@
 /* Screen dimensions */
 #define LAYER_SCREEN_W    640
 #define LAYER_SCREEN_H    400
+#define LAYER_SCREEN_AREA (LAYER_SCREEN_W * LAYER_SCREEN_H)
 
 /*=== Constants ============================================================*/
 

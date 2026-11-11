@@ -48,7 +48,7 @@ void layer_bg_restore_rect(int x, int y, int w, int h, int clip_dialog)
             if (rx < 0 || rx >= LAYER_SCREEN_W) continue;
 
             if (clip_dialog && layer_dialog_drawn()) {
-                if (rx >= LAYER_DIALOG_X && rx < LAYER_DIALOG_X + LAYER_DIALOG_W &&
+                if (rx >= LAYER_DIALOG_X && rx < LAYER_DIALOG_RIGHT &&
                     ry >= LAYER_DIALOG_Y && ry < LAYER_DIALOG_Y + LAYER_DIALOG_H)
                     continue;
             }
@@ -72,13 +72,13 @@ static void layer_capture_bg_from_image(const uint8_t *pixels, int img_w, int im
 
     if (!pixels || !img_w || !img_h) return;
     if (!bg_snapshot) {
-        bg_snapshot = (unsigned char *)malloc(LAYER_SCREEN_W * LAYER_SCREEN_H);
+        bg_snapshot = (unsigned char *)malloc(LAYER_SCREEN_AREA);
         if (!bg_snapshot) {
             hal_log("OOM: bg_snapshot malloc fail\r\n");
             return;
         }
     }
-    memset(bg_snapshot, 0, (size_t)LAYER_SCREEN_W * LAYER_SCREEN_H);
+    memset(bg_snapshot, 0, (size_t)LAYER_SCREEN_AREA);
     for (y = 0; y < LAYER_SCREEN_H && y < img_h; y++) {
         row_w = img_w < LAYER_SCREEN_W ? img_w : LAYER_SCREEN_W;
         memcpy(bg_snapshot + y * LAYER_SCREEN_W, pixels + y * img_w, (size_t)row_w);
@@ -106,7 +106,7 @@ void layer_capture_bg_dialog_from_image(const uint8_t *pixels, int img_w, int im
     }
     /* Zero first so rows the image does not cover (cine 640x280 case) keep
      * no stale pixels; guarded rows are skipped below. */
-    memset(under_dialog, 0, (size_t)LAYER_DIALOG_W * LAYER_DIALOG_H);
+    memset(under_dialog, 0, (size_t)LAYER_DIALOG_AREA);
     row_start = src_x + LAYER_DIALOG_X;
     if (row_start >= img_w) return;
     copy_len = LAYER_DIALOG_W;

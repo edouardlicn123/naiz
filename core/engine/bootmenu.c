@@ -73,6 +73,8 @@ static const char *LANG_CODES[] = {
 #define LABEL_AREA_W 200
 #define LABEL_X      (SEL_LX + ARROW_W + GAP)         /* 214 */
 #define LABEL_CX     (LABEL_X + LABEL_AREA_W / 2)     /* 314 */
+#define LABEL_RIGHT  (LABEL_X + LABEL_AREA_W)
+#define LABEL_ARROW_X (LABEL_RIGHT + GAP)
 #define START_BW     200
 #define START_BH     20
 #define START_X      MENU_X                             /* 30, aligned with Language */
@@ -137,8 +139,8 @@ static int menu_hittest(int mx, int my)
     if (mx >= SEL_LX && mx < SEL_LX + ARROW_W &&
         my >= SEL_Y && my < SEL_Y + 20)
         return 0;
-    if (mx >= LABEL_X + LABEL_AREA_W + GAP &&
-        mx <  LABEL_X + LABEL_AREA_W + GAP + ARROW_W &&
+    if (mx >= LABEL_ARROW_X &&
+        mx <  LABEL_ARROW_X + ARROW_W &&
         my >= SEL_Y && my < SEL_Y + 20)
         return 1;
     if (mx >= START_X && mx < START_X + START_BW &&
@@ -174,7 +176,7 @@ static void bootmenu_draw(int lang_idx, int focus, int full)
         draw_text_outlined(tr("Language"), 0, MENU_X, SEL_Y, 0, PAL_WHITE);
         draw_text_outlined("<", 0, SEL_LX + 10, SEL_Y, 0, PAL_WHITE);
         draw_text_outlined(">", 0,
-                           LABEL_X + LABEL_AREA_W + GAP + 10, SEL_Y, 0, PAL_WHITE);
+                           LABEL_ARROW_X + 10, SEL_Y, 0, PAL_WHITE);
         draw_text_outlined(tr("Start Game"), 0, START_X, START_BY, 0, PAL_WHITE);
 
         /* Dynamic content (language name + focus indicator) */

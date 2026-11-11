@@ -28,8 +28,9 @@ reference FM renderer (the "oracle") for Naiz's FM patch lab (devdocs/136).
   developer machine (Linux). It is **never** linked into `engine.exe`, never
   injected into the HDI, and never runs on the PC-98 / NP2kai target.
 - The engine's own runtime FM playback is `core/lib/fmopn.c` +
-  `core/lib/fmseq.c` + `core/plat/hal_audio.c`; that path is unaffected by
-  this directory.
+  `core/lib/fmopn_patch.c` + `core/lib/fmseq.c` + `core/plat/hal_fm.c`
+  (the PCM/MIDI half of the audio HAL is `core/plat/hal_audio.c`); that path
+  is unaffected by this directory.
 - ymfm's BSD 3-Clause license permits redistribution and use in source and
   binary forms, with the license and copyright notice retained (both are
   present here). No GPL contamination: BSD is permissive.

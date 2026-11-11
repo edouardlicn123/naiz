@@ -55,7 +55,7 @@ void vram_pset_addr(int addr, uint8_t color)
 {
     volatile uint8_t *win = hal_vram_get_window();
     int sx, sy, bx, by;
-    if (addr < 0 || addr >= LAYER_SCREEN_W * LAYER_SCREEN_H) return;
+    if (addr < 0 || addr >= LAYER_SCREEN_AREA) return;
     if (render_tgt_buf) {
         /* RAM target: map absolute screen coords into the buffer, clipped
          * to the buffer w x h (C6 boundary guard). */
@@ -69,7 +69,7 @@ void vram_pset_addr(int addr, uint8_t color)
         return;
     }
     hal_vram_bank_select(addr >> 15);
-    win[addr & (VRAM_BANK_SZ - 1)] = color;
+    win[addr & VRAM_BANK_MASK] = color;
 }
 
 /* Fill a rectangular region with a solid color.
@@ -101,7 +101,7 @@ void fill_rect(int x, int y, int w, int h, uint8_t color)
                 cur_bank = bank;
                 hal_vram_bank_select(bank);
             }
-            off = addr & (VRAM_BANK_SZ - 1);
+            off = addr & VRAM_BANK_MASK;
             seg = VRAM_BANK_SZ - off;
             if (seg > remain) seg = remain;
             vram_fill_row(win, off, color, seg);
@@ -147,7 +147,7 @@ void fill_diag_sweep(int x, int y, int w, int h, uint8_t color,
                 while (remain > 0) {
                     int off, seg;
                     VRAM_SET_BANK(addr, cur_bank);
-                    off = addr & (VRAM_BANK_SZ - 1);
+                    off = addr & VRAM_BANK_MASK;
                     seg = VRAM_BANK_SZ - off;
                     if (seg > remain) seg = remain;
                     vram_fill_row(win, off, color, seg);
@@ -210,7 +210,7 @@ void fill_rect_pattern(int x, int y, int w, int h,
         while (px < w && (px & 7)) {
             if (byte & (0x80 >> (px & 7))) {
                 VRAM_SET_BANK(addr, cur_bank);
-                win[addr & (VRAM_BANK_SZ - 1)] = color;
+                win[addr & VRAM_BANK_MASK] = color;
             }
             addr++;
             px++;
@@ -224,7 +224,7 @@ void fill_rect_pattern(int x, int y, int w, int h,
                     if (byte & (0x80 >> bi)) {
                         int a2 = addr + bi;
                         VRAM_SET_BANK(a2, cur_bank);
-                        win[a2 & (VRAM_BANK_SZ - 1)] = color;
+                        win[a2 & VRAM_BANK_MASK] = color;
                     }
                 }
             }
@@ -235,7 +235,7 @@ void fill_rect_pattern(int x, int y, int w, int h,
         while (px < w) {
             if (byte & (0x80 >> (px & 7))) {
                 VRAM_SET_BANK(addr, cur_bank);
-                win[addr & (VRAM_BANK_SZ - 1)] = color;
+                win[addr & VRAM_BANK_MASK] = color;
             }
             addr++;
             px++;

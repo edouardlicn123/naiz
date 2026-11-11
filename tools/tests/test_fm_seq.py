@@ -1,6 +1,6 @@
 """S4 fmseq host tests (devdocs/123 M2).
 
-Compiles core/lib/fmseq.c (+ fmopn.c, midi.c) with the host gcc into a temp
+Compiles core/lib/fmseq.c (+ fmopn.c, fmopn_patch.c, midi.c) with the host gcc into a temp
 shared object and drives it through ctypes.  The voice allocator is pure
 logic (zero outb()), so allocation, steal, sustain, bend, percussion mapping
 and SSG decay are all proven here without an emulator.
@@ -41,7 +41,7 @@ sys.path.insert(0, os.path.join(REPO_ROOT, "tools", "tests"))
 from test_fmopn import _good_patch, _ratio  # noqa: E402
 from naiz_audio import gen_test_midi  # noqa: E402
 
-LIB_C_FILES = ["fmseq.c", "fmopn.c", "midi.c"]
+LIB_C_FILES = ["fmseq.c", "fmopn.c", "fmopn_patch.c", "midi.c"]
 _BASE = os.path.join(REPO_ROOT, "core", "lib")
 _CACHE = {}
 

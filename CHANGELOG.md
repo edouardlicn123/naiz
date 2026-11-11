@@ -3,6 +3,43 @@
 自 R1 起全部 Bug 修复与功能演进记录（条目顺序沿用 AGENTS.md 既有历史排列）；`AGENTS.md` 仅保留当前版本与规则。**新条目约定**：每轮修复/演进完成后，在下方 `---` 分隔线之后（第一条位置）追加变更摘要，并在 AGENTS.md 头部同步「当前版本」。**条目格式**：每条以 `### <版本号> — <标题>` 开头（版本号化标题行 + `<a id="cN">` 锚点，N 按条目序递增），正文整段或分小节；历史速查直接读下方「版本索引」。
 ---
 
+<a id="c103"></a>
+### 0.4.026 — C35 重复常量表达式收口（几何/掩码具名化）
+
+规则审计（C35/HEUR）报出 11 处「同一文件内常量算术表达式重复 ≥3 次」。全部抽为具名宏，**无行为变化**：
+
+- `render.h`：`LAYER_SCREEN_AREA = LAYER_SCREEN_W * LAYER_SCREEN_H`
+- `scene_layers.h`：`LAYER_DIALOG_RIGHT = LAYER_DIALOG_X + LAYER_DIALOG_W`、`LAYER_DIALOG_AREA = LAYER_DIALOG_W * LAYER_DIALOG_H`
+- `cursor.h`：`CURSOR_SAVED_AREA = CURSOR_SAVED_W * CURSOR_SAVED_H`
+- `hal.h`：`VRAM_BANK_MASK = VRAM_BANK_SZ - 1`（3 个 render 文件共 18 处 `& (VRAM_BANK_SZ - 1)` 归一）
+- `keyboard.c`：`BIOS_HEAD_HI = BIOS_HEAD + 1`（8 处）
+- 文件内布局：`LABEL_RIGHT`/`LABEL_ARROW_X`（bootmenu）、`NI_SLOT_RIGHT`（nameinput）、`SPECIAL_BTN_RIGHT`（special）
+
+落地面 20 个文件（含 `layer_bg.c`/`layer_internal.h`/`nb_anim.c`/`nb_save_dialog.c` 等同表达式顺带归一）。`tools/tests/test_devdoc_refs.py` 的 bootmenu 行号锚点随之 109→111 / 206→208 / 316→318。
+
+**验证**：`make -C core` 0 err；`pytest` 907 passed, 2 skipped；`./start.sh fullaudit` 7/7 通过；规则审计候选 71→60，60 verified / 0 stale / 0 open。版本 0.4.025 → **0.4.026**。
+
+<a id="c102"></a>
+### 0.4.025 — 音频 HAL 与 FM 模型按通路拆分（E 节候选 1+2）
+
+依据最新符号审计（`logs/symbol_audit_20261111_212003.log`）：A（未用 static）/B（死导出）节为空（0 候选，`--gate` 通过），无封装可做；仅剩 E 节拆分候选，本轮执行前两名 `hal_audio.c` 与 `fmopn.c`。
+
+**1. `core/plat/hal_audio.c` 按音频通路拆分**
+
+原文件混装三条硬件通路。拆为 MIDI（MPU-401）+ 86 板 PCM（留 `hal_audio.c`）与 OPNA FM（新 **`core/plat/hal_fm.c`**，全部 `hal_fm_*` 与 `FM_*`）。两半共写的 86 板 A460/A466 寄存器（`PCM_ID_PORT`/`PCM_OPNA_SELECT`/`PCM_STATUS_PORT`/`PCM_STATUS_FIFO_FULL`/`PCM_VOL_PATH_PCM`/`FM_VOL_PATH_VOL1`/`PCM_VOL_ATTEN_MAX`）移入新头 **`core/plat/hal_audio_regs.h`** 单一事实源——避免跨文件复制魔数，正是 §十七 C34/C35 的漂移类。
+
+**2. `core/lib/fmopn.c` 按关注点拆分**
+
+拆为「音符/时间编码器 + 寄存器寻址」（留 `fmopn.c`：`fmopn_ratio_freq_x256`/`fmopn_note_ratio`/`fmopn_bend_ratio`/`fmopn_keyon_value`/SSG 周期/`fmopn_op_addr`/`fmopn_ch_addr`）与「patch 记录模型」（新 **`core/lib/fmopn_patch.c`**：`fmopn_patch_validate`/`fb_alg`/`pan`/`ams`/`pms`/`fmopn_op_*`）。
+
+**构建**：`core/Makefile` 以 `$(wildcard plat/*.c)`/`lib/*.c` 自动收集，新 `.c` 无需改 Makefile；新头经 `$(wildcard plat/*.h)` 自动跟踪。
+
+**守卫同步**：`test_devdoc_refs.py` 锚点 88→90 / 94→96 / 134→132 / 168→166；`test_fmopn.py`、`test_fm_seq.py`、`tools/naiz_audio/s98_dump.py` 编译清单加 `fmopn_patch.c`；`test_fm_lfo.py`、`test_fm_voice_enable.py` 的 `HAL_AUDIO_C`→`HAL_FM_C`；`test_audio_settings_invariants.py` 增 `HAL_AUDIO_REGS_H`，宏断言改读 regs 头。
+
+**文档**：`B90`/`B91`/`B99`、`CODE_MAP.auto.md`（重新生成，`--check` 通过）、`preflight` 索引、ymfm `PROVENANCE.md`、`F03` 行号、`AGENTS.md §十四`；`devdocs/199`（**完结**）按 §十追加 ERRATA 块指向 `hal_fm.c`（正文一字未改）。
+
+**验证**：`make -C core` 无 `.err`；目标 8 文件 **76 passed**；全量 `pytest -q` **907 passed, 2 skipped**；HDI 重新注入。版本 0.4.024 → **0.4.025**。
+
 <a id="c101"></a>
 ### 0.4.024 — 改名页两修：OK 文字切换后消失 + 8255 按钮防抖
 
@@ -1162,6 +1199,8 @@ devdoc 205 落地后三次实机反馈修补的最终收口。
 
 | 条目 |
 |------|
+| [0.4.026 — C35 重复常量表达式收口（几何/掩码具名化）](#c103) |
+| [0.4.025 — 音频 HAL 与 FM 模型按通路拆分（E 节候选 1+2）](#c102) |
 | [0.4.024 — 改名页两修：OK 文字切换后消失 + 8255 按钮防抖](#c101) |
 | [0.4.023 — 改名页尾部按钮帧消失修复 + gallery 背景 + Back 风格统一](#c100) |
 | [0.4.021 — 快速连点卡死修复：publish 内 draw_cursor_force 阻塞 VBlank](#c99) |

@@ -20,6 +20,7 @@ ROOT = Path(__file__).resolve().parent.parent.parent
 AUDIO_C = (ROOT / "core" / "engine" / "audio.c").read_text("utf-8")
 PREFS_C = (ROOT / "core" / "engine" / "prefs.c").read_text("utf-8")
 HAL_AUDIO_C = (ROOT / "core" / "plat" / "hal_audio.c").read_text("utf-8")
+HAL_AUDIO_REGS_H = (ROOT / "core" / "plat" / "hal_audio_regs.h").read_text("utf-8")
 NB_SETTING_C = (ROOT / "core" / "engine" / "nb_setting.c").read_text("utf-8")
 
 
@@ -114,14 +115,14 @@ def test_pcm_volume_writes_vol6_or_attenuation():
         "hal_pcm_set_volume never writes A466"
     )
     # 0xA0 is VOL6 + zero attenuation; anything else is the wrong path.
-    assert re.search(r"#define\s+PCM_VOL_PATH_PCM\s+0xA0\b", HAL_AUDIO_C)
+    assert re.search(r"#define\s+PCM_VOL_PATH_PCM\s+0xA0\b", HAL_AUDIO_REGS_H)
 
 
 def test_pcm_volume_clamped_to_four_bits():
     body = _func_body(HAL_AUDIO_C, "hal_pcm_set_volume")
     assert body.count("if (step < 0)") >= 1
     assert "step > PCM_VOL_ATTEN_MAX" in body
-    assert re.search(r"#define\s+PCM_VOL_ATTEN_MAX\s+15\b", HAL_AUDIO_C)
+    assert re.search(r"#define\s+PCM_VOL_ATTEN_MAX\s+15\b", HAL_AUDIO_REGS_H)
 
 
 def test_pcm_play_honours_the_stored_volume():
