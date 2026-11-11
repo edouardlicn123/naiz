@@ -12,13 +12,13 @@ import re
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent.parent
-HAL_AUDIO_C = ROOT / "core" / "plat" / "hal_audio.c"
+HAL_FM_C = ROOT / "core" / "plat" / "hal_fm.c"
 ENGINE_AUDIO_C = ROOT / "core" / "engine" / "audio.c"
 
 
 def _fn_body(src, name):
     m = re.search(r"\b" + re.escape(name) + r"\s*\([^)]*\)\s*\{", src)
-    assert m, f"{name} not found in hal_audio.c"
+    assert m, f"{name} not found in hal_fm.c"
     i = m.end()
     depth = 1
     while depth:
@@ -31,7 +31,7 @@ def _fn_body(src, name):
 
 
 def test_init_enables_all_six_fm_voices():
-    body = _fn_body(HAL_AUDIO_C.read_text(encoding="utf-8"), "hal_fm_init")
+    body = _fn_body(HAL_FM_C.read_text(encoding="utf-8"), "hal_fm_init")
     m = re.search(r"hal_fm_write_reg\(\s*0\s*,\s*0x29\s*,\s*(\w+)\s*\)", body)
     assert m, "hal_fm_init must write reg $29 to enable channels 4-6"
     val = int(m.group(1), 0)

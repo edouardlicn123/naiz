@@ -32,6 +32,9 @@ def check_ref(stem: str, lineno: int, expected_symbol: str | None = None):
         "hal.h": ROOT / "core/plat/hal.h",
         "vclock.c": ROOT / "core/lib/vclock.c",
         "hal_audio.c": ROOT / "core/plat/hal_audio.c",
+        "hal_fm.c": ROOT / "core/plat/hal_fm.c",
+        "hal_audio_regs.h": ROOT / "core/plat/hal_audio_regs.h",
+        "fmopn_patch.c": ROOT / "core/lib/fmopn_patch.c",
         "frame.c": ROOT / "core/engine/frame.c",
         "test_bgm_timer_units.py": ROOT / "tools/tests/test_bgm_timer_units.py",
     }

@@ -216,9 +216,9 @@ void dialog_occluder_reset_base(void)
     if (!dialog_occluder) return;
     under = layer_bg_under_dialog();
     if (under)
-        memcpy(dialog_occluder, under, LAYER_DIALOG_W * LAYER_DIALOG_H);
+        memcpy(dialog_occluder, under, LAYER_DIALOG_AREA);
     else
-        memset(dialog_occluder, 0, LAYER_DIALOG_W * LAYER_DIALOG_H);
+        memset(dialog_occluder, 0, LAYER_DIALOG_AREA);
     dialog_box_base_dirty = 1;   /* devdoc 181: the clean-box cache seeds from the occluder */
 }
 
@@ -227,15 +227,15 @@ void dialog_occluder_reset_base(void)
 static void dialog_seed_into(unsigned char *dst)
 {
     if (dialog_occluder) {
-        memcpy(dst, dialog_occluder, LAYER_DIALOG_W * LAYER_DIALOG_H);
+        memcpy(dst, dialog_occluder, LAYER_DIALOG_AREA);
         return;
     }
     {
         const unsigned char *under = layer_bg_under_dialog();
         if (under)
-            memcpy(dst, under, LAYER_DIALOG_W * LAYER_DIALOG_H);
+            memcpy(dst, under, LAYER_DIALOG_AREA);
         else
-            memset(dst, 0, LAYER_DIALOG_W * LAYER_DIALOG_H);
+            memset(dst, 0, LAYER_DIALOG_AREA);
     }
 }
 
@@ -263,7 +263,7 @@ static void dialog_box_base_sync(void)
             dialog_paint_box(dialog_box_base, LAYER_DIALOG_W);
             dialog_box_base_dirty = 0;
         }
-        memcpy(dialog_layer, dialog_box_base, LAYER_DIALOG_W * LAYER_DIALOG_H);
+        memcpy(dialog_layer, dialog_box_base, LAYER_DIALOG_AREA);
     } else {
         dialog_seed_base();
         dialog_paint_box(dialog_layer, LAYER_DIALOG_W);
@@ -303,7 +303,7 @@ void dialog_layer_blit(void)
          * pump on both sides so it cannot add a full Timer-B period of gap. */
         audio_pump_once();
         if (dialog_blit_tmp) {
-            memcpy(dialog_blit_tmp, dialog_layer, LAYER_DIALOG_W * LAYER_DIALOG_H);
+            memcpy(dialog_blit_tmp, dialog_layer, LAYER_DIALOG_AREA);
             if (!cursor_composite_splice(dialog_blit_tmp, LAYER_DIALOG_W,
                                          LAYER_DIALOG_X, LAYER_DIALOG_Y,
                                          LAYER_DIALOG_W, LAYER_DIALOG_H)) {

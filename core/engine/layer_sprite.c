@@ -82,7 +82,7 @@ static void dialog_occluder_sprite_blit(const MagImage *img, int x, int y, int m
     y0 = y;
     y1 = y + img->height;
     if (y1 <= LAYER_DIALOG_Y || y0 >= LAYER_DIALOG_Y + LAYER_DIALOG_H) return;
-    if (x + img->width <= LAYER_DIALOG_X || x >= LAYER_DIALOG_X + LAYER_DIALOG_W) return;
+    if (x + img->width <= LAYER_DIALOG_X || x >= LAYER_DIALOG_RIGHT) return;
 
     for (sy = 0; sy < img->height; sy++) {
         int ry = y + sy;
@@ -92,8 +92,8 @@ static void dialog_occluder_sprite_blit(const MagImage *img, int x, int y, int m
         if (ry >= LAYER_DIALOG_Y + LAYER_DIALOG_H) break;
         buf_y = ry - LAYER_DIALOG_Y;
         xs = x < LAYER_DIALOG_X ? LAYER_DIALOG_X : x;
-        xe = x + img->width > LAYER_DIALOG_X + LAYER_DIALOG_W
-             ? LAYER_DIALOG_X + LAYER_DIALOG_W : x + img->width;
+        xe = x + img->width > LAYER_DIALOG_RIGHT
+             ? LAYER_DIALOG_RIGHT : x + img->width;
         for (sxx = xs; sxx < xe; sxx++) {
             int src_x = mirror ? (img->width - 1 - (sxx - x)) : (sxx - x);
             uint8_t c = img->pixels[sy * img->width + src_x];
@@ -224,8 +224,8 @@ void layer_sprite_face(int sprite_id, int asset_id, int x, int y, int mirror)
 #ifdef NAIZ_DEBUG
         if (layer_dialog_snapshot() && clip_h > 0) {
             int ox = x < LAYER_DIALOG_X ? LAYER_DIALOG_X : x;
-            int ow = (x + LAYER_SPRITE_W > LAYER_DIALOG_X + LAYER_DIALOG_W)
-                     ? (LAYER_DIALOG_X + LAYER_DIALOG_W - ox) : (x + LAYER_SPRITE_W - ox);
+            int ow = (x + LAYER_SPRITE_W > LAYER_DIALOG_RIGHT)
+                     ? (LAYER_DIALOG_RIGHT - ox) : (x + LAYER_SPRITE_W - ox);
             if (ow > 0) {
                 unsigned char row[256];
                 const unsigned char *snap = layer_dialog_snapshot();

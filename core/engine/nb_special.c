@@ -32,6 +32,7 @@
  * indicator sits at the button's inner left edge and the label is centered. */
 #define SPECIAL_BTN_X  200
 #define SPECIAL_BTN_W  240
+#define SPECIAL_BTN_RIGHT (SPECIAL_BTN_X + SPECIAL_BTN_W)
 #define SPECIAL_LABEL_LX 206
 
 /* Row Y coordinates (SPECIAL_ROWS rows, mirroring the load menu slots). */
@@ -80,10 +81,10 @@ static void special_draw(int argc, const char **argv, int page, int sel,
         if (!focus_on_back && i == sel) {
             draw_text(">", 0, SPECIAL_LABEL_LX, y + 14,
                       SPECIAL_LABEL_LX + 12, y + 36, 1, MENU_PAL_YELLOW);
-            draw_text(label, 0, lx, y + 14, SPECIAL_BTN_X + SPECIAL_BTN_W,
+            draw_text(label, 0, lx, y + 14, SPECIAL_BTN_RIGHT,
                       y + 36, 1, MENU_PAL_YELLOW);
         } else {
-            draw_text(label, 0, lx, y + 14, SPECIAL_BTN_X + SPECIAL_BTN_W,
+            draw_text(label, 0, lx, y + 14, SPECIAL_BTN_RIGHT,
                       y + 36, 0, PAL_WHITE);
         }
     }
@@ -205,7 +206,7 @@ void cmd_specialmenu(int argc, const char **argv, const char *cmd_name)
                     continue;
                 }
                 /* Entry selection */
-                if (mx >= SPECIAL_BTN_X && mx < SPECIAL_BTN_X + SPECIAL_BTN_W &&
+                if (mx >= SPECIAL_BTN_X && mx < SPECIAL_BTN_RIGHT &&
                     my >= special_row_y[0] && my < special_row_y[SPECIAL_ROWS - 1] + 44) {
                     int rows = special_rows_on_page(argc, page);
                     for (i = 0; i < rows; i++) {

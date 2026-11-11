@@ -27,11 +27,12 @@
 
 #define CURSOR_SAVED_W  24
 #define CURSOR_SAVED_H  24
+#define CURSOR_SAVED_AREA (CURSOR_SAVED_W * CURSOR_SAVED_H)
 
 typedef struct {
     int x, y;
     int valid;
-    unsigned char buf[CURSOR_SAVED_W * CURSOR_SAVED_H];
+    unsigned char buf[CURSOR_SAVED_AREA];
 } CursorBg;
 
 /* Draw the cursor at the mouse display position, erasing any previous one

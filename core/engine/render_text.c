@@ -93,7 +93,7 @@ static void draw_glyph_internal(const uint8_t *g, int x, int y, uint8_t color,
             } else {
                 int addr = py * LAYER_SCREEN_W + px;
                 VRAM_SET_BANK(addr, cur_bank);
-                win[addr & (VRAM_BANK_SZ - 1)] = color;
+                win[addr & VRAM_BANK_MASK] = color;
             }
         }
     }
@@ -299,18 +299,18 @@ static void draw_glyph_scaled(const uint8_t *g, int x, int y, uint8_t color)
                 continue;
             addr = py * LAYER_SCREEN_W + px;
             VRAM_SET_BANK(addr, cur_bank);
-            win[addr & (VRAM_BANK_SZ - 1)] = color;
+            win[addr & VRAM_BANK_MASK] = color;
             if (px + 1 < LAYER_SCREEN_W) {
                 VRAM_SET_BANK(addr + 1, cur_bank);
-                win[(addr + 1) & (VRAM_BANK_SZ - 1)] = color;
+                win[(addr + 1) & VRAM_BANK_MASK] = color;
             }
             if (py + 1 < LAYER_SCREEN_H) {
                 addr2 = addr + LAYER_SCREEN_W;
                 VRAM_SET_BANK(addr2, cur_bank);
-                win[addr2 & (VRAM_BANK_SZ - 1)] = color;
+                win[addr2 & VRAM_BANK_MASK] = color;
                 if (px + 1 < LAYER_SCREEN_W) {
                     VRAM_SET_BANK(addr2 + 1, cur_bank);
-                    win[(addr2 + 1) & (VRAM_BANK_SZ - 1)] = color;
+                    win[(addr2 + 1) & VRAM_BANK_MASK] = color;
                 }
             }
         }
@@ -340,18 +340,18 @@ static void draw_cjk_scaled(const uint8_t *g, int x, int y, uint8_t color)
                 continue;
             addr = py * LAYER_SCREEN_W + px;
             VRAM_SET_BANK(addr, cur_bank);
-            win[addr & (VRAM_BANK_SZ - 1)] = color;
+            win[addr & VRAM_BANK_MASK] = color;
             if (px + 1 < LAYER_SCREEN_W) {
                 VRAM_SET_BANK(addr + 1, cur_bank);
-                win[(addr + 1) & (VRAM_BANK_SZ - 1)] = color;
+                win[(addr + 1) & VRAM_BANK_MASK] = color;
             }
             if (py + 1 < LAYER_SCREEN_H) {
                 addr2 = addr + LAYER_SCREEN_W;
                 VRAM_SET_BANK(addr2, cur_bank);
-                win[addr2 & (VRAM_BANK_SZ - 1)] = color;
+                win[addr2 & VRAM_BANK_MASK] = color;
                 if (px + 1 < LAYER_SCREEN_W) {
                     VRAM_SET_BANK(addr2 + 1, cur_bank);
-                    win[(addr2 + 1) & (VRAM_BANK_SZ - 1)] = color;
+                    win[(addr2 + 1) & VRAM_BANK_MASK] = color;
                 }
             }
         }

@@ -63,7 +63,7 @@ void vram_blit_sprite(const MagImage *img, int x, int y, uint8_t transparent_idx
                 cur_bank = bank;
                 hal_vram_bank_select(bank);
             }
-            off = addr & (VRAM_BANK_SZ - 1);
+            off = addr & VRAM_BANK_MASK;
             seg = VRAM_BANK_SZ - off;
             if (seg > remain) seg = remain;
             if (!mirror && transparent_idx == PAL_NO_TRANSPARENCY) {

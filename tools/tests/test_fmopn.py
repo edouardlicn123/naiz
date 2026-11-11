@@ -1,6 +1,6 @@
 """M1 fmopn host tests (devdocs/123 S1).
 
-Compiles core/lib/fmopn.c with the host gcc into a temp shared object and
+Compiles core/lib/fmopn.c (+ fmopn_patch.c) with the host gcc into a temp shared object and
 drives it through ctypes.  This is the plan's core risk-reduction: the FM
 register model is pure logic (zero outb()), so its correctness is proven
 here without an emulator.
@@ -25,7 +25,9 @@ import pytest
 
 REPO_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 FMOPN_C = os.path.join(REPO_ROOT, "core", "lib", "fmopn.c")
+FMOPN_PATCH_C = os.path.join(REPO_ROOT, "core", "lib", "fmopn_patch.c")
 FMOPN_H = os.path.join(REPO_ROOT, "core", "lib", "fmopn.h")
+FMOPN_SRCS = [FMOPN_C, FMOPN_PATCH_C]
 
 # Master clock 7.9872MHz; YM2608 manual: freq = (fnum << (block-1)) * 7987200
 # / (144 * 2**20).  Writing the shift as the raw block: / (288 * 2**20).
@@ -42,13 +44,13 @@ _BUILD_CACHE = {}
 
 def _build_fmopn():
     """Return (lib, src_mtime) — compile once per process, cached."""
-    mtime = os.stat(FMOPN_C).st_mtime
+    mtime = max(os.stat(p).st_mtime for p in FMOPN_SRCS)
     if _BUILD_CACHE.get("mtime") == mtime:
         return _BUILD_CACHE["lib"], mtime
     with tempfile.TemporaryDirectory(prefix="fmopn_test_") as tmp:
         so = os.path.join(tmp, "fmopn.so")
         cmd = ["gcc", "-O2", "-shared", "-fPIC", "-I", os.path.dirname(FMOPN_H),
-               "-fno-stack-protector", FMOPN_C, "-o", so, "-lm"]
+               "-fno-stack-protector"] + FMOPN_SRCS + ["-o", so, "-lm"]
         subprocess.run(cmd, check=True, capture_output=True, text=True)
         # dlopen keeps the image alive even though the tempdir is removed on
         # context exit; the cache keeps returning the same loaded CDLL.

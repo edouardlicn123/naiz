@@ -11,7 +11,7 @@
  * Wall clock and vsync were split into plat/hal_clock.c, debug logging into
  * plat/hal_log.c, and the interrupt-capability probes into plat/hal_probe.c
  * (devdoc 200 §12.2).  The audio HAL lives in plat/hal_audio.c (MPU-401 MIDI
- * + 86-board PCM, devdoc 101).  Keyboard/mouse/video implementations live
+ * + 86-board PCM, devdoc 101) and plat/hal_fm.c (86-board OPNA FM).  Keyboard/mouse/video implementations live
  * directly in keyboard.c / mouse.c / video.c.
  *
  * When porting to a new platform, only the delegation targets inside plat/

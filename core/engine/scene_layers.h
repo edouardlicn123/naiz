@@ -27,6 +27,8 @@
 #define LAYER_DIALOG_Y    280                       /* 对话框首行 */
 #define LAYER_DIALOG_W    480
 #define LAYER_DIALOG_H    115
+#define LAYER_DIALOG_RIGHT (LAYER_DIALOG_X + LAYER_DIALOG_W)
+#define LAYER_DIALOG_AREA  (LAYER_DIALOG_W * LAYER_DIALOG_H)
 #define LAYER_DIALOG_BORDER  2                      /* 边框宽度 */
 #define LAYER_DIALOG_INDENT  12                     /* 左侧缩进 */
 #define LAYER_DIALOG_RIGHT_INDENT 12                /* 右侧缩进 */

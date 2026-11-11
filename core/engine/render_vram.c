@@ -54,7 +54,7 @@ void vram_read(int x, int y, int w, int h, uint8_t *buf)
                     cur_bank = bank;
                     hal_vram_bank_select(bank);
                 }
-                off = addr & (VRAM_BANK_SZ - 1);
+                off = addr & VRAM_BANK_MASK;
                 seg = VRAM_BANK_SZ - off;
                 if (seg > remain) seg = remain;
                 vram_row_read(win, off,
@@ -88,7 +88,7 @@ void vram_write(const uint8_t *buf, int x, int y, int w, int h)
                     cur_bank = bank;
                     hal_vram_bank_select(bank);
                 }
-                off = addr & (VRAM_BANK_SZ - 1);
+                off = addr & VRAM_BANK_MASK;
                 seg = VRAM_BANK_SZ - off;
                 if (seg > remain) seg = remain;
                 vram_row_write(buf + (skip_y + py) * orig_w + skip_x + (w - remain),
@@ -126,7 +126,7 @@ void render_blit_transparent(const uint8_t *buf, int stride,
             if (buf[rowoff + px] == transparent_idx) continue;
             addr = sy * LAYER_SCREEN_W + sx;
             VRAM_SET_BANK(addr, cur_bank);
-            win[addr & (VRAM_BANK_SZ - 1)] = buf[rowoff + px];
+            win[addr & VRAM_BANK_MASK] = buf[rowoff + px];
         }
     }
 }

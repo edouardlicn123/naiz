@@ -35,6 +35,7 @@
 #define NI_SLOT_Y       90
 #define NI_SLOT_W       480
 #define NI_SLOT_H       44
+#define NI_SLOT_RIGHT   (NI_SLOT_X + NI_SLOT_W)
 #define NI_NAME_X       100
 #define NI_NAME_Y       (NI_SLOT_Y + (NI_SLOT_H - FONT_GLYPH_H) / 2)
 #define NI_PROMPT_X     100
@@ -288,12 +289,12 @@ static void ni_draw_name(const NameInputState *st)
     fill_rect(NI_SLOT_X + 5, NI_SLOT_Y + 5,
               NI_SLOT_W - 10, NI_SLOT_H - 10, BTN_FILL_IDX);
     draw_text(st->name, 0, NI_NAME_X, NI_NAME_Y,
-              NI_SLOT_X + NI_SLOT_W - 8, NI_SLOT_Y + NI_SLOT_H,
+              NI_SLOT_RIGHT - 8, NI_SLOT_Y + NI_SLOT_H,
               1, PAL_WHITE);
     tw = text_width(st->name, 1);
-    if (NI_NAME_X + tw < NI_SLOT_X + NI_SLOT_W - 12)
+    if (NI_NAME_X + tw < NI_SLOT_RIGHT - 12)
         draw_text("_", 0, NI_NAME_X + tw, NI_NAME_Y,
-                  NI_SLOT_X + NI_SLOT_W - 6, NI_SLOT_Y + NI_SLOT_H,
+                  NI_SLOT_RIGHT - 6, NI_SLOT_Y + NI_SLOT_H,
                   0, MENU_PAL_YELLOW);
 }
 

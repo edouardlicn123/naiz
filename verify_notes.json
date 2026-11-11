@@ -8,6 +8,34 @@
       "sha256": "39b3c3527106a055b968157bd5db1e94eea1f16c15511c579b93613e4c801568",
       "line": "#!/bin/bash"
     },
+    "core/engine/audio.c:269": {
+      "verdict": "ok",
+      "text": "g_fm_patches[n].data is uint8_t[FMOPN_PATCH_BYTES] (32); copy length is the same macro",
+      "date": "2026-11-11T21:46:11",
+      "sha256": "4a39918f06c5914edebaa0ef41ec747f1ce67c12d290bd9ebbd322a724554266",
+      "line": "                    memcpy(g_fm_patches[n].data, raw, FMOPN_PATCH_BYTES);"
+    },
+    "core/engine/audio.c:656": {
+      "verdict": "ok",
+      "text": "malloc(g_fm_seq) is null-checked on the very next line (if (g_fm_seq)); OOM disables FM backend and logs AUD WARN",
+      "date": "2026-11-11T21:46:11",
+      "sha256": "4a39918f06c5914edebaa0ef41ec747f1ce67c12d290bd9ebbd322a724554266",
+      "line": "        g_fm_seq = malloc(fmseq_size());"
+    },
+    "core/engine/bootmenu.c:69": {
+      "verdict": "ok",
+      "text": "style-only: repeated LABEL_X+LABEL_AREA_W constant; no functional bug",
+      "date": "2026-11-11T21:46:11",
+      "sha256": "2b09dde9d3f83458e03bca9ccf526319b2df224be824035599c682360a073407",
+      "line": "#define SEL_Y        122    /* language selector row y (1x, 16px tall) */"
+    },
+    "core/engine/cursor.c:26": {
+      "verdict": "ok",
+      "text": "style-only: repeated CURSOR_SAVED_W*CURSOR_SAVED_H constant; no functional bug",
+      "date": "2026-11-11T21:46:11",
+      "sha256": "1c856ed860595d21c2242d6e8e34e470f6898a241583fbb3858f207abff1009a",
+      "line": "    for (i = 0; i < CURSOR_SAVED_W * CURSOR_SAVED_H; i++)"
+    },
     "core/engine/image.c:109": {
       "verdict": "ok",
       "text": "memcpy into ref_r constant-size [256]; source pal fixed-width",
@@ -27,6 +55,27 @@
       "text": "memcpy into ref_b constant-size [256]; source pal fixed-width",
       "date": "2026-08-19T11:01:58",
       "sha256": "5670dda162df2d62874829e25e41152ec26d87e3c7003ca13f96b3de6bbe64c5",
+      "line": "                memcpy(ref_b, pb, 256);"
+    },
+    "core/engine/image.c:121": {
+      "verdict": "ok",
+      "text": "ref_r is uint8_t[256]; source palette is fixed 256 bytes (same as verified ref_g/ref_b)",
+      "date": "2026-11-11T21:46:11",
+      "sha256": "b0c6b0e1ac39fd5e7c96a114466e95a9ee404d78e7afecd39febf352d33c6ac7",
+      "line": "                memcpy(ref_r, pr, 256);"
+    },
+    "core/engine/image.c:122": {
+      "verdict": "ok",
+      "text": "ref_g is uint8_t[256]; source palette is fixed 256 bytes",
+      "date": "2026-11-11T21:46:11",
+      "sha256": "b0c6b0e1ac39fd5e7c96a114466e95a9ee404d78e7afecd39febf352d33c6ac7",
+      "line": "                memcpy(ref_g, pg, 256);"
+    },
+    "core/engine/image.c:123": {
+      "verdict": "ok",
+      "text": "ref_b is uint8_t[256]; source palette is fixed 256 bytes",
+      "date": "2026-11-11T21:46:11",
+      "sha256": "b0c6b0e1ac39fd5e7c96a114466e95a9ee404d78e7afecd39febf352d33c6ac7",
       "line": "                memcpy(ref_b, pb, 256);"
     },
     "core/engine/image.c:65": {
@@ -112,6 +161,41 @@
       "sha256": "7560068edaf6e9b88d522521ae3aa83d0059e5fed7c50c9771fc81c1e51b6151",
       "line": "            memcpy(dialog_layer, under, LAYER_DIALOG_W * LAYER_DIALOG_H);"
     },
+    "core/engine/layer_dialog.c:219": {
+      "verdict": "ok",
+      "text": "dialog_occluder allocated by layer_snapshot_alloc_dialog (LAYER_DIALOG_AREA); copy size identical",
+      "date": "2026-11-11T21:54:18",
+      "sha256": "5cd6deae59e5fcaaca64900f8c1e83a9450ff655b0f63c50b661296e43084d18",
+      "line": "        memcpy(dialog_occluder, under, LAYER_DIALOG_AREA);"
+    },
+    "core/engine/layer_dialog.c:230": {
+      "verdict": "ok",
+      "text": "dst in dialog_seed_into is dialog_layer, allocated LAYER_DIALOG_AREA; copy size identical",
+      "date": "2026-11-11T21:54:18",
+      "sha256": "5cd6deae59e5fcaaca64900f8c1e83a9450ff655b0f63c50b661296e43084d18",
+      "line": "        memcpy(dst, dialog_occluder, LAYER_DIALOG_AREA);"
+    },
+    "core/engine/layer_dialog.c:236": {
+      "verdict": "ok",
+      "text": "dst in dialog_seed_into is dialog_layer/dialog_box_base, both LAYER_DIALOG_AREA; copy size identical",
+      "date": "2026-11-11T21:54:18",
+      "sha256": "5cd6deae59e5fcaaca64900f8c1e83a9450ff655b0f63c50b661296e43084d18",
+      "line": "            memcpy(dst, under, LAYER_DIALOG_AREA);"
+    },
+    "core/engine/layer_dialog.c:266": {
+      "verdict": "ok",
+      "text": "dialog_layer and dialog_box_base both allocated LAYER_DIALOG_AREA; copy size identical",
+      "date": "2026-11-11T21:54:18",
+      "sha256": "5cd6deae59e5fcaaca64900f8c1e83a9450ff655b0f63c50b661296e43084d18",
+      "line": "        memcpy(dialog_layer, dialog_box_base, LAYER_DIALOG_AREA);"
+    },
+    "core/engine/layer_dialog.c:306": {
+      "verdict": "ok",
+      "text": "dialog_blit_tmp and dialog_layer both allocated LAYER_DIALOG_AREA; copy size identical",
+      "date": "2026-11-11T21:54:18",
+      "sha256": "5cd6deae59e5fcaaca64900f8c1e83a9450ff655b0f63c50b661296e43084d18",
+      "line": "            memcpy(dialog_blit_tmp, dialog_layer, LAYER_DIALOG_AREA);"
+    },
     "core/engine/layer_dialog.c:43": {
       "verdict": "ok",
       "text": "malloc guarded by truthy check at :45 before deref;",
@@ -144,6 +228,13 @@
       "text": "decode_buf malloc guarded by if(a->decode_buf) at :443; OOM falls back to per-frame alloc with hal_log :447 (same as :477)",
       "date": "2026-09-14T08:50:44",
       "sha256": "d3985ab4269895a543a88b825d19065f2a871166a12671666ac5a1f5a1b07d4d",
+      "line": "        a->decode_buf = (uint8_t *)malloc(pool);"
+    },
+    "core/engine/nb_anim.c:460": {
+      "verdict": "ok",
+      "text": "malloc(decode_buf) is null-checked on the next line; OOM falls back to per-frame alloc with a log",
+      "date": "2026-11-11T21:46:11",
+      "sha256": "9e1e3b8a6b16227a1dafd585ee3a5a1487a143ed8ecd5c08a61ef38a2cff7564",
       "line": "        a->decode_buf = (uint8_t *)malloc(pool);"
     },
     "core/engine/nb_anim.c:477": {
@@ -221,12 +312,68 @@
       "sha256": "246712ddb7b45dd00d57ad21fa6f10ff94d3f413d7d23738dd23bad66cc24aea",
       "line": "        int d = (val == INT_MIN) ? INT_MIN : -val;"
     },
+    "core/engine/nb_commands.c:427": {
+      "verdict": "ok",
+      "text": "INT_MIN negation is guarded (val==INT_MIN ? INT_MIN : -val); nb_var_add clamps in 64-bit",
+      "date": "2026-11-11T21:46:11",
+      "sha256": "9e2bd6c2746ab41d3b27f24049fa0f3a854045930b09bad29df96034455497dc",
+      "line": "        int d = (val == INT_MIN) ? INT_MIN : -val;"
+    },
+    "core/engine/nb_dialog.c:49": {
+      "verdict": "ok",
+      "text": "out is TR_VAL_LEN; pos+need >= TR_VAL_LEN breaks before memcpy, so the copy stays in bounds",
+      "date": "2026-11-11T21:46:11",
+      "sha256": "23002e4f69ff7825a7d1dc0aa5891a8937378185b93a3ad325373bf50457e6ae",
+      "line": "            memcpy(out + pos, name, (size_t)need);"
+    },
+    "core/engine/nb_nameinput.c:216": {
+      "verdict": "ok",
+      "text": "cur_bytes+add_bytes >= NB_VAR_STR_MAX returns 0 before memcpy; st->name is NB_VAR_STR_MAX",
+      "date": "2026-11-11T21:46:11",
+      "sha256": "a8f3ae02a2b4364c2cc5f962073568ab7eee01556c2f841466b1c148559bdf0c",
+      "line": "    memcpy(st->name + cur_bytes, s, (size_t)add_bytes);"
+    },
+    "core/engine/nb_nameinput.c:217": {
+      "verdict": "ok",
+      "text": "cur_bytes+add_bytes >= NB_VAR_STR_MAX returns 0 before memcpy; st->name is NB_VAR_STR_MAX",
+      "date": "2026-11-11T21:54:18",
+      "sha256": "0aecf6ad0a2c9c5834864e983a46d187e6734abca4d01d02d226e1f2deffbbd4",
+      "line": "    memcpy(st->name + cur_bytes, s, (size_t)add_bytes);"
+    },
+    "core/engine/nb_nameinput.c:259": {
+      "verdict": "ok",
+      "text": "style-only: repeated NI_SLOT_X+NI_SLOT_W constant; no functional bug",
+      "date": "2026-11-11T21:46:11",
+      "sha256": "a8f3ae02a2b4364c2cc5f962073568ab7eee01556c2f841466b1c148559bdf0c",
+      "line": "/*=== Drawing ==============================================================*/"
+    },
     "core/engine/nb_save_dialog.c:65": {
       "verdict": "ok",
       "text": "content-y base",
       "date": "2026-09-16T11:04:33",
       "sha256": "7b0a016bafd5f2cf7acb74b95faa94ca3307ceb4bb0bb7c6269dcf2ed12661f8",
       "line": "        draw_text(tr(\"SAVE\"), 0, content_x, LAYER_DIALOG_Y + LAYER_DIALOG_HEADER_Y,"
+    },
+    "core/engine/nb_saveload.c:440": {
+      "verdict": "ok",
+      "text": "switch covers every SlotOp enumerator; unknown op is logged and returns -1 after the switch (acts as default)",
+      "date": "2026-11-11T21:46:11",
+      "sha256": "860e0d61fdd7058e5f0656cf2b46665b85feb502318ebd4b8d11312e454a5c43",
+      "line": "    switch (op) {"
+    },
+    "core/engine/nb_special.c:77": {
+      "verdict": "ok",
+      "text": "style-only: repeated SPECIAL_BTN_X+SPECIAL_BTN_W constant; no functional bug",
+      "date": "2026-11-11T21:46:11",
+      "sha256": "73522e8605614f5a8a84318dbcede61f655defdec0081ffa7483054c92ac0e8b",
+      "line": "        int lx = SPECIAL_BTN_X + (SPECIAL_BTN_W - lw) / 2;"
+    },
+    "core/engine/prefs.c:195": {
+      "verdict": "ok",
+      "text": "fopen result is checked by if (f) immediately after; missing USER.CFG is a legal first-run state",
+      "date": "2026-11-11T21:46:11",
+      "sha256": "c9e47bf9cc5c966c67979bb43de4d37950be665c7e68568a9500311fe59b5393",
+      "line": "    f = fopen(\"USER.CFG\", \"r\");"
     },
     "core/engine/render.c:72": {
       "verdict": "ok",
@@ -240,6 +387,13 @@
       "text": "vram bank mask",
       "date": "2026-09-16T11:04:33",
       "sha256": "f6c62a5d66d51166b92f600b11e7a3caf96aa480dd35d07dc1e80d4bb099d928",
+      "line": "                win[addr & (VRAM_BANK_SZ - 1)] = color;"
+    },
+    "core/engine/render_text.c:96": {
+      "verdict": "ok",
+      "text": "style-only: repeated VRAM_BANK_SZ-1 mask; no functional bug",
+      "date": "2026-11-11T21:46:11",
+      "sha256": "353bdf281fe5c1bdc5d91093202bf6378f3769ad57162134ee670c9e545f9fe4",
       "line": "                win[addr & (VRAM_BANK_SZ - 1)] = color;"
     },
     "core/engine/render_vram.c:57": {
@@ -270,12 +424,47 @@
       "sha256": "ce17b5579e8921d8076d947a482d1071337edd5f98baa4484003c6ce6ce70189",
       "line": "    a->toc = (uint8_t *)malloc((size_t)header_bytes);"
     },
+    "core/lib/farchive.c:61": {
+      "verdict": "ok",
+      "text": "fopen result is followed immediately by if (!a->fp) return -1",
+      "date": "2026-11-11T21:46:11",
+      "sha256": "7f5bd196f085baaf29143859d1ec6d8759ca031c6176f99580cb63e51a533ba9",
+      "line": "    a->fp = fopen(path, \"rb\");"
+    },
+    "core/lib/farchive.c:86": {
+      "verdict": "ok",
+      "text": "malloc(toc) is followed immediately by if (!a->toc) goto fail",
+      "date": "2026-11-11T21:46:11",
+      "sha256": "7f5bd196f085baaf29143859d1ec6d8759ca031c6176f99580cb63e51a533ba9",
+      "line": "    a->toc = (uint8_t *)malloc((size_t)header_bytes);"
+    },
     "core/lib/fmseq.c:553": {
       "verdict": "ok",
       "text": "test-facing query API; no .c caller since ISR-safe pump dropped the rewind-ring log (devdoc 165 B3)",
       "date": "2026-10-21T13:47:36",
       "sha256": "5078fa963b67de5c800304e2566ee5092c6647e6b8413c07c6e78e705f20a17f",
       "line": "int fmseq_fm_voices(const Fmseq *seq)"
+    },
+    "core/lib/mag.c:419": {
+      "verdict": "ok",
+      "text": "g_resume.pal_r is uint8_t[256]; source pal_r is a fixed 256-byte palette",
+      "date": "2026-11-11T21:46:11",
+      "sha256": "1247b0403dae2bd2324d20838f9d376f41c7cbb235bc5b16c3175903fa8d0964",
+      "line": "    memcpy(g_resume.pal_r, pal_r, 256);"
+    },
+    "core/lib/mag.c:420": {
+      "verdict": "ok",
+      "text": "g_resume.pal_g is uint8_t[256]; source pal_g is a fixed 256-byte palette",
+      "date": "2026-11-11T21:46:11",
+      "sha256": "1247b0403dae2bd2324d20838f9d376f41c7cbb235bc5b16c3175903fa8d0964",
+      "line": "    memcpy(g_resume.pal_g, pal_g, 256);"
+    },
+    "core/lib/mag.c:421": {
+      "verdict": "ok",
+      "text": "g_resume.pal_b is uint8_t[256]; source pal_b is a fixed 256-byte palette",
+      "date": "2026-11-11T21:46:11",
+      "sha256": "1247b0403dae2bd2324d20838f9d376f41c7cbb235bc5b16c3175903fa8d0964",
+      "line": "    memcpy(g_resume.pal_b, pal_b, 256);"
     },
     "core/lib/tr.c:65": {
       "verdict": "ok",
@@ -290,6 +479,13 @@
       "sha256": "f6434276ad2df7a2984c912f1340af957f3bddc321abcf12d5ba9c736584c976",
       "line": "        memcpy(tr_table[tr_count].key, line, klen);"
     },
+    "core/lib/tr.c:99": {
+      "verdict": "ok",
+      "text": "klen clamped to TR_KEY_LEN-1 before memcpy; key is TR_KEY_LEN",
+      "date": "2026-11-11T21:46:11",
+      "sha256": "d0c8787ab27d2cd8ad9f4b89670d8a8db2a98b54fe80fad4fe68c63a9eef718c",
+      "line": "        memcpy(tr_table[tr_count].key, line, klen);"
+    },
     "core/plat/keyboard.c:48": {
       "verdict": "ok",
       "text": "scancode offset",
@@ -297,17 +493,94 @@
       "sha256": "f6d97e5066ecbd39e75408878ac4d9a72c63be5f17fde858ddeb30fa100686fe",
       "line": "#define BIOS_TAIL        0x0526UL   /* word: 下一个写入偏移 */"
     },
+    "core/plat/keyboard.c:55": {
+      "verdict": "ok",
+      "text": "style-only: repeated BIOS_HEAD+1 ring index; no functional bug",
+      "date": "2026-11-11T21:46:11",
+      "sha256": "7dab2fe36dfc26c07763ff7c7cbe7a9c7201142696f118fcad31375e1d4fbc5e",
+      "line": ""
+    },
     "makegame.sh:143": {
       "verdict": "ok",
       "text": "assignment RHS; no word-splitting context",
       "date": "2026-08-18T13:18:13",
       "sha256": "5aa88572b4794ef9dfb0890cfe2e2e227329e0085bb3e545c71976889bbf2cc7"
     },
+    "makegame.sh:145": {
+      "verdict": "ok",
+      "text": "shift 2>/dev/null || true; a no-arg shift is tolerated by design",
+      "date": "2026-11-11T21:46:11",
+      "sha256": "012e0ce6afd26c844bfa4ed770009a277dee7dadd9d6a717113a54545e2c066f",
+      "line": "# shift with stderr redirect: '2>/dev/null' is fd redirect, NOT shift argument."
+    },
+    "makegame.sh:340": {
+      "verdict": "ok",
+      "text": "assignment RHS ${choice:-1}; no word-splitting context, quoting not required",
+      "date": "2026-11-11T21:46:11",
+      "sha256": "012e0ce6afd26c844bfa4ed770009a277dee7dadd9d6a717113a54545e2c066f",
+      "line": "            choice=${choice:-1}"
+    },
     "makegame.sh:43": {
       "verdict": "ok",
       "text": "shift guarded by || true when no args",
       "date": "2026-08-18T13:18:13",
       "sha256": "5aa88572b4794ef9dfb0890cfe2e2e227329e0085bb3e545c71976889bbf2cc7"
+    },
+    "makegame.sh:47": {
+      "verdict": "ok",
+      "text": "shift 2 is guarded by the preceding [ $# -lt 2 ] check",
+      "date": "2026-11-11T21:46:11",
+      "sha256": "012e0ce6afd26c844bfa4ed770009a277dee7dadd9d6a717113a54545e2c066f",
+      "line": "            shift 2"
+    },
+    "makegame.sh:51": {
+      "verdict": "ok",
+      "text": "shift inside the --pack=* case; $1 is guaranteed by the case match",
+      "date": "2026-11-11T21:46:11",
+      "sha256": "012e0ce6afd26c844bfa4ed770009a277dee7dadd9d6a717113a54545e2c066f",
+      "line": "            shift"
+    },
+    "makegame.sh:55": {
+      "verdict": "ok",
+      "text": "shift inside the *) case; $1 is guaranteed by the case match",
+      "date": "2026-11-11T21:46:11",
+      "sha256": "012e0ce6afd26c844bfa4ed770009a277dee7dadd9d6a717113a54545e2c066f",
+      "line": "            shift"
+    },
+    "start.sh:173": {
+      "verdict": "ok",
+      "text": "$dirname is inside a double-quoted echo string (audit S1 false positive)",
+      "date": "2026-11-11T21:46:11",
+      "sha256": "d0a8161dc33a57afd066a0aff4783964d21cea34ac18fd11ff6381f27755b3d5",
+      "line": "        echo \"  $dirname 是符号链接 → $(realpath \"$ROOT/$dirname\")\""
+    },
+    "start.sh:187": {
+      "verdict": "ok",
+      "text": "${dirname} is inside a double-quoted mktemp template (audit S1 false positive)",
+      "date": "2026-11-11T21:46:11",
+      "sha256": "d0a8161dc33a57afd066a0aff4783964d21cea34ac18fd11ff6381f27755b3d5",
+      "line": "    tmpzip=\"$(mktemp \"/tmp/${dirname}.XXXXXX.zip\")\""
+    },
+    "start.sh:229": {
+      "verdict": "ok",
+      "text": "shift 4 after four required positional parameters of download_menu; signature guarantees $# >= 4",
+      "date": "2026-11-11T21:46:11",
+      "sha256": "d0a8161dc33a57afd066a0aff4783964d21cea34ac18fd11ff6381f27755b3d5",
+      "line": "    # Audit S5 false positive: the four positional parameters above are"
+    },
+    "tools/diag/bgm_compare.py:100": {
+      "verdict": "ok",
+      "text": "lazy import of sibling diagnostic module; keeps capture deps out of module import",
+      "date": "2026-11-11T21:46:11",
+      "sha256": "29e14315170dba6264aec17d402567fd4b4c70218bb2ec054e6be392ab0421e8",
+      "line": "    from tools.diag import np2kai_audio"
+    },
+    "tools/diag/np2kai_audio.py:62": {
+      "verdict": "ok",
+      "text": "lazy optional numpy import only in RMS analysis",
+      "date": "2026-11-11T21:46:11",
+      "sha256": "bf5ffba46338059957721e9f3d73527b0b5f195429fc3ad8393eebe02fe3faa5",
+      "line": "    import numpy as np"
     },
     "tools/diag/np2kai_serial.py:37": {
       "verdict": "ok",
@@ -316,11 +589,25 @@
       "sha256": "f113ef6d3ea16675ae1a6c0016cd303efcff881ca477bf3aef60ff6d136fbc6f",
       "line": "    from tools.diag.gen_com import make_serialwrite"
     },
+    "tools/diag/preflight.py:105": {
+      "verdict": "ok",
+      "text": "lazy stdlib re import used only for one parse branch",
+      "date": "2026-11-11T21:46:11",
+      "sha256": "ca009a3b1edffd059f9b00d8edf357ba8094c31dcaeb8cfc41c68956a54b1eed",
+      "line": "                        import re  # Added: import for parsing"
+    },
     "tools/env_setup/env_test.py:250": {
       "verdict": "ok",
       "text": "lazy stdlib urllib import in retroarch installer",
       "date": "2026-08-18T13:17:03",
       "sha256": "311f673c263f7590cdfbc304a08e958d3b519278c391d206730473a42d95cf27"
+    },
+    "tools/env_setup/env_test.py:299": {
+      "verdict": "ok",
+      "text": "lazy stdlib urllib.request import inside the retroarch installer",
+      "date": "2026-11-11T21:46:11",
+      "sha256": "ed964a663634bf7f264453b3a12c4e2f301810b6c2a020c7a9a7fd8597901efa",
+      "line": "    import urllib.request"
     },
     "tools/env_setup/env_utils.py:102": {
       "verdict": "ok",
@@ -342,12 +629,75 @@
       "sha256": "a39cac5d9fc50177119cbfee74f5c3973f91649f34003e369f11e200de69ddc3",
       "line": "        import getpass"
     },
+    "tools/env_setup/env_utils.py:126": {
+      "verdict": "ok",
+      "text": "lazy stdlib getpass import only when a sudo password prompt is needed",
+      "date": "2026-11-11T21:46:11",
+      "sha256": "09f35451587695372c372c0a34f46398da7f88cfef3e18933878d72046ec8894",
+      "line": "        import getpass"
+    },
+    "tools/naiz_audio/fmp_export.py:97": {
+      "verdict": "ok",
+      "text": "read-only CLI open().read(); CPython closes the handle immediately; no leak",
+      "date": "2026-11-11T21:46:11",
+      "sha256": "ced785712c646b9cf5c2da350bc992ab18fe88b5a1c165194d05eb28c2678ecd",
+      "line": "        else open(args.patch, \"rb\").read()"
+    },
+    "tools/naiz_audio/midi_ref.py:119": {
+      "verdict": "ok",
+      "text": "lazy stdlib argparse import inside main()",
+      "date": "2026-11-11T21:46:11",
+      "sha256": "0ff36068ddb1a263807e0402130fcf169b4f93809e227863886e268c8d957b5f",
+      "line": "    import argparse"
+    },
+    "tools/naiz_audio/s98_dump.py:140": {
+      "verdict": "ok",
+      "text": "read-only CLI open().read(); handle released immediately by CPython refcount",
+      "date": "2026-11-11T21:46:11",
+      "sha256": "44b8f7bae995e140c98e00130512b8d2e8ba7995f672c73f8e1da539f35ddf83",
+      "line": "        data = open(p, \"rb\").read()"
+    },
+    "tools/naiz_audio/s98_dump.py:269": {
+      "verdict": "ok",
+      "text": "read-only CLI open().read(); handle released immediately by CPython refcount",
+      "date": "2026-11-11T21:46:11",
+      "sha256": "44b8f7bae995e140c98e00130512b8d2e8ba7995f672c73f8e1da539f35ddf83",
+      "line": "    data = open(path, \"rb\").read()"
+    },
+    "tools/naiz_audio/s98_dump.py:320": {
+      "verdict": "ok",
+      "text": "read-only CLI open().read(); handle released immediately by CPython refcount",
+      "date": "2026-11-11T21:46:11",
+      "sha256": "44b8f7bae995e140c98e00130512b8d2e8ba7995f672c73f8e1da539f35ddf83",
+      "line": "    smf = open(args.input, \"rb\").read()"
+    },
+    "tools/naiz_audio/s98_dump.py:321": {
+      "verdict": "ok",
+      "text": "read-only CLI open().read(); handle released immediately by CPython refcount",
+      "date": "2026-11-11T21:46:11",
+      "sha256": "44b8f7bae995e140c98e00130512b8d2e8ba7995f672c73f8e1da539f35ddf83",
+      "line": "    gm = open(args.gmmap, \"rb\").read() if args.gmmap else None"
+    },
+    "tools/naiz_audio/spectrum_report.py:43": {
+      "verdict": "ok",
+      "text": "lazy stdlib wave import inside load_wav",
+      "date": "2026-11-11T21:46:11",
+      "sha256": "a161701b437530bdb0bf8b2311ed46e564bdaa5d890b3725fc38c50eac14f93a",
+      "line": "    import wave"
+    },
     "tools/naiz_build/anim_import.py:89": {
       "verdict": "ok",
       "text": "lazy mag_convert import defers PIL-dependent converter chain",
       "date": "2026-08-24T12:05:36",
       "sha256": "0c64e7220823fccbebaef0d494e90c208da65434a02625265deeb3f41c5f8136",
       "line": "    from PIL import Image"
+    },
+    "tools/naiz_build/build_game.py:148": {
+      "verdict": "ok",
+      "text": "lazy naiz_conv.mag_convert import defers the PIL converter chain",
+      "date": "2026-11-11T21:46:11",
+      "sha256": "63e44f7d5e883b8675ed05aa8d7c3a6442ee9ac990a3702dae823b987b137321",
+      "line": "    from naiz_conv.mag_convert import convert_file"
     },
     "tools/naiz_build/build_game.py:95": {
       "verdict": "ok",
@@ -361,6 +711,13 @@
       "date": "2026-09-14T08:50:44",
       "sha256": "aa5c88de2f95bb9928a96dee81c41f8299683216dbb2ef0a8d2e00d18b0491ce",
       "line": "    from naiz_conv.mag_convert import convert_file"
+    },
+    "tools/naiz_build/cg_thumb.py:142": {
+      "verdict": "ok",
+      "text": "lazy optional PIL import only when thumbnails are built",
+      "date": "2026-11-11T21:46:11",
+      "sha256": "f2613f6219a159571437287e818ae347de9a75f512dc5b6dae7f3cccccc70fa7",
+      "line": "    from PIL import Image"
     },
     "tools/naiz_build/mp4_to_ani.py:122": {
       "verdict": "ok",
@@ -537,6 +894,13 @@
       "text": "lazy stdlib Counter import",
       "date": "2026-08-18T13:17:03",
       "sha256": "d8d5b422c9bdbd73fceee5cc0fbf1b57b9b173244a93fe0014fe3bb5a0f8c22f"
+    },
+    "tools/naiz_market/market.py:502": {
+      "verdict": "ok",
+      "text": "lazy stdlib tomllib import only when a config file exists",
+      "date": "2026-11-11T21:46:11",
+      "sha256": "63e1f7ff296ffc222ed02ccd469b4dd21fa0e99f87b3f88f3f142ca8c209bc82",
+      "line": "        import tomllib"
     },
     "tools/naiz_screendig/__init__.py:15": {
       "verdict": "ok",

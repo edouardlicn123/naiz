@@ -46,7 +46,7 @@ import tempfile
 
 REPO_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 LIB_DIR = os.path.join(REPO_ROOT, "core", "lib")
-LIB_C_FILES = ["fmseq.c", "fmopn.c", "midi.c"]
+LIB_C_FILES = ["fmseq.c", "fmopn.c", "fmopn_patch.c", "midi.c"]
 
 _S98_CLOCK = 7987200
 _DEVICE_OPNA = 2
