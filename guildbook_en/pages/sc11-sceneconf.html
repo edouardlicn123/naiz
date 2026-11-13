@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta name="translated-from" content="202610300931">
+<meta name="translated-from" content="202611131540">
 <!-- AI-NOTE: translated-from = the guildbook_cn doc-version this page was translated from. If the cn counterpart's doc-version is newer, re-translate this page from the Chinese source. -->
 
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -17,15 +17,16 @@
 <h1>sceneconf — Scene Configuration</h1>
 <hr>
 <blockquote><strong>Created</strong>: 2026-08-29</blockquote>
-<p>The <code>sceneconf()</code> command sets the chapter title and type of the current scene. The title is recorded with the save, and the type controls behaviour such as the save hotkey.</p>
+<p>The <code>sceneconf()</code> command sets the chapter title, type and scene-list flag of the current scene. The title is recorded with the save, the type controls behaviour such as the save hotkey, and the list flag declares whether the scene is planned to appear in the scene menu.</p>
 
 <h2>1. Syntax</h2>
-<pre><code>sceneconf(){title[, type]}</code></pre>
-<p><strong>Brace-only form</strong>: both the title and the type go in the brace payload (the paren alias is deprecated).</p>
+<pre><code>sceneconf(){title[, type[, onlist|outlist]]}</code></pre>
+<p><strong>Brace-only form</strong>: the title, the type and the list flag all go in the brace payload (the paren alias is deprecated).</p>
 <table>
 <tr><th>Parameter</th><th>Type</th><th>Description</th></tr>
 <tr><td><code>title</code></td><td>string</td><td>Chapter title text, recorded with the save and displayed (written in the brace payload)</td></tr>
 <tr><td><code>type</code></td><td>string</td><td>Scene type <code>normal</code> / <code>cg</code> / <code>menu</code>, default <code>normal</code></td></tr>
+<tr><td><code>onlist</code> / <code>outlist</code></td><td>keyword</td><td>Scene-list flag, default <code>outlist</code>. <code>onlist</code> marks the scene as planned for the scene menu; any other value logs a WARN and falls back to <code>outlist</code></td></tr>
 </table>
 
 <h3>1.1 Type Reference</h3>
@@ -39,9 +40,10 @@
 <h2>2. Example</h2>
 <pre><code>sceneconf(){序章, normal}
 sceneconf(){画廊, cg}
-sceneconf(){, menu}   # menu-type scene: the title may be omitted</code></pre>
+sceneconf(){, menu}                  # menu-type scene: the title may be omitted
+sceneconf(){第五章, normal, onlist}  # planned for the scene menu</code></pre>
 
-<div class="note-box"><p><strong>Note</strong>: with <code>type=menu</code> the save hotkey is disabled, so a save is not triggered by accident inside the main menu or a settings scene.</p></div>
+<div class="note-box"><p><strong>Note</strong>: with <code>type=menu</code> the save hotkey is disabled, so a save is not triggered by accident inside the main menu or a settings scene. At build time <code>onlist</code> is scanned by <code>tools/naiz_build/scene_menu.py</code> to generate the scene-menu table (thumbnail: first CG, else first animation frame, else the title's initial letter); the flag itself is not written to saves. <strong>Unplayed scenes stay locked</strong>: the file must be named <code>nbookNNN.nb</code> (the number is the unlock id); loading a scene sets its unlock bit in the system save, and the scene gallery only lists unlocked scenes — locked ones are hidden, not greyed out, and when nothing is unlocked the menu says "Play the story to unlock scenes."</p></div>
 
 </main>
 </body>

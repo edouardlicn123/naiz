@@ -1,4 +1,4 @@
-sceneconf(){Come with me, normal}
+sceneconf(){Come with me, normal, outlist}
 bg(normal){beach1}
 bgm(){icy_garden}
 char(r,swimming,body){fei}

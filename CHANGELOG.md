@@ -3,6 +3,72 @@
 自 R1 起全部 Bug 修复与功能演进记录（条目顺序沿用 AGENTS.md 既有历史排列）；`AGENTS.md` 仅保留当前版本与规则。**新条目约定**：每轮修复/演进完成后，在下方 `---` 分隔线之后（第一条位置）追加变更摘要，并在 AGENTS.md 头部同步「当前版本」。**条目格式**：每条以 `### <版本号> — <标题>` 开头（版本号化标题行 + `<a id="cN">` 锚点，N 按条目序递增），正文整段或分小节；历史速查直接读下方「版本索引」。
 ---
 
+<a id="c109"></a>
+### 0.4.032 — 场景脚本显式 outlist + devdoc 210（4005 深挖）
+
+- **脚本标注**：`nbook001/003/004/006` 的 `sceneconf()` 补第三字段 `outlist`（002 已是 outlist、005 为 onlist），菜单/非 normal 场景不动；生成表结果不变（`SCENE_MENU_COUNT 1`）。
+- **文档**：新增 `devdocs/210-DOS32A加载器fatal4005深挖-os镜像被拒.md`——症状、E1–E5 排除链、LE 头自检、与 devdoc 195/196 同型记录的关系、类级结论与记录级未定位的边界、`SIZE_OPT` 缓解与两条操作规则、下一步解码器方案与踩坑清单。
+- **验证**：全量重编 `core/*.err` 全空；实机串口启动正常（`Init OK` / `Vid OK` / `VRAM OK` / `Pal chk OK`，无 4005）。`pytest` 本轮未复跑（0.4.031 基线 931 passed, 2 skipped），已登记为 devdoc 210 §九 待办。
+
+<a id="c108"></a>
+### 0.4.031 — DOS/32A 链改用 -od：修复 fatal 4005 加载失败
+
+实机症状：把 `nbook002.nb` 改为 `outlist` 重编译后，引擎启动即报 `unrecognized fixup data in application`（DOS/32A fatal 4005），串口零输出——加载器在执行任何引擎代码前退出。
+
+- **定性**：`.nb` 语法与生成的 `nb_scene_menu.h` 均合法（`SCENE_MENU_COUNT=1`，仅 005）；HDI 内 `ENGINE.EXE` 与 `games/demo-a2/engine.exe` 逐字节一致，排除注入截断；LE 头逐字段自检（页数/页大小/数据页偏移与文件长度吻合、修页表单调）与可加载的 `animatest` 同型 → 属已知的 `-l=dos32a` + `-os` 布局敏感加载失败（devdoc 195 P4、196 §六.5 同型记录）。
+- **修复**：`core/Makefile` 新增 `SIZE_OPT = $(if $(filter dos32a,$(EXTENDER)),-od,-os)`，`BASE` 以它替换硬编码 `-os`——**仅 dos32a 链**改 `-od`，dos4g 链保持 `-os`（历史交付形态未受影响）。
+- **验证**：`rm -rf core/build` 全量重编（`core/*.err` 全空）→ `engine32a.exe` 245232→311812 B；实机启动串口完整（`Init OK` / `Vid OK` / `Img OK` / `AUD OPNA OK` / `FM: 15 patch families` / BGM IRQ 挂载），4005 消失。
+- **注意**：改 `BASE` 后必须 `rm -rf core/build`，否则旧 `-os` 目标文件被直接复用（同 AGENTS §八 六禁之六的混用陷阱）。
+- **测试**：`test_sceneconf_list.py::test_demo_onlist_scenes` 与 `test_scene_menu.py::test_cg_thumb_id_from_assets_db` 改为从场景文件/生成表两侧派生断言，翻转 onlist/outlist 不再需要改测试。
+
+<a id="c107"></a>
+### 0.4.030 — 场景鉴赏：未玩锁定 + 播放结束回菜单
+
+`devdocs/209` 落地，补 208 的两项缺口（锁定不显示 / `scene(end)` 回鉴赏）：
+
+- **进入即解锁**：`nb_load()` 按 `nbookNNN.nb` 数字后缀调用 `sys_save_unlock_scene()`（复用既有 `SystemSave.scene_flags`，`SCENE_TOTAL=100`）；已置位早退，避免每次切场景写 SYSTEM.SAV；删除 `scene_target_name()` 与 `save.c` 读档分支的两处旧解锁块（单一事实源）。
+- **读侧**：新增 `sys_save_is_scene_unlocked()`（`save_sys.c` / `save.h`）。
+- **隐藏未解锁**：`nb_scene_menu.c` 进菜单时 `scm_build_visible()` 建可见下标表，网格/翻页/焦点/鼠标命中全部按可见数，未解锁场景**不显示**（非灰显）。
+- **构建期 id**：`scene_menu.py` 从文件名解析 `unlock_id`（`nbookNNN.nb`，1..`SCENE_TOTAL`），缺失/超界硬失败；`SceneMenuEntry` 增 `unsigned char unlock_id`，表行 4 字段。
+- **播放返回**：`SceneSwitchReason` 增 `SCENE_SWITCH_GALLERY`；`scene_switch()` 内 GALLERY 置播放态、SCRIPT 保持、其余清零；`scene_target_name()` 在播放态下把 `scene(end)` 解析为 `scenes.nb`（`SCENE_SWITCH_MENU`），`scene()`/`jumpscene()` 共用该判定。
+- **空态**：构建期空表 `No scenes available.`；有表但全锁 `Play the story to unlock scenes.`（`SYSTEM_UI_KEYS` + 9 语言 `sys_*.txt`，宽度守卫 ≤240px）。
+- **演示数据**：`nbook002.nb` 补 `onlist`（与 `nbook005.nb` 共 2 项）。
+- **清理**：`nb_get_filename()` 失去唯一外部调用方，随 `symbol_audit` R30 gate 删除（`nb_internal.h` / B90 同步）。
+- **防呆**：`test_scene_menu.py` 扩至 13 项（解锁 id 硬失败/范围与 `save.h` 同步/可见性过滤/播放返回/进入即解锁/第三 i18n 键）；`test_sceneconf_list.py` 改为断言 onlist 集合 = `{nbook002, nbook005}`；`test_devdoc_refs` 行号再校准。
+
+**验证**：`make -C core` 0 err；`pytest` **931 passed, 2 skipped**（基线 926 + 新增 5）；`fullaudit --no-make` 全绿（symbol_audit A/B gate）；`build + make demo-a2` 成功。版本 0.4.029 → **0.4.030**。实机冒烟（新档空态 → 玩到 002 后出现 2 格 → 鉴赏播放至 `scene(end)` 回鉴赏 → Back 回 special/mainmenu）待人工执行。
+
+<a id="c106"></a>
+### 0.4.029 — Scene 菜单（场景鉴赏）：构建期清单 + 三级缩略图
+
+`devdocs/208` 落地，架构对齐 CG 画廊（`nb_cggallery.c`）：
+
+- **构建期表**：新增 `tools/naiz_build/scene_menu.py`，扫描 `projects/<game>/scene/*.nb` 的首条 `sceneconf(){title[,type[,onlist|outlist]]}`（`nb_line.next_field`，转义逗号安全），仅收 `type ∈ {'', normal}` 且第三字段 `onlist`；生成 `core/engine/nb_scene_menu.h`（`SCENE_MENU_COUNT` + `scene_menu_entries[] {scene, title, thumb_id}`，幂等）。`build_game.py` 在 `build_cg_thumbs()` 之后、`export_asset_table()`/`pack_images()` 之前调用。
+- **三级缩略图**：① 首个 `cg(){key}` → 复用 `cg_thumb.py` 的 `<cg>_t` THUMB；② 无 CG 但有 `playanima` → 构建期解 ANI 首帧（`parse_ani` + `decode_mag_full`）、cover 至 160×100、写 `images/<ani>_t.MAG` 并 upsert `type='THUMB'`；③ 均无 → `thumb_id=0`，引擎画标题首字母大写（`draw_title_large` scale 4）。8.3 与 THUMB 短名互异硬校验。
+- **引擎**：新增 `core/engine/nb_scene_menu.c`（`cmd_scenesmenu`）：3 列 × 2 行、格 180×130、缩略图 160×100；`menu_layer_*` 复合绘制、`menu_save_item_palette`、255 槽图标底蓝、选中格黄框 + 黄标题；方向键/鼠标焦点、`menu_pagenav_draw` 翻页、`menu_back_draw`/Esc 返回；Enter/点击经 `menu_finish()` 后 `scene_switch(..., SCENE_SWITCH_SCRIPT)` 从头播放；空表 `No scenes available.`。`SCM_*` 常量与 Python 侧 `THUMB_W/H`、`GRID_*`、`CELL_*` 由守卫对齐。
+- **接线**：新增 `projects/demo-a2/scene/scenes.nb`（`sceneconf(){Scenes, menu}` + `scenesmenu()`）；`nb_special.c` 的 `scenes` 分支由误接的 `save_request(LOAD)` 改为跳 `scenes.nb`（回退 `special.nb`）；`nb_mainmenu.c` 的 `scenes` 桩同款（回退 mainmenu）；`nb_validator` 登记 `scenesmenu`。
+- **清理**：删除 0.4.028 的运行期访问器 `nb_is_scene_listed()`、`NbState.scene_listed` 及其重置（无消费方即死导出，R30 gate）；`nb_set_scene_conf()` 保留第三字段校验（拼错 WARN）。`devdocs/207` 按 §十 加 ERRATA 块（正文不改）。
+- **i18n**：`SYSTEM_UI_KEYS` 增 `SCENE GALLERY` / `No scenes available.`，9 语言 `sys_*.txt` 补齐（含宽度守卫）；新场景 `Scenes` 标题在 9 语言 `game_*.txt` 补齐。
+- **附带修复**：`nb_music.c` 的 `BGM: Off` 居左计算改为无符号宽度（C22 `-INT_MIN` 误报面收敛）。
+- **防呆**：`tools/tests/test_scene_menu.py`（8 项）——扫描过滤（含字母回退断言）/ 标题转义 / `nbook005` thumb=29 / 合成 ANI 首帧 / Python↔C 常量 / 命令注册 / 无残留访问器 / 9 语言键与宽度。
+
+**验证**：`make -C core` 0 err；`pytest` **926 passed, 2 skipped**（基线 918 + 新增 8，207 的 2 项守卫改写为构建期语义）；`fullaudit --no-make` 全绿（含 symbol_audit A/B gate）；`build + make demo-a2` 成功。版本 0.4.028 → **0.4.029**。实机冒烟（special → Scenes 缩略图/播放/返回）待人工执行。
+
+<a id="c105"></a>
+### 0.4.028 — sceneconf 第三字段：场景清单标记（onlist / outlist）
+
+`devdocs/207` 落地。语法由 `sceneconf(){title[,type]}` 扩为 `sceneconf(){title[,type[,onlist|outlist]]}`：
+
+- **引擎**：`NbState.scene_listed`（1=onlist / 0=outlist）；`nb_set_scene_conf()` 加第三参，空值与 `outlist` 等价，未知值打 `WARN: sceneconf: unknown list flag` 并回落 outlist（§九.6 消灭静默失败）；`nb_load()` 重置该字段防跨场景残留；新增访问器 `nb_is_scene_listed()` 供将来的 scene 菜单消费（当前仅登记，`mainmenu` 的 `scenes` 仍是桩）。
+- **解析**：`cmd_sceneconf` 用两次 `nb_next_field()` 取 title/type，剩余尾段为 list 标记并裁尾随空白——沿用 §十四.9 的转义语义，不裸 `strchr(',')`。
+- **脚本**：`nbook005.nb` 标记 `sceneconf(){Come with cat, normal, onlist}`；其余场景保持默认 outlist。
+- **校验**：`nb_validator` 新增第三字段白名单校验（空 / `onlist` / `outlist`），拼错如 `onlst` 即 error；`SIGNATURES` 描述同步。
+- **i18n**：`i18n_gen` 取标题改用 `next_field()`（原裸 `split(',')`），转义逗号标题与引擎逐字节一致；第三字段不影响取键。
+- **文档**：`docs/B92` 命令表、`docs/B90` 函数索引、guildbook cn/en `sc11-sceneconf`（cn `doc-version` 202611131200，en `translated-from` 同步）。
+- **防呆**：`tools/tests/test_sceneconf_list.py`（6 项）——引擎双次取字段 / 默认 outlist 与 WARN / `nb_load` 重置 / 全项目字段合法 / 005 为 onlist / validator 拒绝坏值。
+
+**验证**：`make -C core` 0 err；`pytest` **918 passed, 2 skipped**（基线 912 + 新增 6 项）；`build + make demo-a2` 成功。版本 0.4.027 → **0.4.028**。
+
 <a id="c104"></a>
 ### 0.4.027 — 音乐鉴赏界面（Music Room）落地
 
@@ -1213,6 +1279,11 @@ devdoc 205 落地后三次实机反馈修补的最终收口。
 
 | 条目 |
 |------|
+| [0.4.032 — 场景脚本显式 outlist + devdoc 210（4005 深挖）](#c109) |
+| [0.4.031 — DOS/32A 链改用 -od：修复 fatal 4005 加载失败](#c108) |
+| [0.4.030 — 场景鉴赏：未玩锁定 + 播放结束回菜单](#c107) |
+| [0.4.029 — Scene 菜单（场景鉴赏）：构建期清单 + 三级缩略图](#c106) |
+| [0.4.028 — sceneconf 第三字段：场景清单标记（onlist / outlist）](#c105) |
 | [0.4.027 — 音乐鉴赏界面（Music Room）落地](#c104) |
 | [0.4.026 — C35 重复常量表达式收口（几何/掩码具名化）](#c103) |
 | [0.4.025 — 音频 HAL 与 FM 模型按通路拆分（E 节候选 1+2）](#c102) |

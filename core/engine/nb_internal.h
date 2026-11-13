@@ -57,9 +57,8 @@ int  nb_lang_is_cjk(void);
 
 /* Narrow state accessors (implemented in nb.c).
  * Direct reads/writes of nb.<field> outside nb.c are not allowed. */
-void nb_set_scene_conf(const char *title, const char *type);
+void nb_set_scene_conf(const char *title, const char *type, const char *list);
 void nb_set_last_choice(int choice);
-const char *nb_get_filename(void);
 /* Return the loaded script buffer (read-only), used by the line parser. */
 const char *nb_get_buffer(void);
 
@@ -105,6 +104,11 @@ void nb_scene_switch_tagged(const char *filename, int reason, const char *tag);
  * parent scene via nb_get_menu_return(); empty falls back to mainmenu.nb. */
 void nb_set_menu_return(const char *scene);
 const char *nb_get_menu_return(void);
+
+/* nb.c: gallery playback mode (devdoc 209).  Non-zero while the player is
+ * playing a scene started from the scene gallery; scene_target_name() uses it
+ * to send scene(end) back to scenes.nb instead of mainmenu.nb. */
+int nb_get_playback_mode(void);
 
 /* DialogState + dialog_show moved to nb_dialog.h */
 

@@ -1,4 +1,4 @@
-sceneconf(){Have question?, normal}
+sceneconf(){Have question?, normal, outlist}
 tag(visit)
 bg(normal){homeday}
 bgm(){melody_town}

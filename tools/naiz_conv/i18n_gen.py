@@ -43,6 +43,8 @@ SYSTEM_UI_KEYS = {
     "Sound & Voice Vol", "Max", "High", "Mid", "Low",
     "Read Progress",
     "CG GALLERY", "No CGs available.", "[LOCKED]",
+    "SCENE GALLERY", "No scenes available.",
+    "Play the story to unlock scenes.",
     "No save data.", "Load failed.",
     "SPECIAL",
     # devdoc 205: rename page title / prompt / voiced-kana toggle / OK button
@@ -94,9 +96,11 @@ def extract_texts(nb_files):
                     dialogue_texts.add(text.strip())
 
                 if cmd == 'sceneconf' and text:
-                    # sceneconf(){title[,type]}: only the title part (before
-                    # the first ',') is translatable; type is a keyword.
-                    title_part = text.split(',')[0].strip()
+                    # sceneconf(){title[,type[,onlist|outlist]]}: only the
+                    # first field (title) is translatable; type and the list
+                    # flag are keywords. nb_next_field mirrors the engine's
+                    # escaped-comma handling byte for byte.
+                    title_part, _rest = nb_next_field(text)
                     if title_part:
                         dialogue_texts.add(title_part)
 

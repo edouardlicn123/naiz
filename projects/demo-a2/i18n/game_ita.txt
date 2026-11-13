@@ -40,3 +40,4 @@ Night falls over the ancient house.=La notte scende sulla vecchia casa.
 The earth chapter begins here.=Il capitolo della Terra inizia qui.
 To be continued.=Continua.
 Music=Musica
+Scenes=Scene

@@ -101,7 +101,8 @@ void cmd_mainmenu(int argc, const char **argv, const char *cmd_name)
     } else if (strcmp(argv[sel + 4], "start") == 0) {
         start_new_game();
     } else if (strcmp(argv[sel + 4], "scenes") == 0) {
-        hal_log("scene select: not implemented\r\n");
+        nb_set_menu_return("");
+        scene_switch("scenes.nb", SCENE_SWITCH_MENU);
     } else if (strcmp(argv[sel + 4], "special") == 0) {
         nb_set_menu_return("");
         scene_switch("special.nb", SCENE_SWITCH_MENU);

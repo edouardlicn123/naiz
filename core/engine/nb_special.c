@@ -103,8 +103,8 @@ static void special_route(int sel_key, const char *key)
         nb_set_menu_return("special.nb");
         scene_switch("cgview.nb", SCENE_SWITCH_MENU);
     } else if (strcmp(key, "scenes") == 0) {
-        save_request(SAVE_OP_CAPTURE_TEMP, -1);
-        save_request(SAVE_OP_OPEN_LOAD, -1);
+        nb_set_menu_return("special.nb");
+        scene_switch("scenes.nb", SCENE_SWITCH_MENU);
     } else if (strcmp(key, "music") == 0) {
         nb_set_menu_return("special.nb");
         scene_switch("music.nb", SCENE_SWITCH_MENU);

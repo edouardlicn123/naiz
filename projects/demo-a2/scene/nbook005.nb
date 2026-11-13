@@ -1,4 +1,4 @@
-sceneconf(){Come with cat, normal}
+sceneconf(){Come with cat, normal, onlist}
 bg(normal){beach1}
 bgm(){icy_garden}
 char(l,swimming,body){fei}

@@ -39,10 +39,11 @@ SIGNATURES = {
     'cg':       (0, 1, 'cg(){key} | cg(hidedialog)'),
     'char':     (1, 3, 'char(pos[,expr[,type]]){name} | char(hideall)'),
     'scene':    (1, None, 'scene(name)'),
-    'sceneconf': (0, 0, 'sceneconf(){title[,type]}'),
+    'sceneconf': (0, 0, 'sceneconf(){title[,type[,onlist|outlist]]}'),
     'nameinput': (0, 0, 'nameinput()'),
     'mainmenu': (5, None, 'mainmenu(x, y, w, h, opt, ...)'),
     'specialmenu': (1, None, 'specialmenu(entry, ...)'),
+    'scenesmenu': (0, 0, 'scenesmenu()'),
     'host':     (0, 0, 'host(){text}'),
     'bgm':      (0, 1, 'bgm(){key} | bgm(stop)'),
     'sound':    (0, 0, 'sound(){key}'),
@@ -521,7 +522,21 @@ def validate_scene(nb_path, ref):
                 if text is None or not text.strip():
                     errors.append(
                         f"  {nb_path.name}:{lineno}: sceneconf requires "
-                        f"title in braces 'sceneconf(){{title[,type]}}'")
+                        f"title in braces "
+                        f"'sceneconf(){{title[,type[,onlist|outlist]]}}'")
+                else:
+                    # Third field is the scene-menu flag. Escaped commas are
+                    # handled by next_field(), never a bare split.
+                    _title, rest = next_field(text)
+                    if _title is not None:
+                        _type, rest2 = next_field(rest)
+                        if _type is not None:
+                            flag = rest2.strip()
+                            if flag not in ('', 'onlist', 'outlist'):
+                                errors.append(
+                                    f"  {nb_path.name}:{lineno}: sceneconf "
+                                    f"list flag {flag!r} invalid "
+                                    f"(expected 'onlist' or 'outlist')")
 
             elif cmd == 'playanima':
                 if text is None or not text.strip():

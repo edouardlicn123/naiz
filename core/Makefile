@@ -52,6 +52,11 @@ endif
 else
 $(error Unknown EXTENDER '$(EXTENDER)' - use dos4g, dos32a or causeway)
 endif
+# DOS/32A 的加载器会拒绝某些 -os 布局的镜像（fatal 4005:
+# unrecognized fixup data in application，实机复现于 0.4.030；devdoc 196 §六.5
+# 已有同型记录）。同源 -od 产物可正常加载，故 dos32a 链改用 -od；
+# dos4g 链保持 -os（历史交付形态，未受影响）。
+SIZE_OPT = $(if $(filter dos32a,$(EXTENDER)),-od,-os)
 NAIZ_DEBUG ?= ON
 # Extra compile-time defines for diagnostic builds (devdoc 150):
 #   make -C core EXTRA_DEFS=-DBGM_TICK_TRACE=1
@@ -62,7 +67,7 @@ BUILD   = build
 
 # 编译隔离：每层只能看到自己的头文件和共享的 lib/。
 # engine/ 需要 -Iplat 以访问 hal.h；plat/ 需要 -Iengine 以访问 cursor.h。
-BASE    = -bt=dos $(EXT_LINK) -zq -os -s -DNAIZ_DEBUG=$(NAIZ_DEBUG) $(EXT_DEFS) $(EXTRA_DEFS)
+BASE    = -bt=dos $(EXT_LINK) -zq $(SIZE_OPT) -s -DNAIZ_DEBUG=$(NAIZ_DEBUG) $(EXT_DEFS) $(EXTRA_DEFS)
 ENG_CFLAGS = $(BASE) -Iengine -Ilib -Iplat -I$(WATCOM)/h
 PLAT_CFLAGS = $(BASE) -Iplat -Ilib -Iengine -I$(WATCOM)/h -DHAL_BUILD_ALLOWED
 LIB_CFLAGS  = $(BASE) -Ilib -I$(WATCOM)/h

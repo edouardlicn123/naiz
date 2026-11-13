@@ -104,9 +104,11 @@ static void nb_set_chapter_title(const char *title)
     str_copy(nb.chapter_title, sizeof(nb.chapter_title), title);
 }
 
-/* Set scene configuration (chapter title + scene type).
- * type: "normal" / "cg" / "menu".  Invalid/empty type falls back to "normal". */
-void nb_set_scene_conf(const char *title, const char *type)
+/* Set scene configuration (chapter title + scene type + scene-list flag).
+ * type: "normal" / "cg" / "menu".  Invalid/empty type falls back to "normal".
+ * list: "onlist" / "outlist" (default when empty).  Anything else falls back
+ * to outlist with a WARN so a typo ("onlst") cannot silently pass. */
+void nb_set_scene_conf(const char *title, const char *type, const char *list)
 {
     nb_set_chapter_title(title);
     if (type && strcmp(type, "normal") != 0 &&
@@ -118,18 +120,21 @@ void nb_set_scene_conf(const char *title, const char *type)
         str_copy(nb.scene_type, sizeof(nb.scene_type), type);
     else
         nb.scene_type[0] = '\0';
+
+    /* Default is outlist: only an explicit "onlist" opts the scene in.
+     * Scene-menu membership is resolved at build time by
+     * tools/naiz_build/scene_menu.py, so the engine only validates the flag
+     * (a typo like "onlst" must stay visible in the log). */
+    if (list && list[0] != '\0' &&
+        strcmp(list, "onlist") != 0 && strcmp(list, "outlist") != 0) {
+        hal_log("WARN: sceneconf: unknown list flag, fallback to outlist\r\n");
+    }
 }
 
 /* Remember the last question choice (or -1 when unanswered). */
 void nb_set_last_choice(int choice)
 {
     nb.last_choice = choice;
-}
-
-/* Return the currently loaded script filename. */
-const char *nb_get_filename(void)
-{
-    return nb.filename;
 }
 
 /* Return the loaded script buffer (read-only).  Used by the line parser. */
@@ -243,6 +248,15 @@ static void nb_load(const char *filename)
     nb_old_skip = (strcmp(nb.filename, "logo.nb") == 0 || strcmp(nb.filename, "op.nb") == 0);
     str_copy(nb.filename, NB_FILENAME_MAX, filename);
 
+    /* devdoc 209: unlock-on-entry.  A story scene counts as played the moment
+     * it loads; the id is the numeric suffix of nbookNNN.nb.  main.c calls
+     * sys_save_load() before nb_init(), so this never resets existing flags. */
+    {
+        unsigned int scene_id;
+        if (sscanf(nb.filename, "nbook%u.nb", &scene_id) == 1)
+            sys_save_unlock_scene((int)scene_id);
+    }
+
     if (from_arc) {
         int i, complete;
 
@@ -302,20 +316,38 @@ static void nb_load(const char *filename)
 
 /*=== Scene switching (single entry, stage 2 G) =============================*/
 
+/* Gallery playback mode (devdoc 209): set on SCENE_SWITCH_GALLERY, kept
+ * across the script-driven chain (scene 003 -> ...) and cleared by every other
+ * switch reason.  scene_target_name() reads it to route scene(end) back to
+ * the gallery instead of the main menu. */
+static int g_playback_mode;
+
+int nb_get_playback_mode(void)
+{
+    return g_playback_mode;
+}
+
 /* Scene-switch single entry: owns the audio stop (E) and funnels every scene
  * transition through nb_load.  The black screen, keyboard drain and display
  * reset happen inside nb_load -> scene_end; the only scene-end side effect
  * moved out of scene_end (audio_stop_all, stage 2 E) lives here so a scene
- * change can never run with stale pending audio.  reason is logged. */
+ * change can never run with stale pending audio.  reason is logged.
+ * reason also owns the gallery playback flag: GALLERY arms it, SCRIPT keeps
+ * it, anything else (menu/hotkey/apply/init) ends playback. */
 void scene_switch(const char *filename, int reason)
 {
     static const char *const rname[] = { "init", "script", "hotkey",
-                                         "apply", "menu" };
+                                         "apply", "menu", "gallery" };
     const char *rs = "?";
 
-    if (reason >= SCENE_SWITCH_INIT && reason <= SCENE_SWITCH_MENU)
+    if (reason >= SCENE_SWITCH_INIT && reason <= SCENE_SWITCH_GALLERY)
         rs = rname[reason];
     hal_logf("[SCENE] switch '%s' reason=%s\r\n", filename, rs);
+
+    if (reason == SCENE_SWITCH_GALLERY)
+        g_playback_mode = 1;
+    else if (reason != SCENE_SWITCH_SCRIPT)
+        g_playback_mode = 0;
 
     audio_stop_all();     /* silence BGM (all-notes-off) + PCM (scene end) */
     nb_load(filename);

@@ -21,6 +21,7 @@ dist/
 .opencode/
 .mag_conv_state.json
 .cg_thumb_state.json
+.scene_menu_state.json
 *.hdi
 *.pyc
 *.rej

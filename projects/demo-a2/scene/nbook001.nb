@@ -1,4 +1,4 @@
-sceneconf(){Chapter selection, normal}
+sceneconf(){Chapter selection, normal, outlist}
 bg(normal){homeday}
 host(){Which chapter do you choose?}
 jumpscene(Choose a chapter;Chapter of Heaven,002;Chapter of Earth,006)

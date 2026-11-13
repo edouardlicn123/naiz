@@ -40,3 +40,4 @@ Night falls over the ancient house.=오래된 저택에 밤이 내린다.
 The earth chapter begins here.=지의 장은 여기서 시작된다.
 To be continued.=계속됩니다.
 Music=음악
+Scenes=장면
