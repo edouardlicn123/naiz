@@ -158,4 +158,30 @@ void vclock_advance_fixed(VClock *vc, unsigned long delta_units);
 /* Current virtual time in whole milliseconds. */
 unsigned long vclock_ms(const VClock *vc);
 
+/*
+ * Window diagnostic hook (devdoc 211 §5.3).
+ *
+ * vclock.c is deliberately I/O-free so the whole state machine stays testable
+ * on the host, and it is compiled as its own translation unit (core/Makefile
+ * LIB_SRCS), so a macro defined in the platform layer cannot reach it.  A
+ * registration callback is the portable way to let the platform observe window
+ * closures without dragging hal_logf() into the library.
+ *
+ * The observer fires once per CLOSED measurement window, immediately after the
+ * target has been updated and before the counters are cleared, with:
+ *   vc        — the clock, so the caller can read step/target/passes itself
+ *   raw_want  — the measured rate BEFORE the ratio clamp, units per pass
+ *   want      — the rate actually fed to the IIR, units per pass
+ *   passes    — frames the window covered
+ *   accum     — real ms the window spanned
+ *
+ * Pass NULL to detach.  No observer is installed by default, so host tests
+ * and any non-platform build are unaffected.
+ */
+typedef void (*vclock_window_fn)(const VClock *vc, unsigned long raw_want,
+                                 unsigned long want, unsigned long passes,
+                                 unsigned long accum);
+
+void vclock_set_window_observer(vclock_window_fn fn);
+
 #endif /* VCLOCK_H */

@@ -215,7 +215,18 @@ def main():
         print("  Run install_env.py or create ~/.config/wxnp21kai/ first")
         sys.exit(1)
 
-    output = run_emulator(hdi_path, args.output, args.timeout)
+    # The restore must happen even when the emulator run blows up: the patch
+    # above already rewrote AUTOEXEC.BAT inside the HDI, so an exception
+    # escaping here leaves the game disk booting SERTEST.COM instead of the
+    # engine.  That is exactly what a missing /dev/pts in a container produces
+    # (pty.openpty() -> OSError), and the failure used to be silent and
+    # permanent until someone noticed the game no longer started.
+    try:
+        output = run_emulator(hdi_path, args.output, args.timeout)
+    finally:
+        if autoexec_backup and not args.no_restore:
+            print(f"[serial] Restoring AUTOEXEC.BAT ({len(autoexec_backup)} bytes)")
+            patch_autoexec_in_hdi(hdi_path, autoexec_backup)
 
     if "Hello from DOS!" in output:
         print("[serial] RESULT: DOS serial output received - boot chain OK")
@@ -229,10 +240,6 @@ def main():
         print("  Note: leftover emulator instances and a missing "
               "'--start' silently stall the serial chain; "
               "both are auto-handled on this run")
-
-    if autoexec_backup and not args.no_restore:
-        print(f"[serial] Restoring AUTOEXEC.BAT ({len(autoexec_backup)} bytes)")
-        patch_autoexec_in_hdi(hdi_path, autoexec_backup)
 
 
 if __name__ == '__main__':

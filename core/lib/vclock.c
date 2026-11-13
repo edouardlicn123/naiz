@@ -54,6 +54,40 @@
  */
 #include "vclock.h"
 
+/* devdoc 211 §5.3: per-window diagnostic.  vclock.c is deliberately I/O-free
+ * (it is unit-tested on the host), so the trace is a REGISTERED OBSERVER rather
+ * than a macro: this file is compiled as its own translation unit (core/
+ * Makefile LIB_SRCS globs lib/*.c), so a macro defined in core/plat/hal_clock.c
+ * could never reach this code -- the first attempt at this instrumentation was
+ * silently dead for exactly that reason.  hal_clock.c installs the printer in
+ * hal_clock_init(); the host tests never install one.
+ *
+ * What it answers, and why it is the only way to settle devdoc 211:
+ *   passes  — how many frames this window covered.  A correct 176 pass/s run
+ *             shows a few hundred per 1000ms window; a huge number means the
+ *             measurement is diluted by extra advances.
+ *   accum   — how much real time those passes spanned.  Under 1000 the DOS
+ *             clock barely moved; far over 1000 one delta swallowed a stall.
+ *   raw_want— the measurement BEFORE the ratio clamp.  If this is already
+ *             wrong, the clamp is innocent and the delta shape is the cause.
+ *   want    — after the clamp, i.e. what the IIR is actually fed.
+ */
+static vclock_window_fn s_window_observer;
+
+void vclock_set_window_observer(vclock_window_fn fn)
+{
+    s_window_observer = fn;
+}
+
+/* The counters are still live when the observer runs, so it may read them
+ * straight off the clock instead of trusting the copies. */
+#define VCLOCK_NOTIFY_WINDOW(vcp, raw_want, want)                          \
+    do {                                                                   \
+        if (s_window_observer)                                             \
+            s_window_observer((vcp), (raw_want), (want),                   \
+                              (vcp)->passes, (vcp)->accum);                \
+    } while (0)
+
 void vclock_init(VClock *vc)
 {
     if (!vc) return;
@@ -146,6 +180,7 @@ void vclock_advance(VClock *vc, unsigned long real_ms)
          * frames, so that is the true per-pass rate.  Reaching for it here is
          * what keeps the long-run tempo honest. */
         unsigned long want = (vc->accum * VCLOCK_UNITS_PER_MS) / vc->passes;
+        unsigned long raw_want = want;   /* pre-clamp, for the [VW] trace */
         if (want < VCLOCK_RATE_MIN_MS * VCLOCK_UNITS_PER_MS)
             want = VCLOCK_RATE_MIN_MS * VCLOCK_UNITS_PER_MS;
         if (want > VCLOCK_RATE_MAX_MS * VCLOCK_UNITS_PER_MS)
@@ -178,6 +213,7 @@ void vclock_advance(VClock *vc, unsigned long real_ms)
             vc->target = (unsigned long)((long)vc->target
                                          + diff / (long)VCLOCK_MEAS_SMOOTH);
         }
+        VCLOCK_NOTIFY_WINDOW(vc, raw_want, want);
         vc->passes = 0;
         vc->accum = 0;
     } else if (vc->accum >= VCLOCK_WINDOW_MS) {

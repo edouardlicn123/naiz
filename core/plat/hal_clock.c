@@ -14,6 +14,49 @@
 #include "vclock.h"
 #include <i86.h>
 
+/* devdoc 211 §5.3: per-window diagnostic for the virtual clock.
+ *
+ * vclock.c is I/O-free by design (host-testable) AND compiled as its own
+ * translation unit (core/Makefile globs lib/*.c), so a macro defined here can
+ * never reach it -- the first attempt at this instrumentation was dead code
+ * for exactly that reason.  vclock_set_window_observer() is the supported
+ * channel: this file owns only the printing, the library stays pure.
+ *
+ * This is the [VW] line: one record per closed measurement window, carrying
+ * everything needed to tell apart the candidate explanations for "the clock
+ * runs 3.9x fast":
+ *
+ *   passes   — frames the window covered.  ~frame-rate worth is correct; a
+ *              hugely inflated value means passes are counted without real
+ *              time arriving (the window is then diluted, clock runs SLOW).
+ *   accum    — real ms those passes spanned.  Should be just over 1000.
+ *   raw_want — measurement BEFORE the ratio clamp.  If already wrong, the
+ *              clamp is innocent.
+ *   want     — after the clamp (what the IIR is fed).
+ *   tgt/step — smoothed rate and the size actually emitted per pass.
+ *
+ * Reading it: at the engine's measured ~176 pass/s a healthy line is
+ * `passes~176 accum~1000 raw~91 tgt~91 step~91`.  Anything else localises the
+ * defect on the spot -- which is exactly what devdoc 211 §五 needs before
+ * vclock.c may be touched.
+ *
+ * On by default alongside the [VC] line; compile out with
+ *   make -C core EXTRA_DEFS=-DVCLOCK_WINDOW_TRACE=0
+ */
+#ifndef VCLOCK_WINDOW_TRACE
+#define VCLOCK_WINDOW_TRACE 1
+#endif
+
+#if VCLOCK_WINDOW_TRACE
+static void hal_vclock_window_trace(const VClock *vc, unsigned long raw_want,
+                                    unsigned long want, unsigned long passes,
+                                    unsigned long accum)
+{
+    hal_logf("[VW] passes=%lu accum=%lu raw=%lu want=%lu tgt=%lu step=%lu\r\n",
+             passes, accum, raw_want, want, vc->target, vc->step);
+}
+#endif
+
 /*
  * Wall-clock milliseconds via DOS system time (INT 21h AH=2Ch).
  *
@@ -68,6 +111,9 @@ static unsigned long last_advance_units = 258UL;  /* stage 3/4: default = one BG
 void hal_clock_init(void)
 {
     vclock_init(&g_vclock);
+#if VCLOCK_WINDOW_TRACE
+    vclock_set_window_observer(hal_vclock_window_trace);
+#endif
 }
 
 unsigned long hal_wallclock_ms(void)

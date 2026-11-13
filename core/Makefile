@@ -52,11 +52,11 @@ endif
 else
 $(error Unknown EXTENDER '$(EXTENDER)' - use dos4g, dos32a or causeway)
 endif
-# DOS/32A 的加载器会拒绝某些 -os 布局的镜像（fatal 4005:
-# unrecognized fixup data in application，实机复现于 0.4.030；devdoc 196 §六.5
-# 已有同型记录）。同源 -od 产物可正常加载，故 dos32a 链改用 -od；
-# dos4g 链保持 -os（历史交付形态，未受影响）。
-SIZE_OPT = $(if $(filter dos32a,$(EXTENDER)),-od,-os)
+# 全链恢复 -os（0.4.032 补记，devdoc 210 §十一）：v9.12 源码级仿真 + 实测证明
+# 干净全量重编的 -os 镜像可正常加载（4005 无法复现），原 4005 归因于当时的
+# 构建现场/环境，非镜像内容。若再次出现 fatal 4005：先跑复现三连（干净全量
+# 重编 → 注入新 HDI → 开机冒烟），复现不出即环境/现场问题；不要回切 -od。
+SIZE_OPT = -os
 NAIZ_DEBUG ?= ON
 # Extra compile-time defines for diagnostic builds (devdoc 150):
 #   make -C core EXTRA_DEFS=-DBGM_TICK_TRACE=1

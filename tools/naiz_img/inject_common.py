@@ -71,8 +71,16 @@ def generate_autoexec(game_name, mouse_cmd=None):
     content = b'@ECHO OFF\r\n'
     if mouse_cmd:
         content += mouse_cmd + b'\r\n'
-    if not _is_open_pack():
-        content += b'SET DOS16M=1\r\n'
+    # SET DOS16M=1 对两条链都写（devdoc 210 §十一.5，2026-11-13）：
+    # - DOS/4GW 1.97 stub：必需开关，没有它 stub 直接交还 DOS 提示符
+    #   （devdoc 178 移除后回滚 DOS/4GW 时曾导致商业链"不可启动"）。
+    # - DOS/32A：源码不读该变量（tmp_le/dos32a-git 全文零引用），但它
+    #   平移 AUTOEXEC 环境块大小 → 平移 ENGINE.EXE 装载地址。DOS/32A
+    #   9.12 的 LE fixup 处理对装载地址敏感：openpack 链历史上没写这行，
+    #   -os 镜像恰落在坏地址上 → fatal 4005（0.4.030 实机复现）。
+    #   实测同一 -os 镜像：无此行必 4005，加一行 REM（NAIZ_AE_PAD=1）
+    #   或此行即可启动——因果因子是装载地址平移，非变量本身。
+    content += b'SET DOS16M=1\r\n'
     # NAIZ_AE_PAD — P7 布局矩阵验收工具（devdoc 196 §4.4 / refdoc I04）。
     # 注入 N 行 `REM ......` 到 AUTOEXEC.BAT，让每次 makegame 的 DOS
     # 装载地址产生可控偏移，用于复现和排查布局敏感型崩溃（如 P7

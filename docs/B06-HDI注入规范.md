@@ -77,8 +77,7 @@
 
 ```
  0. 移除 DBLSPACE.BIN（根目录标记 0xE5）
- 1. 替换 AUTOEXEC.BAT（SET DOS16M=1 + ENGINE.EXE）
- 2. 替换 CONFIG.SYS（DEVICE=VEM486, SHELL=）
+ 1. 替换 AUTOEXEC.BAT（SET DOS16M=1 + ENGINE.EXE） 2. 替换 CONFIG.SYS（DEVICE=VEM486, SHELL=）
  3. 遍历 games/<name>/ 下每个文件，注入到根目录
     - 文件已存在 → 覆盖（新簇立即清零）
     - 文件不存在 → 新建目录项（新簇立即清零）
@@ -88,6 +87,26 @@
 
 **`_inject_file_content()` 签**：`fat_eoc` 参数指定 FAT12_EOC（0xFF8）或 FAT16_EOC（0xFFF8），兼容 FAT12/FAT16 双格式。
 修复前硬编码 FAT16_EOC，在 FAT12 基座镜像上导致簇链尾标记错误，进而引发文件截断或溢出。
+
+### 4.2 AUTOEXEC.BAT 的 `SET DOS16M=1` 不可移除（0.4.033，devdoc 210）
+
+`generate_autoexec()` 现对**两条链无条件**写入 `SET DOS16M=1`。两条理由互相独立：
+
+| 链 | 作用 | 移除后果 |
+|---|---|---|
+| `dos4g`（cmpack） | DOS/4GW 1.97 stub 的**必需开关** | stub 直接交还 DOS 提示符，引擎不启动（devdoc 178 曾因此"整链不可启动"） |
+| `dos32a`（openpack） | **不被 DOS/32A 读取**，但增大环境块 → 平移 `ENGINE.EXE` 的 DOS 装载地址 | 若布局恰落在坏地址，启动即 `fatal (4005): unrecognized fixup data in application`（0.4.030 实机复现） |
+
+**机理**：DOS/32A 9.12 的 LE fixup 处理对某些装载地址失效（源码级验证 fixup 记录本身完全合法，
+见 devdoc 210 §11.3）。任何**改变 AUTOEXEC 字节数或镜像布局**的改动都可能重新踩到坏地址。
+
+**排查手法**：再现 4005 时先用 `NAIZ_AE_PAD=1..4 makegame.sh make <game>`（注入 N 行 `REM`，
+纯地址平移）扫描——若能启动即确认是地址敏感，**不要再去解 fixup 记录**。诊断后记得把
+`NAIZ_AE_PAD` 归零重建。
+
+**踩坑**：手动 `python -m tools.naiz_img.inject` 与 `makegame.sh make` 会因 `NAIZ_PACK`
+环境变量分支生成**不同的 AUTOEXEC**（历史上 openpack 链曾不含该行）。做启动对照实验时
+必须用同一条注入路径，否则结论无效（devdoc 210 §11.4 的教训）。
 
 
 

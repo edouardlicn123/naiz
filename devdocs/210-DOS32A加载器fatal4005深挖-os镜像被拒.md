@@ -1,10 +1,12 @@
 # 210 — DOS/32A 加载器 fatal 4005 深挖：`-os` LE 镜像被拒绝
 
-> **状态**: 未完结（类级定性已定，记录级未定位）
+> **状态**: 已破案（0.4.033，c111）：4005 = **装载地址敏感**——AUTOEXEC 是否含 `SET DOS16M=1`
+> 平移了 ENGINE.EXE 的 DOS 装载地址，恰落在 DOS/32A fixup 处理的坏地址上。见 §十一。
+> 记录级"逐条拒收"定性仍被推翻（11.2–11.3 成立）；11.4 的初版结论已被对照实验修正。
 > **版本**: 0.4.031 落地缓解，0.4.032 补记脚本标注与本文
 > **交接**: 2026-11-13（0.4.032）暂停深挖，接手请先读 §十 交接状态
 > **关联**: `CHANGELOG.md` c108/c109、devdocs/195 §四 P4、devdocs/196 §六.5、`core/Makefile` `SIZE_OPT`
-> **性质**: 第三方加载器（Open Watcom 绑定的 `dos32a.exe`）与 `wlink -os` 输出的兼容缺陷；本仓库内不可修加载器，只能绕开
+> **性质**: DOS/32A 9.12 加载器 fixup 处理的**装载地址敏感**缺陷；本仓库内不可修加载器，通过 AUTOEXEC `SET DOS16M=1` 平移装载地址绕开
 
 ## 一、症状
 
@@ -119,13 +121,23 @@ BASE    = -bt=dos $(EXT_LINK) -zq $(SIZE_OPT) -s ... $(EXT_DEFS) $(EXTRA_DEFS)
    （本轮已踩：对可启动镜像同样报越界）。
 5. **改编译旗标必须清 `core/build`**；只用 `build` 不 `make` 跑的是旧 HDI（AGENTS §八 六禁之二）。
 6. **每次体积/布局变化后跑开机冒烟**：这是 196 §六.5 留下的一条，本次因未执行而直到用户实机才发现。
+7. **fatal 4005 是"表象错误码"**：`apply_fixups` 在循环顶部预置 `_err_code=4005`，循环内任何
+   `file_errorm` 退出都按 4005 报出（v9.12 `loader.asm`）。见到 4005 不要直接解读为"fixup 记录
+   内容非法"，先用 §十一 的复现三连验证可复现性。
+8. **容器缺 devpts 时 `makegame test --serial` 必挂**（`OSError: out of pty devices`）。挂载
+   devpts 不跨命令持久，替代方案：`tools/diag/np2kai_smoke_fifo.py`（FIFO 串口 + `naiz_screendig`
+   抓屏）。注意模拟器进程**必须与抓屏在同一条命令内**完成启动→等待→抓屏（后台进程不跨命令存活）；
+   抓屏产物在沙箱外的 /tmp，需立即复制进项目目录。
+9. **诊断新工具速记**：`tmp_le/sim_loader.py`（对任意 wlink LE 镜像跑 v9.12 加载器全检查，含
+   fixup 记录逐条解析）、`tmp_le/dos32a-git/`（v9.12 官方源码，取自 GitHub DosWorld/dos32a，
+   codeload.zip 可下，narechk 原站已死且被代理挡）。
 
 ## 九、验收缺口
 
 - [x] 场景 `outlist` 全量显式标注（0.4.032：`nbook001/003/004/006` 补 `outlist`；002 已是 outlist、005 为 onlist；`sceneconf` 无第三字段的 normal 场景已清零）
-- [ ] 0.4.032 后全量 `pytest` 复跑（本轮在 bump 后被打断，未执行；0.4.031 基线 931 passed, 2 skipped）
-- [ ] 记录级定位（§七 1–2）
-- [ ] `-os` 局部恢复可行性（§七 3）
+- [x] 0.4.032 后全量 `pytest` 复跑（2026-11-13 深挖轮：**931 passed, 2 skipped**）
+- [x] 记录级定位（§七 1–2）：解码器已校准，但结论是**否定**的——不存在"被拒的记录"，见 §十一
+- [x] `-os` 全量恢复（§七 3）：`SIZE_OPT = -os`（0.4.033）+ `SET DOS16M=1` 两条链无条件写入（§11.5），实机冒烟通过
 - [ ] 实机剧情冒烟：Scene 菜单应只剩 005 一项，进入可播放、`scene(end)` 回鉴赏
 
 ## 十、交接状态（2026-11-13，0.4.032 暂停）
@@ -149,9 +161,9 @@ BASE    = -bt=dos $(EXT_LINK) -zq $(SIZE_OPT) -s ... $(EXT_DEFS) $(EXTRA_DEFS)
 
 **未做（接手执行）**
 
-1. `python -m pytest -q` 全量复跑（唯一未跑的收口项）。
-2. 记录级定位：按 §七 写正确的 LE fixup 解码器，**先用可启动的 `-od` 样本校准逐页对齐**，再解 `/tmp/engine_os.exe` 比对。
-3. 剧情实机冒烟（Scene 菜单 1 项 / 播放 / `scene(end)` 回鉴赏 / Back 回 special）。
+1. ~~`python -m pytest -q` 全量复跑~~ —— 已做（0.4.032 补记轮：931 passed, 2 skipped）。
+2. ~~记录级定位~~ —— 已做且结论为否定（不存在被拒记录），见 §十一。
+3. 剧情实机冒烟（Scene 菜单 1 项 / 播放 / `scene(end)` 回鉴赏 / Back 回 special）——待人工执行。
 
 **接手命令**
 
@@ -160,5 +172,80 @@ BASE    = -bt=dos $(EXT_LINK) -zq $(SIZE_OPT) -s ... $(EXT_DEFS) $(EXTRA_DEFS)
 python -m pytest -q                                          # 全量守卫
 ./makegame.sh test demo-a2 --serial                          # 开机冒烟（看串口非空、无 4005）
 ```
+
+**硬约束**：改 `core/Makefile` 任何编译旗标后必须 `rm -rf core/build` 全量重编；任何体积/布局变化后必须跑一次开机冒烟。
+
+## 十一、2026-11-13 深挖后续：记录级定性被推翻（§五/§七.2 翻案）
+
+本轮拿到了 DOS/32A v9.12 官方源码并做了逐指令对照 + 决定性实验，结论与 §五 相反。
+
+### 11.1 源码级事实（DosWorld/dos32a @ GitHub，v9.12）
+
+`src/dos32a/loader.asm` 中 fatal 4005 的**全部**触发点只有四处，全在 `apply_fixups`：
+
+1. `test cx,0F20h` —— SRC/FLAGS 的源列表/导入标志置位；
+2. 对象号越界（`(objnum-1)*16 > (nobjects-1)*16` 时 `jc`）；
+3. fixup 类型码 > 8；
+4. 类型 1/4（`fix_invalid`）。
+
+关键点：`_err_code` 在 `apply_fixups` 循环**顶部预置为 4005**，循环内任何 `file_errorm`（包括上述检查）都按 4005 报出。其余错误各有专名（4001 对象过多 / 4004 内存不足 / 4006 16 位溢出 / 3002 文件错 / 3005 no-fixups 标志）。
+
+### 11.2 记录编码对照（校准解码器 vs 源码）
+
+实测 Watcom 记录布局 `type(1)+flags(1)+src16(2)+obj(1)+tgt(2/4)` 与 loader 读取方式**完全一致**：
+- `cx = word@[0]`（低字节=类型，高字节=flags）、`src16 = word@[2]`、objnum 字节 `@[4]`（flags bit6=0x40 时为双字节）；
+- flags bit4（0x10）= loader 里的 "Alias" 位，仅决定 target 是 2 还是 4 字节，**不触发 0x0F20 掩码**；
+- 逐字节消费步长 7/9 字节与校准解码器一致。
+
+### 11.3 仿真结果（`tmp_le/sim_loader.py`，逐检查忠实复刻 loader.asm）
+
+| 镜像 | 模块标志/对象/页表/fixup 全部检查 | 结果 |
+|---|---|---|
+| engine_os.exe（-os，3953 条） | 全部通过 | **无任何 4005 触发条件** |
+| engine_od.exe（-od，4066 条） | 全部通过 | 同上 |
+| engine_animatest.exe（3395 条） | 全部通过 | 同上 |
+
+另有辅助确认：
+- 反汇编内嵌 stub（`objdump` @ 0x54C1 起）：`mov [err],4005h` / `test cx,0F20h` / `test cx,4000h` / `test cx,1000h` / `cmp cl,07h` 与源码逐条对应，stub 即 v9.12 同源代码；
+- fixup 目标地址（页基址+源偏移）全部 < 对象 vsize，无越界写；两镜像各有 2 条 src=-1/-2 的跨页伪记录（0xFFFF/0xFFFE），`-od`/animatest 同样存在且可启动，非分界。
+
+**结论 A：不存在"某条 fixup 记录被拒收"**。§五 的"加载器解释器拒收 -os 产物中的某条记录"定性错误；§七.2 记录级 diff 无 smoking gun 可找。
+
+### 11.4 决定性实验（初版结论有误，被 11.6 对照实验修正）
+
+- 用 `EXTENDER=dos32a SIZE_OPT=-os TARGET=engine_os.exe make`（干净全量重编）重建失败样本（245232 B，md5 `49fdfcf8…`）；
+- 经 `tools.naiz_img.inject` 注入新建 HDI，NP2kai 实机启动：引擎设置菜单正常显示；
+- **但该实验被污染**：手动调 inject 时未设 `NAIZ_PACK`，`_is_open_pack()` 走默认分支 → AUTOEXEC 含 `SET DOS16M=1`。初版"启动成功"与随后一次"4005 复现"实为**仅差 AUTOEXEC 一行的两份 HDI**，见 11.6。原失败样本 `/tmp/engine_os.exe` 已丢失，md5 无从比对。
+
+### 11.5 真正根因：装载地址敏感（0.4.033，c111 破案）
+
+对照实验矩阵（同一 -os 引擎 245232 B，各样本间 md5 差异 ≤ 3 字节模块名，代码段全同）：
+
+| # | 引擎 md5 | HDI 构建方式 | AUTOEXEC | 结果 |
+|---|---|---|---|---|
+| 1 | `49fdfcf8` | 手动 inject（NAIZ_PACK 未设） | 含 `SET DOS16M=1` | **启动到标题画面** |
+| 2 | `e56f3238` | `makegame make`（openpack） | 无 DOS16M | **fatal 4005** |
+| 3 | `e56f3238` | 手动 inject（同 #2 引擎字节） | 含 `SET DOS16M=1` | **启动到标题画面** |
+| 4 | `e56f3238` | `makegame make` + `NAIZ_AE_PAD=1`（加一行 7 字节 REM） | 无 DOS16M 有 REM | **启动** |
+
+关键事实：
+
+- `SET DOS16M=1` **本身 DOS/32A 不读**（v9.12 源码全文零引用）；它的真实作用是**增大 AUTOEXEC/环境块 → 平移 ENGINE.EXE 的 DOS 装载地址**。
+- `NAIZ_AE_PAD=1`（196 §4.4 的诊断旋钮，纯 REM 填充）同样消除 4005 → **因果因子是装载地址平移，不是变量内容**。
+- `inject_common.generate_autoexec` 原来写 `if not _is_open_pack()`，把该行只给商业链 → openpack（DOS/32A）链的装载地址恰落在坏地址 → 4005。0.4.030 原始发作（场景表改一条记录即发作）同为布局敏感的体现。
+- DOS/32A 9.12 loader 的 fixup 处理存在装载地址相关缺陷（指令级机理未再深挖——加载器不可修，只能绕开；如要深挖从 `apply_fixups` 的 `gs:[esi]` 段界限/缓冲区布局入手）。
+
+**修复（0.4.033，c111）**：
+
+1. `core/Makefile`：`SIZE_OPT = -os` 全链恢复——**立绘切换性能恢复**（-od 期间 blit 热循环无优化慢约 4 倍，GCC 等效基准 -O0 vs -Os）；
+2. `tools/naiz_img/inject_common.py`：`SET DOS16M=1` 改为**两条链无条件写入**（对 DOS/4GW 是必需开关，对 DOS/32A 是无害的地址平移）；
+3. 全量重编 + 注入 + 实机冒烟：0.4.033 标题画面正常；`pytest` 931 passed, 2 skipped。
+
+**风险与守则**：
+
+- 4005 与装载地址耦合，**任何改变 AUTOEXEC 字节数或镜像布局的改动**理论上都可能再触发。改旗标/布局后 `rm -rf core/build` 全量重编 + 开机冒烟（守则不变）；若再现 4005，**先 `NAIZ_AE_PAD=0..4` 扫装载地址偏移**即可判定是否地址敏感，不必再怀疑 fixup 记录。
+- 抓屏冒烟两条教训：① 手动 inject 与 `makegame make` 的 AUTOEXEC **不同**（`NAIZ_PACK` 分支），对照实验必须用同一条注入路径；② 判定启动成功前必须 kill_stale + 同命令内启动并抓屏，防残留窗口假阳性。
+
+**新工具**：`tmp_le/sim_loader.py`（LE 加载器仿真）；`tools/diag/np2kai_smoke_fifo.py`（无 pty 环境冒烟替代）。剧情实机冒烟（§九 第 4 项）由用户人工执行。
 
 **硬约束**：改 `core/Makefile` 任何编译旗标后必须 `rm -rf core/build` 全量重编；任何体积/布局变化后必须跑一次开机冒烟。

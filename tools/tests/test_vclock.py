@@ -8,6 +8,15 @@ emulator.
 
 What is pinned:
 
+  CALL-FREQUENCY SENSITIVITY (devdoc 211 — the bug this suite used to miss).
+  vclock_advance()'s contract is one call per FRAME.  The emulator run showed
+  the clock running ~5x fast because the call rate had become one per SECOND:
+  a whole second's delta arrived in a single call, so the window measured
+  "1000 ms per pass" and the step parked at VCLOCK_RATE_MAX_MS.  Every existing
+  test drove the clock at the right rate, so none of them could see it.  The
+  last two tests below drive it at the wrong rate and assert the observable
+  symptom, so a regression is caught here instead of on the player's screen.
+
   STEADY BEAT (the defect).  The old floor/ceiling clamp alternated a 40ms
   step and a 100ms step, a 2.5:1 ratio, which is what the ear heard as
   flutter.  Successive advances here must differ by at most VCLOCK_SLEW_UNITS
@@ -426,3 +435,151 @@ def test_fixed_advance_uses_the_hardware_delta_only():
         "the fixed path must not touch the DOS-rate measurement state")
     assert vc.passes == 0 and vc.accum == 0 and vc.calibrated == 0, (
         "the fixed path must not feed the window/calibration machinery")
+
+
+# --- 4. devdoc 211: call-frequency sensitivity ------------------------------
+
+def test_once_per_second_call_rate_is_rejected_not_accepted():
+    """devdoc 211: the first guess was "called once per second", and it was WRONG.
+
+    The reasoning looked airtight: the emulator log showed step x pass-rate
+    ~= 1000 ms/s, which is what you get if one whole second's delta arrives in
+    a single call.  Driving vclock that way here shows the opposite -- the
+    clock nearly STOPS, because a 1000 ms delta trips the stall branch and
+    gets discarded every time.
+
+    This test exists to stop anyone (including a future me) from re-deriving
+    that wrong conclusion from the same arithmetic.  It pins the real
+    behaviour: a 1 Hz call rate makes the clock run ~25x SLOW, so the
+    emulator's 3.9x FAST cannot be explained by call frequency at all.
+    """
+    lib, vc = _make_clock()
+    for second in range(1, 31):
+        lib.vclock_advance(ctypes.byref(vc), second * 1000)
+
+    virtual = lib.vclock_ms(ctypes.byref(vc))
+    real = 30 * 1000
+    assert virtual < real * 0.2, (
+        f"a 1 Hz call rate must starve the clock (stall branch eats every "
+        f"1000 ms delta), got virtual={virtual}ms vs real={real}ms. If this "
+        "changed, re-check devdoc 211 §5 before trusting any clock theory")
+
+
+def test_call_rate_sweep_never_reaches_the_emulator_ratio():
+    """No sane call frequency explains the observed 3.9x fast clock.
+
+    Sweeps uniform call rates across two orders of magnitude and records the
+    ratio each one ends at.  The point is the SHAPE: slow call rates starve
+    the clock, fast ones overshoot mildly, and nothing lands anywhere near
+    3.9x.  So the emulator's drift must come from the DELTA SHAPE (how
+    hal_wallclock_ms() moves), not from how often it is sampled.
+
+    This is the guard rail for devdoc 211 §5.3: it gives the window diagnostic
+    something to contradict.
+    """
+    ratios = {}
+    for hz in (1, 2, 5, 10, 25, 60, 120, 500):
+        lib, vc = _make_clock()
+        lib.vclock_init(ctypes.byref(vc))
+        calls = hz * 30
+        for i in range(1, calls + 1):
+            lib.vclock_advance(ctypes.byref(vc), i * 1000 // hz)
+        virtual = lib.vclock_ms(ctypes.byref(vc))
+        ratios[hz] = virtual / 30000.0
+
+    assert max(ratios.values()) < 2.5, (
+        f"some call rate now overshoots far enough to explain the emulator: "
+        f"{ratios}")
+    assert min(ratios[hz] for hz in (10, 25, 60)) > 0.9, (
+        f"the contract-rate band (10-60 Hz) must stay honest: {ratios}")
+
+
+def test_fixed_advance_without_baseline_reset_corrupts_the_next_window():
+    """devdoc 211 §7.3: the two advance paths must not share a VClock blindly.
+
+    vclock_advance_fixed() deliberately skips the window machinery, so it
+    leaves real_prev pointing at whatever the last MEASURED call stored.  When
+    the co-operative pump resumes, its first delta covers the entire
+    fixed-mode stretch and lands in accum.
+
+    Pinned as the motivation for vclock_reset_baseline() (devdoc 211 §七).
+    Note accum can be swallowed by the stall branch if the span is under
+    500 ms, hence the 2 s stretch below.
+    """
+    lib, vc = _make_clock()
+    lib.vclock_advance(ctypes.byref(vc), 0)            # baseline at 0
+    lib.vclock_advance(ctypes.byref(vc), 40)           # one real frame
+
+    for _ in range(124):                               # ~2 s of fixed stepping
+        lib.vclock_advance_fixed(ctypes.byref(vc), 258)
+
+    lib.vclock_advance(ctypes.byref(vc), 2040)         # pump resumes
+
+    assert vc.real_prev == 2040 and vc.accum == 0 and vc.passes == 0, (
+        "expected the resumed call to be treated as a stall (span absorbed "
+        f"then discarded): real_prev={vc.real_prev} accum={vc.accum} "
+        f"passes={vc.passes}. If accum stayed non-zero the baseline fix "
+        "landed and devdoc 211 §7.3 is done")
+
+
+def test_window_observer_receives_every_closed_window():
+    """devdoc 211 §5.3 — the [VW] instrumentation must actually fire.
+
+    This is a regression test for a REAL dead end: the first version of the
+    trace was a macro (`VCLOCK_TRACE_WINDOW`) defined in core/plat/hal_clock.c
+    and referenced from vclock.c.  It compiled cleanly and produced nothing,
+    because core/Makefile globs lib/*.c — vclock.c is its own translation unit
+    and never saw the platform's macro.  The clock then looked undiagnosable.
+
+    The observer is the fix, and this test pins the property the macro lacked:
+    a hook installed from OUTSIDE the library is actually reached, once per
+    closed window, with the counters still live.
+    """
+    lib, vc = _make_clock()
+
+    seen = []
+    OBS = ctypes.CFUNCTYPE(None, ctypes.c_void_p, ctypes.c_ulong,
+                           ctypes.c_ulong, ctypes.c_ulong, ctypes.c_ulong)
+
+    def _obs(vc_p, raw, want, passes, accum):
+        seen.append({"raw": raw, "want": want,
+                     "passes": passes, "accum": accum})
+
+    obs = OBS(_obs)
+    lib.vclock_set_window_observer.argtypes = [OBS]
+    lib.vclock_set_window_observer.restype = None
+    lib.vclock_set_window_observer(obs)
+
+    try:
+        # Baseline, then 100 frames of 10 ms = 1000 ms -> exactly one window.
+        lib.vclock_advance(ctypes.byref(vc), 0)
+        for i in range(1, 101):
+            lib.vclock_advance(ctypes.byref(vc), i * 10)
+    finally:
+        lib.vclock_set_window_observer(OBS())
+
+    assert len(seen) == 1, f"expected exactly one closed window, got {len(seen)}"
+    w = seen[0]
+    assert w["passes"] == 100, f"100 frames must be counted: {w}"
+    assert w["accum"] == 1000, f"the window must span 1000 ms: {w}"
+    # 1000 ms across 100 passes = 10 ms/pass = 160 units.
+    assert w["raw"] == 160, f"raw_want must be the pre-clamp 10ms/pass: {w}"
+    assert w["want"] == 160, f"no clamp applies to a sane measurement: {w}"
+
+
+def test_window_observer_null_probe_is_the_default():
+    """An uninstalled observer must be a no-op, not a crash.
+
+    vclock_set_window_observer(NULL) detaches; host builds and every non-
+    platform consumer run without any observer at all.
+    """
+    lib, vc = _make_clock()
+    lib.vclock_set_window_observer.argtypes = [ctypes.c_void_p]
+    lib.vclock_set_window_observer.restype = None
+    lib.vclock_set_window_observer(None)
+
+    lib.vclock_advance(ctypes.byref(vc), 0)
+    for i in range(1, 201):                       # two windows' worth
+        lib.vclock_advance(ctypes.byref(vc), i * 10)
+
+    assert lib.vclock_ms(ctypes.byref(vc)) > 1000, "the clock must still run"
