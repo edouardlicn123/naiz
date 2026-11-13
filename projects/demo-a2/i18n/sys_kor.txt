@@ -54,3 +54,6 @@ Enter your name=이름을 입력하세요
 NAME=이름 변경
 VOICE=탁음
 OK=확인
+MUSIC=음악
+No BGM available.=사용 가능한 BGM이 없습니다
+BGM: Off=BGM: 끔

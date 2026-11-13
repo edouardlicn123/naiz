@@ -106,7 +106,8 @@ void cmd_mainmenu(int argc, const char **argv, const char *cmd_name)
         nb_set_menu_return("");
         scene_switch("special.nb", SCENE_SWITCH_MENU);
     } else if (strcmp(argv[sel + 4], "music") == 0) {
-        hal_log("music room: not implemented\r\n");
+        nb_set_menu_return("");
+        scene_switch("music.nb", SCENE_SWITCH_MENU);
     } else if (strcmp(argv[sel + 4], "gallery") == 0) {
         nb_set_menu_return("");
         scene_switch("cgview.nb", SCENE_SWITCH_MENU);
@@ -132,10 +133,4 @@ void cmd_startsetting(int argc, const char **argv, const char *cmd_name)
          * table, CJK glyph font, blackletter style). */
         nb_set_lang(prefs_get_lang());
     }
-}
-
-void cmd_musicmenu(int argc, const char **argv, const char *cmd_name)
-{
-    (void)argc; (void)argv; (void)cmd_name;
-    NB_DEBUG("musicmenu: not implemented yet\r\n");
 }

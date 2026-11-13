@@ -54,3 +54,6 @@ Enter your name=Entrez votre nom
 NAME=RENOMMER
 VOICE=SONORE
 OK=OK
+MUSIC=Musique
+No BGM available.=Aucune musique disponible.
+BGM: Off=BGM : désactivé

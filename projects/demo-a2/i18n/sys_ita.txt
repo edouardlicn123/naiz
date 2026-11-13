@@ -54,3 +54,6 @@ Enter your name=Inserisci il nome
 NAME=RINOMINA
 VOICE=SONORA
 OK=OK
+MUSIC=Musica
+No BGM available.=Nessuna musica disponibile.
+BGM: Off=BGM: disattivato

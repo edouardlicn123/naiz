@@ -3,6 +3,20 @@
 自 R1 起全部 Bug 修复与功能演进记录（条目顺序沿用 AGENTS.md 既有历史排列）；`AGENTS.md` 仅保留当前版本与规则。**新条目约定**：每轮修复/演进完成后，在下方 `---` 分隔线之后（第一条位置）追加变更摘要，并在 AGENTS.md 头部同步「当前版本」。**条目格式**：每条以 `### <版本号> — <标题>` 开头（版本号化标题行 + `<a id="cN">` 锚点，N 按条目序递增），正文整段或分小节；历史速查直接读下方「版本索引」。
 ---
 
+<a id="c104"></a>
+### 0.4.027 — 音乐鉴赏界面（Music Room）落地
+
+依据 `devdocs/206` §1–§14 完整实施。主菜单 / special 子菜单已有 `music` 接入点，本轮实现 `cmd_musicmenu` 并打通整条链路：
+
+- **新增 `core/engine/nb_music.c`**（330 行）：LOAD 范式全屏列表（4 行/页、emboss 圆角、分页箭头、`focus_on_back` 模型）；曲目从 `bgm_title_map[]` 自动枚举（`BGM_COUNT`），空 `title` 回落脚本 key；Enter/Space 播 / 停 toggle（`audio_bgm_start` / `audio_bgm_stop`，**不走 PCM 循环**）；菜单循环内 `engine_frame_pump()` 保持 FM 泵；设置关 BGM 时右上角显示 `BGM: Off` 提示而非静默；播放中标记由 `♪` 字符改为几何填充块（FONT.DAT / CJK 无音符字形）。
+- **接线**：`nb_mainmenu.c` music 分支 → `scene_switch("music.nb")`，`nb_special.c` music 分支 → 同（携带 `special.nb` 回退路径），`nb_commands.c:513` musicmenu 标志位由 `0` 改 `CMD_BLOCKING | CMD_NEEDS_INPUT | CMD_TOUCHES_DISPLAY`。
+- **资产表**：`export_asset_table.py` 探测 `img_map.title` 列（缺列回落 `''`），生成 `BGM_COUNT` + `bgm_title_map[]`；`ASSETS.DB` demo-a2 BGM 行补 `title` 列（`melody_town→Melody Town Theme`、`icy_garden→Icy Garden`）。
+- **脚本**：`projects/demo-a2/scene/music.nb` 新增（`sceneconf{Music, menu}` + `bg{yellow_grid}` + `musicmenu()`）。
+- **i18n**：`SYSTEM_UI_KEYS` 加 `MUSIC` / `No BGM available.` / `BGM: Off`；9 语言 `sys_<lang>.txt` + `game_<lang>.txt` 补译文。
+- **防呆**：`tools/tests/test_music_assets.py`（5 项）——数组平行性 / 空标题回落 / 旧库兼容 / 已售 BGM 必有标题 / 引擎保留空标题回落分支；`nb_validator.py` STUBS 清空 + SIGNATURES 登记；`test_devdoc_refs.py` 白名单锚点 128/130 → 129/131。
+
+**验证**：`make -C core` 0 err；`pytest` **912 passed, 2 skipped**（基线 907 + 新增 5 项 music_assets 守卫）；`./makegame.sh build demo-a2 && ./makegame.sh make demo-a2` 成功。版本 0.4.026 → **0.4.027**。
+
 <a id="c103"></a>
 ### 0.4.026 — C35 重复常量表达式收口（几何/掩码具名化）
 
@@ -1199,6 +1213,7 @@ devdoc 205 落地后三次实机反馈修补的最终收口。
 
 | 条目 |
 |------|
+| [0.4.027 — 音乐鉴赏界面（Music Room）落地](#c104) |
 | [0.4.026 — C35 重复常量表达式收口（几何/掩码具名化）](#c103) |
 | [0.4.025 — 音频 HAL 与 FM 模型按通路拆分（E 节候选 1+2）](#c102) |
 | [0.4.024 — 改名页两修：OK 文字切换后消失 + 8255 按钮防抖](#c101) |

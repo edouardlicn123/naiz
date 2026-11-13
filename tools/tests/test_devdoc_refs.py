@@ -90,8 +90,10 @@ LINE_REF_WHITELIST = {
     ("main.c", 143): "prefs_save",
     # devdoc 205 (rename page) added the start_new_game helper before
     # cmd_startsetting, shifting its prefs citations by +13 (115/117 ->
-    # 128/130).
-    ("nb_mainmenu.c", 128): "prefs_save",
+    # 128/130).  devdoc 206 (music room) wired the "music" main-menu branch
+    # (one hal_log line -> two scene_switch lines, +1), so both move once
+    # more (128/130 -> 129/131).
+    ("nb_mainmenu.c", 129): "prefs_save",
     # devdoc 119 §3.4: the i18n width guard's geometry anchors.  These were
     # cited before they were registered, and the off-by-one that followed
     # (241 written as 240) passed silently -- see
@@ -124,7 +126,7 @@ LINE_REF_WHITELIST = {
     ("nb.c", 167): "prefs_load",
     ("nb.c", 172): "nb_set_lang",
     ("nb.c", 349): "nb_set_lang",
-    ("nb_mainmenu.c", 130): "prefs_get_lang",
+    ("nb_mainmenu.c", 131): "prefs_get_lang",
     ("nb_menu.c", 273): "prefs_get_version",
     ("tr.c", 28): "tr_table",
     ("tr.c", 168): "break",

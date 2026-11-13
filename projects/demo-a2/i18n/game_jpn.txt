@@ -39,3 +39,4 @@ Which chapter do you choose?=どの章を選びますか？
 Night falls over the ancient house.=古い館に夜が訪れる。
 The earth chapter begins here.=地の章はここから始まる。
 To be continued.=つづく。
+Music=音楽

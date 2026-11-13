@@ -39,3 +39,4 @@ Which chapter do you choose?=Qual capítulo você escolhe?
 Night falls over the ancient house.=A noite cai sobre a antiga casa.
 The earth chapter begins here.=O capítulo da Terra começa aqui.
 To be continued.=Continua.
+Music=Música

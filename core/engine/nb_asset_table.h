@@ -87,6 +87,16 @@ static const AudioAssetMap bgm_map[] = {
     {NULL, 0}
 };
 
+/* Number of registered BGM assets (music-room enumeration) */
+#define BGM_COUNT 2
+
+/* BGM display titles, index-parallel to bgm_map (empty title falls back to name) */
+static const struct { const char *name; const char *title; } bgm_title_map[] = {
+    {"melody_town", "Melody Town Theme"},
+    {"icy_garden", "Icy Garden"},
+    {NULL, NULL}
+};
+
 /* SE asset key->ID lookup (for sound command) */
 static const AudioAssetMap snd_map[] = {
     {"chime", 21},

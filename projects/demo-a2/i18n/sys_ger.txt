@@ -54,3 +54,6 @@ Enter your name=Namen eingeben
 NAME=UMBENENNEN
 VOICE=STIMMHAFT
 OK=OK
+MUSIC=Musik
+No BGM available.=Keine Musik verfügbar.
+BGM: Off=BGM: Aus
