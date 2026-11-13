@@ -510,7 +510,7 @@ static const CmdEntry cmd_table[] = {
     {"question",     cmd_question,    CMD_BLOCKING | CMD_NEEDS_INPUT | CMD_TOUCHES_DISPLAY},
     {"settingmenu",  cmd_settingmenu, CMD_BLOCKING | CMD_NEEDS_INPUT | CMD_TOUCHES_DISPLAY},
     {"cgvmenu",      cmd_cgvmenu,     CMD_BLOCKING | CMD_NEEDS_INPUT | CMD_TOUCHES_DISPLAY},
-    {"musicmenu",    cmd_musicmenu,   0},
+    {"musicmenu",    cmd_musicmenu,   CMD_BLOCKING | CMD_NEEDS_INPUT | CMD_TOUCHES_DISPLAY},
     {"specialmenu",  cmd_specialmenu, CMD_BLOCKING | CMD_NEEDS_INPUT | CMD_TOUCHES_DISPLAY},
     {"bgm",          cmd_bgm,         CMD_TOUCHES_AUDIO},
     {"sound",        cmd_sound,       CMD_TOUCHES_AUDIO},

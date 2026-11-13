@@ -1,12 +1,12 @@
 # Naiz — AI 编程规则
 
-> **当前版本**: `0.4.026`（`projects/demo-a2/config.toml`）
+> **当前版本**: `0.4.027`（`projects/demo-a2/config.toml`）
 >
-> **最新条目**: `CHANGELOG.md` `c103` — C35 重复常量表达式收口：`LAYER_SCREEN_AREA`/`LAYER_DIALOG_RIGHT`/`LAYER_DIALOG_AREA`/`CURSOR_SAVED_AREA`/`VRAM_BANK_MASK`/`BIOS_HEAD_HI` 等具名宏落地 20 文件，无行为变化。**本行只放当前状态指针**：历史条目正文一律只写进 `CHANGELOG.md`（规则见 §十三「变更后更新规约」），本文件不承载任何开发历史摘要——§一–§十七 只存**规则与当前状态**。
-> **当前状态**（0.4.026 / c103）：Studio 与 naiz 并列放置；共享 venv 位于 `~/venv`；guildbook 与 `assets/<game>/bgm/` 仍在主仓库。改名页已 0.4.017（cursor）→ 0.4.018（残留框线）→ 0.4.019（grid+功能键+标题）→ 0.4.021（快速连点卡死）→ 0.4.023（帧消失+风格统一+gallery 背景）→ 0.4.024（OK 文字消失+8255 防抖）多轮实机修补；0.4.025 完成音频 HAL/FM 模型拆分，0.4.026 完成 C35 常量具名化（均无实机行为变化）。devdoc 205 §16 的完整运行期冒烟仍待实机执行；devdoc 203 的 tag/jump/jumpscene 运行期冒烟同样待实机。
-> **开发历史**：`CHANGELOG.md`（唯一载体）；本文件只存规则与当前状态，不承载历史摘要。历史速查 → CHANGELOG.md（最新：c103），新条目追加到 CHANGELOG.md 顶部。
+> **最新条目**: `CHANGELOG.md` `c104` — 音乐鉴赏界面（Music Room）落地：`nb_music.c` 330 行、`music.nb` 场景、`bgm_title_map[]` 自动枚举曲目、`BGM: Off` 提示，新增 5 项 `test_music_assets.py` 守卫（912 passed）。**本行只放当前状态指针**：历史条目正文一律只写进 `CHANGELOG.md`（规则见 §十三「变更后更新规约」），本文件不承载任何开发历史摘要——§一–§十七 只存**规则与当前状态**。
+> **当前状态**（0.4.027 / c104）：Studio 与 naiz 并列放置；共享 venv 位于 `~/venv`；guildbook 与 `assets/<game>/bgm/` 仍在主仓库。改名页已 0.4.017（cursor）→ 0.4.018（残留框线）→ 0.4.019（grid+功能键+标题）→ 0.4.021（快速连点卡死）→ 0.4.023（帧消失+风格统一+gallery 背景）→ 0.4.024（OK 文字消失+8255 防抖）多轮实机修补；0.4.025 完成音频 HAL/FM 模型拆分，0.4.026 完成 C35 常量具名化，0.4.027 完成 Music Room 落地。devdoc 205 §16 的完整运行期冒烟仍待实机执行；devdoc 203 的 tag/jump/jumpscene 运行期冒烟同样待实机；devdoc 206 §14.5 的 Music Room 实机冒烟待执行。
+> **开发历史**：`CHANGELOG.md`（唯一载体）；本文件只存规则与当前状态，不承载历史摘要。历史速查 → CHANGELOG.md（最新：c104），新条目追加到 CHANGELOG.md 顶部。
 > **防复发机制**：§十七（39 条规则逐一对照）；写完 devdoc 须过 §十「规格与实现的收敛责任」（行号校准 + 声称逐条落地，pytest 全绿不算证据）。
-> **构建验证**：`make -C core` + `core/*.err` 全为空（诊断走 `.err`，**不在 stdout**）。`pytest` 907 passed, 2 skipped（含守卫）；venv 统一为 `~/venv`，naiz 与 naiz-studio 共用。
+> **构建验证**：`make -C core` + `core/*.err` 全为空（诊断走 `.err`，**不在 stdout**）。`pytest` 912 passed, 2 skipped（含守卫）；venv 统一为 `~/venv`，naiz 与 naiz-studio 共用。
 
 ## 一、Git 限制
 

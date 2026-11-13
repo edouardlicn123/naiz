@@ -54,3 +54,6 @@ Enter your name=Digite seu nome
 NAME=RENOMEAR
 VOICE=SONORA
 OK=OK
+MUSIC=Música
+No BGM available.=Nenhuma música disponível.
+BGM: Off=BGM: desativado

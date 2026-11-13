@@ -54,3 +54,6 @@ Enter your name=Introduce tu nombre
 NAME=RENOMBRAR
 VOICE=SONORA
 OK=OK
+MUSIC=Música
+No BGM available.=No hay música disponible.
+BGM: Off=BGM: desactivado

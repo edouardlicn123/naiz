@@ -7,16 +7,7 @@
 
 ---
 
-## Repositories
-
-- **Naiz engine (this repository)**: https://github.com/edouardlicn123/naiz
-- **Naiz Script Studio**: https://github.com/edouardlicn123/naiz-studio
-
-Naiz Studio is a separate repository and must be placed next to this checkout under the same parent directory. See its README for details.
-
----
-
-## Overview
+## 概览
 
 Naiz 是面向 PC-98 的视觉小说（ADV）制作套件：剧本与配置都是可直接编辑的纯文本，素材就是普通的图片与音频文件，构建后以 **32-bit 保护模式**程序的形式，在真机 PC-9801/9821 或 NP2kai 模拟器上运行。
 
@@ -69,7 +60,18 @@ Naiz 是面向 PC-98 的视觉小说（ADV）制作套件：剧本与配置都�
 
 ---
 
-## Reference Projects
+## 派生项目
+
+| 项目 | 仓库 | 说明 |
+|---|---|---|
+| Naiz Script Studio | https://github.com/edouardlicn123/naiz-studio | 网页版 NB 剧本 IDE；须与本仓库同父目录，共用 `~/venv`，经 `./studio.sh` 启动 |
+| naiz-openpack | https://github.com/edouardlicn123/naiz-openpack | 开源构建资源包（FreeDOS(98) 链 + 开源基座 HDI）；`./start.sh openpack` 下载解压到 `tools_open/` |
+| naiz_cmpack | https://github.com/edouardlicn123/naiz_cmpack | 商用构建资源包（MS-DOS 5 + PC-9821 BIOS）；`./start.sh commercial` 下载解压到 `tools_commercial/` |
+| naiz_assets | https://github.com/edouardlicn123/naiz_assets | 公开素材市场仓库；`./market.sh` 按包下载资源到 `assets_samples/` |
+
+---
+
+## 参考项目
 
 - [MHVNVisualNovelEngine](https://github.com/maxotaku11niku/MHVNVisualNovelEngine) — MIT, 场景格式参考
 - [98Bridge](https://github.com/NullMagic2/98Bridge) — MIT, HDI 注入设计参考

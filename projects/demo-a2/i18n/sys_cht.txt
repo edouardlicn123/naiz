@@ -54,3 +54,6 @@ Enter your name=請輸入姓名
 NAME=改名
 VOICE=濁音
 OK=確定
+MUSIC=音樂
+No BGM available.=暫無可用 BGM
+BGM: Off=BGM: 關

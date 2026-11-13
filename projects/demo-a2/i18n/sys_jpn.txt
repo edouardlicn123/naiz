@@ -54,3 +54,6 @@ Enter your name=名前を入力してください
 NAME=名前変更
 VOICE=濁音
 OK=決定
+MUSIC=音楽
+No BGM available.=BGMがありません
+BGM: Off=BGM: オフ

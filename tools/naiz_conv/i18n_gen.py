@@ -49,6 +49,8 @@ SYSTEM_UI_KEYS = {
     # (title key renamed from RENAME → NAME in 0.4.018; any legacy 'RENAME='
     # lines in sys_*.txt will be marked # ORPHANED on next i18n_gen run).
     "NAME", "Enter your name", "VOICE", "OK",
+    # devdoc 206: music room title / empty-catalogue / BGM-off hint
+    "MUSIC", "No BGM available.", "BGM: Off",
 }
 
 # Common question option labels (English source) that are global UI vocabulary.

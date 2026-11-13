@@ -186,6 +186,34 @@ def generate(project_dir, output_path):
         lines.append('};')
         lines.append('')
 
+        # -- BGM_COUNT + bgm_title_map: music-room enumeration --
+        # The music room lists every registered BGM (mirroring the CG gallery
+        # enumerating CG_COUNT) and needs a human-readable title per track.
+        # 'title' is an optional img_map column (docs/B11 §3.1): projects
+        # migrated before it existed still export, with the title falling
+        # back to the script key ('' is emitted and the engine substitutes
+        # bgm_title_map[i].name).
+        img_cols = {r[1] for r in db.execute("PRAGMA table_info(img_map)")}
+        title_expr = "COALESCE(title, '')" if 'title' in img_cols else "''"
+        lines.append('/* Number of registered BGM assets (music-room enumeration) */')
+        lines.append('#define BGM_COUNT %d' % len(bgm_rows))
+        lines.append('')
+        lines.append('/* BGM display titles, index-parallel to bgm_map '
+                     '(empty title falls back to name) */')
+        lines.append(
+            'static const struct { const char *name; const char *title; } '
+            'bgm_title_map[] = {')
+        if not bgm_rows:
+            lines.append('    {"__dummy__", "__dummy__"},')
+        for id_val, name, title in db.execute(
+            "SELECT id, name, %s FROM img_map WHERE type='BGM' ORDER BY id"
+            % title_expr
+        ):
+            lines.append('    {"%s", "%s"},' % (escape(name), escape(title)))
+        lines.append('    {NULL, NULL}')
+        lines.append('};')
+        lines.append('')
+
         # -- snd_map: SE assets (type='SND') --
         lines.append('/* SE asset key->ID lookup (for sound command) */')
         lines.append('static const AudioAssetMap snd_map[] = {')

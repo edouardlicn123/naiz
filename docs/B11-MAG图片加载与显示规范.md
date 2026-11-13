@@ -81,7 +81,9 @@ ASSETS.DB 只保留 `img_map` 表，管理图像资源索引：
 CREATE TABLE img_map (
     id       INTEGER PRIMARY KEY,
     filename TEXT NOT NULL,
-    type     TEXT DEFAULT 'IMG'      -- 'IMG'=背景/图片, 'SPR'=精灵
+    type     TEXT DEFAULT 'IMG',     -- 'IMG'=背景/图片, 'SPR'=精灵
+    name     TEXT,                   -- 引擎脚本键
+    title    TEXT DEFAULT ''         -- 可选：人类可读显示名（音乐室曲名）
 );
 ```
 
@@ -91,6 +93,7 @@ CREATE TABLE img_map (
 | `filename` | 素材路径，相对于 `projects/<game>/` |
 | `type` | `'IMG'`=图片（加载上传播色板）, `'SPR'`=精灵 |
 | `name` | 引擎脚本中使用的键（如 `bg splbg` 中的 `splbg`） |
+| `title` | 可选显示名。仅 `type='BGM'` 使用：音乐室（`musicmenu`）的曲名，空值回落 `name`。旧库用 `ALTER TABLE img_map ADD COLUMN title TEXT DEFAULT ''` 迁移；缺失该列时 `export_asset_table.py` 仍可导出（曲名全部回落 `name`） |
 
 ### 3.2 角色与表情：characters.yaml
 
