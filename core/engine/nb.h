@@ -34,7 +34,8 @@ typedef enum {
     SCENE_SWITCH_SCRIPT = 1,  /* 脚本 scene 命令 */
     SCENE_SWITCH_HOTKEY = 2,  /* main loop F5/F6/ESC */
     SCENE_SWITCH_APPLY = 3,   /* 存档应用（load） */
-    SCENE_SWITCH_MENU = 4     /* 菜单跳转（mainmenu/cgview/loadscen/back） */
+    SCENE_SWITCH_MENU = 4,    /* 菜单跳转（mainmenu/cgview/loadscen/back） */
+    SCENE_SWITCH_GALLERY = 5  /* 场景鉴赏播放开始（结束回鉴赏菜单） */
 } SceneSwitchReason;
 
 void scene_switch(const char *filename, int reason);

@@ -40,3 +40,4 @@ Night falls over the ancient house.=夜幕降臨在古老的宅邸上。
 The earth chapter begins here.=地之章從這裡開始。
 To be continued.=待續。
 Music=音樂
+Scenes=場景

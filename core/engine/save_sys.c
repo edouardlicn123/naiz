@@ -49,11 +49,29 @@ static void sys_save_write(void)
     sys_write(SYSPATH, &sys_sd);
 }
 
+/* Unlock a story scene (1..SCENE_TOTAL) in SYSTEM.SAV and flush to disk.
+ * Called on every nbookNNN.nb load (unlock-on-entry), so an already-set flag
+ * returns early: re-writing the whole system save per scene change would be
+ * a pointless disk write on the critical scene-switch path. */
 void sys_save_unlock_scene(int scene_id)
 {
+    unsigned int *word;
+    unsigned int bit;
+
     if (scene_id < 1 || scene_id > SCENE_TOTAL) return;
-    sys_sd.scene_flags[(scene_id - 1) / 32] |= (1u << ((scene_id - 1) % 32));
+    word = &sys_sd.scene_flags[(scene_id - 1) / 32];
+    bit = 1u << ((scene_id - 1) % 32);
+    if (*word & bit) return;
+    *word |= bit;
     sys_save_write();
+}
+
+/* Return non-zero when story scene scene_id has been unlocked. */
+int sys_save_is_scene_unlocked(int scene_id)
+{
+    if (scene_id < 1 || scene_id > SCENE_TOTAL) return 0;
+    return (sys_sd.scene_flags[(scene_id - 1) / 32] &
+            (1u << ((scene_id - 1) % 32))) != 0;
 }
 
 /* Unlock a CG (1..CG_TOTAL) in SYSTEM.SAV and flush to disk. */

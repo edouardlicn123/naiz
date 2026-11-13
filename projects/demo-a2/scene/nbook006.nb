@@ -1,4 +1,4 @@
-sceneconf(){Chapter of Earth, normal}
+sceneconf(){Chapter of Earth, normal, outlist}
 bg(normal){homenite}
 bgm(){melody_town}
 host(){The earth chapter begins here.}

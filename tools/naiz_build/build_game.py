@@ -537,6 +537,13 @@ def build_game(game_name: str):
                         if (d / "images.map").exists()]
     build_cg_thumbs(proj_dir, thumb_asset_dirs)
 
+    # 1c. Scene-menu table (devdoc 208): scans sceneconf(){title, normal,
+    # onlist}, resolving each entry's thumbnail (CG thumb / ANI frame 0 /
+    # letter icon).  Runs here so ANI-derived THUMB rows are in ASSETS.DB
+    # before the export and pack steps below.
+    from naiz_build.scene_menu import build_scene_menu
+    build_scene_menu(proj_dir, proj_dir / "scene")
+
     # 2a. Export ASSETS.DB → C header for engine compilation
     export_py = ROOT / "tools" / "naiz_build" / "export_asset_table.py"
     header_dst = ROOT / "core" / "engine" / "nb_asset_table.h"

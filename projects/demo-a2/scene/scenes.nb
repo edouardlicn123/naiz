@@ -1,0 +1,3 @@
+sceneconf(){Scenes, menu}
+bg(normal){yellow_grid}
+scenesmenu()

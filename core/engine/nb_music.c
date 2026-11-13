@@ -140,8 +140,8 @@ static void music_draw(int page, int sel, int focus_on_back, int total_pages,
          * design, so say so rather than letting the player think it broke. */
         if (!prefs_get_bgm_enabled()) {
             const char *hint = tr("BGM: Off");
-            int hw = text_width(hint, 0);
-            draw_text(hint, 0, LAYER_SCREEN_W - 20 - hw, MUS_TITLE_Y + 8,
+            unsigned hw = (unsigned)text_width(hint, 0);
+            draw_text(hint, 0, LAYER_SCREEN_W - 20 - (int)hw, MUS_TITLE_Y + 8,
                       LAYER_SCREEN_W - 20, MUS_TITLE_Y + 24, 0, MENU_PAL_YELLOW);
         }
         menu_pagenav_draw(MUS_ARR_Y, MUS_COUNT_Y, PAL_WHITE, page, total_pages);

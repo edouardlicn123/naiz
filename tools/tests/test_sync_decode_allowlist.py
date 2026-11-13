@@ -43,6 +43,8 @@ SYMBOLS = ("image_load(", "mag_decode(", "mag_decode_into(",
 #    (decode-per-frame is the animation design; the blob read is per-anim)
 #  - nb_cggallery.c / nb_saveload.c / bootmenu.c: UI screens, user-triggered,
 #    thumbnails decode in batch (small images) -- acceptable, not gameplay
+#  - nb_scene_menu.c: UI grid, one 160x100 thumbnail per visible cell,
+#    user-triggered (same class as nb_cggallery.c)
 #  - audio.c: BGM fallback read (177 D6), PCM/SE read (deferred, 177 §9.3)
 #  - unlisted files: DENY -- any sync call fails the test
 EXPECTED = {
@@ -52,6 +54,7 @@ EXPECTED = {
     "scene_display.c": {"image_load(": 2},
     "nb_anim.c": {"mag_decode(": 1, "mag_decode_into(": 1},
     "nb_cggallery.c": {"image_load(": 3},
+    "nb_scene_menu.c": {"image_load(": 1},
     "nb_saveload.c": {"image_load(": 1},
     "bootmenu.c": {"image_load(": 1},
     "audio.c": {"farchive_read_alloc(": 3},

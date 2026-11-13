@@ -354,41 +354,56 @@ static void cmd_dialogue(int argc, const char **argv, const char *cmd_name)
 }
 
 
-/* Scene configuration: title + type.
- * Grammar (brace-only): sceneconf(){Title[,type]} — the {..} payload is a
- * single arg "Title, type", split on ',' below.  The paren alias
- * sceneconf(Title,type) was removed: parens are reserved for parameters. */
+/* Scene configuration: title + type + scene-list flag.
+ * Grammar (brace-only): sceneconf(){Title[,type[,onlist|outlist]]} — the {..}
+ * payload is a single arg "Title, type, list", split on ',' below.  The paren
+ * alias sceneconf(Title,type) was removed: parens are reserved for parameters. */
 static void cmd_sceneconf(int argc, const char **argv, const char *cmd_name)
 {
     char title[NB_LINE_MAX];
     char type[16];
+    char list[16];
     const char *p;
 
     (void)cmd_name;
     if (argc < 1) return;
 
-    /* Hard gate: title/type must arrive via the brace payload. */
+    /* Hard gate: title/type/list must arrive via the brace payload. */
     if (nb_get_last_brace_arg() != argc - 1) {
-        NB_DEBUG("sceneconf: usage sceneconf(){title[,type]}\r\n");
+        NB_DEBUG("sceneconf: usage sceneconf(){title[,type[,onlist|outlist]]}\r\n");
         return;
     }
 
     title[0] = '\0';
     type[0] = '\0';
+    list[0] = '\0';
 
-    /* Text form: {Title, type} arrives as one arg; split on ','. */
+    /* Text form: {Title, type, list} arrives as one arg; split on ','. */
     p = argv[0];
     if (nb_next_field(&p, title, sizeof(title))) {
         /* title read; p points to type (may be empty). */
         if (*p) {
-            str_copy(type, sizeof(type), p);
+            if (nb_next_field(&p, type, sizeof(type))) {
+                /* type read; p points to the list flag (may be empty). */
+                if (*p) {
+                    size_t n;
+                    str_copy(list, sizeof(list), p);
+                    /* Trailing blanks are not part of the keyword. */
+                    n = strlen(list);
+                    while (n > 0 && (list[n - 1] == ' ' || list[n - 1] == '\t'))
+                        list[--n] = '\0';
+                }
+            } else {
+                /* No second comma: the remainder is the type. */
+                str_copy(type, sizeof(type), p);
+            }
         }
     } else {
-        /* No comma: entire arg is the title, type defaults to NULL. */
+        /* No comma: entire arg is the title, type/list default to empty. */
         str_copy(title, sizeof(title), argv[0]);
     }
 
-    nb_set_scene_conf(tr(title), type[0] ? type : NULL);
+    nb_set_scene_conf(tr(title), type[0] ? type : NULL, list[0] ? list : NULL);
 }
 
 /*
@@ -512,6 +527,7 @@ static const CmdEntry cmd_table[] = {
     {"cgvmenu",      cmd_cgvmenu,     CMD_BLOCKING | CMD_NEEDS_INPUT | CMD_TOUCHES_DISPLAY},
     {"musicmenu",    cmd_musicmenu,   CMD_BLOCKING | CMD_NEEDS_INPUT | CMD_TOUCHES_DISPLAY},
     {"specialmenu",  cmd_specialmenu, CMD_BLOCKING | CMD_NEEDS_INPUT | CMD_TOUCHES_DISPLAY},
+    {"scenesmenu",   cmd_scenesmenu,  CMD_BLOCKING | CMD_NEEDS_INPUT | CMD_TOUCHES_DISPLAY},
     {"bgm",          cmd_bgm,         CMD_TOUCHES_AUDIO},
     {"sound",        cmd_sound,       CMD_TOUCHES_AUDIO},
     {"voice",        cmd_voice,       CMD_TOUCHES_AUDIO},

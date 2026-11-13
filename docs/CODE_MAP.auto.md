@@ -21,7 +21,7 @@
 | layer_sprite.c | part of the scene layer subsystem. | layer_sprite_sync_dialog_base, layer_sprite_face, layer_sprite_hide_all_ex, layer_sprite_hide_all, layer_has_sprite, layer_redraw_sprites, layer_sprite_update (7) | B15-图层渲染与换装机制.md |
 | main.c | HAL / 字库 / 键盘 / 视频 / 调色板 / 图片归档初始化 | main (1) | B01-Engine日志机制.md |
 | menu_layer.c | reusable menu overlay layer (draw / blit / restore). | menu_layer_open, menu_layer_begin_draw, menu_layer_commit, menu_layer_blit, menu_layer_blit_rect, menu_layer_erase_to_base, menu_layer_blit_sprite, menu_layer_close (8) | B15-图层渲染与换装机制.md |
-| nb.c | pure-text script engine for Naiz | nb_get_last_brace_arg, nb_set_scene_conf, nb_set_last_choice, nb_get_filename, nb_get_buffer, nb_lang_is_cjk, nb_init, scene_switch, nb_is_menu_scene, nb_get_state, nb_set_lang, nb_seek_tag, nb_scene_switch_tagged, nb_preload_scene, nb_prefetch_lookahead, nb_process (16) | B02-显示管线规范.md |
+| nb.c | pure-text script engine for Naiz | nb_get_last_brace_arg, nb_set_scene_conf, nb_set_last_choice, nb_get_buffer, nb_lang_is_cjk, nb_init, nb_get_playback_mode, scene_switch, nb_is_menu_scene, nb_get_state, nb_set_lang, nb_seek_tag, nb_scene_switch_tagged, nb_preload_scene, nb_prefetch_lookahead, nb_process (16) | B02-显示管线规范.md |
 | nb_anim.c | nb_anim.c | cmd_playanima, cmd_waitanima, cmd_stopanima, anim_waiting, anim_stop, anim_tick (6) | B19-时钟计算经验参考.md |
 | nb_audio.c | NB audio commands (bgm/sound/voice). | cmd_bgm, cmd_sound, cmd_voice (3) | B92-NB脚本命令参考.md |
 | nb_cg.c | nb_cg.c | cmd_cg (1) | B92-NB脚本命令参考.md |
@@ -29,14 +29,16 @@
 | nb_commands.c | NB script command handlers and dispatch table | nb_asset_id, nb_prefetch_key, nb_next_field, nb_has_field_delim, nb_commands_dispatch (5) | B11-MAG图片加载与显示规范.md |
 | nb_dialog.c | Dialog paging state machine for NB script engine. | nb_text_expand_vars, dialog_show, nb_dialog_get_text, nb_dialog_get_offset, nb_dialog_get_charname, nb_dialog_pending, nb_dialog_reveal_tick, nb_dialog_reveal_active, nb_dialog_reveal_finish, nb_dialog_dismiss, nb_dialog_reset (11) | B02-显示管线规范.md |
 | nb_interact.c | blocking option-list interaction primitive (ui_interact). | ui_interact (1) | - |
-| nb_mainmenu.c | NB main-menu flow commands. | nb_set_menu_return, nb_get_menu_return, cmd_mainmenu, cmd_startsetting, cmd_musicmenu (5) | B92-NB脚本命令参考.md |
+| nb_mainmenu.c | NB main-menu flow commands. | nb_set_menu_return, nb_get_menu_return, cmd_mainmenu, cmd_startsetting (4) | B92-NB脚本命令参考.md |
 | nb_menu.c | NB menu UI: button rendering, palette save/restore, input loop. | menu_save_item_palette, menu_restore_item_palette, menu_finish, menu_pagecount, menu_pagenav_draw, menu_page_hit, menu_back_draw, menu_back_hit, menu_confirm_input, menu_consume_key, menu_show (11) | B18-存档读档系统设计.md |
+| nb_music.c | Music Room (LOAD-paradigm full-screen list). | cmd_musicmenu (1) | - |
 | nb_nameinput.c | Name-entry page (NB command `nameinput`, devdoc 205). | cmd_nameinput (1) | B92-NB脚本命令参考.md |
 | nb_parser.c | NB script line parser (tokenizer). | nb_parse_line, nb_get_line, nb_parse_line_semi (3) | B96-NB解析器规范.md |
 | nb_question.c | NB question/choice command (cmd_question) and helpers. | nb_prompt_options, cmd_question (2) | B92-NB脚本命令参考.md |
 | nb_save_dialog.c | In-dialog save menu. | save_dialog_menu (1) | B18-存档读档系统设计.md |
 | nb_saveload.c | Save/load menu UIs (full-screen + in-dialog). | slot_chapter_label, cmd_loadscene, save_request (3) | B18-存档读档系统设计.md |
 | nb_scene.c | NB scene-jump command (cmd_scene) and its helpers. | cmd_scene, cmd_jump, cmd_jumpscene (3) | B92-NB脚本命令参考.md |
+| nb_scene_menu.c | Scene select menu (scene gallery). | cmd_scenesmenu (1) | B92-NB脚本命令参考.md |
 | nb_setting.c | In-game settings scene (LOAD-paradigm full-screen list). | cmd_settingmenu (1) | B92-NB脚本命令参考.md |
 | nb_special.c | Special menu (LOAD-style full-screen list). | cmd_specialmenu (1) | B92-NB脚本命令参考.md |
 | nb_vars.c | nb_vars.c | nb_var_init, nb_var_get, nb_var_set, nb_var_add, nb_var_lookup, nb_var_get_str, nb_var_set_str, nb_var_default_str, nb_var_get_state, nb_var_set_state, char, nb_var_set_str_state (12) | B17-变量系统设计规范.md |
@@ -49,7 +51,7 @@
 | render_vram.c | rectangular read/write between the banked VRAM window | vram_read, vram_write, render_blit_transparent (3) | B15-图层渲染与换装机制.md |
 | save.c | save.c | save_get_filename, save_game_temp, save_game_slot, load_game_temp, load_game_slot, slot_info (6) | B18-存档读档系统设计.md |
 | save_io.c | Shared save-file I/O helpers for save.c and save_sys.c. | save_file_write, save_file_read, save_read_header (3) | B18-存档读档系统设计.md |
-| save_sys.c | System save (CG/ending/scene unlock flags, clear count). | sys_save_load, sys_save_unlock_scene, sys_save_unlock_cg, sys_save_is_cg_unlocked (4) | B18-存档读档系统设计.md |
+| save_sys.c | System save (CG/ending/scene unlock flags, clear count). | sys_save_load, sys_save_unlock_scene, sys_save_is_scene_unlocked, sys_save_unlock_cg, sys_save_is_cg_unlocked (5) | B18-存档读档系统设计.md |
 | scene_display.c | Display-side scene state: narrow apply facade. | display_apply_bg, display_apply_cg, display_apply_sprite, display_apply_dialog (4) | - |
 | transition.c | Scene transition dispatcher. | transition_start, transition_active, transition_sweeping, transition_tick (4) | B95-VM执行核心规范.md |
 | transition_blinds.c | Blinds (strip sweep) transition family. | transition_pblinds_wipe (1) | B97-场景过渡状态机规范.md |

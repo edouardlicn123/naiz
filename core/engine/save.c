@@ -41,13 +41,9 @@ static void save_apply(const SaveData *s)
      * default, never to "". */
     nb_var_set_str_state(s->var_strings);
     nb_set_lang(s->lang);
+    /* The loaded scene is unlocked by nb_load (unlock-on-entry), so the save
+     * apply path does not need a second unlock call here. */
     scene_switch(s->filename, SCENE_SWITCH_APPLY);
-    /* Mark the loaded scene as unlocked */
-    {
-        unsigned int scene_id;
-        if (sscanf(s->filename, "nbook%u.nb", &scene_id) == 1)
-            sys_save_unlock_scene((int)scene_id);
-    }
 }
 
 static int save_write(const char *path, SaveData *s)

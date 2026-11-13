@@ -14,39 +14,40 @@
 #include "tr.h"
 #include "nb_internal.h"
 #include "nb_vars.h"
-#include "save.h"
 #include "debug.h"
 #include "nb_commands.h"
 
 /*
  * scene_target_name — Normalize a scene target to a .nb filename.
  * Shared by scene and jumpscene (devdoc 203 §3.3):
- *   "end"                    -> mainmenu.nb
+ *   "end"                    -> mainmenu.nb (scenes.nb during gallery playback)
  *   "logo"/"op"/"mainmenu"   -> {name}.nb
  *   "003"/"nb003"/"nbook003"/"nbook003.nb" -> nbook003.nb
- *   other numeric target     -> nbook{target}.nb (unlocks current scene)
+ *   other numeric target     -> nbook{target}.nb
+ * Returns 1 when the target resolved to the scene gallery (playback end), so
+ * the caller can switch with SCENE_SWITCH_MENU and end playback mode.
  */
-static void scene_target_name(const char *target, char *fname, size_t fsize)
+static int scene_target_name(const char *target, char *fname, size_t fsize)
 {
     char base[64];
     size_t n;
 
     if (strcmp(target, "end") == 0) {
+        /* devdoc 209: a scene started from the gallery returns there, not to
+         * the main menu; the menu switch reason clears playback mode. */
+        if (nb_get_playback_mode()) {
+            snprintf(fname, fsize, "scenes.nb");
+            return 1;
+        }
         snprintf(fname, fsize, "mainmenu.nb");
-        return;
+        return 0;
     }
 
     if (strcmp(target, "logo") == 0 ||
         strcmp(target, "op") == 0 ||
         strcmp(target, "mainmenu") == 0) {
         snprintf(fname, fsize, "%s.nb", target);
-        return;
-    }
-
-    {
-        unsigned int cur_id;
-        if (sscanf(nb_get_filename(), "nbook%u.nb", &cur_id) == 1)
-            sys_save_unlock_scene((int)cur_id);
+        return 0;
     }
 
     snprintf(base, sizeof(base), "%s", target);
@@ -60,16 +61,18 @@ static void scene_target_name(const char *target, char *fname, size_t fsize)
         snprintf(fname, fsize, "nbook%s.nb", base + 2);
     else
         snprintf(fname, fsize, "nbook%s.nb", base);
+    return 0;
 }
 
 /* scene_jump — Resolve and jump to a scene target. */
 static void scene_jump(const char *target)
 {
     char fname[NB_FILENAME_MAX];
+    int to_gallery;
 
-    scene_target_name(target, fname, sizeof(fname));
+    to_gallery = scene_target_name(target, fname, sizeof(fname));
     NB_DEBUG("scene: %s -> %s\r\n", target, fname);
-    scene_switch(fname, SCENE_SWITCH_SCRIPT);
+    scene_switch(fname, to_gallery ? SCENE_SWITCH_MENU : SCENE_SWITCH_SCRIPT);
 }
 
 /* Trim trailing blanks in place (option tails are taken verbatim). */
@@ -266,6 +269,7 @@ void cmd_jumpscene(int argc, const char **argv, const char *cmd_name)
     char tags[10][32];
     const char *ui_labels[10];
     char fname[NB_FILENAME_MAX];
+    int to_gallery;
     int i, n = 0, sel;
 
     (void)cmd_name;
@@ -316,11 +320,14 @@ void cmd_jumpscene(int argc, const char **argv, const char *cmd_name)
     if (sel < 0)
         return;   /* timeout: stay in this scene, continue after the line */
 
-    scene_target_name(scenes[sel], fname, sizeof(fname));
+    to_gallery = scene_target_name(scenes[sel], fname, sizeof(fname));
     NB_DEBUG("jumpscene: %s -> %s tag='%s'\r\n",
              scenes[sel], fname, tags[sel]);
     if (tags[sel][0])
-        nb_scene_switch_tagged(fname, SCENE_SWITCH_SCRIPT, tags[sel]);
+        nb_scene_switch_tagged(fname, to_gallery ? SCENE_SWITCH_MENU
+                                                 : SCENE_SWITCH_SCRIPT,
+                               tags[sel]);
     else
-        scene_switch(fname, SCENE_SWITCH_SCRIPT);
+        scene_switch(fname, to_gallery ? SCENE_SWITCH_MENU
+                                       : SCENE_SWITCH_SCRIPT);
 }
