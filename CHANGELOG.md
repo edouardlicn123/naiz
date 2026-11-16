@@ -12,7 +12,9 @@
 
 - **修复**：`tools/naiz_img/inject_common.py` `generate_autoexec()` 在 `SET DOS16M=1` 后为 openpack 链固定写一行 `REM naiz ae pad`（17 字节，参与地址计算）；dos4g 链不变，`NAIZ_AE_PAD` 诊断旋钮保留在垫行之后。
 - **文档**：新增 `devdocs/212-DOS32A装载地址敏感复发与AUTOEXEC垫行兜底.md`——判定矩阵、0.4.033 过拟合的原因、方案 A 实现与守则、方案 C（地址探针 / 坏区测绘 / `apply_fixups` 地址级归因）计划。
-- **验证**：`core/*.err` 全空；注入后 AUTOEXEC 含垫行、`ENGINE.EXE` 245500 B；实机串口 **1827 B** 正常启动（`Init OK` / `Vid OK`，无 4005）；`pytest` **938 passed, 2 skipped**。
+- **测试**：新增 `tools/tests/test_autoexec_pad.py`——守护 openpack 垫行的存在、17 B 长度、`SET DOS16M=1 → pad → engine.exe` 顺序，以及 dos4g 链不含该行；devdoc 212 §八.5 的「不要随意删」由此变成 pytest 可检测。
+- **工具**：`tools/diag/np2kai_smoke_fifo.py` 的串口从 FIFO 改为 **PTY**——本机 wxnp21kai 对普通文件/FIFO 只做一次 `openat(O_RDWR|O_NONBLOCK)` 随即 close，不转发任何字节（strace 实测）；改 PTY 后本机冒烟恢复，demo-a2 输出 **1220 B**（`aiz engine` / `Init OK` / `Vid OK`，无 4005）。A03 §8、devdoc 210 §九.8 已同步。
+- **验证**：`core/*.err` 全空；注入后 AUTOEXEC 含垫行、`ENGINE.EXE` 245500 B；旧机实机串口 **1827 B** 正常启动（`Init OK` / `Vid OK`，无 4005）；本机复测（同一 245500 B openpack）串口 **1220 B** 正常启动（`aiz engine` / `Init OK` / `Vid OK`，无 4005）；`pytest` **938 passed, 2 skipped**（0.4.034 HEAD `8b341f3` 为 933，补上述 5 条守护测试后为 938）。
 
 <a id="c110"></a>
 ### 0.4.032（补记） — devdoc 210 §十一：fatal 4005 定性翻案

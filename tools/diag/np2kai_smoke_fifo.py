@@ -1,5 +1,9 @@
 #!/usr/bin/env python3
-# 无 pty 环境下的 NP2kai 冒烟: 用 FIFO 替代 pty 捕获串口, 并用 screendig 抓屏
+# NP2kai 冒烟: 用 PTY 捕获串口, 固定时长或见首批输出即停
+#
+# 历史备注: 文件名沿用 np2kai_smoke_fifo —— 早期用 FIFO, 但本机 wxnp21kai 对
+# com1_m_o 的普通文件/FIFO 只做 O_RDWR|O_NONBLOCK 探测后立即 close, 不转发
+# 任何字节 (strace 可见); 只有 PTY slave 才真正接到 rs232c. 不要改回 FIFO.
 #
 # Usage:
 #   python tools/diag/np2kai_smoke_fifo.py [hdi] [seconds]
@@ -9,7 +13,7 @@
 # devdoc 211 clock measurement needs -- the point is what the clock does while
 # nobody touches anything, and VCLOCK_WINDOW_MS is 1000 ms, so cutting the run
 # short at the first byte measures nothing.
-import os, sys, time, subprocess, shutil
+import os, sys, time, subprocess, pty, select, threading
 sys.path.insert(0, '/home/edo/naiz')
 from tools.naiz_lib import np2kai_capture as cap
 
@@ -19,70 +23,70 @@ try:
 except ValueError:
     RUN_SECONDS = 0
 ROOT = '/home/edo/naiz'
-FIFO = os.path.join(ROOT, 'tmp_le', 'ser.fifo')
-LOG = os.path.join(ROOT, 'tmp_le', 'serial_os_test.log')
+LOG = os.path.join(ROOT, 'tmp_le', 'serial_smoke.log')
 
 cap.kill_stale_emulators()
-if os.path.exists(FIFO):
-    os.unlink(FIFO)
-os.mkfifo(FIFO)
+
+master_fd, slave_fd = pty.openpty()
+slave_name = os.ttyname(slave_fd)
 
 updates = {
     'SCSIHDD0': os.path.join(ROOT, HDI),
-    'com1_m_o': FIFO, 'com1_m_i': FIFO,
+    'com1_m_o': slave_name, 'com1_m_i': slave_name,
     'com1port': 1, 'com1para': 0xE3, 'com1_bps': 9600,
 }
 cfg = cap.write_emulator_toml(updates)
 print('config:', cfg)
+print('pty slave:', slave_name)
 print('run_seconds:', RUN_SECONDS or '(legacy: stop at first output)')
 
 cmd = [cap.EMULATOR, '--start']
 print('launch:', cmd)
 proc = subprocess.Popen(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-try:
-    # FIFO 读端: NP2kai 会以写方式打开 com1_m_o; 读端需要常驻
-    deadline = time.time() + 120
-    with open(LOG, 'wb') as slog:
-        # 非阻塞读 FIFO: 打开读端会阻塞直到写端打开, 用线程化处理简化
-        import threading
-        stop = threading.Event()
-        def reader():
+
+stop = threading.Event()
+with open(LOG, 'wb') as slog:
+    def reader():
+        while not stop.is_set():
+            r, _, _ = select.select([master_fd], [], [], 0.2)
+            if not r:
+                continue
             try:
-                with open(FIFO, 'rb') as f:
-                    while not stop.is_set():
-                        data = f.read1(4096) if hasattr(f,'read1') else f.read(4096)
-                        if not data:
-                            if RUN_SECONDS:
-                                time.sleep(0.05)
-                            else:
-                                break
-                            continue
-                        slog.write(data); slog.flush()
+                data = os.read(master_fd, 4096)
             except OSError:
-                pass
-        t = threading.Thread(target=reader, daemon=True)
-        t.start()
+                break
+            if not data:
+                continue
+            slog.write(data)
+            slog.flush()
+
+    t = threading.Thread(target=reader, daemon=True)
+    t.start()
+    try:
         if RUN_SECONDS:
             # Fixed-duration mode: never stop early on first output.
             time.sleep(RUN_SECONDS)
         else:
+            deadline = time.time() + 120
             while time.time() < deadline:
                 if proc.poll() is not None:
                     break
                 time.sleep(2)
-                sz = os.path.getsize(LOG)
-                if sz > 200:
+                if os.path.getsize(LOG) > 200:
                     # 引擎已输出, 再等几秒抓尾
                     time.sleep(10)
                     break
-    stop.set()
-finally:
-    proc.terminate()
-    try: proc.wait(10)
-    except Exception: proc.kill()
+    finally:
+        stop.set()
+        t.join(timeout=2)
+        proc.terminate()
+        try: proc.wait(10)
+        except Exception: proc.kill()
+        os.close(master_fd)
+        os.close(slave_fd)
 
 print('--- serial log (%d bytes) ---' % os.path.getsize(LOG))
-data = open(LOG,'rb').read()
-print(data.decode('utf-8','replace')[:2000] or '(空)')
+data = open(LOG, 'rb').read()
+print(data.decode('utf-8', 'replace')[:2000] or '(空)')
 if not data:
     print('!! 串口为空 —— 需要抓屏看 fatal 信息')
