@@ -43,3 +43,15 @@ assets_samples/
 
 # 本地测试产物（HDI/截图/串口日志），不入库
 test/
+
+# AI 工具/临时产物清理（2026-11-16）：一次性脚本、截图、镜像、审计缓存不入库
+tmp_le/
+.trae-html-share-packages/
+.screenshots/
+audit_state.json
+verify_notes.json
+.~lock.*
+*.err
+*.bak
+*.img
+无标题文档
