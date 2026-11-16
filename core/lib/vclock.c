@@ -99,12 +99,17 @@ void vclock_init(VClock *vc)
     vc->accum = 0;
     vc->started = 0;
     vc->calibrated = 0;
+    vc->undershoot = 0;
 }
 
 void vclock_advance(VClock *vc, unsigned long real_ms)
 {
     unsigned long delta;
     unsigned long emitted;
+    /* C89: declarations live at block top (WATCOM rejects mid-block ones).
+     * hi/lo/diff serve the ratio clamp in the window-close branch. */
+    unsigned long hi, lo;
+    long diff;
 
     if (!vc) return;
 
@@ -193,16 +198,41 @@ void vclock_advance(VClock *vc, unsigned long real_ms)
             vc->target = want;
             vc->step = want;
             vc->calibrated = 1;
+        } else if (raw_want * 2 < vc->target) {
+            /* devdoc 211 §7.3: SUSTAINED rate collapse — re-adopt outright.
+             *
+             * The 5/4 ratio clamp plus the 1/4 IIR can only move the target
+             * ~5-20% per window downward.  When the pass rate jumps (Naiz
+             * measured 117 pass/s at boot, then 315 pass/s on the same
+             * machine — the emulator's frame pump is NOT frame-locked), the
+             * true per-pass rate halves or worse, and the clamp turns a
+             * one-second correction into a 30-60 s crawl during which the
+             * virtual clock runs 1.5-3x fast.  That was the whole runaway
+             * behind devdoc 211: `[VW]` showed raw=50 while tgt crawled
+             * 136→55 over 21 windows.
+             *
+             * A single low window is NOT trusted (one that spans a hard
+             * stall measures a too-low rate too — that is what VCLOCK_MIN_
+             * WINDOW_PASSES guards only weakly); two consecutive windows
+             * below half the running target means the machine's pass rate
+             * genuinely changed.  Adopt raw_want (it is already clamped to
+             * RATE_MIN/MAX), same contract as the first window. */
+            vc->undershoot++;
+            if (vc->undershoot >= 2) {
+                vc->target = raw_want;
+                vc->step = raw_want;
+                vc->undershoot = 0;
+            }
         } else {
+            vc->undershoot = 0;
             /* Bound how far one window may move the rate before averaging it:
              * a window that catches a DOS-clock stall gap plus its catch-up
              * jump measures a spuriously fast rate (B19 §2.3), and following
              * it would hold the clock fast for seconds. */
-            unsigned long hi = vc->target * VCLOCK_MAX_WINDOW_RATIO_NUM
-                               / VCLOCK_MAX_WINDOW_RATIO_DEN;
-            unsigned long lo = vc->target * VCLOCK_MAX_WINDOW_RATIO_DEN
-                               / VCLOCK_MAX_WINDOW_RATIO_NUM;
-            long diff;
+            hi = vc->target * VCLOCK_MAX_WINDOW_RATIO_NUM
+                 / VCLOCK_MAX_WINDOW_RATIO_DEN;
+            lo = vc->target * VCLOCK_MAX_WINDOW_RATIO_DEN
+                 / VCLOCK_MAX_WINDOW_RATIO_NUM;
             if (want > hi)
                 want = hi;
             if (want < lo)

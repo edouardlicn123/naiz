@@ -248,4 +248,12 @@ python -m pytest -q                                          # 全量守卫
 
 **新工具**：`tmp_le/sim_loader.py`（LE 加载器仿真）；`tools/diag/np2kai_smoke_fifo.py`（无 pty 环境冒烟替代）。剧情实机冒烟（§九 第 4 项）由用户人工执行。
 
+### 11.7 2026-11-16 复发（接 212）
+
+0.4.033 落地后，vclock 等改动把镜像从 245232 推到 245500 B，**同一枚 `-os` 引擎在 `SET DOS16M=1`
+已在位的情况下再次 fatal 4005**（串口 0 字节）；`NAIZ_AE_PAD=1..4` 均能启动。即 §11.5 的「写一行
+撑大 AUTOEXEC」只是过拟合到当时的装载地址，镜像一变即失效。0.4.034 起改为 openpack 链生产
+AUTOEXEC 固定垫行 `REM naiz ae pad`，详见 `devdocs/212-DOS32A装载地址敏感复发与AUTOEXEC垫行兜底.md`
+（判定矩阵、守则、方案 C 计划）。**本文 §11.5 的机理描述仍成立，但其「修复」表述已被 212 取代。**
+
 **硬约束**：改 `core/Makefile` 任何编译旗标后必须 `rm -rf core/build` 全量重编；任何体积/布局变化后必须跑一次开机冒烟。

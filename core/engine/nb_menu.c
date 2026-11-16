@@ -245,12 +245,21 @@ static int btn_hittest(int mx, int my, int cols, int argc, const char **argv,
 
 /*=== Main input loop ======================================================*/
 
+/* Input-ready gate (devdoc 211 §7.4), mirroring ui_interact's.  menu_show
+ * used to enter its loop immediately after hal_mouse_flush(), with NO gate —
+ * the emulator's synthetic left-button edge (the key press that advanced the
+ * previous line) could then pick whatever button sat under the freshly
+ * centred pointer, which is exactly the "wandered into special" symptom.
+ * Time-based so it does not shrink when the frame pump runs fast. */
+#define MENU_INPUT_READY_MS  400UL
+
 int menu_show(int mx, int my, int cols, int argc, const char **argv)
 {
     int sel = 0;
     int prev_sel = 0;
     int btn_w = BTN_W;
     int btn_h = BTN_H;
+    unsigned long ready_at;
 
 #ifdef AUTOEXIT
     sel = argc - 1;
@@ -276,21 +285,51 @@ int menu_show(int mx, int my, int cols, int argc, const char **argv)
     menu_layer_blit();
     hal_mouse_set_pos(LAYER_SCREEN_W / 2, LAYER_SCREEN_H / 2);
     hal_mouse_flush();
+    ready_at = hal_wallclock_smooth_ms() + MENU_INPUT_READY_MS;
 
     for (;;) {
+            unsigned long now = hal_wallclock_smooth_ms();
+
             engine_frame_pump();  /* keep BGM/PCM + clock ticking while menu open */
             hal_kbd_update();
             hal_mouse_update();
 
-            if (hal_mouse_was_clicked(HAL_MOUSE_LBUTTON)) {
-                int hit = btn_hittest(mx, my, cols, argc, argv, btn_w, btn_h,
-                                      hal_mouse_get_x(), hal_mouse_get_y());
-                if (hit >= 0) {
-                    NB_DEBUG("menu: mouse sel=%d (%s)\r\n", hit, argv[hit]);
-                    /* Exit contract (shared by all menu UIs): restore the
-                     * base snapshot, flush the mouse, restore the palette. */
-                    menu_finish();
-                    return hit;
+            /* Input-ready gate: swallow clicks and key events already in
+             * flight when the menu opened, and keep extending while a confirm
+             * key is physically held so its auto-repeat cannot trigger. */
+            if (now < ready_at) {
+                int held = 0;
+                (void)hal_mouse_was_clicked(HAL_MOUSE_LBUTTON);
+                (void)hal_kbd_is_down(KC_UP);
+                (void)hal_kbd_is_down(KC_DOWN);
+                (void)hal_kbd_is_down(KC_LEFT);
+                (void)hal_kbd_is_down(KC_RIGHT);
+                if (hal_kbd_is_down(KC_SPACE))  held = 1;
+                if (hal_kbd_is_down(KC_ENTER))  held = 1;
+                if (hal_kbd_is_down(KC_XFER))   held = 1;
+                if (held)
+                    ready_at = now + MENU_INPUT_READY_MS;
+                hal_mouse_draw_cursor();
+                continue;
+            }
+
+            /* devdoc 211 §7.4: hit-test with the EVENT's own coordinates.
+             * The FIFO stores where the click happened; pairing the consume
+             * with hal_mouse_get_x/y() instead let a stale event pick the
+             * button under the pointer's CURRENT position. */
+            {
+                int cx, cy;
+                if (hal_mouse_pop_click(HAL_MOUSE_LBUTTON, &cx, &cy)) {
+                    int hit = btn_hittest(mx, my, cols, argc, argv, btn_w, btn_h,
+                                          cx, cy);
+                    if (hit >= 0) {
+                        NB_DEBUG("menu: mouse sel=%d (%s) at (%d,%d)\r\n",
+                                 hit, argv[hit], cx, cy);
+                        /* Exit contract (shared by all menu UIs): restore the
+                         * base snapshot, flush the mouse, restore the palette. */
+                        menu_finish();
+                        return hit;
+                    }
                 }
             }
 

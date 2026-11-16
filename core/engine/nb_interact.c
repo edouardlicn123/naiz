@@ -53,11 +53,35 @@ static void interact_draw_opt(const char *label, int i, int y, int mw, int highl
     draw_text(label, 0, x, opt_y, mw - 8, opt_y + MENU_ITEM_H, 1, pal);
 }
 
-/* Safety valve: how long a blocking choice may wait before returning -1.
+/* Safety valve: how long a blocking choice may wait before giving up.
  * Time-based, not frame-based — the frame pump can run far above the display
  * rate (VSYNC not emulated), which made the old "600 frames" expire in
- * well under a second and skip the question as if it were auto-answered. */
+ * well under a second and skip the question as if it were auto-answered.
+ *
+ * Timeout SEMANTICS (devdoc 211 §7.1): -1 used to mean BOTH "cancel" and
+ * "timeout", and every caller treated it as "continue with the script" —
+ * so any clock error silently skipped the question.  The separation:
+ *   UI_INTERACT_CANCEL   (-1)  invalid request / explicit cancel
+ *   UI_INTERACT_TIMEOUT  (-2)  safety valve expired (only after the valve
+ *                              re-armed itself several times, see below)
+ * On expiry the list is REDRAWN and the deadline re-armed in place — the
+ * player sees the choice is still waiting instead of the story moving on.
+ * Only after UI_INTERACT_MAX_TIMEOUTS consecutive re-arms (a truly absent
+ * player; also keeps automated runs finite) does -2 come out, and the
+ * callers keep their "continue after the line" behaviour for that case.
+ */
 #define UI_INTERACT_TIMEOUT_MS  30000UL
+#define UI_INTERACT_TIMEOUT     (-2)
+#define UI_INTERACT_CANCEL      (-1)
+#define UI_INTERACT_MAX_TIMEOUTS  3
+
+/* Deadline drift guard (devdoc 211 §7.2).  The deadline is computed from the
+ * SMOOTH clock, but the smooth clock is a rate-calibrated metronome, not a
+ * wall clock (its whole contract is "rate matters, phase does not" —
+ * vclock.h).  If the wall clock and the smooth clock ever disagree by more
+ * than this, the deadline is re-based from the wall clock; a 30 s wait must
+ * not silently become 8 s because the metronome ran hot. */
+#define UI_INTERACT_DRIFT_LIMIT_MS  2000UL
 
 /* Input-ready gate: ignore ALL input (mouse clicks and the confirm keys)
  * for this long after the option list opens.  Two stale sources reach the
@@ -78,10 +102,11 @@ int ui_interact(const UiRequest *req)
     int i, y, mw, n;
     unsigned long deadline;
     unsigned long ready_at;
+    int timeouts = 0;
 
     if (!req || req->n < 1 || !req->labels) {
         NB_DEBUG("interact: invalid request\r\n");
-        return -1;
+        return UI_INTERACT_CANCEL;
     }
 
     n = req->n;
@@ -100,10 +125,38 @@ int ui_interact(const UiRequest *req)
 
     for (;;) {
         unsigned long now = hal_wallclock_smooth_ms();
+        unsigned long wall = hal_wallclock_ms();
+
+        /* Drift guard: re-base the deadline from the REAL clock when the two
+         * disagree badly.  Covers both directions — a hot metronome would
+         * fire the valve early (skip the question), a stalled one would hold
+         * it open for minutes. */
+        {
+            long drift = (long)wall - (long)now;
+            if (drift < 0) drift = -drift;
+            if (drift > (long)UI_INTERACT_DRIFT_LIMIT_MS) {
+                NB_DEBUG("interact: clock drift %ld ms, re-basing deadline\r\n",
+                         drift);
+                deadline = wall + UI_INTERACT_TIMEOUT_MS;
+                ready_at = wall + UI_INTERACT_INPUT_READY_MS;
+            }
+        }
 
         if (now >= deadline) {
-            NB_DEBUG("interact: timeout\r\n");
-            return -1;
+            /* devdoc 211 §7.1: a timeout no longer skips the choice.  Redraw
+             * the list (the focus flash is the visible "still waiting") and
+             * re-arm.  Only the safety valve's repeated expiry returns, and
+             * it returns TIMEOUT (-2), never CANCEL (-1). */
+            timeouts++;
+            NB_DEBUG("interact: timeout #%d\r\n", timeouts);
+            if (timeouts >= UI_INTERACT_MAX_TIMEOUTS) {
+                NB_DEBUG("interact: safety valve expired\r\n");
+                return UI_INTERACT_TIMEOUT;
+            }
+            for (i = 0; i < n; i++)
+                interact_draw_opt(req->labels[i], i, y, mw, i == sel);
+            deadline = hal_wallclock_smooth_ms() + UI_INTERACT_TIMEOUT_MS;
+            continue;
         }
 
         engine_frame_pump();  /* keep BGM/PCM + clock ticking while waiting */
@@ -129,11 +182,17 @@ int ui_interact(const UiRequest *req)
             continue;
         }
 
-        if (hal_mouse_was_clicked(HAL_MOUSE_LBUTTON)) {
-            int hit = interact_hittest(hal_mouse_get_x(), hal_mouse_get_y(), n);
-            if (hit >= 0) {
-                NB_DEBUG("interact: mouse sel=%d\r\n", hit);
-                return hit;
+        /* devdoc 211 §7.4: hit-test with the EVENT's coordinates, not the
+         * current pointer position — a stale queued click must not pick the
+         * row the pointer happens to be over now. */
+        {
+            int cx, cy;
+            if (hal_mouse_pop_click(HAL_MOUSE_LBUTTON, &cx, &cy)) {
+                int hit = interact_hittest(cx, cy, n);
+                if (hit >= 0) {
+                    NB_DEBUG("interact: mouse sel=%d (%d,%d)\r\n", hit, cx, cy);
+                    return hit;
+                }
             }
         }
 

@@ -449,6 +449,33 @@ int hal_mouse_was_clicked(int btn)
     return 0;
 }
 
+/*
+ * Consume a single click event matching btn and report WHERE it happened.
+ * devdoc 211 §7.4: the FIFO stores the event's own coordinates, but every
+ * caller so far paired hal_mouse_was_clicked() with hal_mouse_get_x/y() —
+ * the CURRENT position.  A stale event then hit-tests against wherever the
+ * pointer is now, which is how a synthetic edge can pick the wrong button
+ * (the "wandered into special" symptom).  Same drain semantics as
+ * hal_mouse_was_clicked (entries before the match are dropped); returns 0
+ * and leaves x/y untouched when no matching click is queued.
+ */
+int hal_mouse_pop_click(int btn, int *x, int *y)
+{
+    int current;
+    if (!mouse_is_initialized) return 0;
+    current = mouse_fifo_tail;
+    while (current != mouse_fifo_head) {
+        if (mouse_click_fifo[current].button == btn) {
+            if (x) *x = mouse_click_fifo[current].x;
+            if (y) *y = mouse_click_fifo[current].y;
+            mouse_fifo_tail = (current + 1) % MOUSE_FIFO_SIZE;
+            return 1;
+        }
+        current = (current + 1) % MOUSE_FIFO_SIZE;
+    }
+    return 0;
+}
+
 void hal_mouse_flush(void)
 {
     mouse_fifo_head = 0;

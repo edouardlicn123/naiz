@@ -203,7 +203,17 @@ static int g_vs_level = -1;   /* last sampled VSYNC level, -1 = uninitialised */
 
 void hal_vblank_wait(void)
 {
+    /* devdoc 211 §八 #2: the frame pump measured 315 pass/s under NP2kai
+     * because the VSYNC flag reads as ALREADY ASSERTED on entry — the old
+     * single "wait while 0" loop returned instantly on every call and
+     * nothing paced the frame at all.  Wait for a full vsync cycle instead:
+     * if the flag is high, first wait for it to drop, then for the next
+     * assertion — an edge, matching hal_vblank_poll's boundary definition.
+     * Degenerate flags still fall through the bounded spins (stuck-at-1
+     * exits the first loop, stuck-at-0 the second), so the worst case is
+     * the old behaviour, never a hang. */
     int timeout = 100000;
+    while ((inb(GDC_GFX_PARAM) & GDC_VSYNC) && --timeout > 0);
     while (!(inb(GDC_GFX_PARAM) & GDC_VSYNC) && --timeout > 0);
     /* Returning at the start of a VBLANK:  the flag is asserted here. */
     g_vs_level = 1;

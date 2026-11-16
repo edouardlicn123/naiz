@@ -124,6 +124,10 @@ typedef struct {
     unsigned long accum;      /* real ms accumulated in the window */
     int           started;
     int           calibrated; /* first window adopted? */
+    int           undershoot; /* consecutive windows measuring < target/2
+                                 (devdoc 211 §7.3: sustained rate collapse
+                                 triggers re-adoption; host tests mirror
+                                 this struct field-for-field) */
 } VClock;
 
 /* Establish the origin.  Must be called before the first advance. */

@@ -251,8 +251,12 @@ void cmd_jump(int argc, const char **argv, const char *cmd_name)
         ui_labels[i] = labels[i];
 
     sel = nb_prompt_options(argv[0], ui_labels, n);
+    /* < 0 = invalid request or the safety valve (devdoc 211 §7.1: a timeout
+     * re-arms in place and only returns TIMEOUT after several re-arms, so a
+     * mere clock error can no longer skip the choice).  Continue after the
+     * jump line, like question. */
     if (sel < 0)
-        return;   /* timeout: continue after the jump line, like question */
+        return;
 
     /* nb_seek_tag logs the WARN and leaves pc unchanged when the tag is
      * missing, so the script continues after this line. */
@@ -317,8 +321,10 @@ void cmd_jumpscene(int argc, const char **argv, const char *cmd_name)
         ui_labels[i] = labels[i];
 
     sel = nb_prompt_options(argv[0], ui_labels, n);
+    /* < 0 = invalid request or the safety valve (see cmd_jump).  Stay in
+     * this scene, continue after the line. */
     if (sel < 0)
-        return;   /* timeout: stay in this scene, continue after the line */
+        return;
 
     to_gallery = scene_target_name(scenes[sel], fname, sizeof(fname));
     NB_DEBUG("jumpscene: %s -> %s tag='%s'\r\n",

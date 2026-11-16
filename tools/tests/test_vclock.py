@@ -96,6 +96,8 @@ def _make_clock():
     lib = _build_vclock()
 
     class VClockT(ctypes.Structure):
+        # Must mirror core/lib/vclock.h field-for-field: C code writes
+        # undershoot through the pointer we hand it.
         _fields_ = [
             ("virtual", ctypes.c_ulong),
             ("real_prev", ctypes.c_ulong),
@@ -105,6 +107,7 @@ def _make_clock():
             ("accum", ctypes.c_ulong),
             ("started", ctypes.c_int),
             ("calibrated", ctypes.c_int),
+            ("undershoot", ctypes.c_int),
         ]
 
     lib.vclock_init.argtypes = [ctypes.POINTER(VClockT)]
@@ -583,3 +586,99 @@ def test_window_observer_null_probe_is_the_default():
         lib.vclock_advance(ctypes.byref(vc), i * 10)
 
     assert lib.vclock_ms(ctypes.byref(vc)) > 1000, "the clock must still run"
+
+
+def test_pass_rate_jump_readopts_within_two_windows():
+    """devdoc 211 §7.3 — the runaway behind the whole investigation.
+
+    Real machine data (logs/clock_probe.log, co-operative pump mode):
+    pass rate was 117/s at boot, then 315/s.  `[VW]` showed raw=50 (the
+    CORRECT measurement) while tgt crawled 136→55 over 21 windows, because
+    the 5/4 ratio clamp + 1/4 IIR only move ~5-20% per window.  During that
+    crawl the virtual clock ran 1.5-3x real time, compressing a 30 s
+    UI timeout to ~8 s, and the -1 the timeout returned was treated as
+    "continue" — the story advanced itself while nobody touched anything.
+
+    The fix: two consecutive windows measuring below half the running
+    target re-adopt the measurement outright.  This test drives exactly
+    that shape: calibrate at a slow pass rate, then jump.
+    """
+    lib, vc = _make_clock()
+
+    # Phase 1: calibrate at ~20 pass/s (50 ms/pass = 800 units).
+    lib.vclock_advance(ctypes.byref(vc), 0)
+    t = 0
+    for _ in range(60):
+        t += 50
+        lib.vclock_advance(ctypes.byref(vc), t)
+    assert vc.calibrated == 1
+    # target settled near the true rate (800 units, ratio-clamped downward
+    # from the adopt of the first window which is 800 too — so ~800).
+    assert 640 <= vc.target <= 800, f"phase-1 target: {vc.target}"
+
+    v_before = lib.vclock_ms(ctypes.byref(vc))
+    real_before = t
+
+    # Phase 2: jump to ~300 pass/s (3.3 ms/pass).  The machine "got faster".
+    for _ in range(700):
+        t += 3
+        lib.vclock_advance(ctypes.byref(vc), t)
+
+    # Two windows have closed below half the old target: the fix must have
+    # re-adopted the measured rate (~48 units), NOT crawled toward it.
+    assert vc.target < 100, (
+        f"target={vc.target}: after a sustained rate collapse the clock must "
+        "re-adopt the measured rate within two windows (devdoc 211 §7.3); "
+        "a slowly crawling target means the runaway is back")
+
+    # And the observable symptom must be bounded: the ONE window it takes to
+    # discover the change necessarily runs at the stale rate (you cannot know
+    # the rate moved until a window closes), so the overshoot is bounded by
+    # that single window, not by a 30-60 s crawl.  Assert recovery instead:
+    # after re-adoption the clock tracks real time within noise.
+    v_mid = lib.vclock_ms(ctypes.byref(vc))
+    for _ in range(330):                              # one more window's worth
+        t += 3
+        lib.vclock_advance(ctypes.byref(vc), t)
+    v_after = lib.vclock_ms(ctypes.byref(vc))
+    real_elapsed = t - (t - 330 * 3)                  # last 990 ms of real time
+    virtual_elapsed = v_after - v_mid
+    assert 0.8 * real_elapsed <= virtual_elapsed <= 1.3 * real_elapsed, (
+        f"after re-adoption virtual grew {virtual_elapsed} ms over "
+        f"{real_elapsed} ms real — clock did not recover (devdoc 211 §三)")
+
+
+def test_single_low_window_does_not_crash_the_target():
+    """A stall-spanning window measures too low; one window must NOT adopt.
+
+    The re-adoption needs two CONSECUTIVE undershooting windows.  A single
+    low reading (e.g. a window that swallowed a stall) must leave the rate
+    alone — otherwise every hard stall would briefly crawl the clock.
+    """
+    lib, vc = _make_clock()
+
+    # Calibrate at ~20 pass/s.
+    lib.vclock_advance(ctypes.byref(vc), 0)
+    t = 0
+    for _ in range(60):
+        t += 50
+        lib.vclock_advance(ctypes.byref(vc), t)
+    good_target = vc.target
+
+    # One window at ~300 pass/s (a single low measurement)...
+    for _ in range(330):
+        t += 3
+        lib.vclock_advance(ctypes.byref(vc), t)
+    low_after_one = vc.target
+
+    # ...then back to the normal rate: the next window is NOT below half,
+    # so the undershoot streak resets and the rate recovers via the IIR.
+    for _ in range(40):
+        t += 50
+        lib.vclock_advance(ctypes.byref(vc), t)
+
+    assert low_after_one >= good_target * 3 // 4, (
+        f"a single low window moved target {good_target}->{low_after_one}: "
+        "re-adoption must require two consecutive undershoots")
+    # After returning to the normal rate the target stays in the sane band.
+    assert vc.target >= good_target * 3 // 4, f"target collapsed: {vc.target}"

@@ -468,6 +468,7 @@ void hal_mouse_update(void);
 int  hal_mouse_get_x(void);
 int  hal_mouse_get_y(void);
 int  hal_mouse_was_clicked(int btn);
+int  hal_mouse_pop_click(int btn, int *x, int *y);  /* devdoc 211 §7.4: event coords */
 void hal_mouse_set_pos(int x, int y);
 void hal_mouse_flush(void);
 void hal_mouse_drain(void);

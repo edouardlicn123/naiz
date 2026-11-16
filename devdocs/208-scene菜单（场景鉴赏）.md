@@ -1,6 +1,6 @@
 # 208 — Scene 菜单（场景鉴赏）
 
-- **状态**：完结（0.4.029 实施；实机冒烟待人工）
+- **状态**：完结（0.4.029 实施；实机冒烟空态已验证，播放待执行）
 - **基线版本**：0.4.028 → 实施后 0.4.029
 - **日期**：2026-11-13
 - **目标项目**：`projects/demo-a2`
@@ -114,7 +114,7 @@ static const SceneMenuEntry scene_menu_entries[SCENE_MENU_COUNT > 0 ? SCENE_MENU
 | `pytest` | **926 passed, 2 skipped**（基线 918 + 新增 8；`test_sceneconf_list` 2 项改写为构建期语义） |
 | `fullaudit --no-make` | 全绿：规则审计 / pytest / nb_validator / py_compile / bash -n / symbol_audit A+B gate |
 | `build + make demo-a2` | 成功；`nb_scene_menu.h` 生成 1 项（`nbook005.nb` / `Come with cat` / `thumb_id=29`）；CJK 9 语言字库重生成含新 UI 文案 |
-| 实机冒烟 | 待人工执行（special → Scenes → 缩略图 → Enter 播放 → Esc 返回） |
+| 实机冒烟 | **空态已验证（2026-11-16，0.4.034）**：special → Scenes → 0/1 解锁 → 屏幕显示 `Play the story to unlock scenes.` → Enter 关闭后 `[SCENE] switch 'special.nb'` 返回 Special。播放（解锁后网格 + Enter 播放 + Esc 返回）待执行 |
 
 ### 8.1 实施中的偏差与修正
 

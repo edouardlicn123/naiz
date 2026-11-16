@@ -81,6 +81,17 @@ def generate_autoexec(game_name, mouse_cmd=None):
     #   实测同一 -os 镜像：无此行必 4005，加一行 REM（NAIZ_AE_PAD=1）
     #   或此行即可启动——因果因子是装载地址平移，非变量本身。
     content += b'SET DOS16M=1\r\n'
+    # Load-address guard (devdoc 212): DOS/32A v9.12's LE fixup handling is
+    # sensitive to where ENGINE.EXE is loaded, and the stock openpack
+    # AUTOEXEC lands on an address where the loader dies with fatal 4005
+    # ("unrecognized fixup data in application") before any engine code runs.
+    # One harmless REM line shifts the load address into a working one;
+    # verified by boot smoke on the 245500-byte -os build (0.4.034).  The
+    # byte length of this line is part of the address calculation: any edit
+    # to AUTOEXEC contents or to the engine image must be followed by a boot
+    # smoke (serial log must be non-empty).
+    if _is_open_pack():
+        content += b'REM naiz ae pad\r\n'
     # NAIZ_AE_PAD — P7 布局矩阵验收工具（devdoc 196 §4.4 / refdoc I04）。
     # 注入 N 行 `REM ......` 到 AUTOEXEC.BAT，让每次 makegame 的 DOS
     # 装载地址产生可控偏移，用于复现和排查布局敏感型崩溃（如 P7

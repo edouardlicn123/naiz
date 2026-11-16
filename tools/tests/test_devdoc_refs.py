@@ -127,7 +127,7 @@ LINE_REF_WHITELIST = {
     ("nb.c", 177): "nb_set_lang",
     ("nb.c", 381): "nb_set_lang",
     ("nb_mainmenu.c", 132): "prefs_get_lang",
-    ("nb_menu.c", 273): "prefs_get_version",
+    ("nb_menu.c", 282): "prefs_get_version",
     ("tr.c", 28): "tr_table",
     ("tr.c", 168): "break",
     ("build_game.py", 396): "stale_settings.unlink",
