@@ -125,8 +125,9 @@ BASE    = -bt=dos $(EXT_LINK) -zq $(SIZE_OPT) -s ... $(EXT_DEFS) $(EXTRA_DEFS)
    `file_errorm` 退出都按 4005 报出（v9.12 `loader.asm`）。见到 4005 不要直接解读为"fixup 记录
    内容非法"，先用 §十一 的复现三连验证可复现性。
 8. **容器缺 devpts 时 `makegame test --serial` 必挂**（`OSError: out of pty devices`）。挂载
-   devpts 不跨命令持久，替代方案：`tools/diag/np2kai_smoke_fifo.py`（FIFO 串口 + `naiz_screendig`
-   抓屏）。注意模拟器进程**必须与抓屏在同一条命令内**完成启动→等待→抓屏（后台进程不跨命令存活）；
+   devpts 不跨命令持久，替代方案：`tools/diag/np2kai_smoke_fifo.py`（现已用 PTY 串口，容器内
+   退化为 `naiz_screendig` 抓屏；FIFO 在本机 wxnp21kai 上不转发串口，勿改回）。注意模拟器进程
+   **必须与抓屏在同一条命令内**完成启动→等待→抓屏（后台进程不跨命令存活）；
    抓屏产物在沙箱外的 /tmp，需立即复制进项目目录。
 9. **诊断新工具速记**：`tmp_le/sim_loader.py`（对任意 wlink LE 镜像跑 v9.12 加载器全检查，含
    fixup 记录逐条解析）、`tmp_le/dos32a-git/`（v9.12 官方源码，取自 GitHub DosWorld/dos32a，
@@ -211,11 +212,11 @@ python -m pytest -q                                          # 全量守卫
 
 **结论 A：不存在"某条 fixup 记录被拒收"**。§五 的"加载器解释器拒收 -os 产物中的某条记录"定性错误；§七.2 记录级 diff 无 smoking gun 可找。
 
-### 11.4 决定性实验（初版结论有误，被 11.6 对照实验修正）
+### 11.4 决定性实验（初版结论有误，被 11.5 对照实验修正）
 
 - 用 `EXTENDER=dos32a SIZE_OPT=-os TARGET=engine_os.exe make`（干净全量重编）重建失败样本（245232 B，md5 `49fdfcf8…`）；
 - 经 `tools.naiz_img.inject` 注入新建 HDI，NP2kai 实机启动：引擎设置菜单正常显示；
-- **但该实验被污染**：手动调 inject 时未设 `NAIZ_PACK`，`_is_open_pack()` 走默认分支 → AUTOEXEC 含 `SET DOS16M=1`。初版"启动成功"与随后一次"4005 复现"实为**仅差 AUTOEXEC 一行的两份 HDI**，见 11.6。原失败样本 `/tmp/engine_os.exe` 已丢失，md5 无从比对。
+- **但该实验被污染**：手动调 inject 时未设 `NAIZ_PACK`，`_is_open_pack()` 走默认分支 → AUTOEXEC 含 `SET DOS16M=1`。初版"启动成功"与随后一次"4005 复现"实为**仅差 AUTOEXEC 一行的两份 HDI**，见 11.5。原失败样本 `/tmp/engine_os.exe` 已丢失，md5 无从比对。
 
 ### 11.5 真正根因：装载地址敏感（0.4.033，c111 破案）
 
@@ -246,7 +247,7 @@ python -m pytest -q                                          # 全量守卫
 - 4005 与装载地址耦合，**任何改变 AUTOEXEC 字节数或镜像布局的改动**理论上都可能再触发。改旗标/布局后 `rm -rf core/build` 全量重编 + 开机冒烟（守则不变）；若再现 4005，**先 `NAIZ_AE_PAD=0..4` 扫装载地址偏移**即可判定是否地址敏感，不必再怀疑 fixup 记录。
 - 抓屏冒烟两条教训：① 手动 inject 与 `makegame make` 的 AUTOEXEC **不同**（`NAIZ_PACK` 分支），对照实验必须用同一条注入路径；② 判定启动成功前必须 kill_stale + 同命令内启动并抓屏，防残留窗口假阳性。
 
-**新工具**：`tmp_le/sim_loader.py`（LE 加载器仿真）；`tools/diag/np2kai_smoke_fifo.py`（无 pty 环境冒烟替代）。剧情实机冒烟（§九 第 4 项）由用户人工执行。
+**新工具**：`tmp_le/sim_loader.py`（LE 加载器仿真，已随 c5187e6 出库、当前不可复跑）；`tools/diag/np2kai_smoke_fifo.py`（无 pty 环境冒烟替代）。剧情实机冒烟（§九 第 4 项）由用户人工执行。
 
 ### 11.7 2026-11-16 复发（接 212）
 
