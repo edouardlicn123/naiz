@@ -80,7 +80,15 @@ static void interact_draw_opt(const char *label, int i, int y, int mw, int highl
  * wall clock (its whole contract is "rate matters, phase does not" —
  * vclock.h).  If the wall clock and the smooth clock ever disagree by more
  * than this, the deadline is re-based from the wall clock; a 30 s wait must
- * not silently become 8 s because the metronome ran hot. */
+ * not silently become 8 s because the metronome ran hot.
+ *
+ * Only the deadline is re-based.  ready_at (the input-ready gate) is NOT:
+ * its contract is "swallow stale input for 400 ms after the list opens",
+ * anchored to the moment the list opened, not to any later drift event.
+ * Re-basing ready_at here would push the gate forward on every drift tick
+ * (drift > 2000 ms + now lagging wall by the same amount = now < ready_at
+ * forever), permanently swallowing every click and confirm key — the exact
+ * "choice list is up but cannot be picked" symptom. */
 #define UI_INTERACT_DRIFT_LIMIT_MS  2000UL
 
 /* Input-ready gate: ignore ALL input (mouse clicks and the confirm keys)
@@ -130,7 +138,8 @@ int ui_interact(const UiRequest *req)
         /* Drift guard: re-base the deadline from the REAL clock when the two
          * disagree badly.  Covers both directions — a hot metronome would
          * fire the valve early (skip the question), a stalled one would hold
-         * it open for minutes. */
+         * it open for minutes.  ready_at is deliberately NOT re-based here;
+         * see the comment above UI_INTERACT_DRIFT_LIMIT_MS. */
         {
             long drift = (long)wall - (long)now;
             if (drift < 0) drift = -drift;
@@ -138,7 +147,6 @@ int ui_interact(const UiRequest *req)
                 NB_DEBUG("interact: clock drift %ld ms, re-basing deadline\r\n",
                          drift);
                 deadline = wall + UI_INTERACT_TIMEOUT_MS;
-                ready_at = wall + UI_INTERACT_INPUT_READY_MS;
             }
         }
 

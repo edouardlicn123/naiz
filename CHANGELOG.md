@@ -3,6 +3,17 @@
 自 R1 起全部 Bug 修复与功能演进记录（条目顺序沿用 AGENTS.md 既有历史排列）；`AGENTS.md` 仅保留当前版本与规则。**新条目约定**：每轮修复/演进完成后，在下方 `---` 分隔线之后（第一条位置）追加变更摘要，并在 AGENTS.md 头部同步「当前版本」。**条目格式**：每条以 `### <版本号> — <标题>` 开头（版本号化标题行 + `<a id="cN">` 锚点，N 按条目序递增），正文整段或分小节；历史速查直接读下方「版本索引」。
 ---
 
+<a id="c116"></a>
+### 0.4.038 — 分支选择菜单输入门修复：drift guard 不再 re-base ready_at
+
+**症状**：场景分支选择菜单（`question` 命令）无法点选或键盘选择，串口反复打印 `interact: clock drift 2000~2400 ms, re-basing deadline`。
+
+**根因**：[core/engine/nb_interact.c](file:///home/edo/naiz/core/engine/nb_interact.c) `ui_interact()` 的 drift guard（devdoc 211 §7.2 引入）在 smooth clock 与 wall clock 差距超过 `UI_INTERACT_DRIFT_LIMIT_MS`（2000 ms）时，同时 re-base `deadline` 和 `ready_at`。`ready_at` 是输入门（菜单打开后 400 ms 内吞 stale 输入），每次 drift 触发都被推到 `wall + 400 ms`；而 smooth clock 比 wall clock 慢 2000+ ms，导致 `now < ready_at` 永远成立，输入门永远关着，所有鼠标点击和键盘确认被吞。
+
+**修复**：drift guard 里删掉 `ready_at = wall + UI_INTERACT_INPUT_READY_MS`，只 re-base `deadline`。输入门只从菜单打开那一刻算一次 400 ms，不随后续 drift 事件推迟。
+
+- **验证**：`make -C core` 编译通过，`.err` 全空。实机验证待执行（需 `./makegame.sh build demo-a2 && ./makegame.sh make demo-a2` 后跑 `nbook003.nb` 的 `question` 场景）。
+
 <a id="c115"></a>
 ### 0.4.037 — Shell 瘦身：start.sh / makegame.sh / anima.sh 主体逻辑迁移至 Python
 
@@ -1383,6 +1394,7 @@ devdoc 205 落地后三次实机反馈修补的最终收口。
 
 | 条目 |
 |------|
+| [0.4.038 — 分支选择菜单输入门修复：drift guard 不再 re-base ready_at](#c116) |
 | [0.4.037 — Shell 瘦身：start.sh / makegame.sh / anima.sh 主体逻辑迁移至 Python](#c115) |
 | [0.4.036 — 删除备用模拟器/DJGPP 编译支持 + 开发工具四语 i18n 机制](#c114) |
 | [0.4.035 — openpack tools_open.zip sha256 钉值过期修正](#c113) |
