@@ -75,20 +75,28 @@ static void interact_draw_opt(const char *label, int i, int y, int mw, int highl
 #define UI_INTERACT_CANCEL      (-1)
 #define UI_INTERACT_MAX_TIMEOUTS  3
 
-/* Deadline drift guard (devdoc 211 §7.2).  The deadline is computed from the
- * SMOOTH clock, but the smooth clock is a rate-calibrated metronome, not a
- * wall clock (its whole contract is "rate matters, phase does not" —
- * vclock.h).  If the wall clock and the smooth clock ever disagree by more
- * than this, the deadline is re-based from the wall clock; a 30 s wait must
- * not silently become 8 s because the metronome ran hot.
+/* Deadline drift guard (devdoc 211 §7.2, corrected 0.4.038).
+ *
+ * The deadline is computed from the SMOOTH clock, but the smooth clock is a
+ * rate-calibrated metronome, not a wall clock: its contract is "rate matters,
+ * phase does not" (vclock.h).  Phase error between the two accumulates for the
+ * whole session, so the ABSOLUTE difference (wall - smooth) is a historical
+ * offset, not a defect of this wait.  Comparing absolute readings made the
+ * guard fire on every frame once that offset exceeded the limit: one log line
+ * per frame forever, and the deadline re-based every frame so the 30 s safety
+ * valve could never expire.
+ *
+ * The guard therefore measures drift RELATIVE to a baseline captured when the
+ * list opens (base_wall / base_smooth) and rebases that baseline whenever it
+ * re-arms.  A constant phase offset cancels out; only divergence accumulated
+ * DURING this wait can trigger a re-base.
  *
  * Only the deadline is re-based.  ready_at (the input-ready gate) is NOT:
  * its contract is "swallow stale input for 400 ms after the list opens",
  * anchored to the moment the list opened, not to any later drift event.
- * Re-basing ready_at here would push the gate forward on every drift tick
- * (drift > 2000 ms + now lagging wall by the same amount = now < ready_at
- * forever), permanently swallowing every click and confirm key — the exact
- * "choice list is up but cannot be picked" symptom. */
+ * Re-basing ready_at here would push the gate forward on every drift tick,
+ * permanently swallowing every click and confirm key — the exact "choice list
+ * is up but cannot be picked" symptom. */
 #define UI_INTERACT_DRIFT_LIMIT_MS  2000UL
 
 /* Input-ready gate: ignore ALL input (mouse clicks and the confirm keys)
@@ -110,6 +118,8 @@ int ui_interact(const UiRequest *req)
     int i, y, mw, n;
     unsigned long deadline;
     unsigned long ready_at;
+    unsigned long base_wall;     /* wall-clock anchor for the drift guard */
+    unsigned long base_smooth;   /* smooth-clock anchor, same instant */
     int timeouts = 0;
 
     if (!req || req->n < 1 || !req->labels) {
@@ -128,25 +138,30 @@ int ui_interact(const UiRequest *req)
 
     input_drain_boundary();
     hal_mouse_set_pos(LAYER_SCREEN_W / 2, LAYER_SCREEN_H / 2);
-    deadline = hal_wallclock_smooth_ms() + UI_INTERACT_TIMEOUT_MS;
-    ready_at = hal_wallclock_smooth_ms() + UI_INTERACT_INPUT_READY_MS;
+    base_smooth = hal_wallclock_smooth_ms();
+    base_wall = hal_wallclock_ms();
+    deadline = base_smooth + UI_INTERACT_TIMEOUT_MS;
+    ready_at = base_smooth + UI_INTERACT_INPUT_READY_MS;
 
     for (;;) {
         unsigned long now = hal_wallclock_smooth_ms();
         unsigned long wall = hal_wallclock_ms();
 
-        /* Drift guard: re-base the deadline from the REAL clock when the two
-         * disagree badly.  Covers both directions — a hot metronome would
-         * fire the valve early (skip the question), a stalled one would hold
-         * it open for minutes.  ready_at is deliberately NOT re-based here;
-         * see the comment above UI_INTERACT_DRIFT_LIMIT_MS. */
+        /* Drift guard: measure divergence accumulated DURING this wait, not
+         * the session's historical phase offset between the two clocks (see
+         * the comment above UI_INTERACT_DRIFT_LIMIT_MS).  Both clocks are
+         * monotone, so the unsigned differences are safe.  On a re-base the
+         * anchor moves with the deadline, otherwise the guard would fire on
+         * every following frame again. */
         {
-            long drift = (long)wall - (long)now;
+            long drift = (long)(wall - base_wall) - (long)(now - base_smooth);
             if (drift < 0) drift = -drift;
             if (drift > (long)UI_INTERACT_DRIFT_LIMIT_MS) {
                 NB_DEBUG("interact: clock drift %ld ms, re-basing deadline\r\n",
                          drift);
-                deadline = wall + UI_INTERACT_TIMEOUT_MS;
+                base_wall = wall;
+                base_smooth = now;
+                deadline = now + UI_INTERACT_TIMEOUT_MS;
             }
         }
 
@@ -163,7 +178,9 @@ int ui_interact(const UiRequest *req)
             }
             for (i = 0; i < n; i++)
                 interact_draw_opt(req->labels[i], i, y, mw, i == sel);
-            deadline = hal_wallclock_smooth_ms() + UI_INTERACT_TIMEOUT_MS;
+            base_smooth = hal_wallclock_smooth_ms();
+            base_wall = hal_wallclock_ms();
+            deadline = base_smooth + UI_INTERACT_TIMEOUT_MS;
             continue;
         }
 

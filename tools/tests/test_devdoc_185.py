@@ -52,7 +52,7 @@ def test_watchdog_threshold_and_throttle():
     body = strip_comments(RENDER.read_text(encoding="utf-8", errors="replace"))
     start = body.index("void vblank_wait(void)")
     fn = body[start:start + 2200]
-    assert "dt >= 40" in fn, "stall threshold (>=2 dropped frames) missing"
+    assert "dt >= 100" in fn, "stall threshold (>=6 dropped frames) missing"
     assert "125" in fn, "serial throttle (125 ms) missing -- 9600 baud backpressure"
 
 

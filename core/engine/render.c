@@ -255,8 +255,10 @@ void fill_rect_pattern(int x, int y, int w, int h,
  * then +1000..+6000 ms jumps -- see hal_pc98.c), which read as 93 phantom
  * "stalls" of exactly 1000 ms in the first capture (devdoc 185 §2).  In the
  * shipped BGM-IRQ configuration the smooth clock is driven by the Timer-B
- * ISR at ~62 ticks/s (real time, ~16 ms resolution), so the 40 ms threshold
- * flags >=2 dropped frames without quantisation false positives.  Serial
+ * ISR at ~62 ticks/s (real time, ~16 ms resolution), so the 100 ms threshold
+ * flags >=6 dropped frames while ignoring the ~48 ms NP2kai idle-loop
+ * baseline (a 40 ms threshold saturated the log with dt=48/49 records during
+ * boot menu / input waits and buried real stalls).  Serial
  * runs at 9600 baud, so stall records throttle to one per 125 ms and a
  * compact [FPS] summary emits about every 10 s; correlate stall records
  * with the surrounding [NB] command / [PRELOAD] / [ANIM-DEC] records. */
@@ -272,7 +274,7 @@ void vblank_wait(void)
         dt = now - last_ms;
         frames++;
         window_ms += dt;
-        if (dt >= 40) {
+        if (dt >= 100) {
             stalls++;
             if (dt > stall_max) stall_max = dt;
             if (now - last_log_ms >= 125) {
