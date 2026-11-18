@@ -10,6 +10,10 @@ import os
 import shutil
 import subprocess
 import sys
+try:
+    from i18n import tr
+except ImportError:  # imported as `tools.env_setup` (repo root on sys.path)
+    from tools.i18n import tr
 from .env_utils import (
     MIRROR, REPO_MAP,
     SDL3_DIR, SDL3_TAG, SDL3_TTF_DIR, SDL3_TTF_TAG,
@@ -23,14 +27,14 @@ from .env_utils import (
 # DOS/4GW engine.  No start.sh entry point.  Not reached by normal flows.
 def cmd_build_i286():
     print("")
-    print("[DEPRECATED] i286 核心已废弃，请使用 IA32 核心 (wxnp21kai, wxWidgets/GTK3)")
-    print("===== 编译 i286 核心 =====")
+    print(f"[DEPRECATED] {tr('i286 core is deprecated, use the IA32 core (wxnp21kai, wxWidgets/GTK3)')}")
+    print(f"===== {tr('Compiling i286 core')} =====")
 
     np2kai_dir = _get_np2kai_source()
     _patch_sdl2ttf_cmake(np2kai_dir)
     build_dir = os.path.join(np2kai_dir, "build")
 
-    print("--- 应用上游补丁 ---")
+    print(f"--- {tr('Apply upstream patches')} ---")
     cmake_file = os.path.join(np2kai_dir, "CMakeLists.txt")
 
     subprocess.run(
@@ -49,9 +53,9 @@ def cmd_build_i286():
                 "#define\tUSE_SDL_JOYSTICK\n\n#define SUPPORT_SASI")
             with open(compiler_h, "w") as f:
                 f.write(content)
-            print("  已添加 SUPPORT_SASI 宏")
+            print(f"  {tr('Added SUPPORT_SASI macro')}")
         else:
-            print("  SUPPORT_SASI 已存在，跳过")
+            print(f"  {tr('SUPPORT_SASI already present, skipped')}")
 
     _patch_np2_idetype(np2kai_dir)
 
@@ -104,9 +108,9 @@ def cmd_build_i286():
             sxsi_content = sxsi_content.replace(old_fn, new_fn)
             with open(sxsi_c, "w") as f:
                 f.write(sxsi_content)
-            print("  已修复 sxsi_issasi() NC 检测逻辑")
+            print(f"  {tr('Fixed sxsi_issasi() NC detection logic')}")
         else:
-            print("  sxsi_issasi() 已修复，跳过")
+            print(f"  {tr('sxsi_issasi() already fixed, skipped')}")
 
     if os.path.exists(sxsi_c):
         with open(sxsi_c, "r") as f:
@@ -117,9 +121,9 @@ def cmd_build_i286():
                 "return(7);		// 非 SASI 标准几何，标记为未知类型但不设为 INVSASI")
             with open(sxsi_c, "w") as f:
                 f.write(sxsi_content)
-            print("  已修复 gethddtype() INVSASI 标记")
+            print(f"  {tr('Fixed gethddtype() INVSASI flag')}")
         else:
-            print("  gethddtype() 已修复，跳过")
+            print(f"  {tr('gethddtype() already fixed, skipped')}")
     subprocess.run(
         ["sed", "-i",
          '/target_link_libraries(NP2kai_SDL2_base.*lib_dl_libraries})/ s|}|) crypto}|',
@@ -131,14 +135,14 @@ def cmd_build_i286():
     if os.path.exists(build_dir):
         shutil.rmtree(build_dir)
 
-    ok = run_step("生成构建系统 (i286 core, SDL2)",
+    ok = run_step(tr("Generate build system (i286 core, SDL2)"),
                   ["cmake", "-S", np2kai_dir, "-B", build_dir,
                    "-DBUILD_I286=ON", "-DBUILD_SDL=ON",
                    "-DUSE_SDL=2", "-DBUILD_WX=OFF"])
     if not ok:
         sys.exit(1)
 
-    ok = run_step("编译 sdlnp2kai_sdl2",
+    ok = run_step(tr("Compile sdlnp2kai_sdl2"),
                   ["cmake", "--build", build_dir, "--target", "sdlnp2kai_sdl2",
                    "-j", str(os.cpu_count() or 4)])
     if not ok:
@@ -146,19 +150,19 @@ def cmd_build_i286():
 
     binary = os.path.join(build_dir, "sdlnp2kai_sdl2")
     if os.path.exists(binary):
-        print(f"[✓] 编译完成：{binary}")
+        print(f"[✓] {tr('Compilation complete:')} {binary}")
     else:
-        print(f"[✗] 编译失败：未生成 {binary}")
+        print(f"[✗] {tr('Compilation failed:')} {tr('not generated')} {binary}")
         sys.exit(1)
 
-    run_step("安装到 /usr/local/bin",
+    run_step(tr("Install to /usr/local/bin"),
              ["cp", binary, "/usr/local/bin/sdlnp2kai_sdl2"], sudo=True)
 
     if os.path.exists("/usr/local/bin/sdlnp2kai_sdl2"):
-        print("[✓] 安装验证: sdlnp2kai_sdl2")
+        print(f"[✓] {tr('Install verification:')} sdlnp2kai_sdl2")
     else:
-        print("[!] 警告: 未找到已安装的 i286 核心")
-        print("    请检查 /usr/local/bin/ 或运行 start.sh → 检测开发环境")
+        print(f"[!] {tr('Warning:')} {tr('installed i286 core not found')}")
+        print(f"    {tr('Please check /usr/local/bin/ or run')} start.sh → {tr('detect dev environment')}")
 
 
 def _apply_common_patches(np2kai_dir):
@@ -170,7 +174,7 @@ def _apply_common_patches(np2kai_dir):
     """
     patch_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "np2kaipatch"))
     if not os.path.isdir(patch_dir):
-        print("[✗] np2kaipatch 目录不存在")
+        print(f"[✗] {tr('np2kaipatch directory does not exist')}")
         sys.exit(1)
     found = 0
     for patch_file in sorted(os.listdir(patch_dir)):
@@ -181,30 +185,30 @@ def _apply_common_patches(np2kai_dir):
         r = subprocess.run(["git", "apply", "--reverse", "--check", "--ignore-whitespace", full],
                            cwd=np2kai_dir, capture_output=True, text=True)
         if r.returncode == 0:
-            print(f"  [✓] {patch_file} 已应用，跳过")
+            print(f"  [✓] {patch_file} {tr('already applied, skipped')}")
             continue
-        if not run_step(f"应用补丁 {patch_file}", ["git", "apply", "--ignore-whitespace", full], cwd=np2kai_dir):
-            print(f"[✗] 补丁 {patch_file} 应用失败（上游可能已更新）")
-            print("    若基于旧的 /tmp/NP2kai，请删除后重跑 start.sh np2kai 重新检出")
+        if not run_step(f"{tr('Apply patch')} {patch_file}", ["git", "apply", "--ignore-whitespace", full], cwd=np2kai_dir):
+            print(f"[✗] {tr('Patch')} {patch_file} {tr('failed to apply (upstream may have changed)')}")
+            print(f"    {tr('If using an old /tmp/NP2kai, delete it and re-run start.sh np2kai to re-checkout')}")
             sys.exit(1)
     if found == 0:
-        print("[✗] np2kaipatch 目录下无 .patch 文件")
+        print(f"[✗] {tr('No .patch files under np2kaipatch directory')}")
         sys.exit(1)
-    print("[✓] NP2kai 通用补丁应用完成")
+    print(f"[✓] {tr('NP2kai common patches applied')}")
 
 
 def cmd_np2kai():
     print("")
-    print("===== 编译 NP2kai (IA-32 核心, wxWidgets/GTK3) =====")
-    print("    (设置 NAIZ_NP2KAI_REBUILD=1 可强制重编译)")
+    print(f"===== {tr('Compiling NP2kai (IA-32 core, wxWidgets/GTK3)')} =====")
+    print(f"    ({tr('set NAIZ_NP2KAI_REBUILD=1 to force rebuild')})")
 
     if os.path.exists("/usr/local/bin/wxnp21kai") and not os.environ.get("NAIZ_NP2KAI_REBUILD"):
-        print(f"[✓] NP2kai 已安装: /usr/local/bin/wxnp21kai")
-        print("    如需重编译，请运行: NAIZ_NP2KAI_REBUILD=1 start.sh np2kai")
+        print(f"[✓] {tr('NP2kai already installed:')} /usr/local/bin/wxnp21kai")
+        print(f"    {tr('To rebuild, run:')} NAIZ_NP2KAI_REBUILD=1 start.sh np2kai")
 
-        print("[*] 检查补丁状态:")
+        print(f"[*] {tr('Check patch status:')}")
         if not _check_np2kai_patches():
-            print("  [!] 请卸载后重装")
+            print(f"  [!] {tr('Please uninstall and reinstall')}")
         return
 
     np2kai_dir = _get_np2kai_source()
@@ -216,7 +220,7 @@ def cmd_np2kai():
     if os.path.exists(build_dir):
         shutil.rmtree(build_dir)
 
-    ok = run_step("生成构建系统 (IA32 core, GTK3, wxWidgets)",
+    ok = run_step(tr("Generate build system (IA32 core, GTK3, wxWidgets)"),
                   ["cmake", "-S", np2kai_dir, "-B", build_dir,
                    "-DBUILD_I286=OFF", "-DBUILD_WX=ON",
                    # USE_SDL=3 runs find_package(SDL3/SDL3_ttf), satisfied
@@ -227,7 +231,7 @@ def cmd_np2kai():
     if not ok:
         sys.exit(1)
 
-    ok = run_step("编译 NP2kai wxnp21kai",
+    ok = run_step(tr("Compile NP2kai wxnp21kai"),
                   ["cmake", "--build", build_dir, "--target", "wxnp21kai",
                    "-j", str(os.cpu_count() or 4)])
     if not ok:
@@ -235,62 +239,25 @@ def cmd_np2kai():
 
     binary = os.path.join(build_dir, "wxnp21kai")
     if os.path.exists(binary):
-        print(f"[✓] 编译完成：{binary}")
+        print(f"[✓] {tr('Compilation complete:')} {binary}")
     else:
-        print(f"[✗] 编译失败：未生成 {binary}")
+        print(f"[✗] {tr('Compilation failed:')} {tr('not generated')} {binary}")
         sys.exit(1)
 
-    run_step("安装到 /usr/local/bin",
+    run_step(tr("Install to /usr/local/bin"),
              ["cp", binary, "/usr/local/bin/wxnp21kai"], sudo=True)
 
     if os.path.exists("/usr/local/bin/wxnp21kai"):
-        print("[✓] 安装验证: wxnp21kai")
+        print(f"[✓] {tr('Install verification:')} wxnp21kai")
     else:
-        print("[!] 警告: 未找到已安装的 wxnp21kai")
-        print("    请检查 /usr/local/bin/")
-    print("[✓] NP2kai 安装完成（含补丁 P1-P6）")
-
-
-def cmd_np2kai_libretro():
-    print("")
-    print("===== 编译 NP2kai libretro 核心 =====")
-
-    np2kai_dir = _get_np2kai_source()
-
-    build_dir = os.path.join(np2kai_dir, "build_libretro")
-    if os.path.exists(build_dir):
-        shutil.rmtree(build_dir)
-
-    ok = run_step("生成构建系统 (libretro)",
-                  ["cmake", "-S", np2kai_dir, "-B", build_dir,
-                   "-DBUILD_LIBRETRO=ON", "-DBUILD_WX=OFF",
-                   "-DBUILD_SDL=OFF", "-DBUILD_I286=OFF",
-                   "-DCMAKE_BUILD_TYPE=Release"])
-    if not ok:
-        sys.exit(1)
-
-    ok = run_step("编译 libretro 核心",
-                  ["cmake", "--build", build_dir, "-j",
-                   str(os.cpu_count() or 4)])
-    if not ok:
-        sys.exit(1)
-
-    core_path = os.path.join(build_dir, "np2kai_libretro.so")
-    if os.path.exists(core_path):
-        print(f"[✓] libretro 核心: {core_path}")
-    else:
-        print(f"[✗] 编译失败：未生成 np2kai_libretro.so")
-        sys.exit(1)
-
-    retro_dir = os.path.expanduser("~/.config/retroarch/cores")
-    os.makedirs(retro_dir, exist_ok=True)
-    shutil.copy2(core_path, os.path.join(retro_dir, "np2kai_libretro.so"))
-    print("[✓] 已复制到 RetroArch cores 目录")
+        print(f"[!] {tr('Warning:')} {tr('installed wxnp21kai not found')}")
+        print(f"    {tr('Please check /usr/local/bin/')}")
+    print(f"[✓] {tr('NP2kai installation complete (with patches P1-P6)')}")
 
 
 def cmd_deps():
     print("")
-    print("===== 系统依赖安装 =====")
+    print(f"===== {tr('System dependency installation')} =====")
     np2kai_dir = _get_np2kai_source()
     _np2kai_deps()
 
@@ -311,7 +278,7 @@ def _patch_sdl2ttf_cmake(np2kai_dir):
         content = content.replace(old, new, 1)
         with open(cmake_file, "w", encoding="utf-8") as f:
             f.write(content)
-        print("  已打补丁: SDL2_ttf CMake freetype 路径")
+        print(f"  {tr('Patched: SDL2_ttf CMake freetype path')}")
 
 
 def _patch_np2_idetype(np2kai_dir):
@@ -326,9 +293,9 @@ def _patch_np2_idetype(np2kai_dir):
             "#define\tUSE_SDL_JOYSTICK\n\n#define SUPPORT_IDE\t\t1")
         with open(path, "w") as f:
             f.write(content)
-        print("  已添加 SUPPORT_IDE 宏")
+        print(f"  {tr('Added SUPPORT_IDE macro')}")
     else:
-        print("  SUPPORT_IDE 已存在，跳过")
+        print(f"  {tr('SUPPORT_IDE already present, skipped')}")
 
     if "SUPPORT_SASI" not in content:
         content = content.replace(
@@ -336,7 +303,7 @@ def _patch_np2_idetype(np2kai_dir):
             "#define\tUSE_SDL_JOYSTICK\n\n#define SUPPORT_SASI")
         with open(path, "w") as f:
             f.write(content)
-        print("  已添加 SUPPORT_SASI 宏")
+        print(f"  {tr('Added SUPPORT_SASI macro')}")
 
 
 def _patch_fontmng_sdlttf(np2kai_dir):
@@ -359,9 +326,9 @@ def _patch_fontmng_sdlttf(np2kai_dir):
                 new2, 1)
         with open(path, "w") as f:
             f.write(content)
-        print("  已替换 CJK 字体为 Noto Sans CJK JP")
+        print(f"  {tr('Replaced CJK font with Noto Sans CJK JP')}")
     else:
-        print("  字体补丁已应用或无需，跳过")
+        print(f"  {tr('Font patch already applied or not needed, skipped')}")
 
 
 def _np2kai_deps(pkg_manager="apt"):
@@ -392,21 +359,20 @@ def _np2kai_deps(pkg_manager="apt"):
                 pkgs.append(wx)
                 break
         else:
-            print("[!] 未探测到 wxWidgets 开发包（libwxgtk*-dev），"
-                  "cmake 配置阶段可能失败，请手动安装")
+            print(f"[!] {tr('No wxWidgets dev package detected (libwxgtk*-dev); cmake configure may fail, please install manually')}")
         # SDL3 distro packages only exist on newer releases
         # (Ubuntu 25.04+); probe instead of hard-failing on 24.04.
         for sdl3_pkg in ("libsdl3-dev", "libsdl3-ttf-dev"):
             if _apt_has(sdl3_pkg):
                 pkgs.append(sdl3_pkg)
-    _pkg_install(pkgs, "安装 NP2kai 编译依赖")
+    _pkg_install(pkgs, tr("Installing NP2kai build dependencies"))
 
 
 def _np2kai_x_deps(pkg_manager="apt"):
     _pkg_install([
         "libx11-dev", "libxext-dev", "libxxf86vm-dev",
         "libxxf86dga-dev", "libsdl2-dev",
-    ], "安装 NP2kai X11 依赖")
+    ], tr("Installing NP2kai X11 dependencies"))
 
 
 _CMAKE_PREFIXES = (
@@ -435,13 +401,13 @@ def _cmake_build_install(src_dir, name, extra=None):
 
     argv = (["cmake", "-S", src_dir, "-B", build_dir,
              "-DCMAKE_BUILD_TYPE=Release"] + list(extra or []))
-    if not run_step(f"配置 {name}", argv):
+    if not run_step(f"{tr('Configure')} {name}", argv):
         return False
-    if not run_step(f"编译 {name}",
+    if not run_step(f"{tr('Compile')} {name}",
                     ["cmake", "--build", build_dir, "-j",
                      str(os.cpu_count() or 4)]):
         return False
-    return run_step(f"安装 {name}",
+    return run_step(f"{tr('Install')} {name}",
                     ["cmake", "--install", build_dir], sudo=True)
 
 
@@ -470,9 +436,9 @@ def _build_sdl_component(repo_name, src_dir, tag, desc, extra=None):
         if _tag_exists(url, tag):
             chosen = url
             break
-        print(f"  [!] {url} 无 tag {tag}，尝试下一来源")
+        print(f"  [!] {url} {tr('has no tag')} {tag}, {tr('trying next source')}")
     if chosen is None:
-        print(f"[✗] 所有仓库源均无 {desc} tag {tag}")
+        print(f"[✗] {tr('No repo source has')} {desc} {tr('tag')} {tag}")
         sys.exit(1)
     if not _git_clone_with_retry(chosen, src_dir, desc=desc, branch=tag):
         sys.exit(1)
@@ -496,7 +462,7 @@ def _build_sdl3():
             "sdl3", SDL3_DIR, SDL3_TAG, "SDL3",
             ["-DSDL_TESTS=OFF", "-DSDL_STATIC=OFF"])
     else:
-        print("[✓] SDL3 开发文件已安装，跳过源码编译")
+        print(f"[✓] {tr('SDL3 dev files installed, skipping source build')}")
 
     if not have_ttf:
         # Uses system freetype/harfbuzz (installed by _np2kai_deps).
@@ -504,9 +470,9 @@ def _build_sdl3():
             "sdl_ttf", SDL3_TTF_DIR, SDL3_TTF_TAG, "SDL3_ttf",
             ["-DSDLTTF_VENDORED=OFF"])
     elif not have_sdl3:
-        print("[✓] SDL3_ttf 开发文件已安装，跳过源码编译")
+        print(f"[✓] {tr('SDL3_ttf dev files installed, skipping source build')}")
 
     if have_sdl3 and have_ttf:
-        print("[✓] SDL3 / SDL3_ttf 已安装")
+        print(f"[✓] {tr('SDL3 / SDL3_ttf installed')}")
         return
-    run_step("刷新动态链接缓存 (ldconfig)", ["ldconfig"], sudo=True)
+    run_step(tr("Refresh dynamic linker cache (ldconfig)"), ["ldconfig"], sudo=True)

@@ -51,15 +51,18 @@ def _probe_text():
 
 
 def test_makegame_test_branch_gates_stale_hdi():
-    # The guard has to sit in the `test` subcommand and before the emulator
-    # is launched; a check placed after the exec would never run.
-    text = _makegame_text()
-    start = text.index("    test)")
-    end = text.index("    build)", start)
+    # The guard has to sit in the `_test` function and before the emulator
+    # is launched; a check placed after the launch call would never run.
+    project_root = Path(__file__).resolve().parents[2]
+    makegame_py = project_root / "tools" / "naiz_cli" / "makegame.py"
+    text = makegame_py.read_text(encoding="utf-8")
+    start = text.index("def _test")
+    end = text.index("def _build", start)
     branch = text[start:end]
 
-    assert "-ot" in branch, (
-        "makegame.sh test must compare the HDI against engine.exe with -ot; "
+    # Python uses Path.stat().st_mtime comparison instead of shell -ot
+    assert ".stat()" in branch, (
+        "makegame.py _test must compare HDI against engine.exe via .stat(); "
         "a stale HDI boots the previous engine and every log line still looks "
         "normal, so the run reports full confidence while measuring nothing "
         "(devdoc 117 §5)")
@@ -70,7 +73,7 @@ def test_makegame_test_branch_gates_stale_hdi():
         "the failure message must name the injection step (`make`); `build` "
         "only deploys the DOS tree and can never refresh the HDI, which is "
         "exactly the wrong signpost that caused the original confusion")
-    assert branch.index("-ot") < branch.index("test-hdi"), (
+    assert branch.index(".stat()") < branch.index("test-hdi"), (
         "the guard must run before the emulator is launched, otherwise it is "
         "dead code")
 

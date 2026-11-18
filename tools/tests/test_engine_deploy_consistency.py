@@ -102,18 +102,19 @@ def test_extrad_defs_channel_is_documented():
 
 
 def test_makegame_build_passes_environment_to_compile():
-    # `build` runs in-process (python -m build_game), so EXTRA_DEFS reaches
-    # compile_engine() only because it is inherited from the environment.
-    # Assert build_game is invoked as a module (subprocess would need an
-    # explicit env= to be flag-aware).  This pins the mechanism the docs
-    # rely on ("export EXTRA_DEFS=... then run the whole build+make").
-    text = _read(MAKEGAME_SH)
-    build_branch = text[text.index("    build)")::]
-    build_branch = build_branch[:build_branch.index("    make)")]
-    assert "naiz_build.build_game" in build_branch, (
-        "makegame.sh build must invoke tools.naiz_build.build_game, the entry "
-        "point that runs compile_engine() in-process and thus inherits the "
-        "caller's EXTRA_DEFS")
+    # `build` runs build_game via subprocess (env inherited).  Assert the
+    # Python backend invokes tools.naiz_build.build_game as a module — this
+    # pins the mechanism the docs rely on ("export EXTRA_DEFS=... then run
+    # the whole build+make").
+    project_root = Path(__file__).resolve().parents[2]
+    makegame_py = project_root / "tools" / "naiz_cli" / "makegame.py"
+    text = makegame_py.read_text(encoding="utf-8")
+    # Find the _build function and check it calls build_game via _call_python
+    build_fn = text[text.index("def _build")::]
+    build_fn = build_fn[:build_fn.index("def _makegame")]
+    assert "naiz_build.build_game" in build_fn, (
+        "makegame.py _build must invoke tools.naiz_build.build_game so that "
+        "compile_engine() runs in a subprocess inheriting the caller's EXTRA_DEFS")
 
 
 @pytest.mark.skipif(os.environ.get("NAIZ_CHECK_DEPLOY") != "1",

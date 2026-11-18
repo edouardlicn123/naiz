@@ -2,83 +2,84 @@
 
 # Naiz — PC-98 Visual Novel Engine
 
-> **ナイズ** — 基于 PC-98（NEC PC-9801/9821）的电子小说引擎，使用 NB 纯文本剧本格式。
-> A PC-98 visual novel engine with NB (Naiz Book) text-based scripting.
+**English** | [简体中文](README.zh-CN.md) | [繁體中文](README.zh-TW.md) | [日本語](README.ja.md)
+
+> **Naiz** (ナイズ) — a visual novel engine for PC-98 (NEC PC-9801/9821), powered by the plain-text NB (Naiz Book) scripting format.
 
 ---
 
-## 概览
+## Overview
 
-Naiz 是面向 PC-98 的视觉小说（ADV）制作套件：剧本与配置都是可直接编辑的纯文本，素材就是普通的图片与音频文件，构建后以 **32-bit 保护模式**程序的形式，在真机 PC-9801/9821 或 NP2kai 模拟器上运行。
+Naiz is a visual novel (ADV) authoring suite for PC-98: scripts and configuration are plain text you can edit directly, and assets are ordinary image and audio files. Built as a **32-bit protected-mode** program, it runs on real PC-9801/9821 hardware or in the NP2kai emulator.
 
-核心特色：
+Highlights:
 
-- **32 位保护模式** — 用 DOS/4GW 运行在 PC-98 的保护模式下，摆脱实模式 640 KB 内存与 64 KB 段上限，长剧本与大批素材不必再精打细算
-- **Naiz Queue 统一执行模型** — ISR 独立时钟 + 生产-消费队列 + frame pump，BGM/动画/立绘/过渡/打字机全事务解耦；transition 期间自动 preload 下一场景资源，消除同步阻塞与 burst drain，长 stall 不影响时钟节奏
-- **纯文本剧本** — `.nb` 文件里写剧情，改一行、重跑一次构建就能看到效果，无需专用编辑器
-- **鼠标与键盘** — 两种操作方式同时可用
-- **多语言发行** — 一次编写，可同时发行 10 种语言（英语、简中、繁中、日、韩、法、德、意、西、葡），玩家在开机菜单自选
-- **开箱即用的工具链** — 环境配置、构建打包、模拟器测试、动画制作、素材下载均有独立脚本
+- **32-bit protected mode** — runs under DOS/4GW in PC-98 protected mode, free from the 640 KB real-mode memory limit and the 64 KB segment limit; long scripts and large asset sets no longer require careful budgeting
+- **Naiz Queue unified execution model** — an ISR-owned independent clock + producer–consumer queue + frame pump decouple BGM, animation, sprites, transitions, and typewriter effects into independent transactions; the next scene's resources are preloaded automatically during transitions, eliminating synchronous blocking and burst drains, so long stalls do not disturb the clock cadence
+- **Plain-text scripts** — write the story in `.nb` files: change a line, rerun the build, and see the result; no dedicated editor required
+- **Mouse and keyboard** — both input methods are available at the same time
+- **Multi-language releases** — write once and ship in 10 languages (English, Simplified Chinese, Traditional Chinese, Japanese, Korean, French, German, Italian, Spanish, Portuguese), selected by the player in the boot menu
+- **Out-of-the-box toolchain** — dedicated scripts for environment setup, building and packaging, emulator testing, animation authoring, and asset downloads
 
 ---
 
-## 快速开始
+## Quick Start
 
-首次使用先配置环境（Python venv、NP2kai、Open Watcom 工具链）：
+Set up the environment first (Python venv, NP2kai, Open Watcom toolchain):
 
 ```bash
-./start.sh          # 交互式配置菜单
-./start.sh check    # 仅环境检测
+./start.sh          # interactive setup menu
+./start.sh check    # environment check only
 ```
 
-首次运行会在 `~/venv` 创建共享 Python 虚拟环境；同父目录下的 `naiz-studio` 复用同一 venv，不会重复创建。
+The first run creates a shared Python virtual environment at `~/venv`; a sibling `naiz-studio` directory reuses the same venv instead of creating another one.
 
-构建并运行演示项目：
+Build and run the demo project:
 
 ```bash
-./makegame.sh build demo-a2            # 素材 → MAG → IMAGE.DAT → 编译引擎 → 部署 DOS 树
-./makegame.sh make  demo-a2            # 打包 disks/demo-a2.hdi
-./makegame.sh test  demo-a2 --serial   # NP2kai 启动，串口日志输出
+./makegame.sh build demo-a2            # assets → MAG → IMAGE.DAT → compile engine → deploy DOS tree
+./makegame.sh make  demo-a2            # package disks/demo-a2.hdi
+./makegame.sh test  demo-a2 --serial   # launch NP2kai with serial log output
 ```
 
-`build` 只部署到 `games/<game>/`，`make` 才把部署树注入 HDI；模拟器启动的是 HDI，因此改引擎后两者都要跑。
+`build` only deploys to `games/<game>/`, while `make` injects the deployment tree into the HDI. The emulator boots the HDI, so run both after changing the engine.
 
 ---
 
-## 工具链
+## Toolchain
 
-| 入口 | 作用 |
+| Entry point | Purpose |
 |---|---|
-| `start.sh` | 环境配置（check / pip / deps / np2kai / retroarch / watcom / djgpp / mirror）、`audit` 符号封装审计、`fullaudit` 全项目规则审计 |
-| `makegame.sh` | `build` 编译项目、`make` 打包 HDI、`makegame` 二合一、`test [--serial]` 启动模拟器、`audio` 设置模拟器音频延迟 |
-| `anima.sh` | `.na` 动画脚本 → `.ANI` 容器（init / register / check / mp4 / build / buildall / list） |
-| `market.sh` | 从公开市场仓库整包下载素材（list / get / get-all / sync / menu） |
-| `~/naiz-studio` | 网页版 NB 剧本 IDE（独立仓库，需与本仓库同父目录，通过 `./studio.sh` 启动） |
-| `tools/` | Python 工具链：`naiz_img` 镜像注入、`naiz_build` 数据打包与校验、`naiz_conv` 格式转换与 i18n、`naiz_audio` 音频、`diag` 诊断、`env_setup` 环境安装 |
+| `start.sh` | Environment setup (check / pip / deps / np2kai / retroarch / watcom / djgpp / mirror), `audit` symbol-encapsulation audit, `fullaudit` whole-project rule audit |
+| `makegame.sh` | `build` compiles a project, `make` packages the HDI, `makegame` does both, `test [--serial]` launches the emulator, `audio` adjusts emulator audio latency |
+| `anima.sh` | `.na` animation scripts → `.ANI` containers (init / register / check / mp4 / build / buildall / list) |
+| `market.sh` | Whole-package asset downloads from the public asset market (list / get / get-all / sync / menu) |
+| `~/naiz-studio` | Web-based NB script IDE (separate repository, must be a sibling of this repository; launch via `./studio.sh`) |
+| `tools/` | Python toolchain: `naiz_img` image injection, `naiz_build` data packing and validation, `naiz_conv` format conversion and i18n, `naiz_audio` audio, `diag` diagnostics, `env_setup` environment installation |
 
-包级索引见 `docs/B90-参考-函数索引.md`。
+See `docs/B90-参考-函数索引.md` for the package-level index.
 
 ---
 
-## 派生项目
+## Derived Projects
 
-| 项目 | 仓库 | 说明 |
+| Project | Repository | Description |
 |---|---|---|
-| Naiz Script Studio | https://github.com/edouardlicn123/naiz-studio | 网页版 NB 剧本 IDE；须与本仓库同父目录，共用 `~/venv`，经 `./studio.sh` 启动 |
-| naiz-openpack | https://github.com/edouardlicn123/naiz-openpack | 开源构建资源包（FreeDOS(98) 链 + 开源基座 HDI）；`./start.sh openpack` 下载解压到 `tools_open/` |
-| naiz_cmpack | https://github.com/edouardlicn123/naiz_cmpack | 商用构建资源包（MS-DOS 5 + PC-9821 BIOS）；`./start.sh commercial` 下载解压到 `tools_commercial/` |
-| naiz_assets | https://github.com/edouardlicn123/naiz_assets | 公开素材市场仓库；`./market.sh` 按包下载资源到 `assets_samples/` |
+| Naiz Script Studio | https://github.com/edouardlicn123/naiz-studio | Web-based NB script IDE; must be a sibling of this repository and shares `~/venv`; launch via `./studio.sh` |
+| naiz-openpack | https://github.com/edouardlicn123/naiz-openpack | Open-source build asset pack (FreeDOS(98) chain + open-source base HDI); `./start.sh openpack` downloads and extracts it to `tools_open/` |
+| naiz_cmpack | https://github.com/edouardlicn123/naiz_cmpack | Commercial build asset pack (MS-DOS 5 + PC-9821 BIOS); `./start.sh commercial` downloads and extracts it to `tools_commercial/` |
+| naiz_assets | https://github.com/edouardlicn123/naiz_assets | Public asset market repository; `./market.sh` downloads assets by package into `assets_samples/` |
 
 ---
 
-## 参考项目
+## References
 
-- [MHVNVisualNovelEngine](https://github.com/maxotaku11niku/MHVNVisualNovelEngine) — MIT, 场景格式参考
-- [98Bridge](https://github.com/NullMagic2/98Bridge) — MIT, HDI 注入设计参考
-- [ADV98](https://github.com/yarufu/pc98) — MIT, PC-98 ADV 引擎；游戏侧 PMD 集成与 BGM 生命周期参考
-- [ADVS98](https://alammofm.com/advs98/) (Adventure System 98) — 源码未公开, PC-98 视觉小说/指令式 ADV 的浏览器内编辑器 + `p98c` 编译器 + 内置模拟器（WASM，可离线）；网页端可视化编辑体验（左脚本 / 右实机画面）参考
-- [98fmplayer](https://github.com/myon98/98fmplayer) — BSD-2-Clause, PMD/FMP 驱动与 OPN 寄存器实现参考
-- [NP2kai](https://github.com/AZO234/NP2kai) — MIT, 模拟器宿主与 fmgen FM 核（实机 oracle）
-- [ymfm](https://github.com/aaronsgiles/ymfm) — BSD-3-Clause, Yamaha FM 模拟核（离线音色 oracle，已 vendor 于 `tools/vendor/ymfm`）
+- [MHVNVisualNovelEngine](https://github.com/maxotaku11niku/MHVNVisualNovelEngine) — MIT, scene-format reference
+- [98Bridge](https://github.com/NullMagic2/98Bridge) — MIT, HDI injection design reference
+- [ADV98](https://github.com/yarufu/pc98) — MIT, PC-98 ADV engine; reference for game-side PMD integration and BGM lifecycle
+- [ADVS98](https://alammofm.com/advs98/) (Adventure System 98) — source not public; in-browser editor + `p98c` compiler + built-in emulator (WASM, works offline) for PC-98 visual novels and command-driven ADV; reference for its web-based visual editing experience (script on the left, live machine screen on the right)
+- [98fmplayer](https://github.com/myon98/98fmplayer) — BSD-2-Clause, reference for PMD/FMP drivers and OPN register implementation
+- [NP2kai](https://github.com/AZO234/NP2kai) — MIT, emulator host and fmgen FM core (hardware oracle)
+- [ymfm](https://github.com/aaronsgiles/ymfm) — BSD-3-Clause, Yamaha FM emulation core (offline timbre oracle, vendored under `tools/vendor/ymfm`)
 
 License: MIT — see `LICENSE`.

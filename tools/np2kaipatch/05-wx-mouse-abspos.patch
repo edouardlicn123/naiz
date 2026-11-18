@@ -44,7 +44,7 @@ index cd70e5b..ee15eda 100644
  
  // ---- I/F
  
-@@ -973,6 +992,10 @@ void np2sysp_bind(void) {
+@@ -973,4 +992,8 @@ void np2sysp_bind(void) {
    iocore_attachout(0x07ef, np2sysp_o7ef);
    iocore_attachinp(0x07ed, np2sysp_i7ed);
    iocore_attachinp(0x07ef, np2sysp_i7ef);
@@ -53,8 +53,6 @@ index cd70e5b..ee15eda 100644
 +  iocore_attachinp(0x07e2, np2sysp_i7e2);
 +  iocore_attachinp(0x07e3, np2sysp_i7e3);
  
- #if defined(NP2APPDEV)
-   iocore_attachout(0x00e9, np2sysp_o0e9);
 diff --git a/wx/mousemng.cpp b/wx/mousemng.cpp
 index 0a3bc01..fab9a1c 100644
 --- a/wx/mousemng.cpp

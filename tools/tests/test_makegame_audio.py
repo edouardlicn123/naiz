@@ -19,7 +19,7 @@ from pathlib import Path
 from tools.naiz_lib import np2kai_capture
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
-MAKEGAME = PROJECT_ROOT / "makegame.sh"
+MAKEGAME_PY = PROJECT_ROOT / "tools" / "naiz_cli" / "makegame.py"
 
 # Block clusters measured in devdoc 154 §二 (SampleHz = 44100).
 EXPECTED_MS = {"off": None, "short": 47, "normal": 93, "long": 186, "max": 372}
@@ -35,10 +35,10 @@ def test_level_table_matches_devdoc_154_clusters():
 
 
 def test_makegame_menu_matches_level_table():
-    """Every Latencys value in makegame.sh must match the canonical table."""
-    src = MAKEGAME.read_text(encoding="utf-8")
+    """Every Latencys value in makegame.py must match the canonical table."""
+    src = MAKEGAME_PY.read_text(encoding="utf-8")
     src_ms = {int(m) for m in re.findall(r"Latencys=(\d+)", src)}
-    assert src_ms, "makegame.sh has no Latencys= menu entries"
+    assert src_ms, "makegame.py has no Latencys= menu entries"
 
     table_ms = {ms for _k, _l, ms, _b in np2kai_capture.AUDIO_LATENCY_LEVELS
                 if ms is not None}
@@ -46,9 +46,9 @@ def test_makegame_menu_matches_level_table():
 
 
 def test_makegame_exposes_audio_subcommand():
-    src = MAKEGAME.read_text(encoding="utf-8")
-    assert re.search(r"^\s*audio\)", src, re.M), "no `audio)` case in makegame.sh"
-    assert "audio_menu" in src, "audio_menu not wired into makegame.sh"
+    src = MAKEGAME_PY.read_text(encoding="utf-8")
+    assert '"audio"' in src or "'audio'" in src, "no 'audio' dispatch in makegame.py"
+    assert "_audio" in src, "_audio handler not wired into makegame.py"
 
 
 def test_off_leaves_config_untouched(tmp_path):

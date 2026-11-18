@@ -13,6 +13,7 @@ tools/naiz_audio/fmbench/.cache/
 *.MAG
 *.DAT
 temp*.png
+.naiz_lang
 projects/*/assets/images/
 core/build/
 __pycache__/

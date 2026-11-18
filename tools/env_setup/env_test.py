@@ -7,12 +7,14 @@ import shutil
 import subprocess
 import sys
 from datetime import datetime
+try:
+    from i18n import tr
+except ImportError:  # imported as `tools.env_setup` (repo root on sys.path)
+    from tools.i18n import tr
 from ..naiz_lib import COMMERCIAL_BIOS_DIR, np2kai_capture
 from .env_utils import (
     LOG_DIR, LOG_FILE,
     NP2KAI_DIR,
-    RETROARCH_LATEST, RETROARCH_APPIMAGE_URL,
-    RETROARCH_APPIMAGE_DIR, RETROARCH_BIN_SYMLINK,
     EMULATORS, EMULATOR_DEV,
     MIRROR,
     log_write, run_step, _sudo_init,
@@ -30,10 +32,10 @@ def _pick_emulator(emulator_arg):
     if not available:
         dev_exists = any(os.path.exists(p) for p in EMULATOR_DEV.values())
         if not dev_exists:
-            print("[✗] 未找到任何 NP2kai 模拟器")
+            print(f"[✗] {tr('No NP2kai emulator found')}")
             for name, path in EMULATORS.items():
                 print(f"    {name}: {path}")
-            print("    请先运行菜单选项编译模拟器")
+            print(f"    {tr('Please run the menu option to build the emulator first')}")
             sys.exit(1)
         for name, path in EMULATOR_DEV.items():
             if os.path.exists(path):
@@ -41,26 +43,26 @@ def _pick_emulator(emulator_arg):
 
     if emulator_arg:
         if emulator_arg not in EMULATORS:
-            print(f"[✗] 无效模拟器: {emulator_arg}")
-            print(f"    可选: {', '.join(EMULATORS.keys())}")
+            print(f"[✗] {tr('Invalid emulator:')} {emulator_arg}")
+            print(f"    {tr('Available:')} {', '.join(EMULATORS.keys())}")
             sys.exit(1)
         if emulator_arg not in available:
-            print(f"[✗] {emulator_arg} 未安装: {EMULATORS[emulator_arg]}")
+            print(f"[✗] {emulator_arg} {tr('not installed:')} {EMULATORS[emulator_arg]}")
             sys.exit(1)
         return emulator_arg
 
     if len(available) == 1:
         return list(available.keys())[0]
 
-    print("\n选择模拟器版本:")
+    print(f"\n{tr('Select emulator version:')}")
     keys = list(available.keys())
-    defaults = {"ia32": "wxWidgets/GTK3, SCSI/IDE HDD 完整支持 (推荐)"}
+    defaults = {"ia32": tr("wxWidgets/GTK3, full SCSI/IDE HDD support (recommended)")}
     for i, k in enumerate(keys, 1):
         desc = defaults.get(k, "")
         print(f"  {i}) {k} — {desc}")
     while True:
         try:
-            choice = input(f"  选择 [1-{len(keys)}] (默认 1): ").strip()
+            choice = input(f"  {tr('Choose')} [1-{len(keys)}] ({tr('default')} 1): ").strip()
             if choice == "":
                 idx = 0
             else:
@@ -69,12 +71,12 @@ def _pick_emulator(emulator_arg):
                 return keys[idx]
         except (ValueError, IndexError):
             pass
-        print("  无效选择，请重新输入")
+        print(f"  {tr('Invalid selection, please try again')}")
 
 
 def cmd_test_hdi(hdi_path=None, emulator=None, serial=False, auto=False):
     print("")
-    print("===== NP2kai 测试启动 =====")
+    print(f"===== {tr('NP2kai test launch')} =====")
 
     project_root = os.path.normpath(
         os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", ".."))
@@ -85,7 +87,7 @@ def cmd_test_hdi(hdi_path=None, emulator=None, serial=False, auto=False):
     dev_bin = EMULATOR_DEV.get(emu_name, "")
     if dev_bin and os.path.exists(dev_bin):
         binary = dev_bin
-    print(f"  模拟器: {emu_name} -> {binary}")
+    print(f"  {tr('emulator:')} {emu_name} -> {binary}")
 
     if hdi_path:
         if os.path.isfile(hdi_path):
@@ -95,36 +97,36 @@ def cmd_test_hdi(hdi_path=None, emulator=None, serial=False, auto=False):
             if os.path.isfile(guess):
                 selected = guess
             else:
-                print(f"[✗] HDI 文件不存在: {hdi_path}")
-                print(f"    也未找到: {guess}")
+                print(f"[✗] {tr('HDI file does not exist:')} {hdi_path}")
+                print(f"    {tr('Also not found:')} {guess}")
                 sys.exit(1)
     else:
         if not os.path.isdir(disks_dir):
-            print(f"[✗] 未找到 disks/ 目录: {disks_dir}")
+            print(f"[✗] {tr('disks/ directory not found:')} {disks_dir}")
             sys.exit(1)
 
         hdis = sorted([f for f in os.listdir(disks_dir) if f.endswith(".hdi")])
         if not hdis:
-            print("[✗] disks/ 下没有 .hdi 文件")
-            print("    请先运行 make_hdi.sh 生成磁盘镜像")
+            print(f"[✗] {tr('No .hdi files under disks/')}")
+            print(f"    {tr('Please run make_hdi.sh first to generate a disk image')}")
             sys.exit(1)
 
         if len(hdis) == 1:
             selected = os.path.join(disks_dir, hdis[0])
         else:
-            print("可用 HDI 镜像:")
+            print(f"{tr('Available HDI images:')}")
             for i, name in enumerate(hdis, 1):
                 print(f"  {i}) {name}")
             while True:
                 try:
-                    choice = input(f"  选择测试镜像 [1-{len(hdis)}]: ").strip()
+                    choice = input(f"  {tr('Choose test image')} [1-{len(hdis)}]: ").strip()
                     idx = int(choice) - 1
                     if 0 <= idx < len(hdis):
                         selected = os.path.join(disks_dir, hdis[idx])
                         break
                 except (ValueError, IndexError):
                     pass
-                print("  无效选择，请重新输入")
+                print(f"  {tr('Invalid selection, please try again')}")
 
     os.makedirs(os.path.join(project_root, "logs"), exist_ok=True)
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
@@ -151,7 +153,7 @@ def cmd_test_hdi(hdi_path=None, emulator=None, serial=False, auto=False):
         dst = os.path.join(cfg_dir, dst_name)
         if not os.path.exists(dst) or os.path.getsize(dst) != os.path.getsize(src):
             shutil.copy2(src, dst)
-            print(f"  [✓] 已复制: {src} -> {dst_name}")
+            print(f"  [✓] {tr('Copied:')} {src} -> {dst_name}")
 
     sec = {'SCSIHDD0': selected}
 
@@ -159,7 +161,7 @@ def cmd_test_hdi(hdi_path=None, emulator=None, serial=False, auto=False):
     if serial:
         stale = np2kai_capture.kill_stale_emulators()
         if stale:
-            print(f"  清理残留模拟器实例: {stale}")
+            print(f"  {tr('Cleaning up stale emulator instances:')} {stale}")
         import pty as pty_mod
         master_fd, slave_fd = pty_mod.openpty()
         slave_name = os.ttyname(slave_fd)
@@ -178,7 +180,7 @@ def cmd_test_hdi(hdi_path=None, emulator=None, serial=False, auto=False):
     # until a manual click.  `--auto` additionally enables auto-run.
     if serial or auto:
         cmd.append("--start")
-    print(f"  启动: {' '.join(cmd)}")
+    print(f"  {tr('Launching:')} {' '.join(cmd)}")
 
     if serial and serial_pty:
         master_fd, slave_fd, slave_name = serial_pty
@@ -189,7 +191,7 @@ def cmd_test_hdi(hdi_path=None, emulator=None, serial=False, auto=False):
                                   f"serial_{os.path.splitext(os.path.basename(selected))[0]}.log")
         with open(serial_log, "wb") as slog:
             process = subprocess.Popen(cmd, stdout=None, stderr=None)
-            print(f"  串口日志: {serial_log}")
+            print(f"  {tr('Serial log:')} {serial_log}")
             try:
                 while True:
                     data = os.read(master_fd, 4096)
@@ -224,28 +226,28 @@ def cmd_audio_latency(level):
     the game.  Runs `makegame.sh audio` -> this command.
     """
     print("")
-    print("===== 模拟器音频延迟设置 =====")
+    print(f"===== {tr('Emulator audio latency setting')} =====")
 
     levels = np2kai_capture.audio_latency_levels()
     by_key = {k: m for k, _l, m, _b in levels}
     if level is None or level not in by_key:
-        print(f"[✗] 未知档位: {level}")
-        print("    可选: " + ", ".join(k for k, _l, _m, _b in levels))
+        print(f"[✗] {tr('Unknown level:')} {level}")
+        print(f"    {tr('Available:')} " + ", ".join(k for k, _l, _m, _b in levels))
         sys.exit(1)
 
     try:
         cpath = np2kai_capture.apply_audio_latency(level)
     except ValueError:
-        print(f"[✗] 未知档位: {level}")
+        print(f"[✗] {tr('Unknown level:')} {level}")
         sys.exit(1)
 
     if cpath is None:
-        print("[✓] Off — 未改动模拟器音频延迟（使用其现有设置）")
+        print(f"[✓] {tr('Off — emulator audio latency unchanged (using its current settings)')}")
     else:
-        print(f"[✓] 已写入: {cpath}")
+        print(f"[✓] {tr('Written to:')} {cpath}")
         print(f"    Latencys = {by_key[level]}"
               f"   SampleHz = {np2kai_capture.AUDIO_LATENCY_SAMPLE_HZ}")
-        print("    （全局设置，影响所有游戏；如需还原请选 Off 或手动改回）")
+        print(f"    ({tr('global setting, affects all games; to revert choose Off or change it back manually')})")
     print("")
 
 
@@ -254,7 +256,7 @@ def cmd_check():
         os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", ".."))
 
     print("")
-    print("───── 模拟器 ─────")
+    print(f"───── {tr('Emulators')} ─────")
     _check_file("wxnp21kai (ia32)",
         "/usr/local/bin/wxnp21kai")
     _check_file("np2kai_libretro",
@@ -262,7 +264,7 @@ def cmd_check():
     _check_file("sdlnp2kai (i286)",
         "/usr/local/bin/sdlnp2kai")
 
-    print("\n───── 工具链 ─────")
+    print(f"\n───── {tr('Toolchains')} ─────")
     if os.path.exists("/opt/gcc-ia16/bin/ia16-elf-gcc"):
         _run_check("ia16-elf-gcc",
             ["/opt/gcc-ia16/bin/ia16-elf-gcc", "--version"])
@@ -273,7 +275,7 @@ def cmd_check():
     _check_file("ia16-elf-g++",
         "/opt/gcc-ia16/bin/ia16-elf-g++")
 
-    print("\n───── 依赖库 ─────")
+    print(f"\n───── {tr('Dependency libraries')} ─────")
     _run_check("SDL2",
         ["pkg-config", "--modversion", "sdl2"])
     _run_check("GTK3",
@@ -281,7 +283,7 @@ def cmd_check():
     _run_check("wxWidgets",
         ["wx-config", "--version"])
 
-    print("\n───── 环境 ─────")
+    print(f"\n───── {tr('Environment')} ─────")
     _run_check("Python",
         ["python3", "--version"])
     _run_check("CMake",
@@ -289,61 +291,10 @@ def cmd_check():
     _run_check("Git",
         ["git", "--version"])
 
-    print("\n───── NP2kai 补丁 ─────")
+    print(f"\n───── {tr('NP2kai patches')} ─────")
     _check_np2kai_patches()
 
     print("")
 
 
-def _install_retroarch_appimage():
-    import urllib.request
 
-    appimage_name = "RetroArch.7z"
-    appimage_path = os.path.join(RETROARCH_APPIMAGE_DIR, appimage_name)
-
-    os.makedirs(RETROARCH_APPIMAGE_DIR, exist_ok=True)
-
-    if os.path.exists(appimage_path):
-        print(f"[✓] RetroArch AppImage 已下载: {appimage_path}")
-    else:
-        print("[*] 下载 RetroArch AppImage...")
-        try:
-            urllib.request.urlretrieve(RETROARCH_APPIMAGE_URL, appimage_path)
-            print(f"[✓] 下载完成: {appimage_path}")
-        except Exception as e:
-            print(f"[✗] 下载失败: {e}")
-            sys.exit(1)
-
-    extract_dir = os.path.join(RETROARCH_APPIMAGE_DIR,
-                               f"RetroArch-{RETROARCH_LATEST}")
-    os.makedirs(extract_dir, exist_ok=True)
-
-    print("[*] 解压 RetroArch...")
-    try:
-        import py7zr
-        with py7zr.SevenZipFile(appimage_path, mode='r') as z:
-            z.extractall(path=extract_dir)
-    except ImportError:
-        print("[!] 需要 py7zr 库，尝试 pip install py7zr")
-        subprocess.run(
-            [sys.executable, "-m", "pip", "install", "py7zr"],
-            check=True)
-        import py7zr
-        with py7zr.SevenZipFile(appimage_path, mode='r') as z:
-            z.extractall(path=extract_dir)
-
-    retro_bin = os.path.join(extract_dir, "RetroArch")
-    if os.path.exists(retro_bin):
-        os.chmod(retro_bin, 0o755)
-        subprocess.run(["sudo", "ln", "-sf", retro_bin,
-                       RETROARCH_BIN_SYMLINK], check=True)
-        print(f"[✓] RetroArch {RETROARCH_LATEST} 安装完成")
-    else:
-        print(f"[✗] 解压后未找到 RetroArch 可执行文件")
-        sys.exit(1)
-
-
-def cmd_retroarch():
-    print("")
-    print("===== 安装 RetroArch (备用模拟器) =====")
-    _install_retroarch_appimage()

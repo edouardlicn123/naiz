@@ -1,6 +1,6 @@
 # 212 — DOS/32A 装载地址敏感复发与 AUTOEXEC 垫行兜底（0.4.034）
 
-> **状态**: 已完结（短期兜底 A 已落地并实机验证；机理深挖 C 见 §九，未完成）
+> **状态**: 长期未完结（短期兜底 A 已落地并实机验证；机理深挖 C 见 §九，2026-11-17 已完成离线静态部分，实机扫描受阻，见 §十三）
 > **版本**: 0.4.034（`projects/demo-a2/config.toml`）
 > **关联**: `CHANGELOG.md` c112、devdocs/210 §十一、`tools/naiz_img/inject_common.py` `generate_autoexec()`
 > **结论类型**: 现象级兜底（非根因修复）——根因仍是 DOS/32A v9.12 加载器对 `ENGINE.EXE` 装载地址的敏感性
@@ -130,6 +130,7 @@ if _is_open_pack():
 
 1. **地址探针**：在 `AUTOEXEC.BAT` 里用 `MEM`/`DEBUG` 或自写小 COM 打印 `ENGINE.EXE` 的实际
    装载段（DOS 的 `PSP:0002h` 即段顶），把「变量 → 地址」的映射测出来，而不是只观测成败。
+   **（2026-11-17 订正：无需自写 COM，官方旋钮 `SET DOS32A=/VERBOSE` 已足够，见 §十三.2）**
 2. **坏区测绘**：`NAIZ_AE_PAD` 从 0 扫到 ~64，记录每个值的装载段（16 字节粒度）与成败，
    判断坏区是单点、区间，还是与 `段:偏移` 的 64KB 边界跨越相关。
 3. **源码级归因**：用 v9.12 `loader.asm` 的 `apply_fixups` 逐条对照坏地址样本（重点：
@@ -156,6 +157,7 @@ if _is_open_pack():
 - [x] 方案 A 落地 + 0.4.034 实机冒烟（串口 1827 B，无 4005）
 - [x] `pytest` 全量复跑（938 passed, 2 skipped）
 - [ ] 方案 C：地址探针 + 坏区测绘 + `apply_fixups` 地址级归因（§九 1–3）
+  - 2026-11-17：探针已定为 `SET DOS32A=/VERBOSE`；静态归因已收敛到「写入异常掩盖 4005」；坏区测绘待模拟器恢复（§十三）
 - [ ] 方案 C 验收：三种体积镜像在 pad=0 下均可启动（§九 5）
 - [ ] 用户人工流程冒烟：Scene 菜单（当前仅 005 一项）/ 播放 / `scene(end)` 回鉴赏 / Back 回 special
 
@@ -204,3 +206,57 @@ if _is_open_pack():
 
 剩余可选实验（未执行，价值递减）：`SET DOS32A=/VERBOSE` 观察对象/记录装载位置；`ss.exe` 试
 Object Loading Scheme #1–#4。
+
+## 十三、方案 C 离线进展（2026-11-17）
+
+本轮只做**不依赖模拟器**的部分；实机扫描因环境缺件暂停（§十三.4）。
+
+### 1. 源码基线已就地重建
+
+`tmp_le/dos32a-git/src/`（`loader.asm` / `loadpe.asm` / `kernel.asm` / `dos32a.asm`）与
+`tmp_le/dos32a-main/`（完整 v9.12 树）已拉取，`tmp_le/` 在 `.gitignore:48` 内，不污染仓库。
+§九.3 的源码级归因从此可离线进行。
+
+### 2. 地址探针：用官方 `/VERBOSE`，不自写 COM
+
+- `SET DOS32A=/VERBOSE` 是加载器注册的关键字：`src/dos32a/text/client/data.asm:52`
+  （`dfA_str` = `'VERBOSE'`），`_misc_byte2` 默认值 `7`（同文件 `:104`）已使能环境变量解析，
+  无需额外开关。
+- 输出通道是 `writes` → INT 21h **AH=09h**（句柄 1），因此 `AUTOEXEC` 写
+  `engine.exe > D32ALOG.TXT` 即可把加载布局落盘，再用现有 `naiz_img` 读回——**不依赖串口、
+  不依赖截图**。VERBOSE 会打印启动内存状况（含 PSP/Env 段）与每个对象的装载基址，
+  正好覆盖 §九.1 要的「变量 → 地址」映射。
+
+### 3. `apply_fixups` 静态归因（`src/dos32a/loader.asm`）
+
+- 4005 在 `apply_fixups` 入口预置，函数内能独立置位的只有 4 类**内容检查**：
+  `test cx,0F20h`、objnum 越界（`sub edx,eax; jc`）、`type > 8`、以及 `fix_invalid`
+  （type 1/4）。记录内容若全部合法（§五仿真结论），这些分支都不该命中。
+- 记录表读取路径：`load_gs_block` → INT 21h 反射（`client/int21h.asm` `@__3Fh`），
+  目标 `ES:EDI` 中 ES = 调用方 DS（flat）、EDI = **完整 32 位 EDX**，按 `_lobufsize`
+  分块拷贝。**未发现 64KB 截断或段内偏移丢失**。
+- `gs` = `_sel_zero`（`client/misc.asm` 建描述符：base 0 / limit 4 GB），故 §十二.3 的
+  「段界限」猜测继续排除。
+- 由此收敛出唯一未被否证的残余假设：**记录合法，但写入 `gs:[edi]` 时目标页异常，
+  异常路径把入口预置的 4005 当作错误码报出**——这正是「地址敏感」的形态，但必须实测
+  才能定案，不能再用静态推理替代证据。
+
+### 4. 卡点：本机没有可执行的模拟器
+
+`/usr/local/bin/wxnp21kai` 不存在，`~/NP2kai` 全树也无已构建产物，因此
+`np2kai_capture` / `np2kai_smoke_fifo.py` / `makegame.sh test` 均无法执行。
+在模拟器恢复前，§九.2（坏区测绘）与 §九.5（三镜像验收）**无法推进**。
+
+### 5. 已实测的当前镜像参数（离线，可复核）
+
+`games/demo-a2/engine.exe`（245500 B，`-os`）LE 头自洽数据：`e_lfanew = 0x6B90`、
+页数 46、页大小 4096、末页 2808 B、数据页偏移 58372、fixup 段 30392 B、loader 段 246 B
+（58372 + 45×4096 + 2808 = 245500 ✓）。可作为坏区测绘时「地址—成败」对照的固定基线。
+
+### 6. 下一步（按依赖顺序）
+
+1. 恢复模拟器（或提供可执行路径）→ 实现 `tools/diag/ae_addr_sweep.py`：任意**单字节粒度**
+   垫行（现有 `NAIZ_AE_PAD` 只有 6 字节粒度）+ `DOS32A=VERBOSE` + 日志回读 + 成败表；
+2. 扫 pad=0..N，产出「装载段 → 成败」映射，判定坏区是单点/区间/64KB 边界相关；
+3. 按 §九.4 选修复方向；4. 按 §九.5 用三种体积镜像验收。
+

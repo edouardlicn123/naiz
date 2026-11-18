@@ -3,6 +3,55 @@
 自 R1 起全部 Bug 修复与功能演进记录（条目顺序沿用 AGENTS.md 既有历史排列）；`AGENTS.md` 仅保留当前版本与规则。**新条目约定**：每轮修复/演进完成后，在下方 `---` 分隔线之后（第一条位置）追加变更摘要，并在 AGENTS.md 头部同步「当前版本」。**条目格式**：每条以 `### <版本号> — <标题>` 开头（版本号化标题行 + `<a id="cN">` 锚点，N 按条目序递增），正文整段或分小节；历史速查直接读下方「版本索引」。
 ---
 
+<a id="c115"></a>
+### 0.4.037 — Shell 瘦身：start.sh / makegame.sh / anima.sh 主体逻辑迁移至 Python
+
+三项入口 shell 脚本仅保留 ROOT 推导 + `exec python`（原 1204 行 → 81 行），全部逻辑迁移至 `tools/naiz_cli/` Python CLI 模块：
+
+- **`start.sh`**（414 行 → 29 行）：`run_audit()`、`run_fullaudit()`（7 步流水线）、`fetch_pack()` / `download_menu()` / `commercial_menu()` / `openpack_menu()`（资产包下载 + sha256 校验）、`lang_menu()`、`show_menu()` / `show_env_menu()` / `env_menu()` 全部迁移至 [tools/naiz_cli/start.py](file:///home/edo/naiz/tools/naiz_cli/start.py)。Shell 直接 `exec "$VENV_PYTHON" -m tools.naiz_cli start "$@"`。
+- **`makegame.sh`**（405 行 → 26 行）：Pack mode 解析（`--pack` → `.naiz_pack` → auto-detect）、`check_wcl386()`、HDI freshness 守卫、engine freshness 守卫、`audio_menu()`（音频延迟菜单）、交互式项目工作流全部迁移至 [tools/naiz_cli/makegame.py](file:///home/edo/naiz/tools/naiz_cli/makegame.py)。Shell wrapper 自动解析 `--pack` 参数后 `exec` Python。
+- **`anima.sh`**（385 行 → 26 行）：4 层交互菜单（项目→脚本→构建动作）、`buildall` 汇总逻辑、`list` 全部迁移至 [tools/naiz_cli/anima.py](file:///home/edo/naiz/tools/naiz_cli/anima.py)。
+
+新建模块：
+- [tools/naiz_cli/\_\_init\_\_.py](file:///home/edo/naiz/tools/naiz_cli/__init__.py) + [tools/naiz_cli/\_\_main\_\_.py](file:///home/edo/naiz/tools/naiz_cli/__main__.py)：单一入口 `python -m tools.naiz_cli <start|makegame|anima> [args...]`。
+- [tools/naiz_cli/common.py](file:///home/edo/naiz/tools/naiz_cli/common.py)：ROOT 推导、venv 路径、pack mode 解析、lang 读写（Python 版 `_naiz_set_lang` / `_naiz_current_lang`，因 Bash `lang.sh` 是 shell-only 无法直接 import）、终端 prompt 辅助。
+
+同步更新 4 个测试文件：`test_makegame_audio.py`、`test_engine_deploy_consistency.py`、`test_hdi_freshness_guard.py`（检查 Python 后端而非 shell 脚本）。
+
+- **验证**：`bash -n` 3 个 shell 全过；`py_compile` 6 个 Python 模块全过；`pytest` **937 passed, 2 skipped**（仅 `test_engine_binary_is_current` 因环境无 Watcom 无法重编引擎而失败，与本次改动无关）。
+
+<a id="c114"></a>
+### 0.4.036 — 删除备用模拟器/DJGPP 编译支持 + 开发工具四语 i18n 机制
+
+两项独立改动：
+
+**1. 删除备用模拟器（RetroArch/libretro）与 DJGPP 编译支持**
+
+- 主编译器保留 Open Watcom，主模拟器保留 NP2kai（wxnp21kai）+ `np2appimage.sh`。
+- 删除范围：`start.sh` 菜单 RetroArch / DJGPP 项与 dispatch；`tools/env_setup/install_env.py` 的 `cmd_backup_emu()`、`cmd_retroarch()`、`cmd_install_djgpp()` 及其在 `VALID_COMMANDS` / `needs_sudo` / `commands` 的登记；`env_np2kai.py::cmd_np2kai_libretro()`；`env_test.py::cmd_retroarch()`；`env_toolchains.py::cmd_install_djgpp()`；`env_build.py` 的相关 import；`env_utils.py` 中 `DJGPP_DIR` / `DJGPP_BIN` / `RETROARCH_*` 常量。
+- `env_test.py::cmd_check()` 仍保留 `np2kai_libretro` 路径探测行（仅状态展示，无安装路径）。
+
+**2. 开发工具 i18n（默认英语，支持中日韩）**
+
+- 语言存储：项目根 `.naiz_lang`（单 token `eng|chi|jpn|kor`），`NAIZ_LANG` 环境变量覆盖，默认 `eng`。
+- Shell 库 `tools/i18n/lang.sh`：`_t "English key"`、`_naiz_current_lang()`、`_naiz_set_lang()`，表在 source 时一次性加载。英语字符串本身即查找键，缺失回落英语。
+- Python 模块 `tools/i18n/__init__.py` + `tools/i18n/strings.py`：`tr()` / `current_lang()` / `set_lang()`，`TABLES` 由 `strings_{chi,jpn,kor}.sh` 生成保持一致。
+- `start.sh` 新增语言选择菜单（菜单项 5 / `lang` 命令），全部文本英文化并走 `_t`；`makegame.sh`、`anima.sh` 同步英文化。
+- `tools/env_setup/` 全部 5 个模块（`install_env` / `env_utils` / `env_toolchains` / `env_np2kai` / `env_test`）的用户输出英文化并走 `tr()`；import 采用项目既有 try/except 双路径模式（兼容 `tools/` 在 sys.path 与仓库根在 sys.path 两种场景）。
+- 翻译表：chi / jpn / kor 各 375 键，覆盖 shell 脚本 199 键 + Python env 183 键。
+
+- **验证**：`bash -n` 7 个 shell 文件全过；`py_compile` 8 个 Python 文件全过；4 语 smoke test（shell `_t` + Python `tr()`）通过；键覆盖检查 shell 199 / Python 183 均 0 缺失；`pytest` **937 passed, 2 skipped**（仅 `test_engine_binary_is_current` 因环境无 Watcom 无法重编引擎而失败，与本次改动无关）。
+
+<a id="c113"></a>
+### 0.4.035 — openpack tools_open.zip sha256 钉值过期修正
+
+`start.sh openpack` 下载 `naiz-openpack` release 1.1 的 `tools_open.zip` 时报 sha256
+校验失败：脚本钉死 `bb50ee81…`，但实际下载到的文件哈希为 `92f28594…`。
+
+- **根因**：release 1.1 的 `tools_open.zip` 资产被重新上传（内容变更），脚本里的固定哈希过期。下载本身完整（4.38 MB，44 个条目，`tools_open/` 结构含 pc9821bios / dos_system / licenses / base HDI，合法），并非网络损坏。
+- **修复**：`start.sh` `OPEN_DOWNLOADS[0]` 的 sha256 更新为 `92f2859417f7aced53ff62368bb07a2ea97bf2f26219835236e7185b74d59eb7`。`devdocs/193` 中旧哈希属历史存档，按 §二 不修改。
+- **验证**：`bash -n start.sh` 通过；S2/S3/S4 规则干净；下载文件 `sha256sum` 与钉值一致。
+
 <a id="c112"></a>
 ### 0.4.034 — 4005 复发：openpack AUTOEXEC 固定垫行兜底
 
@@ -1332,6 +1381,9 @@ devdoc 205 落地后三次实机反馈修补的最终收口。
 
 | 条目 |
 |------|
+| [0.4.037 — Shell 瘦身：start.sh / makegame.sh / anima.sh 主体逻辑迁移至 Python](#c115) |
+| [0.4.036 — 删除备用模拟器/DJGPP 编译支持 + 开发工具四语 i18n 机制](#c114) |
+| [0.4.035 — openpack tools_open.zip sha256 钉值过期修正](#c113) |
 | [0.4.034 — 4005 复发：openpack AUTOEXEC 固定垫行兜底](#c112) |
 | [0.4.033 — 4005 真因破案（装载地址敏感）：-os 全量恢复 + 立绘切换性能修复](#c111) |
 | [0.4.032（补记） — devdoc 210 §十一：fatal 4005 定性翻案](#c110) |
